@@ -1,0 +1,18 @@
+{
+  "name": "Gana Agent",
+  "model": "anthropic/claude-haiku-4.5",
+  "maxSteps": 20,
+  "maxCost": 1,
+  "sessionDir": ".sessions",
+  "showBanner": true,
+  "display": {
+    "inputStyle": "block",
+    "toolDisplay": "grouped",
+    "reasoning": false,
+    "loader": {
+      "text": "Pensando",
+      "style": "spinner"
+    }
+  },
+  "slashCommands": true
+}

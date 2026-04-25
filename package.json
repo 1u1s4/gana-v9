@@ -1,0 +1,30 @@
+{
+  "name": "gana-agent-tui",
+  "version": "0.1.0",
+  "description": "Custom terminal UI for OpenRouter-powered coding agents.",
+  "type": "module",
+  "main": "dist/cli.js",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "dev": "tsx watch src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "agent",
+    "tui",
+    "openrouter"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@openrouter/agent": "^0.4.0",
+    "dotenv": "^17.4.2",
+    "glob": "^13.0.6",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}
