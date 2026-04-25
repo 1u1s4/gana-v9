@@ -1,4 +1,6 @@
 import type { Interface } from 'readline';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import type { AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
 
@@ -33,6 +35,28 @@ function ask(rl: Interface, prompt: string): Promise<string> {
   });
 }
 
+function loadCodexModels(ctx: CommandContext): { id: string; name: string }[] {
+  const path = join(ctx.config.codexHome, 'models_cache.json');
+  if (!existsSync(path)) return [];
+
+  const raw = JSON.parse(readFileSync(path, 'utf-8')) as { models?: unknown };
+  const models = raw.models;
+  if (!Array.isArray(models)) return [];
+
+  return models
+    .map((model: any) => ({
+      id: String(model.slug ?? model.id ?? model.name ?? ''),
+      name: String(model.display_name ?? model.name ?? model.slug ?? model.id ?? ''),
+    }))
+    .filter((model) => model.id);
+}
+
+async function loadOpenRouterModels() {
+  const res = await fetch('https://openrouter.ai/api/v1/models');
+  const { data } = await res.json() as { data: { id: string; name: string }[] };
+  return data;
+}
+
 commands.push({
   name: '/model',
   description: 'Switch to a different model',
@@ -41,8 +65,9 @@ commands.push({
     const query = await ask(ctx.rl, `  ${DIM}Search models:${RESET} `);
     if (!query.trim()) return;
     process.stdout.write(`  ${DIM}Fetching…${RESET}`);
-    const res = await fetch('https://openrouter.ai/api/v1/models');
-    const { data } = await res.json() as { data: { id: string; name: string }[] };
+    const data = ctx.config.provider === 'codex'
+      ? loadCodexModels(ctx)
+      : await loadOpenRouterModels();
     process.stdout.write('\r\x1b[K');
     const q = query.toLowerCase();
     const matches = data
@@ -64,6 +89,7 @@ commands.push({
   description: 'Start a fresh conversation',
   execute: async (_args, ctx) => {
     ctx.messages.length = 0;
+    ctx.config.codexThreadId = undefined;
     ctx.sessionPath = ctx.resetSession();
     console.log(`  ${GREEN}✓${RESET} ${DIM}New session started.${RESET}`);
   },

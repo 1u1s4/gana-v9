@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { join, resolve } from 'path';
 import 'dotenv/config';
 
 export interface LoaderConfig {
@@ -15,6 +15,7 @@ export interface DisplayConfig {
 }
 
 export interface AgentConfig {
+  provider: 'codex' | 'openrouter';
   apiKey: string;
   model: string;
   name: string;
@@ -25,11 +26,15 @@ export interface AgentConfig {
   showBanner: boolean;
   display: DisplayConfig;
   slashCommands: boolean;
+  codexHome: string;
+  codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
+  codexThreadId?: string;
 }
 
 const DEFAULTS: AgentConfig = {
+  provider: 'codex',
   apiKey: '',
-  model: 'anthropic/claude-haiku-4.5',
+  model: 'gpt-5.5',
   name: 'Gana Agent',
   systemPrompt: [
     'You are Gana Agent, a coding assistant with access to tools for reading, writing, editing, and searching files, and running shell commands.',
@@ -57,6 +62,8 @@ const DEFAULTS: AgentConfig = {
     loader: { text: 'Working', style: 'spinner' },
   },
   slashCommands: true,
+  codexHome: join(process.env.HOME ?? '', '.codex'),
+  codexSandbox: 'workspace-write',
 };
 
 export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipApiKey?: boolean }): AgentConfig {
@@ -72,14 +79,23 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   }
 
   if (process.env.OPENROUTER_API_KEY) config.apiKey = process.env.OPENROUTER_API_KEY;
+  if (process.env.AGENT_PROVIDER === 'codex' || process.env.AGENT_PROVIDER === 'openrouter') {
+    config.provider = process.env.AGENT_PROVIDER;
+  }
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
   if (process.env.AGENT_MAX_STEPS) config.maxSteps = Number(process.env.AGENT_MAX_STEPS);
   if (process.env.AGENT_MAX_COST) config.maxCost = Number(process.env.AGENT_MAX_COST);
+  if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
 
   if (overrides.display) {
     config.display = { ...config.display, ...overrides.display };
   }
   config = { ...config, ...overrides, display: config.display };
-  if (!config.apiKey && !opts?.skipApiKey) throw new Error('OPENROUTER_API_KEY is required.');
+  if (config.provider === 'openrouter' && !config.apiKey && !opts?.skipApiKey) {
+    throw new Error('OPENROUTER_API_KEY is required for provider "openrouter".');
+  }
+  if (config.provider === 'codex' && !opts?.skipApiKey && !existsSync(resolve(config.codexHome, 'auth.json'))) {
+    throw new Error(`Codex auth not found at ${resolve(config.codexHome, 'auth.json')}. Run "codex login" first.`);
+  }
   return config;
 }

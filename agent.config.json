@@ -1,9 +1,12 @@
 {
   "name": "Gana Agent",
-  "model": "anthropic/claude-haiku-4.5",
+  "provider": "codex",
+  "model": "gpt-5.5",
   "maxSteps": 20,
   "maxCost": 1,
   "sessionDir": ".sessions",
+  "codexHome": "/Users/luisalvarado/.codex",
+  "codexSandbox": "workspace-write",
   "showBanner": true,
   "display": {
     "inputStyle": "block",

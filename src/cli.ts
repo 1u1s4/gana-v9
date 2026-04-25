@@ -28,6 +28,7 @@ function textBanner(name: string, model: string) {
   console.log();
   console.log(line);
   console.log(`  ${BOLD}${name}${RESET}`);
+  console.log(`  ${DIM}provider${RESET}  ${CYAN}local codex auth${RESET}`);
   console.log(`  ${DIM}model${RESET}  ${CYAN}${model}${RESET}`);
   console.log(line);
   console.log(`  ${DIM}Type a message to start. "exit" to quit.${RESET}`);
@@ -180,6 +181,7 @@ async function main() {
   } else {
     textBanner(config.name, config.model);
   }
+  if (config.showBanner) console.log(`  ${DIM}provider  ${RESET}${config.provider === 'codex' ? 'local codex auth' : 'openrouter'}\n`);
   if (config.slashCommands) console.log(`  ${DIM}/help for commands${RESET}\n`);
 
   const renderer = new TuiRenderer({ display: config.display });
@@ -201,7 +203,34 @@ async function main() {
 
   async function getInput(): Promise<string> {
     if (!process.stdin.isTTY) {
-      return new Promise((resolve) => { rl.prompt(); rl.once('line', resolve); });
+      return new Promise((resolve) => {
+        if ((rl as any).closed) {
+          resolve('exit');
+          return;
+        }
+
+        const cleanup = () => {
+          rl.off('line', onLine);
+          rl.off('close', onClose);
+        };
+        const onLine = (line: string) => {
+          cleanup();
+          resolve(line);
+        };
+        const onClose = () => {
+          cleanup();
+          resolve('exit');
+        };
+
+        rl.once('line', onLine);
+        rl.once('close', onClose);
+        try {
+          rl.prompt();
+        } catch {
+          cleanup();
+          resolve('exit');
+        }
+      });
     }
     switch (config.display.inputStyle) {
       case 'block': return styledReadLine(BG_INPUT);

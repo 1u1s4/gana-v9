@@ -1,6 +1,6 @@
 # Gana Agent TUI
 
-Interfaz de terminal personalizada para agentes con `@openrouter/agent`.
+Interfaz de terminal personalizada para agentes. Por defecto usa tu autenticacion local de Codex (`~/.codex/auth.json`) mediante `codex exec`, y conserva OpenRouter como backend opcional.
 
 ## Uso
 
@@ -10,13 +10,14 @@ Interfaz de terminal personalizada para agentes con `@openrouter/agent`.
    npm install
    ```
 
-2. Configura tu API key:
+2. Configura credenciales:
 
    ```bash
    cp .env.example .env
    ```
 
-   Luego agrega `OPENROUTER_API_KEY` en `.env` o exporta la variable en tu shell.
+   Para el backend Codex no necesitas agregar una API key si ya hiciste `codex login`.
+   Si cambias `AGENT_PROVIDER=openrouter`, agrega `OPENROUTER_API_KEY`.
 
 3. Ejecuta la TUI:
 
@@ -26,19 +27,25 @@ Interfaz de terminal personalizada para agentes con `@openrouter/agent`.
 
 ## Configuracion
 
-Puedes ajustar el modelo, estilo visual, presupuesto y carpeta de sesiones en `agent.config.json`.
+Puedes ajustar el provider, modelo, estilo visual, presupuesto y carpeta de sesiones en `agent.config.json`.
 
 Comandos disponibles dentro de la TUI:
 
 - `/help`: lista comandos.
-- `/model`: busca y cambia modelo desde OpenRouter.
+- `/model`: busca y cambia modelo desde Codex u OpenRouter, segun el provider activo.
 - `/new`: inicia una conversacion nueva.
 - `exit`: cierra la TUI.
 
-Herramientas incluidas:
+Backend Codex:
 
-- Lectura, escritura y edicion de archivos.
-- Busqueda por glob y grep.
-- Listado de directorios.
-- Ejecucion de shell con timeout.
-- Web search y datetime como herramientas server-side de OpenRouter.
+- Usa `codex exec --json` como subprocess.
+- Lee la autenticacion desde `CODEX_HOME` o `codexHome`.
+- Reanuda el thread de Codex entre turnos hasta usar `/new`.
+- Muestra comandos de shell ejecutados por Codex dentro del renderer de herramientas.
+
+Backend OpenRouter:
+
+- Disponible configurando `provider: "openrouter"` y `OPENROUTER_API_KEY`.
+- Incluye lectura, escritura y edicion de archivos.
+- Incluye busqueda por glob y grep, listado de directorios y ejecucion de shell con timeout.
+- Incluye web search y datetime como herramientas server-side de OpenRouter.
