@@ -54,6 +54,14 @@ Debe implementarse desde Corte 1 y formar parte obligatoria de PR-01:
 
 Este skeleton no debe contener logica de dominio. Solo conecta config/runtime/status services disponibles.
 
+Servicios de status iniciales de PR-01:
+
+- `src/storage/db-status.ts`
+- `src/providers/sports/football-status.ts`
+- `src/filters/status.ts`
+
+En PR-01 estos servicios pueden responder `missing DATABASE_URL`, `missing API_FOOTBALL_KEY`, `configured but not checked` o `ready not implemented yet`. No deben hacer crash ni exponer secretos.
+
 ### 09b: Experiencia final
 
 Debe completarse cuando DB, API-Football, filtros, scoring, parlay y validation ya existan:

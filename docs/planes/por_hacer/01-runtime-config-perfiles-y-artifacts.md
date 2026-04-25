@@ -76,6 +76,25 @@ export const DEFAULT_MARKETS: MarketKey[] = [
 
 El plan `06-domain-mercados-y-settlement.md` conserva ownership del dominio y expande ese archivo con selections, validators, odds y settlement.
 
+Tambien crear en PR-01 los refs minimos usados por `ApiFootballFilterConfig`, para que `typecheck` no dependa del provider completo:
+
+```ts
+export interface ApiFootballLeagueRef {
+  providerLeagueId: string;
+  name?: string;
+  country?: string;
+}
+
+export interface ApiFootballTeamRef {
+  providerTeamId: string;
+  name?: string;
+  leagueId?: string;
+  country?: string;
+}
+```
+
+Ubicacion inicial recomendada: `src/filters/types.ts`, porque PR-01 ya expone `filters show`; el plan `05-filtros-fixtures-y-low-odds.md` expande esos tipos.
+
 Defaults iniciales:
 
 - `runtime`: `mvp-productivo-online`.
@@ -261,6 +280,7 @@ Abrir la TUI no debe requerir auth agentic, `API_FOOTBALL_KEY` ni `DATABASE_URL`
 - `npm run typecheck` pasa.
 - `loadConfig({})` funciona sin auth agentic, `DATABASE_URL` ni `API_FOOTBALL_KEY` para abrir TUI, pero `/provider`, `/db` y `/football` reportan configuracion faltante o auth missing.
 - PR-01 crea `src/domain/markets.ts` con `MarketKey` y `DEFAULT_MARKETS` minimos para soportar config sin esperar el dominio completo.
+- PR-01 crea `src/filters/types.ts` con `ApiFootballLeagueRef` y `ApiFootballTeamRef` minimos.
 - `defaultSeason` se resuelve por env o inferencia; si no es seguro, los scans productivos exigen `GANA_DEFAULT_SEASON` con warning accionable.
 - `agent.config.json` puede definir `runtime`, `profile`, `artifactRoot`, `approvalMode` y `apiFootball`.
 - `.env.example` documenta todas las variables nuevas.

@@ -88,16 +88,22 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 
 ### Corte 1: Harness arranca con estado real
 
+Corte 1 no es un solo PR. Abarca:
+
+- PR-01: runtime/config/redaction/profile + skeleton TUI/CLI + status commands.
+- PR-02: dominio minimo completo.
+- PR-03: DB baseline.
+
 - Config extendida con runtime, profile, DB/API env vars redacted, artifacts y audit events minimos.
 - Command registry minimo: `/session`, `/profile`, `/approval`, `/db`, `/football`, `/filters` y equivalentes headless de status existen aunque algunas respuestas iniciales sean de estado/configuracion.
-- Bootstrap minimo de dominio: `MarketKey` y `DEFAULT_MARKETS` existen en `src/domain/markets.ts`; el dominio completo entra en el siguiente corte.
+- Bootstrap minimo de dominio: `MarketKey` y `DEFAULT_MARKETS` existen en `src/domain/markets.ts`; refs minimos de liga/equipo existen en `src/filters/types.ts`.
 - DB baseline preparado para discovery: provider, competitions, teams, fixtures, snapshots, odds quotes, runs, tasks minimos, artifacts, audit logs, presets y low-odds.
 - `pnpm gana` queda definido como target del producto.
 - Aceptacion: la TUI muestra provider agentic, modelo, perfil, artifact root, DB status y API-Football status sin exponer secretos.
 
 ## Orden PR congelado
 
-1. PR-01: runtime/config/redaction/profile + bootstrap `MarketKey` + skeleton TUI/CLI + status commands.
+1. PR-01: runtime/config/redaction/profile + bootstrap `MarketKey`/filter refs + skeleton TUI/CLI + status commands.
 2. PR-02: dominio minimo completo: `Fixture`, `OddsQuote`, selections y `settlement-v1`.
 3. PR-03: DB baseline DigitalOcean PostgreSQL + Prisma.
 4. PR-04: API-Football provider + status/quota + fixtures.
