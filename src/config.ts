@@ -1,6 +1,12 @@
 import { readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import 'dotenv/config';
+import { DEFAULT_MARKETS, type MarketKey } from './domain/markets.js';
+import type { ApiFootballLeagueRef, ApiFootballTeamRef } from './filters/types.js';
+
+export type GanaRuntime = 'mvp-productivo-online';
+export type GanaProfile = 'standard' | 'full-permissions';
+export type ApprovalMode = 'manual' | 'auto-grant';
 
 export interface LoaderConfig {
   text: string;
@@ -14,7 +20,32 @@ export interface DisplayConfig {
   loader: LoaderConfig;
 }
 
-export interface AgentConfig {
+export interface ApiFootballFilterConfig {
+  defaultSeason: number;
+  defaultSeasonInferred: boolean;
+  defaultLeagues: ApiFootballLeagueRef[];
+  defaultTeams: ApiFootballTeamRef[];
+  defaultMarkets: MarketKey[];
+  lowOddsThreshold: number;
+  kickoffWindowHours: number;
+  includeLiveFixtures: boolean;
+  includeCompletedFixtures: boolean;
+  maxFixturesPerRun: number;
+  bookmakerAllowlist?: string[];
+}
+
+export interface GanaConfigExtension {
+  runtime: GanaRuntime;
+  profile: GanaProfile;
+  apiFootballKey: string;
+  apiFootballBaseUrl: string;
+  databaseUrl: string;
+  artifactRoot: string;
+  approvalMode: ApprovalMode;
+  apiFootball: ApiFootballFilterConfig;
+}
+
+export interface AgentConfig extends GanaConfigExtension {
   provider: 'codex' | 'gemini' | 'cursor' | 'openrouter';
   apiKey: string;
   model: string;
@@ -43,7 +74,91 @@ export interface AgentConfig {
   cursorSessionId?: string;
 }
 
+export type AppConfig = AgentConfig;
+
+export function inferSeasonFromDate(date: Date): number {
+  return date.getUTCFullYear();
+}
+
+function parseBoolean(value: string | undefined): boolean | undefined {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+function parseNumber(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function isRuntime(value: unknown): value is GanaRuntime {
+  return value === 'mvp-productivo-online';
+}
+
+function isProfile(value: unknown): value is GanaProfile {
+  return value === 'standard' || value === 'full-permissions';
+}
+
+function isApprovalMode(value: unknown): value is ApprovalMode {
+  return value === 'manual' || value === 'auto-grant';
+}
+
+function isMarketKey(value: unknown): value is MarketKey {
+  return typeof value === 'string' && DEFAULT_MARKETS.includes(value as MarketKey);
+}
+
+function parseMarkets(value: string | undefined): MarketKey[] | undefined {
+  if (!value) return undefined;
+  const markets = value.split(',').map((part) => part.trim()).filter(isMarketKey);
+  return markets.length ? markets : undefined;
+}
+
+function mergeApiFootballConfig(
+  base: ApiFootballFilterConfig,
+  override: Partial<ApiFootballFilterConfig> | undefined,
+): ApiFootballFilterConfig {
+  if (!override) return { ...base };
+  return {
+    ...base,
+    ...override,
+    defaultSeasonInferred: override.defaultSeason !== undefined && override.defaultSeasonInferred === undefined
+      ? false
+      : override.defaultSeasonInferred ?? base.defaultSeasonInferred,
+    defaultLeagues: Array.isArray(override.defaultLeagues) ? override.defaultLeagues : base.defaultLeagues,
+    defaultTeams: Array.isArray(override.defaultTeams) ? override.defaultTeams : base.defaultTeams,
+    defaultMarkets: Array.isArray(override.defaultMarkets)
+      ? override.defaultMarkets.filter(isMarketKey)
+      : base.defaultMarkets,
+    bookmakerAllowlist: Array.isArray(override.bookmakerAllowlist)
+      ? override.bookmakerAllowlist
+      : base.bookmakerAllowlist,
+  };
+}
+
+const defaultSeasonFromEnv = parseNumber(process.env.GANA_DEFAULT_SEASON);
+const DEFAULT_SEASON = defaultSeasonFromEnv ?? inferSeasonFromDate(new Date());
+
 const DEFAULTS: AgentConfig = {
+  runtime: 'mvp-productivo-online',
+  profile: 'standard',
+  apiFootballKey: '',
+  apiFootballBaseUrl: 'https://v3.football.api-sports.io',
+  databaseUrl: '',
+  artifactRoot: '.artifacts/gana-v9',
+  approvalMode: 'manual',
+  apiFootball: {
+    defaultSeason: DEFAULT_SEASON,
+    defaultSeasonInferred: defaultSeasonFromEnv === undefined,
+    defaultLeagues: [],
+    defaultTeams: [],
+    defaultMarkets: DEFAULT_MARKETS,
+    lowOddsThreshold: 1.2,
+    kickoffWindowHours: 24,
+    includeLiveFixtures: false,
+    includeCompletedFixtures: false,
+    maxFixturesPerRun: 50,
+  },
   provider: 'codex',
   apiKey: '',
   model: 'gpt-5.5',
@@ -88,19 +203,35 @@ const DEFAULTS: AgentConfig = {
   cursorForce: true,
 };
 
-export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipApiKey?: boolean }): AgentConfig {
-  let config = { ...DEFAULTS };
+export function loadConfig(
+  overrides: Partial<AgentConfig> = {},
+  opts?: { skipApiKey?: boolean; validateAgentAuth?: boolean },
+): AgentConfig {
+  let config: AgentConfig = { ...DEFAULTS, display: { ...DEFAULTS.display }, apiFootball: { ...DEFAULTS.apiFootball } };
 
   const configPath = resolve('agent.config.json');
   if (existsSync(configPath)) {
-    const file = JSON.parse(readFileSync(configPath, 'utf-8'));
+    const file = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<AgentConfig>;
     if (file.display) {
       config.display = { ...config.display, ...file.display };
     }
-    config = { ...config, ...file, display: config.display };
+    if (file.apiFootball) {
+      config.apiFootball = mergeApiFootballConfig(config.apiFootball, file.apiFootball);
+    }
+    config = { ...config, ...file, display: config.display, apiFootball: config.apiFootball };
   }
 
   if (process.env.OPENROUTER_API_KEY) config.apiKey = process.env.OPENROUTER_API_KEY;
+  if (isRuntime(process.env.GANA_RUNTIME)) config.runtime = process.env.GANA_RUNTIME;
+  if (isProfile(process.env.GANA_PROFILE)) config.profile = process.env.GANA_PROFILE;
+  if (process.env.API_FOOTBALL_KEY) config.apiFootballKey = process.env.API_FOOTBALL_KEY;
+  if (process.env.API_FOOTBALL_BASE_URL) config.apiFootballBaseUrl = process.env.API_FOOTBALL_BASE_URL;
+  if (process.env.DATABASE_URL) config.databaseUrl = process.env.DATABASE_URL;
+  if (process.env.GANA_ARTIFACT_ROOT) config.artifactRoot = process.env.GANA_ARTIFACT_ROOT;
+  if (isApprovalMode(process.env.GANA_APPROVAL_MODE)) config.approvalMode = process.env.GANA_APPROVAL_MODE;
+  if (config.profile === 'full-permissions' && !process.env.GANA_APPROVAL_MODE) {
+    config.approvalMode = 'auto-grant';
+  }
   if (
     process.env.AGENT_PROVIDER === 'codex'
     || process.env.AGENT_PROVIDER === 'gemini'
@@ -132,20 +263,47 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
   if (process.env.CURSOR_MODEL_LIST_PATH) config.cursorModelListPath = process.env.CURSOR_MODEL_LIST_PATH;
 
+  const envSeason = parseNumber(process.env.GANA_DEFAULT_SEASON);
+  const envThreshold = parseNumber(process.env.GANA_LOW_ODDS_THRESHOLD);
+  const envMaxFixtures = parseNumber(process.env.GANA_MAX_FIXTURES_PER_RUN);
+  const envWindow = parseNumber(process.env.GANA_KICKOFF_WINDOW_HOURS);
+  const envMarkets = parseMarkets(process.env.GANA_DEFAULT_MARKETS);
+  const envIncludeLive = parseBoolean(process.env.GANA_INCLUDE_LIVE_FIXTURES);
+  const envIncludeCompleted = parseBoolean(process.env.GANA_INCLUDE_COMPLETED_FIXTURES);
+
+  config.apiFootball = {
+    ...config.apiFootball,
+    ...(envSeason !== undefined && { defaultSeason: envSeason, defaultSeasonInferred: false }),
+    ...(envThreshold !== undefined && { lowOddsThreshold: envThreshold }),
+    ...(envMaxFixtures !== undefined && { maxFixturesPerRun: envMaxFixtures }),
+    ...(envWindow !== undefined && { kickoffWindowHours: envWindow }),
+    ...(envMarkets && { defaultMarkets: envMarkets }),
+    ...(envIncludeLive !== undefined && { includeLiveFixtures: envIncludeLive }),
+    ...(envIncludeCompleted !== undefined && { includeCompletedFixtures: envIncludeCompleted }),
+  };
+
   if (overrides.display) {
     config.display = { ...config.display, ...overrides.display };
   }
-  config = { ...config, ...overrides, display: config.display };
-  if (config.provider === 'openrouter' && !config.apiKey && !opts?.skipApiKey) {
+  if (overrides.apiFootball) {
+    config.apiFootball = mergeApiFootballConfig(config.apiFootball, overrides.apiFootball);
+  }
+  config = { ...config, ...overrides, display: config.display, apiFootball: config.apiFootball };
+  if (config.profile === 'full-permissions' && !overrides.approvalMode && !process.env.GANA_APPROVAL_MODE) {
+    config.approvalMode = 'auto-grant';
+  }
+
+  const validateAgentAuth = opts?.validateAgentAuth === true && !opts.skipApiKey;
+  if (config.provider === 'openrouter' && !config.apiKey && validateAgentAuth) {
     throw new Error('OPENROUTER_API_KEY is required for provider "openrouter".');
   }
-  if (config.provider === 'codex' && !opts?.skipApiKey && !existsSync(resolve(config.codexHome, 'auth.json'))) {
+  if (config.provider === 'codex' && validateAgentAuth && !existsSync(resolve(config.codexHome, 'auth.json'))) {
     throw new Error(`Codex auth not found at ${resolve(config.codexHome, 'auth.json')}. Run "codex login" first.`);
   }
-  if (config.provider === 'gemini' && !opts?.skipApiKey && !existsSync(resolve(config.geminiHome, 'oauth_creds.json'))) {
+  if (config.provider === 'gemini' && validateAgentAuth && !existsSync(resolve(config.geminiHome, 'oauth_creds.json'))) {
     throw new Error(`Gemini auth not found at ${resolve(config.geminiHome, 'oauth_creds.json')}. Run "gemini" and complete login first.`);
   }
-  if (config.provider === 'cursor' && !opts?.skipApiKey) {
+  if (config.provider === 'cursor' && validateAgentAuth) {
     const ok = existsSync(resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json'));
     if (!ok) throw new Error('Cursor Agent auth/config not found. Run "cursor-agent login" first.');
   }

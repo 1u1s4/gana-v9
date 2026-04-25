@@ -4,9 +4,16 @@ import { runAgentWithRetry, type ChatMessage } from './agent.js';
 import { initSessionDir, saveMessage, newSessionPath } from './session.js';
 import { printBanner } from './banner.js';
 import { TuiRenderer } from './renderer.js';
-import { dispatch, type CommandContext } from './commands.js';
+import { dispatch, printHeadlessUsage, type CommandContext } from './commands.js';
 import { detectBg } from './terminal-bg.js';
 import { Loader } from './loader.js';
+import { getFiltersStatus } from './filters/status.js';
+import { runHeadless } from './headless.js';
+import { redactSecrets } from './permissions/redaction.js';
+import { getFootballStatus } from './providers/sports/football-status.js';
+import { createRuntimeContext } from './runtime/context.js';
+import { ensureArtifactRoot } from './runtime/artifacts.js';
+import { getDbStatus } from './storage/db-status.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -44,6 +51,31 @@ function providerLabel(provider: string): string {
 
 function formatTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+function firstCommandArg(argv: string[]): string | undefined {
+  return argv[0]?.startsWith('-') ? undefined : argv[0];
+}
+
+function printStartupStatus(config: ReturnType<typeof loadConfig>) {
+  const db = getDbStatus(config);
+  const football = getFootballStatus(config);
+  const filters = getFiltersStatus(config);
+
+  console.log(`  ${DIM}runtime   ${RESET}${CYAN}${config.runtime}${RESET}`);
+  console.log(`  ${DIM}profile   ${RESET}${CYAN}${config.profile}${RESET} ${DIM}approval=${config.approvalMode}${RESET}`);
+  console.log(`  ${DIM}artifacts ${RESET}${CYAN}${config.artifactRoot}${RESET}`);
+  console.log(`  ${DIM}db        ${RESET}${statusColor(db.status)}${db.status}${RESET}`);
+  console.log(`  ${DIM}football  ${RESET}${statusColor(football.status)}${football.status}${RESET}`);
+  console.log(`  ${DIM}filters   ${RESET}${statusColor(filters.status)}season=${filters.filters.defaultSeason} threshold=${filters.filters.lowOddsThreshold}${RESET}`);
+  if (filters.warnings.length) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${filters.warnings[0]}${RESET}`);
+  }
+  console.log();
+}
+
+function statusColor(status: string): string {
+  return status === 'missing' || status === 'warning' ? YELLOW : GREEN;
 }
 
 function styledReadLine(bg: string): Promise<string> {
@@ -156,7 +188,7 @@ function borderedReadLine(borderColor = GRAY): Promise<string> {
   });
 }
 
-async function main() {
+export async function runTui() {
   const argBanner = parseArg('--banner');
   const argModel = parseArg('--model');
   const argInput = parseArg('--input') as DisplayConfig['inputStyle'] | undefined;
@@ -177,10 +209,12 @@ async function main() {
   }
 
   const config = loadConfig(overrides, { skipApiKey: demoMode || demoLoaderMode });
+  ensureArtifactRoot(config);
   const BG_INPUT = config.display.inputStyle === 'block' ? await detectBg() : '';
 
   initSessionDir(config.sessionDir);
   let sessionPath = newSessionPath(config.sessionDir);
+  const runtime = createRuntimeContext(config, sessionPath);
   const messages: ChatMessage[] = [];
 
   if (config.showBanner) {
@@ -189,6 +223,7 @@ async function main() {
     textBanner(config.name, config.model, config.provider);
   }
   if (config.showBanner) console.log(`  ${DIM}provider  ${RESET}${providerLabel(config.provider)}\n`);
+  printStartupStatus(config);
   if (config.slashCommands) console.log(`  ${DIM}/help for commands${RESET}\n`);
 
   const renderer = new TuiRenderer({ display: config.display });
@@ -198,45 +233,46 @@ async function main() {
     output: process.stdout,
     prompt: `${GREEN}>${RESET} `,
   });
+  const queuedInput: string[] = [];
+  let stdinClosed = false;
+  let waitingForInput: ((line: string) => void) | undefined;
+
+  if (!process.stdin.isTTY) {
+    rl.on('line', (line) => {
+      if (waitingForInput) {
+        const resolve = waitingForInput;
+        waitingForInput = undefined;
+        resolve(line);
+      } else {
+        queuedInput.push(line);
+      }
+    });
+    rl.on('close', () => {
+      stdinClosed = true;
+      if (waitingForInput) {
+        const resolve = waitingForInput;
+        waitingForInput = undefined;
+        resolve('exit');
+      }
+    });
+  }
 
   const cmdCtx: CommandContext = {
     config,
+    runtime,
     rl,
     messages,
     sessionPath,
-    resetSession: () => { sessionPath = newSessionPath(config.sessionDir); return sessionPath; },
+    resetSession: () => { sessionPath = newSessionPath(config.sessionDir); runtime.sessionPath = sessionPath; return sessionPath; },
     totalTokens: { input: 0, output: 0 },
   };
 
   async function getInput(): Promise<string> {
     if (!process.stdin.isTTY) {
+      if (queuedInput.length) return queuedInput.shift() ?? 'exit';
+      if (stdinClosed) return 'exit';
       return new Promise((resolve) => {
-        if ((rl as any).closed) {
-          resolve('exit');
-          return;
-        }
-
-        const cleanup = () => {
-          rl.off('line', onLine);
-          rl.off('close', onClose);
-        };
-        const onLine = (line: string) => {
-          cleanup();
-          resolve(line);
-        };
-        const onClose = () => {
-          cleanup();
-          resolve('exit');
-        };
-
-        rl.once('line', onLine);
-        rl.once('close', onClose);
-        try {
-          rl.prompt();
-        } catch {
-          cleanup();
-          resolve('exit');
-        }
+        waitingForInput = resolve;
       });
     }
     switch (config.display.inputStyle) {
@@ -379,7 +415,7 @@ async function main() {
       } catch (err: any) {
         loader.stop();
         renderer.endTurn();
-        console.log(`\n${YELLOW}  Error: ${err.message}${RESET}\n`);
+        console.log(`\n${YELLOW}  Error: ${redactSecrets(err.message)}${RESET}\n`);
       }
     }
   }
@@ -393,4 +429,30 @@ async function main() {
   }
 }
 
-main();
+async function main() {
+  const argv = process.argv.slice(2);
+  const command = firstCommandArg(argv);
+
+  if (command === 'tui' || command === undefined) {
+    await runTui();
+    return;
+  }
+
+  if (command === 'db' || command === 'football' || command === 'filters') {
+    const config = loadConfig({}, { skipApiKey: true });
+    ensureArtifactRoot(config);
+    initSessionDir(config.sessionDir);
+    const sessionPath = newSessionPath(config.sessionDir);
+    const runtime = createRuntimeContext(config, sessionPath);
+    process.exitCode = await runHeadless(argv, { config, runtime });
+    return;
+  }
+
+  printHeadlessUsage();
+  process.exitCode = 1;
+}
+
+main().catch((err: any) => {
+  console.error(`${YELLOW}Error:${RESET} ${redactSecrets(err?.message ?? err)}`);
+  process.exitCode = 1;
+});

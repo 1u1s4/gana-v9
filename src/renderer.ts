@@ -1,5 +1,6 @@
 import type { AgentEvent } from './agent.js';
 import type { DisplayConfig } from './config.js';
+import { redactSecrets } from './permissions/redaction.js';
 
 const RESET = '\x1b[0m';
 const DIM = '\x1b[2m';
@@ -129,11 +130,12 @@ export class TuiRenderer {
     if (this.display.toolDisplay === 'hidden') return;
     this.endStreaming();
     this.toolStart.set(callId, Date.now());
+    const safeArgs = redactSecrets(args) as Record<string, unknown>;
 
     if (this.display.toolDisplay === 'emoji') {
       const color = this.toolColors[name] ?? YELLOW;
       const formatter = this.formatters[name] ?? this.defaultFormatter;
-      const argStr = formatter(name, args);
+      const argStr = formatter(name, safeArgs);
       console.log(`  ${color}⚡${RESET} ${DIM}${name}${argStr ? ' ' + argStr : ''}${RESET}`);
     } else if (this.display.toolDisplay === 'grouped') {
       const category = TOOL_LABELS[name]?.past ?? name;
@@ -141,7 +143,7 @@ export class TuiRenderer {
         this.flushGrouped();
         this.groupedCategory = category;
       }
-      this.groupedPending.push({ name, callId, args });
+      this.groupedPending.push({ name, callId, args: safeArgs });
     } else if (this.display.toolDisplay === 'minimal') {
       this.minimalBatch.set(name, (this.minimalBatch.get(name) ?? 0) + 1);
     }
@@ -149,6 +151,7 @@ export class TuiRenderer {
 
   private renderToolResult(name: string, callId: string, output: string): void {
     if (this.display.toolDisplay === 'hidden') return;
+    const safeOutput = String(redactSecrets(output));
     const ms = Date.now() - (this.toolStart.get(callId) ?? Date.now());
     const dur = `(${(ms / 1000).toFixed(1)}s)`;
 
@@ -156,7 +159,7 @@ export class TuiRenderer {
       console.log(`  ${GREEN}✓${RESET} ${DIM}${name} ${dur}${RESET}`);
     } else if (this.display.toolDisplay === 'grouped') {
       const pending = this.groupedPending.find((p) => p.callId === callId);
-      if (pending) pending.output = output;
+      if (pending) pending.output = safeOutput;
     }
   }
 

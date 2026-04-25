@@ -1,5 +1,6 @@
 import { appendFileSync, readFileSync, existsSync, mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { redactSecrets } from './permissions/redaction.js';
 
 type Message = { role: string; content: string; [key: string]: unknown };
 
@@ -15,7 +16,15 @@ export function initSessionDir(dir: string): void {
 export function saveMessage(sessionPath: string, message: Message): void {
   const entry: SessionEntry = {
     timestamp: new Date().toISOString(),
-    message,
+    message: redactSecrets(message) as Message,
+  };
+  appendFileSync(sessionPath, JSON.stringify(entry) + '\n');
+}
+
+export function saveSessionEvent(sessionPath: string, event: unknown): void {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    event: redactSecrets(event),
   };
   appendFileSync(sessionPath, JSON.stringify(entry) + '\n');
 }

@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/cli.js",
   "scripts": {
+    "gana": "tsx src/cli.ts",
     "start": "tsx src/cli.ts",
     "dev": "tsx watch src/cli.ts",
     "typecheck": "tsc --noEmit",

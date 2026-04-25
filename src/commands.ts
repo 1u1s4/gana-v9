@@ -3,6 +3,12 @@ import { existsSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import type { AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
+import { getFiltersStatus, type FiltersStatus, type ServiceStatusReport } from './filters/status.js';
+import { appendAuditEvent, appendConfigStatusEvent } from './permissions/audit.js';
+import { redactSecrets } from './permissions/redaction.js';
+import { getFootballStatus } from './providers/sports/football-status.js';
+import { updateRuntimeContext, type RuntimeContext } from './runtime/context.js';
+import { getDbStatus } from './storage/db-status.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -30,6 +36,7 @@ const PROVIDER_DEFAULT_MODELS: Record<Provider, string[]> = {
 
 export interface CommandContext {
   config: AgentConfig;
+  runtime: RuntimeContext;
   rl: Interface;
   messages: ChatMessage[];
   sessionPath: string;
@@ -41,6 +48,17 @@ export interface SlashCommand {
   name: string;
   description: string;
   execute: (args: string, ctx: CommandContext) => Promise<void>;
+}
+
+export interface HeadlessCommandContext {
+  config: AgentConfig;
+  runtime: RuntimeContext;
+}
+
+export interface CommandResult {
+  ok: boolean;
+  exitCode: number;
+  message?: string;
 }
 
 const commands: SlashCommand[] = [];
@@ -149,6 +167,85 @@ function providerLabel(provider: Provider): string {
   return 'OpenRouter';
 }
 
+function syncRuntime(ctx: CommandContext): void {
+  updateRuntimeContext(ctx.runtime, ctx.config, { sessionPath: ctx.sessionPath });
+}
+
+function statusMarker(status: string): string {
+  if (status === 'missing' || status === 'warning') return `${YELLOW}!${RESET}`;
+  return `${GREEN}✓${RESET}`;
+}
+
+function printKeyValue(key: string, value: unknown): void {
+  const safe = redactSecrets(value);
+  console.log(`  ${DIM}${key}:${RESET} ${CYAN}${String(safe)}${RESET}`);
+}
+
+function printServiceStatus(report: ServiceStatusReport): void {
+  console.log(`  ${statusMarker(report.status)} ${CYAN}${report.service}${RESET} ${DIM}${report.status}${RESET}`);
+  console.log(`  ${DIM}${report.message}${RESET}`);
+  if (report.missing.length) {
+    console.log(`  ${DIM}missing:${RESET} ${YELLOW}${report.missing.join(', ')}${RESET}`);
+  }
+  if (report.config && Object.keys(report.config).length) {
+    for (const [key, value] of Object.entries(report.config)) {
+      if (value !== null) printKeyValue(key, value);
+    }
+  }
+}
+
+function printFiltersStatus(status: FiltersStatus): void {
+  console.log(`  ${statusMarker(status.status)} ${CYAN}${status.service}${RESET} ${DIM}${status.status}${RESET}`);
+  console.log(`  ${DIM}${status.summary}${RESET}`);
+  for (const warning of status.warnings) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+  }
+  printKeyValue('season', status.filters.defaultSeason);
+  printKeyValue('markets', status.filters.defaultMarkets.join(', '));
+  printKeyValue('leagues', status.filters.defaultLeagues.length ? status.filters.defaultLeagues.length : 'none');
+  printKeyValue('teams', status.filters.defaultTeams.length ? status.filters.defaultTeams.length : 'none');
+  printKeyValue('lowOddsThreshold', status.filters.lowOddsThreshold);
+  printKeyValue('kickoffWindowHours', status.filters.kickoffWindowHours);
+  printKeyValue('includeLiveFixtures', status.filters.includeLiveFixtures);
+  printKeyValue('includeCompletedFixtures', status.filters.includeCompletedFixtures);
+  printKeyValue('maxFixturesPerRun', status.filters.maxFixturesPerRun);
+}
+
+function printSessionStatus(ctx: CommandContext): void {
+  syncRuntime(ctx);
+  printKeyValue('sessionPath', ctx.sessionPath);
+  printKeyValue('runId', ctx.runtime.runId ?? 'none');
+  printKeyValue('runtime', ctx.config.runtime);
+  printKeyValue('provider', providerLabel(ctx.config.provider));
+  printKeyValue('model', ctx.config.model);
+  printKeyValue('profile', ctx.config.profile);
+  printKeyValue('approvalMode', ctx.config.approvalMode);
+  printKeyValue('artifactRoot', ctx.config.artifactRoot);
+  printKeyValue('tokens', `${ctx.totalTokens.input} in / ${ctx.totalTokens.output} out`);
+}
+
+function printApprovalStatus(ctx: Pick<CommandContext, 'config' | 'runtime'>): void {
+  printKeyValue('profile', ctx.config.profile);
+  printKeyValue('approvalMode', ctx.config.approvalMode);
+  printKeyValue('policy', ctx.config.approvalMode === 'auto-grant'
+    ? 'auto-grant for configured PR-01 skeleton actions, audit retained'
+    : 'manual approvals for sensitive actions');
+  printKeyValue('audit', `${ctx.runtime.artifactRoot}/runs/<session-run>/audit-log.jsonl`);
+}
+
+function applyProfile(profile: AgentConfig['profile'], ctx: Pick<CommandContext, 'config' | 'runtime'>): void {
+  ctx.config.profile = profile;
+  ctx.config.approvalMode = profile === 'full-permissions' ? 'auto-grant' : 'manual';
+  updateRuntimeContext(ctx.runtime, ctx.config);
+  appendAuditEvent(ctx.runtime, {
+    type: 'profile.changed',
+    payload: {
+      profile: ctx.config.profile,
+      approvalMode: ctx.config.approvalMode,
+    },
+  });
+}
+
 function providerReady(ctx: CommandContext, provider: Provider): boolean {
   if (provider === 'codex') return existsSync(resolve(ctx.config.codexHome, 'auth.json'));
   if (provider === 'gemini') return existsSync(resolve(ctx.config.geminiHome, 'oauth_creds.json'));
@@ -177,6 +274,7 @@ function resetProviderSession(ctx: CommandContext): void {
   ctx.config.fastMode = false;
   ctx.config.reasoningEffort = undefined;
   ctx.sessionPath = ctx.resetSession();
+  updateRuntimeContext(ctx.runtime, ctx.config, { sessionPath: ctx.sessionPath });
 }
 
 function findCursorVariant(models: ModelInfo[], current: string, suffix: string): string | undefined {
@@ -274,6 +372,7 @@ commands.push({
     const idx = parseInt(pick) - 1;
     if (idx >= 0 && idx < matches.length) {
       ctx.config.model = matches[idx].id;
+      syncRuntime(ctx);
       console.log(`  ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
     } else { console.log(`  ${DIM}Cancelled.${RESET}`); }
   },
@@ -293,6 +392,7 @@ commands.push({
         return;
       }
       ctx.config.fastMode = next;
+      syncRuntime(ctx);
       console.log(`  ${GREEN}✓${RESET} ${DIM}Fast mode ${next ? 'enabled' : 'disabled'} for Codex.${RESET}`);
       return;
     }
@@ -305,6 +405,7 @@ commands.push({
       }
       ctx.config.model = target;
       ctx.config.fastMode = next;
+      syncRuntime(ctx);
       console.log(`  ${GREEN}✓${RESET} ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
       return;
     }
@@ -332,6 +433,7 @@ commands.push({
         return;
       }
       ctx.config.reasoningEffort = effort;
+      syncRuntime(ctx);
       console.log(`  ${GREEN}✓${RESET} ${DIM}Codex reasoning →${RESET} ${CYAN}${effort}${RESET}`);
       return;
     }
@@ -345,6 +447,7 @@ commands.push({
       }
       ctx.config.model = target;
       ctx.config.reasoningEffort = effort;
+      syncRuntime(ctx);
       console.log(`  ${GREEN}✓${RESET} ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
       return;
     }
@@ -393,12 +496,81 @@ commands.push({
   name: '/new',
   description: 'Start a fresh conversation',
   execute: async (_args, ctx) => {
-    ctx.messages.length = 0;
-    ctx.config.codexThreadId = undefined;
-    ctx.config.geminiSessionId = undefined;
-    ctx.config.cursorSessionId = undefined;
-    ctx.sessionPath = ctx.resetSession();
+    resetProviderSession(ctx);
+    appendAuditEvent(ctx.runtime, { type: 'agent.session_reset', payload: { sessionPath: ctx.sessionPath } });
     console.log(`  ${GREEN}✓${RESET} ${DIM}New session started.${RESET}`);
+  },
+});
+
+commands.push({
+  name: '/session',
+  description: 'Show session and runtime metadata',
+  execute: async (_args, ctx) => {
+    printSessionStatus(ctx);
+    appendConfigStatusEvent(ctx.runtime, { command: '/session', sessionPath: ctx.sessionPath });
+  },
+});
+
+commands.push({
+  name: '/profile',
+  description: 'Show or change profile: standard, full-permissions',
+  execute: async (args, ctx) => {
+    const next = args.trim() as AgentConfig['profile'] | '';
+    if (!next) {
+      printKeyValue('profile', ctx.config.profile);
+      printKeyValue('approvalMode', ctx.config.approvalMode);
+      console.log(`\n  ${DIM}Usage:${RESET} ${CYAN}/profile standard|full-permissions${RESET}`);
+      return;
+    }
+
+    if (next !== 'standard' && next !== 'full-permissions') {
+      console.log(`  ${YELLOW}!${RESET} ${DIM}Unknown profile "${next}". Use standard or full-permissions.${RESET}`);
+      return;
+    }
+
+    applyProfile(next, ctx);
+    console.log(`  ${GREEN}✓${RESET} ${DIM}Profile →${RESET} ${CYAN}${ctx.config.profile}${RESET}`);
+    console.log(`  ${DIM}Approval mode →${RESET} ${CYAN}${ctx.config.approvalMode}${RESET}`);
+  },
+});
+
+commands.push({
+  name: '/approval',
+  description: 'Show active approval mode and audit target',
+  execute: async (_args, ctx) => {
+    syncRuntime(ctx);
+    printApprovalStatus(ctx);
+    appendConfigStatusEvent(ctx.runtime, { command: '/approval', approvalMode: ctx.config.approvalMode });
+  },
+});
+
+commands.push({
+  name: '/db',
+  description: 'Show database skeleton status',
+  execute: async (_args, ctx) => {
+    const status = getDbStatus(ctx.config);
+    printServiceStatus(status);
+    appendConfigStatusEvent(ctx.runtime, { command: '/db', status });
+  },
+});
+
+commands.push({
+  name: '/football',
+  description: 'Show API-Football skeleton status',
+  execute: async (_args, ctx) => {
+    const status = getFootballStatus(ctx.config);
+    printServiceStatus(status);
+    appendConfigStatusEvent(ctx.runtime, { command: '/football', status });
+  },
+});
+
+commands.push({
+  name: '/filters',
+  description: 'Show active sports filter defaults',
+  execute: async (_args, ctx) => {
+    const status = getFiltersStatus(ctx.config);
+    printFiltersStatus(status);
+    appendConfigStatusEvent(ctx.runtime, { command: '/filters', status });
   },
 });
 
@@ -412,6 +584,10 @@ commands.push({
   },
 });
 
+export function listCommands(): SlashCommand[] {
+  return [...commands];
+}
+
 export async function dispatch(input: string, ctx: CommandContext): Promise<boolean> {
   const [name, ...rest] = input.split(' ');
   const cmd = commands.find((c) => c.name === name);
@@ -421,4 +597,46 @@ export async function dispatch(input: string, ctx: CommandContext): Promise<bool
   }
   await cmd.execute(rest.join(' '), ctx);
   return true;
+}
+
+export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandContext): Promise<CommandResult> {
+  const [area, action] = argv;
+  try {
+    if (area === 'db' && action === 'status') {
+      const status = getDbStatus(ctx.config);
+      printServiceStatus(status);
+      appendConfigStatusEvent(ctx.runtime, { command: 'db status', status });
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'football' && action === 'status') {
+      const status = getFootballStatus(ctx.config);
+      printServiceStatus(status);
+      appendConfigStatusEvent(ctx.runtime, { command: 'football status', status });
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'filters' && action === 'show') {
+      const status = getFiltersStatus(ctx.config);
+      printFiltersStatus(status);
+      appendConfigStatusEvent(ctx.runtime, { command: 'filters show', status });
+      return { ok: true, exitCode: 0 };
+    }
+
+    printHeadlessUsage();
+    return { ok: false, exitCode: 1, message: `Unknown command: ${argv.join(' ')}` };
+  } catch (err: any) {
+    const message = String(redactSecrets(err?.message ?? err));
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${message}${RESET}`);
+    return { ok: false, exitCode: 1, message };
+  }
+}
+
+export function printHeadlessUsage(): void {
+  console.log(`  ${DIM}Usage:${RESET}`);
+  console.log(`  ${CYAN}pnpm gana${RESET}`);
+  console.log(`  ${CYAN}pnpm gana tui${RESET}`);
+  console.log(`  ${CYAN}pnpm gana db status${RESET}`);
+  console.log(`  ${CYAN}pnpm gana football status${RESET}`);
+  console.log(`  ${CYAN}pnpm gana filters show${RESET}`);
 }
