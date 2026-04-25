@@ -28,6 +28,8 @@ export interface AgentConfig {
   slashCommands: boolean;
   fastMode: boolean;
   reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+  nativeWebSearch: boolean;
+  nativeWebSearchMode: 'cached' | 'live';
   codexHome: string;
   codexModelListPath: string;
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
@@ -74,6 +76,8 @@ const DEFAULTS: AgentConfig = {
   slashCommands: true,
   fastMode: false,
   reasoningEffort: undefined,
+  nativeWebSearch: true,
+  nativeWebSearchMode: 'live',
   codexHome: join(process.env.HOME ?? '', '.codex'),
   codexModelListPath: 'config/codex-models.json',
   codexSandbox: 'workspace-write',
@@ -107,6 +111,11 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   }
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
   if (process.env.AGENT_FAST_MODE === 'true') config.fastMode = true;
+  if (process.env.AGENT_NATIVE_WEB_SEARCH === 'true') config.nativeWebSearch = true;
+  if (process.env.AGENT_NATIVE_WEB_SEARCH === 'false') config.nativeWebSearch = false;
+  if (process.env.AGENT_NATIVE_WEB_SEARCH_MODE === 'cached' || process.env.AGENT_NATIVE_WEB_SEARCH_MODE === 'live') {
+    config.nativeWebSearchMode = process.env.AGENT_NATIVE_WEB_SEARCH_MODE;
+  }
   if (
     process.env.AGENT_REASONING_EFFORT === 'low'
     || process.env.AGENT_REASONING_EFFORT === 'medium'

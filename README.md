@@ -44,6 +44,7 @@ Comandos disponibles dentro de la TUI:
 - `/model`: lista, busca y cambia modelos del provider activo.
 - `/fast`: alterna modo rapido cuando el provider/modelo lo soporta.
 - `/think low|medium|high|xhigh`: ajusta nivel de razonamiento en Codex o cambia a una variante equivalente en Cursor cuando exista.
+- `/web`: muestra o cambia el uso obligatorio de web search nativo: `on`, `off`, `cached`, `live`.
 - `/new`: inicia una conversacion nueva.
 - `exit`: cierra la TUI.
 
@@ -51,6 +52,7 @@ Backend Codex:
 
 - Usa `codex exec --json` como subprocess.
 - Lee la autenticacion desde `CODEX_HOME` o `codexHome`.
+- Fuerza web search nativo con `web_search="live"` cuando `nativeWebSearch` esta activo.
 - Reanuda el thread de Codex entre turnos hasta usar `/new`.
 - Muestra comandos de shell ejecutados por Codex dentro del renderer de herramientas.
 - `/model` lee `config/codex-models.json`.
@@ -66,6 +68,7 @@ Backend Gemini CLI:
 - Disponible configurando `provider: "gemini"` y un modelo como `gemini-2.5-flash`.
 - Usa `gemini --prompt --output-format stream-json` como subprocess.
 - Lee la autenticacion local desde `~/.gemini/oauth_creds.json`.
+- Fuerza el uso del tool nativo `google_web_search` cuando `nativeWebSearch` esta activo.
 - Reanuda la sesion de Gemini entre turnos hasta usar `/new`.
 - `/model` primero lee `config/gemini-models.json` desde este repo y luego agrega modelos conocidos del CLI de Gemini como fallback.
 
@@ -82,6 +85,7 @@ Backend Cursor Agent:
 - Disponible configurando `provider: "cursor"` y un modelo como `composer-2-fast`.
 - Usa `cursor-agent --print --output-format stream-json` como subprocess.
 - Lee tu autenticacion local de Cursor Agent.
+- Fuerza el uso del tool nativo `WebSearch` cuando `nativeWebSearch` esta activo; el harness usa `--force` para aprobarlo en modo headless.
 - Reanuda la sesion de Cursor entre turnos hasta usar `/new`.
 - `/model` lee `config/cursor-models.json`.
 

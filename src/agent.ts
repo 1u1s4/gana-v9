@@ -95,6 +95,8 @@ interface CodexJsonEvent {
     aggregated_output?: string;
     exit_code?: number | null;
     status?: string;
+    query?: string;
+    action?: { type?: string; query?: string; queries?: string[] };
   };
 }
 
@@ -144,18 +146,45 @@ function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[]):
     ? input
     : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
 
-  if (config.codexThreadId) return userPrompt;
+  const prompt = withNativeWebSearchRequirement(config, userPrompt);
+
+  if (config.codexThreadId) return prompt;
 
   return [
     config.systemPrompt.replace('{cwd}', process.cwd()),
     '',
     'User request:',
-    userPrompt,
+    prompt,
   ].join('\n');
+}
+
+function withNativeWebSearchRequirement(config: AgentConfig, prompt: string): string {
+  if (!config.nativeWebSearch) return prompt;
+
+  const toolName = config.provider === 'codex'
+    ? 'Codex web_search'
+    : config.provider === 'gemini'
+      ? 'Gemini google_web_search'
+      : config.provider === 'cursor'
+        ? 'Cursor WebSearch'
+        : 'OpenRouter web_search';
+
+  return [
+    `Native web search requirement: before answering, call the embedded ${toolName} tool for this request. After the tool call returns, answer the user normally using the result. The harness will reject the turn if the native web search tool is not used.`,
+    '',
+    prompt,
+  ].join('\n');
+}
+
+function requiresNativeWebSearch(config: AgentConfig): boolean {
+  return config.nativeWebSearch && ['codex', 'gemini', 'cursor'].includes(config.provider);
 }
 
 function codexArgs(config: AgentConfig, prompt: string): string[] {
   const configArgs: string[] = [];
+  if (config.nativeWebSearch) {
+    configArgs.push('-c', `web_search="${config.nativeWebSearchMode}"`);
+  }
   if (config.reasoningEffort) {
     configArgs.push('-c', `model_reasoning_effort="${config.reasoningEffort}"`);
   }
@@ -188,13 +217,15 @@ function inputToGeminiPrompt(config: AgentConfig, input: string | ChatMessage[])
     ? input
     : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
 
-  if (config.geminiSessionId) return userPrompt;
+  const prompt = withNativeWebSearchRequirement(config, userPrompt);
+
+  if (config.geminiSessionId) return prompt;
 
   return [
     config.systemPrompt.replace('{cwd}', process.cwd()),
     '',
     'User request:',
-    userPrompt,
+    prompt,
   ].join('\n');
 }
 
@@ -223,13 +254,15 @@ function inputToCursorPrompt(config: AgentConfig, input: string | ChatMessage[])
     ? input
     : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
 
-  if (config.cursorSessionId) return userPrompt;
+  const prompt = withNativeWebSearchRequirement(config, userPrompt);
+
+  if (config.cursorSessionId) return prompt;
 
   return [
     config.systemPrompt.replace('{cwd}', process.cwd()),
     '',
     'User request:',
-    userPrompt,
+    prompt,
   ].join('\n');
 }
 
@@ -246,7 +279,7 @@ function cursorArgs(config: AgentConfig, prompt: string): string[] {
     config.model,
   ];
 
-  if (config.cursorForce) args.push('--force');
+  if (config.cursorForce || config.nativeWebSearch) args.push('--force');
   if (config.cursorSessionId) args.push('--resume', config.cursorSessionId);
   args.push(prompt);
 
@@ -257,6 +290,11 @@ function cursorToolName(toolCall: Record<string, any> | undefined): string {
   const key = Object.keys(toolCall ?? {})[0];
   if (!key) return 'tool';
   return key.replace(/ToolCall$/, '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function cursorToolCallId(toolCall: Record<string, any> | undefined, fallback: string): string {
+  const key = Object.keys(toolCall ?? {})[0];
+  return key ? toolCall?.[key]?.args?.toolCallId ?? fallback : fallback;
 }
 
 function cursorToolArgs(toolCall: Record<string, any> | undefined): Record<string, unknown> {
@@ -291,6 +329,7 @@ async function runCodexAgent(
   let stderr = '';
   let text = '';
   let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; reasoningOutputTokens?: number } = {};
+  let sawNativeWebSearch = false;
 
   const handleEvent = (event: CodexJsonEvent) => {
     if (event.type === 'thread.started' && event.thread_id) {
@@ -305,6 +344,30 @@ async function runCodexAgent(
         name: 'shell',
         callId,
         args: { command: event.item.command ?? '' },
+      });
+      return;
+    }
+
+    if (event.type === 'item.started' && event.item?.type === 'web_search') {
+      sawNativeWebSearch = true;
+      const callId = event.item.id ?? `codex-web-${Date.now()}`;
+      options?.onEvent?.({
+        type: 'tool_call',
+        name: 'web_search',
+        callId,
+        args: { query: event.item.query ?? event.item.action?.query ?? '' },
+      });
+      return;
+    }
+
+    if (event.type === 'item.completed' && event.item?.type === 'web_search') {
+      const callId = event.item.id ?? `codex-web-${Date.now()}`;
+      const query = event.item.query ?? event.item.action?.query ?? event.item.action?.queries?.join(', ') ?? '';
+      options?.onEvent?.({
+        type: 'tool_result',
+        name: 'web_search',
+        callId,
+        output: query ? `Search completed: ${query}` : 'Search completed.',
       });
       return;
     }
@@ -379,6 +442,9 @@ async function runCodexAgent(
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `codex exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
+  if (requiresNativeWebSearch(config) && !sawNativeWebSearch) {
+    throw new Error('Native Codex web_search was required but was not used.');
+  }
 
   return { text, usage, output: text };
 }
@@ -403,6 +469,7 @@ async function runGeminiAgent(
   let text = '';
   let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number } = {};
   const toolNames = new Map<string, string>();
+  let sawNativeWebSearch = false;
 
   const handleEvent = (event: GeminiJsonEvent) => {
     if (event.type === 'init' && event.session_id) {
@@ -413,6 +480,7 @@ async function runGeminiAgent(
     if (event.type === 'tool_use') {
       const callId = event.tool_id ?? `gemini-${Date.now()}`;
       toolNames.set(callId, event.tool_name ?? 'tool');
+      if (event.tool_name === 'google_web_search') sawNativeWebSearch = true;
       options?.onEvent?.({
         type: 'tool_call',
         name: event.tool_name ?? 'tool',
@@ -490,6 +558,9 @@ async function runGeminiAgent(
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `gemini exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
+  if (requiresNativeWebSearch(config) && !sawNativeWebSearch) {
+    throw new Error('Native Gemini google_web_search was required but was not used.');
+  }
 
   return { text, usage, output: text };
 }
@@ -511,15 +582,18 @@ async function runCursorAgent(
   let text = '';
   let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; cacheWriteTokens?: number } = {};
   let sawPartialAssistant = false;
+  let sawNativeWebSearch = false;
 
   const handleEvent = (event: CursorJsonEvent) => {
     if (event.session_id) config.cursorSessionId = event.session_id;
 
     if (event.type === 'tool_call' && event.subtype === 'started') {
+      const toolName = cursorToolName(event.tool_call);
+      if (toolName === 'web_search') sawNativeWebSearch = true;
       options?.onEvent?.({
         type: 'tool_call',
-        name: cursorToolName(event.tool_call),
-        callId: event.call_id ?? `cursor-${Date.now()}`,
+        name: toolName,
+        callId: cursorToolCallId(event.tool_call, event.call_id ?? `cursor-${Date.now()}`),
         args: cursorToolArgs(event.tool_call),
       });
       return;
@@ -529,7 +603,7 @@ async function runCursorAgent(
       options?.onEvent?.({
         type: 'tool_result',
         name: cursorToolName(event.tool_call),
-        callId: event.call_id ?? `cursor-${Date.now()}`,
+        callId: cursorToolCallId(event.tool_call, event.call_id ?? `cursor-${Date.now()}`),
         output: cursorToolOutput(event.tool_call),
       });
       return;
@@ -611,6 +685,9 @@ async function runCursorAgent(
 
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `cursor-agent exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
+  }
+  if (requiresNativeWebSearch(config) && !sawNativeWebSearch) {
+    throw new Error('Native Cursor WebSearch was required but was not used.');
   }
 
   return { text, usage, output: text };

@@ -354,6 +354,42 @@ commands.push({
 });
 
 commands.push({
+  name: '/web',
+  description: 'Show or change native web search: on, off, cached, live',
+  execute: async (args, ctx) => {
+    const mode = args.trim().toLowerCase();
+
+    if (!mode) {
+      console.log(`  ${DIM}Native web search:${RESET} ${CYAN}${ctx.config.nativeWebSearch ? 'on' : 'off'}${RESET}`);
+      console.log(`  ${DIM}Codex mode:${RESET} ${CYAN}${ctx.config.nativeWebSearchMode}${RESET}`);
+      console.log(`\n  ${DIM}Usage:${RESET} ${CYAN}/web on|off|cached|live${RESET}`);
+      return;
+    }
+
+    if (mode === 'on') {
+      ctx.config.nativeWebSearch = true;
+      console.log(`  ${GREEN}✓${RESET} ${DIM}Native web search enabled.${RESET}`);
+      return;
+    }
+
+    if (mode === 'off') {
+      ctx.config.nativeWebSearch = false;
+      console.log(`  ${GREEN}✓${RESET} ${DIM}Native web search disabled.${RESET}`);
+      return;
+    }
+
+    if (mode === 'cached' || mode === 'live') {
+      ctx.config.nativeWebSearch = true;
+      ctx.config.nativeWebSearchMode = mode;
+      console.log(`  ${GREEN}✓${RESET} ${DIM}Native web search enabled. Codex mode →${RESET} ${CYAN}${mode}${RESET}`);
+      return;
+    }
+
+    console.log(`  ${YELLOW}!${RESET} ${DIM}Unknown web mode "${mode}". Use on, off, cached, or live.${RESET}`);
+  },
+});
+
+commands.push({
   name: '/new',
   description: 'Start a fresh conversation',
   execute: async (_args, ctx) => {

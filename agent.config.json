@@ -3,6 +3,8 @@
   "provider": "codex",
   "model": "gpt-5.5",
   "fastMode": false,
+  "nativeWebSearch": true,
+  "nativeWebSearchMode": "live",
   "maxSteps": 20,
   "maxCost": 1,
   "sessionDir": ".sessions",
