@@ -57,8 +57,8 @@ function firstCommandArg(argv: string[]): string | undefined {
   return argv[0]?.startsWith('-') ? undefined : argv[0];
 }
 
-function printStartupStatus(config: ReturnType<typeof loadConfig>) {
-  const db = getDbStatus(config);
+async function printStartupStatus(config: ReturnType<typeof loadConfig>) {
+  const db = await getDbStatus(config);
   const football = getFootballStatus(config);
   const filters = getFiltersStatus(config);
 
@@ -75,7 +75,9 @@ function printStartupStatus(config: ReturnType<typeof loadConfig>) {
 }
 
 function statusColor(status: string): string {
-  return status === 'missing' || status === 'warning' ? YELLOW : GREEN;
+  return status === 'missing' || status === 'warning' || status === 'disconnected' || status === 'degraded'
+    ? YELLOW
+    : GREEN;
 }
 
 function styledReadLine(bg: string): Promise<string> {
@@ -223,7 +225,7 @@ export async function runTui() {
     textBanner(config.name, config.model, config.provider);
   }
   if (config.showBanner) console.log(`  ${DIM}provider  ${RESET}${providerLabel(config.provider)}\n`);
-  printStartupStatus(config);
+  await printStartupStatus(config);
   if (config.slashCommands) console.log(`  ${DIM}/help for commands${RESET}\n`);
 
   const renderer = new TuiRenderer({ display: config.display });

@@ -10,6 +10,11 @@
     "dev": "tsx watch src/cli.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:status": "tsx src/cli.ts db status",
     "update:codex-models": "tsx scripts/update-codex-models.ts",
     "update:gemini-models": "tsx scripts/update-gemini-models.ts",
     "update:cursor-models": "tsx scripts/update-cursor-models.ts"
@@ -22,6 +27,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^6.18.0",
     "@openrouter/agent": "^0.4.0",
     "dotenv": "^17.4.2",
     "glob": "^13.0.6",
@@ -29,6 +35,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "prisma": "^6.18.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }

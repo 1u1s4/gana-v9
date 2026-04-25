@@ -1,0 +1,407 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model SportsProvider {
+  id          String   @id @default(uuid()) @db.Char(36)
+  code        String   @unique @db.VarChar(64)
+  name        String   @db.VarChar(160)
+  baseUrl     String?  @map("base_url") @db.VarChar(500)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  competitions        Competition[]
+  teams               Team[]
+  fixtures            Fixture[]
+  providerSnapshots   ProviderSnapshot[]
+  providerQuotaSamples ProviderQuotaSample[]
+  leaguePresets       LeaguePreset[]
+  teamPresets         TeamPreset[]
+
+  @@map("sports_providers")
+}
+
+model Competition {
+  id                    String   @id @default(uuid()) @db.Char(36)
+  providerId            String   @map("provider_id") @db.Char(36)
+  providerCompetitionId String   @map("provider_competition_id") @db.VarChar(80)
+  name                  String   @db.VarChar(200)
+  country               String?  @db.VarChar(120)
+  type                  String?  @db.VarChar(80)
+  metadata              Json?
+  createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  fixtures Fixture[]
+  leaguePresets LeaguePreset[]
+
+  @@unique([providerId, providerCompetitionId], map: "competitions_provider_provider_competition_id_key")
+  @@index([providerId], map: "competitions_provider_id_idx")
+  @@map("competitions")
+}
+
+model Team {
+  id             String   @id @default(uuid()) @db.Char(36)
+  providerId     String   @map("provider_id") @db.Char(36)
+  providerTeamId String   @map("provider_team_id") @db.VarChar(80)
+  name           String   @db.VarChar(200)
+  country        String?  @db.VarChar(120)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  homeFixtures Fixture[] @relation("fixture_home_team")
+  awayFixtures Fixture[] @relation("fixture_away_team")
+  teamPresets TeamPreset[]
+
+  @@unique([providerId, providerTeamId], map: "teams_provider_provider_team_id_key")
+  @@index([providerId], map: "teams_provider_id_idx")
+  @@map("teams")
+}
+
+model Fixture {
+  id                String    @id @default(uuid()) @db.Char(36)
+  providerId        String    @map("provider_id") @db.Char(36)
+  providerFixtureId String    @map("provider_fixture_id") @db.VarChar(80)
+  competitionId     String?   @map("competition_id") @db.Char(36)
+  season            Int?
+  homeTeamId        String?   @map("home_team_id") @db.Char(36)
+  awayTeamId        String?   @map("away_team_id") @db.Char(36)
+  scheduledAt       DateTime? @map("scheduled_at") @db.DateTime(3)
+  status            String    @default("unknown") @db.VarChar(40)
+  scoreHome         Int?      @map("score_home")
+  scoreAway         Int?      @map("score_away")
+  includedByFilters Json?     @map("included_by_filters")
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  homeTeam Team? @relation("fixture_home_team", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  awayTeam Team? @relation("fixture_away_team", fields: [awayTeamId], references: [id], onDelete: SetNull)
+  oddsSnapshots OddsSnapshot[]
+  oddsQuotes OddsQuote[]
+  lowOddsHits LowOddsHit[]
+
+  @@unique([providerId, providerFixtureId], map: "fixtures_provider_provider_fixture_id_key")
+  @@index([status, scheduledAt], map: "fixtures_status_scheduled_at_idx")
+  @@index([competitionId, season, scheduledAt], map: "fixtures_competition_season_scheduled_at_idx")
+  @@index([homeTeamId, scheduledAt], map: "fixtures_home_team_scheduled_at_idx")
+  @@index([awayTeamId, scheduledAt], map: "fixtures_away_team_scheduled_at_idx")
+  @@map("fixtures")
+}
+
+model ProviderSnapshot {
+  id              String   @id @default(uuid()) @db.Char(36)
+  providerId      String   @map("provider_id") @db.Char(36)
+  endpointName    String   @map("endpoint_name") @db.VarChar(120)
+  requestHash     String   @map("request_hash") @db.VarChar(64)
+  responseHash    String?  @map("response_hash") @db.VarChar(64)
+  payloadHash     String?  @map("payload_hash") @db.VarChar(64)
+  capturedAt      DateTime @default(now()) @map("captured_at") @db.DateTime(3)
+  quotaMetadata   Json?    @map("quota_metadata")
+  requestMetadata Json?    @map("request_metadata")
+  rawPayload      Json?    @map("raw_payload")
+  runId           String?  @map("run_id") @db.Char(36)
+  taskId          String?  @map("task_id") @db.Char(36)
+  correlationId   String?  @map("correlation_id") @db.VarChar(80)
+  traceId         String?  @map("trace_id") @db.VarChar(80)
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  task HarnessTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  oddsSnapshots OddsSnapshot[]
+
+  @@index([providerId, endpointName, capturedAt], map: "provider_snapshots_provider_endpoint_captured_at_idx")
+  @@index([runId], map: "provider_snapshots_run_id_idx")
+  @@index([taskId], map: "provider_snapshots_task_id_idx")
+  @@map("provider_snapshots")
+}
+
+model OddsSnapshot {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  fixtureId          String   @map("fixture_id") @db.Char(36)
+  providerSnapshotId String?  @map("provider_snapshot_id") @db.Char(36)
+  providerFixtureId  String   @map("provider_fixture_id") @db.VarChar(80)
+  bookmakerCount     Int      @default(0) @map("bookmaker_count")
+  capturedAt         DateTime @default(now()) @map("captured_at") @db.DateTime(3)
+  payloadHash        String?  @map("payload_hash") @db.VarChar(64)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  providerSnapshot ProviderSnapshot? @relation(fields: [providerSnapshotId], references: [id], onDelete: SetNull)
+  oddsQuotes OddsQuote[]
+
+  @@index([fixtureId, capturedAt], map: "odds_snapshots_fixture_captured_at_idx")
+  @@index([providerSnapshotId], map: "odds_snapshots_provider_snapshot_id_idx")
+  @@map("odds_snapshots")
+}
+
+model OddsQuote {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  snapshotId         String   @map("snapshot_id") @db.Char(36)
+  fixtureId          String   @map("fixture_id") @db.Char(36)
+  bookmaker          String   @db.VarChar(160)
+  bookmakerKey       String?  @map("bookmaker_key") @db.VarChar(120)
+  marketKey          String   @map("market_key") @db.VarChar(80)
+  selectionKey       String   @map("selection_key") @db.VarChar(120)
+  line               Decimal? @db.Decimal(12,6)
+  price              Decimal  @db.Decimal(12,6)
+  impliedProbability Decimal? @map("implied_probability") @db.Decimal(12,6)
+  capturedAt         DateTime @default(now()) @map("captured_at") @db.DateTime(3)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  snapshot OddsSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  lowOddsHits LowOddsHit[]
+
+  @@index([fixtureId, marketKey, capturedAt], map: "odds_quotes_fixture_market_captured_at_idx")
+  @@index([fixtureId, marketKey, selectionKey, line, capturedAt], map: "odds_quotes_fixture_market_selection_line_captured_at_idx")
+  @@index([snapshotId], map: "odds_quotes_snapshot_id_idx")
+  @@map("odds_quotes")
+}
+
+model HarnessRun {
+  id                String    @id @default(uuid()) @db.Char(36)
+  runtime           String    @db.VarChar(80)
+  profile           String    @db.VarChar(80)
+  providerSports    String    @map("provider_sports") @db.VarChar(80)
+  providerAgentic   String?   @map("provider_agentic") @db.VarChar(80)
+  model             String?   @db.VarChar(160)
+  filterPresetId    String?   @map("filter_preset_id") @db.Char(36)
+  status            String    @default("created") @db.VarChar(40)
+  verdict           String?   @db.VarChar(80)
+  artifactDir       String?   @map("artifact_dir") @db.VarChar(700)
+  startedAt         DateTime? @map("started_at") @db.DateTime(3)
+  completedAt       DateTime? @map("completed_at") @db.DateTime(3)
+  metadata          Json?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  filterPreset SearchFilterPreset? @relation(fields: [filterPresetId], references: [id], onDelete: SetNull)
+  tasks HarnessTask[]
+  artifacts Artifact[]
+  auditLogs AuditLog[]
+  providerSnapshots ProviderSnapshot[]
+  lowOddsScans LowOddsScan[]
+
+  @@index([status, createdAt], map: "harness_runs_status_created_at_idx")
+  @@index([filterPresetId], map: "harness_runs_filter_preset_id_idx")
+  @@map("harness_runs")
+}
+
+model HarnessTask {
+  id              String    @id @default(uuid()) @db.Char(36)
+  runId           String?   @map("run_id") @db.Char(36)
+  type            String    @db.VarChar(120)
+  status          String    @default("queued") @db.VarChar(40)
+  priority        Int       @default(0)
+  scheduledFor    DateTime? @map("scheduled_for") @db.DateTime(3)
+  leaseExpiresAt  DateTime? @map("lease_expires_at") @db.DateTime(3)
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(3) @map("max_attempts")
+  payload         Json?
+  lastErrorRedacted String? @map("last_error_redacted") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  providerSnapshots ProviderSnapshot[]
+
+  @@index([status, scheduledFor, priority, createdAt], map: "harness_tasks_queue_idx")
+  @@index([status, leaseExpiresAt], map: "harness_tasks_running_lease_idx")
+  @@index([runId], map: "harness_tasks_run_id_idx")
+  @@map("harness_tasks")
+}
+
+model Artifact {
+  id        String   @id @default(uuid()) @db.Char(36)
+  runId     String?  @map("run_id") @db.Char(36)
+  name      String   @db.VarChar(240)
+  kind      String   @db.VarChar(80)
+  path      String   @db.VarChar(700)
+  sha256    String?  @db.VarChar(64)
+  sizeBytes BigInt?  @map("size_bytes")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([runId, createdAt], map: "artifacts_run_created_at_idx")
+  @@map("artifacts")
+}
+
+model AuditLog {
+  id              String   @id @default(uuid()) @db.Char(36)
+  runId           String?  @map("run_id") @db.Char(36)
+  taskId          String?  @map("task_id") @db.Char(36)
+  eventType       String   @map("event_type") @db.VarChar(120)
+  actor           String   @default("harness") @db.VarChar(120)
+  severity        String   @default("info") @db.VarChar(40)
+  correlationId   String?  @map("correlation_id") @db.VarChar(80)
+  traceId         String?  @map("trace_id") @db.VarChar(80)
+  payloadRedacted Json?    @map("payload_redacted")
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([runId, createdAt], map: "audit_logs_run_created_at_idx")
+  @@index([eventType, createdAt], map: "audit_logs_event_type_created_at_idx")
+  @@map("audit_logs")
+}
+
+model ProviderQuotaSample {
+  id              String   @id @default(uuid()) @db.Char(36)
+  providerId      String?  @map("provider_id") @db.Char(36)
+  providerCode    String   @map("provider_code") @db.VarChar(64)
+  endpointName    String?  @map("endpoint_name") @db.VarChar(120)
+  status          String   @db.VarChar(40)
+  quotaLimit      Int?     @map("quota_limit")
+  quotaRemaining  Int?     @map("quota_remaining")
+  resetAt         DateTime? @map("reset_at") @db.DateTime(3)
+  responseMs      Int?     @map("response_ms")
+  errorRedacted   String?  @map("error_redacted") @db.Text
+  metadata        Json?
+  sampledAt       DateTime @default(now()) @map("sampled_at") @db.DateTime(3)
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  provider SportsProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([providerCode, sampledAt], map: "provider_quota_samples_provider_sampled_at_idx")
+  @@index([providerId, sampledAt], map: "provider_quota_samples_provider_id_sampled_at_idx")
+  @@map("provider_quota_samples")
+}
+
+model LeaguePreset {
+  id                    String   @id @default(uuid()) @db.Char(36)
+  presetKey             String   @default("default") @map("preset_key") @db.VarChar(80)
+  providerId            String   @map("provider_id") @db.Char(36)
+  providerCompetitionId String   @map("provider_competition_id") @db.VarChar(80)
+  competitionId         String?  @map("competition_id") @db.Char(36)
+  name                  String   @db.VarChar(200)
+  country               String?  @db.VarChar(120)
+  season                Int?
+  enabled               Boolean  @default(true)
+  metadata              Json?
+  createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+
+  @@unique([presetKey, providerId, providerCompetitionId, season], map: "league_presets_preset_provider_competition_season_key")
+  @@index([enabled, presetKey], map: "league_presets_enabled_preset_idx")
+  @@map("league_presets")
+}
+
+model TeamPreset {
+  id             String   @id @default(uuid()) @db.Char(36)
+  presetKey      String   @default("default") @map("preset_key") @db.VarChar(80)
+  providerId     String   @map("provider_id") @db.Char(36)
+  providerTeamId String   @map("provider_team_id") @db.VarChar(80)
+  teamId         String?  @map("team_id") @db.Char(36)
+  name           String   @db.VarChar(200)
+  country        String?  @db.VarChar(120)
+  providerLeagueId String? @map("provider_league_id") @db.VarChar(80)
+  enabled        Boolean  @default(true)
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([presetKey, providerId, providerTeamId], map: "team_presets_preset_provider_team_key")
+  @@index([enabled, presetKey], map: "team_presets_enabled_preset_idx")
+  @@map("team_presets")
+}
+
+model SearchFilterPreset {
+  id                       String   @id @default(uuid()) @db.Char(36)
+  key                      String   @unique @db.VarChar(80)
+  name                     String   @db.VarChar(160)
+  season                   Int?
+  markets                  Json?
+  threshold                Decimal? @db.Decimal(12,6)
+  kickoffWindowHours       Int?     @map("kickoff_window_hours")
+  includeLiveFixtures      Boolean  @default(false) @map("include_live_fixtures")
+  includeCompletedFixtures Boolean  @default(false) @map("include_completed_fixtures")
+  maxFixtures              Int?     @map("max_fixtures")
+  bookmakerAllowlist       Json?    @map("bookmaker_allowlist")
+  combineMode              String   @default("OR") @map("combine_mode") @db.VarChar(20)
+  configSnapshot           Json?    @map("config_snapshot")
+  enabled                  Boolean  @default(true)
+  createdAt                DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt                DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  harnessRuns HarnessRun[]
+  lowOddsScans LowOddsScan[]
+
+  @@index([enabled, key], map: "search_filter_presets_enabled_key_idx")
+  @@map("search_filter_presets")
+}
+
+model LowOddsScan {
+  id             String    @id @default(uuid()) @db.Char(36)
+  runId          String?   @map("run_id") @db.Char(36)
+  filterPresetId String?   @map("filter_preset_id") @db.Char(36)
+  querySnapshot  Json?     @map("query_snapshot")
+  threshold      Decimal   @db.Decimal(12,6)
+  comparison     String    @default("lte") @db.VarChar(20)
+  status         String    @default("created") @db.VarChar(40)
+  fixtureCount   Int       @default(0) @map("fixture_count")
+  hitCount       Int       @default(0) @map("hit_count")
+  startedAt      DateTime? @map("started_at") @db.DateTime(3)
+  completedAt    DateTime? @map("completed_at") @db.DateTime(3)
+  errorRedacted  String?   @map("error_redacted") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  filterPreset SearchFilterPreset? @relation(fields: [filterPresetId], references: [id], onDelete: SetNull)
+  hits LowOddsHit[]
+
+  @@index([status, createdAt], map: "low_odds_scans_status_created_at_idx")
+  @@index([runId], map: "low_odds_scans_run_id_idx")
+  @@index([filterPresetId], map: "low_odds_scans_filter_preset_id_idx")
+  @@map("low_odds_scans")
+}
+
+model LowOddsHit {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  scanId             String   @map("scan_id") @db.Char(36)
+  fixtureId          String   @map("fixture_id") @db.Char(36)
+  oddsQuoteId        String?  @map("odds_quote_id") @db.Char(36)
+  marketKey          String   @map("market_key") @db.VarChar(80)
+  selectionKey       String   @map("selection_key") @db.VarChar(120)
+  line               Decimal? @db.Decimal(12,6)
+  odds               Decimal  @db.Decimal(12,6)
+  impliedProbability Decimal? @map("implied_probability") @db.Decimal(12,6)
+  bookmaker          String?  @db.VarChar(160)
+  includedReasons    Json?    @map("included_reasons")
+  excludedReasons    Json?    @map("excluded_reasons")
+  eligible           Boolean  @default(true)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  scan LowOddsScan @relation(fields: [scanId], references: [id], onDelete: Restrict)
+  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  oddsQuote OddsQuote? @relation(fields: [oddsQuoteId], references: [id], onDelete: SetNull)
+
+  @@index([scanId, odds], map: "low_odds_hits_scan_odds_idx")
+  @@index([fixtureId], map: "low_odds_hits_fixture_id_idx")
+  @@index([oddsQuoteId], map: "low_odds_hits_odds_quote_id_idx")
+  @@map("low_odds_hits")
+}

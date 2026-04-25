@@ -172,7 +172,7 @@ function syncRuntime(ctx: CommandContext): void {
 }
 
 function statusMarker(status: string): string {
-  if (status === 'missing' || status === 'warning') return `${YELLOW}!${RESET}`;
+  if (status === 'missing' || status === 'warning' || status === 'disconnected' || status === 'degraded') return `${YELLOW}!${RESET}`;
   return `${GREEN}✓${RESET}`;
 }
 
@@ -546,9 +546,9 @@ commands.push({
 
 commands.push({
   name: '/db',
-  description: 'Show database skeleton status',
+  description: 'Show database status',
   execute: async (_args, ctx) => {
-    const status = getDbStatus(ctx.config);
+    const status = await getDbStatus(ctx.config);
     printServiceStatus(status);
     appendConfigStatusEvent(ctx.runtime, { command: '/db', status });
   },
@@ -603,7 +603,7 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
   const [area, action] = argv;
   try {
     if (area === 'db' && action === 'status') {
-      const status = getDbStatus(ctx.config);
+      const status = await getDbStatus(ctx.config);
       printServiceStatus(status);
       appendConfigStatusEvent(ctx.runtime, { command: 'db status', status });
       return { ok: true, exitCode: 0 };

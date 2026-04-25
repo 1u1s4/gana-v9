@@ -1,5 +1,9 @@
 # DB DigitalOcean PostgreSQL
 
+## Estado de implementacion
+
+Completado en PR-03 Fase A con override operativo confirmado por el usuario: DigitalOcean MySQL existente en lugar de PostgreSQL. El baseline conserva el alcance de Fase A, usa Prisma, migraciones versionadas y tablas durables para discovery, fixtures, odds, snapshots, runs, artifacts, audit, presets y low-odds. La Fase B de research, predictions, parlays y validation queda fuera de este corte.
+
 ## Objetivo
 
 Definir e implementar la base de datos durable de Gana v9 sobre DigitalOcean Managed PostgreSQL + Prisma, con migraciones versionadas, snapshots auditables, indices adecuados y repositorios para el runtime TUI-first.

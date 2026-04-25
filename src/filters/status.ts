@@ -1,6 +1,12 @@
 import type { AgentConfig, ApiFootballFilterConfig } from '../config.js';
 
-export type ServiceStatusState = 'missing' | 'configured-not-checked' | 'ready-not-implemented';
+export type ServiceStatusState =
+  | 'missing'
+  | 'configured-not-checked'
+  | 'ready-not-implemented'
+  | 'connected'
+  | 'disconnected'
+  | 'degraded';
 
 export type StatusConfigValue = string | number | boolean | null;
 
