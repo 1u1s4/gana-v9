@@ -27,6 +27,7 @@ export interface AgentConfig {
   display: DisplayConfig;
   slashCommands: boolean;
   codexHome: string;
+  codexModelListPath: string;
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
   codexThreadId?: string;
   geminiHome: string;
@@ -70,6 +71,7 @@ const DEFAULTS: AgentConfig = {
   },
   slashCommands: true,
   codexHome: join(process.env.HOME ?? '', '.codex'),
+  codexModelListPath: 'config/codex-models.json',
   codexSandbox: 'workspace-write',
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
@@ -103,6 +105,7 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   if (process.env.AGENT_MAX_STEPS) config.maxSteps = Number(process.env.AGENT_MAX_STEPS);
   if (process.env.AGENT_MAX_COST) config.maxCost = Number(process.env.AGENT_MAX_COST);
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
+  if (process.env.CODEX_MODEL_LIST_PATH) config.codexModelListPath = process.env.CODEX_MODEL_LIST_PATH;
   if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
   if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
   if (process.env.CURSOR_MODEL_LIST_PATH) config.cursorModelListPath = process.env.CURSOR_MODEL_LIST_PATH;

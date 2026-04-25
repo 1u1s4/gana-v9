@@ -50,6 +50,13 @@ Backend Codex:
 - Lee la autenticacion desde `CODEX_HOME` o `codexHome`.
 - Reanuda el thread de Codex entre turnos hasta usar `/new`.
 - Muestra comandos de shell ejecutados por Codex dentro del renderer de herramientas.
+- `/model` lee `config/codex-models.json`.
+
+Actualizar el listado de modelos Codex:
+
+```bash
+npm run update:codex-models
+```
 
 Backend Gemini CLI:
 

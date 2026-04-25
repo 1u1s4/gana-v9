@@ -8,6 +8,7 @@
     "start": "tsx src/cli.ts",
     "dev": "tsx watch src/cli.ts",
     "typecheck": "tsc --noEmit",
+    "update:codex-models": "tsx scripts/update-codex-models.ts",
     "update:gemini-models": "tsx scripts/update-gemini-models.ts",
     "update:cursor-models": "tsx scripts/update-cursor-models.ts"
   },

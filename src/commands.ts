@@ -36,7 +36,8 @@ function ask(rl: Interface, prompt: string): Promise<string> {
 }
 
 function loadCodexModels(ctx: CommandContext): { id: string; name: string }[] {
-  const path = join(ctx.config.codexHome, 'models_cache.json');
+  const repoPath = resolve(ctx.config.codexModelListPath);
+  const path = existsSync(repoPath) ? repoPath : join(ctx.config.codexHome, 'models_cache.json');
   if (!existsSync(path)) return [];
 
   const raw = JSON.parse(readFileSync(path, 'utf-8')) as { models?: unknown };
@@ -46,7 +47,7 @@ function loadCodexModels(ctx: CommandContext): { id: string; name: string }[] {
   return models
     .map((model: any) => ({
       id: String(model.slug ?? model.id ?? model.name ?? ''),
-      name: String(model.display_name ?? model.name ?? model.slug ?? model.id ?? ''),
+      name: String(model.display_name ?? model.displayName ?? model.name ?? model.slug ?? model.id ?? ''),
     }))
     .filter((model) => model.id);
 }
