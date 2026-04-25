@@ -8,6 +8,7 @@
   "codexHome": "/Users/luisalvarado/.codex",
   "codexSandbox": "workspace-write",
   "geminiHome": "/Users/luisalvarado/.gemini",
+  "geminiModelListPath": "config/gemini-models.json",
   "geminiApprovalMode": "yolo",
   "showBanner": true,
   "display": {

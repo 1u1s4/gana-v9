@@ -7,7 +7,8 @@
   "scripts": {
     "start": "tsx src/cli.ts",
     "dev": "tsx watch src/cli.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "update:gemini-models": "tsx scripts/update-gemini-models.ts"
   },
   "keywords": [
     "agent",

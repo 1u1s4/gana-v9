@@ -30,6 +30,7 @@ export interface AgentConfig {
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
   codexThreadId?: string;
   geminiHome: string;
+  geminiModelListPath: string;
   geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
   geminiSessionId?: string;
 }
@@ -68,6 +69,7 @@ const DEFAULTS: AgentConfig = {
   codexHome: join(process.env.HOME ?? '', '.codex'),
   codexSandbox: 'workspace-write',
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
+  geminiModelListPath: 'config/gemini-models.json',
   geminiApprovalMode: 'yolo',
 };
 
@@ -92,6 +94,7 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   if (process.env.AGENT_MAX_COST) config.maxCost = Number(process.env.AGENT_MAX_COST);
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
   if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
+  if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
 
   if (overrides.display) {
     config.display = { ...config.display, ...overrides.display };

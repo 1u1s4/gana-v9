@@ -1,6 +1,6 @@
 import type { Interface } from 'readline';
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import type { AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
 
@@ -56,16 +56,15 @@ function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
   const settings = existsSync(settingsPath)
     ? JSON.parse(readFileSync(settingsPath, 'utf-8'))
     : {};
+  const repoListPath = resolve(ctx.config.geminiModelListPath);
+  const repoList = existsSync(repoListPath)
+    ? JSON.parse(readFileSync(repoListPath, 'utf-8'))?.models
+    : [];
 
   const configured = settings?.model?.name;
-  const configuredList = Array.isArray(settings?.model?.available)
-    ? settings.model.available
-    : Array.isArray(settings?.model?.availableModels)
-      ? settings.model.availableModels
-      : [];
 
   const models = [
-    ...configuredList.map((model: any) => typeof model === 'string' ? model : model?.id ?? model?.name),
+    ...(Array.isArray(repoList) ? repoList : []).map((model: any) => typeof model === 'string' ? model : model?.id ?? model?.name),
     ...Object.keys(settings?.modelConfigs?.modelDefinitions ?? {}),
     ...Object.keys(settings?.modelConfigs?.customAliases ?? {}),
     'gemini-3-pro-preview',
@@ -80,8 +79,14 @@ function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
     models.unshift(configured);
   }
 
+  const names = new Map<string, string>();
+  for (const model of Array.isArray(repoList) ? repoList : []) {
+    if (typeof model === 'string') names.set(model, model);
+    else if (model?.id) names.set(model.id, model.name ?? model.id);
+  }
+
   return [...new Set(models.filter(Boolean))]
-    .map((id) => ({ id, name: id }));
+    .map((id) => ({ id, name: names.get(id) ?? id }));
 }
 
 async function loadOpenRouterModels() {
@@ -116,16 +121,6 @@ commands.push({
       ctx.config.model = matches[idx].id;
       console.log(`  ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
     } else { console.log(`  ${DIM}Cancelled.${RESET}`); }
-  },
-});
-
-commands.push({
-  name: '/tokens',
-  description: 'Display total input/output tokens',
-  execute: async (_args, ctx) => {
-    console.log(`  ${DIM}Input tokens:${RESET}  ${CYAN}${ctx.totalTokens.input}${RESET}`);
-    console.log(`  ${DIM}Output tokens:${RESET} ${CYAN}${ctx.totalTokens.output}${RESET}`);
-    console.log(`  ${DIM}Total tokens:${RESET}  ${CYAN}${ctx.totalTokens.input + ctx.totalTokens.output}${RESET}`);
   },
 });
 

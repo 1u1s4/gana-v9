@@ -56,7 +56,15 @@ Backend Gemini CLI:
 - Usa `gemini --prompt --output-format stream-json` como subprocess.
 - Lee la autenticacion local desde `~/.gemini/oauth_creds.json`.
 - Reanuda la sesion de Gemini entre turnos hasta usar `/new`.
-- `/model` primero lee `model.available` desde `~/.gemini/settings.json` y luego agrega modelos conocidos del CLI de Gemini como fallback.
+- `/model` primero lee `config/gemini-models.json` desde este repo y luego agrega modelos conocidos del CLI de Gemini como fallback.
+
+Actualizar el listado de modelos Gemini:
+
+```bash
+npm run update:gemini-models
+```
+
+El script lee modelos desde el Gemini CLI instalado. Si defines `GEMINI_API_KEY` o `GOOGLE_API_KEY`, tambien intenta consultar la API de Gemini y fusionar esos resultados.
 
 Backend OpenRouter:
 
