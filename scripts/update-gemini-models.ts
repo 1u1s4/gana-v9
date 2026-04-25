@@ -35,15 +35,20 @@ function titleCaseModel(id: string): string {
 }
 
 function addModel(models: Map<string, GeminiModel>, id: string, source: string, name?: string): void {
-  const clean = id.replace(/^models\//, '').trim();
-  if (!/^gemini-[a-z0-9.-]+(?:-[a-z0-9]+)*$/i.test(clean)) return;
+  const clean = id.replace(/^models\//, '').trim().toLowerCase();
+  if (!/^gemini-\d+(?:\.\d+)?-[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(clean)) return;
+  if (/\.(js|ts|json|toml|yml|yaml|png|txt)$/i.test(clean)) return;
   if (clean.includes('embedding')) return;
+  if (clean.includes('cli')) return;
+  if (clean.includes('api-key')) return;
+  if (!/(pro|flash|computer-use|live)/.test(clean)) return;
 
   const existing = models.get(clean);
+  const sourceParts = new Set([...(existing?.source?.split(',') ?? []), source]);
   models.set(clean, {
     id: clean,
     name: name ?? existing?.name ?? titleCaseModel(clean),
-    source: existing?.source ? `${existing.source},${source}` : source,
+    source: [...sourceParts].filter(Boolean).join(','),
   });
 }
 
