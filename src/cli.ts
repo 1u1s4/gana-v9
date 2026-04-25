@@ -359,7 +359,10 @@ async function main() {
           onEvent: (e) => {
             if (!started) { started = true; loader.stop(); }
             renderer.handle(e);
-            if (e.type === 'tool_result') { started = false; process.stdout.write('\n'); loader.start(); }
+            if (e.type === 'tool_result') {
+              started = false;
+              loader.start();
+            }
           },
         });
         loader.stop();

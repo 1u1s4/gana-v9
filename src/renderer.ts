@@ -21,7 +21,7 @@ const DEFAULT_FORMATTERS: Record<string, ToolFormatter> = {
   glob: (_n, a) => `pattern=${trunc(String(a.pattern ?? ''))}`,
   grep: (_n, a) => `pattern=${trunc(String(a.pattern ?? ''))}`,
   list_dir: (_n, a) => `path=${trunc(String(a.path ?? ''))}`,
-  web_search: (_n, a) => `query=${trunc(String(a.query ?? ''))}`,
+  web_search: (_n, a) => a.query ? `query=${trunc(String(a.query))}` : '',
 };
 
 const TOOL_LABELS: Record<string, { past: string; noun: string }> = {
@@ -93,6 +93,7 @@ export class TuiRenderer {
 
   private renderText(delta: string): void {
     this.flushMinimal();
+    this.flushGrouped();
     this.streaming = true;
     this.lineBuf += delta;
     const lines = this.lineBuf.split('\n');
