@@ -42,7 +42,7 @@ Transicion:
 
 ### 09a: Skeleton temprano
 
-Debe implementarse desde Corte 1:
+Debe implementarse desde Corte 1 y formar parte obligatoria de PR-01:
 
 - command registry compartible entre slash y headless;
 - `pnpm gana` y `pnpm gana tui`;

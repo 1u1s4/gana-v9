@@ -55,6 +55,27 @@ interface GanaConfigExtension {
 }
 ```
 
+Para que PR-01 pueda pasar `typecheck` antes de completar todo el dominio, crear el bootstrap minimo `src/domain/markets.ts`:
+
+```ts
+export type MarketKey =
+  | 'h2h'
+  | 'double_chance'
+  | 'goals_over_under'
+  | 'corners_over_under'
+  | 'btts';
+
+export const DEFAULT_MARKETS: MarketKey[] = [
+  'h2h',
+  'double_chance',
+  'goals_over_under',
+  'corners_over_under',
+  'btts',
+];
+```
+
+El plan `06-domain-mercados-y-settlement.md` conserva ownership del dominio y expande ese archivo con selections, validators, odds y settlement.
+
 Defaults iniciales:
 
 - `runtime`: `mvp-productivo-online`.
@@ -142,7 +163,7 @@ Cada evento debe tener `eventId`, `runId`, `taskId?`, `correlationId`, `traceId`
 
 ### Artifacts
 
-Crear `src/evidence/artifacts.ts` o `src/runtime/artifacts.ts` con operaciones:
+Crear `src/runtime/artifacts.ts` como modulo canonico de escritura de artifacts. `src/evidence/*` podra consumirlo despues para evidence packs, pero no debe crear otro writer paralelo.
 
 - `ensureArtifactRoot(config)`
 - `createRunArtifactDir(runId)`
@@ -224,6 +245,8 @@ Eventos minimos:
 
 `loadConfig()` debe devolver una configuracion extendida compatible con los campos actuales. Ningun consumidor existente debe romperse por falta de nuevos env vars excepto comandos productivos que requieran DB/API.
 
+Abrir la TUI no debe requerir auth agentic, `API_FOOTBALL_KEY` ni `DATABASE_URL`. Si falta auth de Codex/Gemini/Cursor, el harness debe abrir y mostrar estado `missing` o `not configured`; solo los comandos o turnos que usen ese provider deben fallar con error accionable.
+
 `full-permissions` debe setear defaults coherentes:
 
 - `approvalMode = auto-grant`
@@ -236,11 +259,13 @@ Eventos minimos:
 ## Criterios de aceptacion
 
 - `npm run typecheck` pasa.
-- `loadConfig({})` funciona sin `DATABASE_URL` ni `API_FOOTBALL_KEY` para abrir TUI, pero `/db` y `/football` reportan configuracion faltante.
+- `loadConfig({})` funciona sin auth agentic, `DATABASE_URL` ni `API_FOOTBALL_KEY` para abrir TUI, pero `/provider`, `/db` y `/football` reportan configuracion faltante o auth missing.
+- PR-01 crea `src/domain/markets.ts` con `MarketKey` y `DEFAULT_MARKETS` minimos para soportar config sin esperar el dominio completo.
 - `defaultSeason` se resuelve por env o inferencia; si no es seguro, los scans productivos exigen `GANA_DEFAULT_SEASON` con warning accionable.
 - `agent.config.json` puede definir `runtime`, `profile`, `artifactRoot`, `approvalMode` y `apiFootball`.
 - `.env.example` documenta todas las variables nuevas.
 - `artifactRoot` se crea al iniciar un run, no necesariamente al abrir la TUI.
+- El writer canonico de artifacts vive en `src/runtime/artifacts.ts`.
 - Ningun log/status imprime secretos completos.
 - `profile full-permissions` no elimina auditoria; solo cambia aprobacion a auto-grant auditada.
 - Existe `src/permissions/redaction.ts` como modulo canonico de redaccion.

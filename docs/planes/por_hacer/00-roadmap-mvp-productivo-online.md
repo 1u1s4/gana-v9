@@ -34,10 +34,11 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 1. `01-runtime-config-perfiles-y-artifacts.md`
    - Preparar configuracion, perfiles, artifact root, redaccion obligatoria y audit events minimos.
    - Debe dejar listo el suelo para que los planes siguientes registren runs/eventos sin inventar formatos distintos ni filtrar secretos.
+   - PR-01 crea el bootstrap minimo `src/domain/markets.ts` con `MarketKey` y `DEFAULT_MARKETS` para que config pueda tipar `defaultMarkets`.
 
 2. Skeleton temprano de comandos desde `09-tui-cli-headless.md`
    - Crear command registry minimo y CLI headless base para `/session`, `/profile`, `/approval`, `/db`, `/football` y `/filters`.
-   - Debe existir desde el Corte 1 para preservar el enfoque TUI-first mientras los servicios reales se conectan progresivamente.
+   - Es parte obligatoria de PR-01 y debe existir desde el Corte 1 para preservar el enfoque TUI-first mientras los servicios reales se conectan progresivamente.
 
 3. `06-domain-mercados-y-settlement.md`
    - Fijar dominio minimo antes de API-Football y filtros: `Fixture`, `Odds`, `MarketKey`, selections, lineas e inicio de `settlement-v1`.
@@ -89,10 +90,26 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 
 - Config extendida con runtime, profile, DB/API env vars redacted, artifacts y audit events minimos.
 - Command registry minimo: `/session`, `/profile`, `/approval`, `/db`, `/football`, `/filters` y equivalentes headless de status existen aunque algunas respuestas iniciales sean de estado/configuracion.
-- Dominio minimo definido: `Fixture`, `Odds`, `MarketKey`, selections y `settlement-v1` inicial.
+- Bootstrap minimo de dominio: `MarketKey` y `DEFAULT_MARKETS` existen en `src/domain/markets.ts`; el dominio completo entra en el siguiente corte.
 - DB baseline preparado para discovery: provider, competitions, teams, fixtures, snapshots, odds quotes, runs, tasks minimos, artifacts, audit logs, presets y low-odds.
 - `pnpm gana` queda definido como target del producto.
 - Aceptacion: la TUI muestra provider agentic, modelo, perfil, artifact root, DB status y API-Football status sin exponer secretos.
+
+## Orden PR congelado
+
+1. PR-01: runtime/config/redaction/profile + bootstrap `MarketKey` + skeleton TUI/CLI + status commands.
+2. PR-02: dominio minimo completo: `Fixture`, `OddsQuote`, selections y `settlement-v1`.
+3. PR-03: DB baseline DigitalOcean PostgreSQL + Prisma.
+4. PR-04: API-Football provider + status/quota + fixtures.
+5. PR-05: odds normalization + snapshots + odds quotes.
+6. PR-06: filtros, presets, fixtures y low-odds.
+7. PR-07: providers agentic formalizados + sessions/events/web requirement.
+8. PR-08: research/evidence/claims.
+9. PR-09: scoring y predictions.
+10. PR-10: parlay builder.
+11. PR-11: validation.
+12. PR-12: run pipeline, export, handoff y evidence pack.
+13. PR-13: seguridad completa + QA/E2E final.
 
 ### Corte 2: Descubrimiento deportivo persistido
 

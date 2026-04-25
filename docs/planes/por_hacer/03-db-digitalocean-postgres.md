@@ -64,6 +64,7 @@ Esta fase debe desbloquear `/db status`, `/football status`, fixtures, odds, fil
 - `harness_tasks`
 - `artifacts`
 - `audit_logs`
+- `provider_quota_samples`
 - `league_presets`
 - `team_presets`
 - `search_filter_presets`
@@ -84,7 +85,6 @@ Esta fase entra cuando discovery persistido ya funciona:
 - `parlay_legs`
 - `validation_artifacts`
 - `approvals`
-- `provider_quota_samples`
 
 La Fase A no debe esperar a que el modelo de research/predictions este perfecto. La Fase B debe usar las mismas claves, IDs y audit contracts definidos en la Fase A.
 
@@ -256,6 +256,7 @@ Salida minima:
 - `prisma/schema.prisma` usa `postgresql`.
 - No hay tablas con nombres MySQL heredados tipo `fac_*` salvo decision explicita documentada.
 - Fase A: la DB puede persistir un run, fixture, provider snapshot, odds quote, low-odds scan/hit, artifact y audit log.
+- Fase A: `/football status` puede persistir `provider_quota_samples` para observar cuota, rate limits y errores del proveedor desde el inicio.
 - Fase A: `harness_tasks` existe en version minima para trazabilidad de `/run`, aunque el MVP inicial ejecute comandos directos sin cola distribuida.
 - Fase B: la DB puede persistir agent run, research bundle, prediction, parlay, validation y approval.
 - `db status` no imprime credenciales.
