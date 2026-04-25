@@ -47,6 +47,46 @@ Definir e implementar la base de datos durable de Gana v9 sobre DigitalOcean Man
 - Indices incompletos para fixtures elegibles, latest odds, task queue y published predictions.
 - Secretos en docs/migration guides; no migrar ningun secreto historico.
 
+## Entrega por fases
+
+### Fase A: DB baseline de discovery
+
+Esta fase debe desbloquear `/db status`, `/football status`, fixtures, odds, filters y low-odds sin esperar research/parlays:
+
+- `sports_providers`
+- `competitions`
+- `teams`
+- `fixtures`
+- `provider_snapshots`
+- `odds_snapshots`
+- `odds_quotes`
+- `harness_runs`
+- `artifacts`
+- `audit_logs`
+- `league_presets`
+- `team_presets`
+- `search_filter_presets`
+- `low_odds_scans`
+- `low_odds_hits`
+
+### Fase B: expansion de prediccion
+
+Esta fase entra cuando discovery persistido ya funciona:
+
+- `agent_runs`
+- `research_bundles`
+- `source_records`
+- `evidence_items`
+- `claims`
+- `predictions`
+- `parlays`
+- `parlay_legs`
+- `validation_artifacts`
+- `approvals`
+- `provider_quota_samples`
+
+La Fase A no debe esperar a que el modelo de research/predictions este perfecto. La Fase B debe usar las mismas claves, IDs y audit contracts definidos en la Fase A.
+
 ## Schema minimo v9
 
 ### Catalogo deportivo
@@ -214,7 +254,8 @@ Salida minima:
 - `npm run db:validate` pasa.
 - `prisma/schema.prisma` usa `postgresql`.
 - No hay tablas con nombres MySQL heredados tipo `fac_*` salvo decision explicita documentada.
-- La DB puede persistir un run, fixture, provider snapshot, odds quote, prediction, parlay, validation y audit log.
+- Fase A: la DB puede persistir un run, fixture, provider snapshot, odds quote, low-odds scan/hit, artifact y audit log.
+- Fase B: la DB puede persistir agent run, research bundle, prediction, parlay, validation y approval.
 - `db status` no imprime credenciales.
 - Cada FK relevante tiene indice.
 - Los snapshots conservan hashes y captured_at.
@@ -236,4 +277,3 @@ Salida minima:
 - Prisma no soporta todas las capacidades Postgres necesarias via schema; usar migraciones SQL complementarias y documentarlas.
 - Evitar RLS/Supabase-specific si DigitalOcean PostgreSQL no lo requiere; si se adopta Supabase despues, agregar plan separado. Para v9 actual, seguridad se controla server-side/TUI y secretos locales.
 - No persistir raw prompts sin redaccion y politica de retencion.
-

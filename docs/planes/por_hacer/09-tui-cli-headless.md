@@ -4,6 +4,8 @@
 
 Convertir la TUI actual en la superficie operativa de Gana v9 y agregar CLI headless `pnpm gana ...` para flujos principales, sin mover logica de dominio al renderer ni a los comandos.
 
+Este plan se implementa en dos momentos: un skeleton temprano en Corte 1 y una experiencia final cuando los servicios productivos ya existan.
+
 ## SRS cubierto
 
 - Secciones 2.1, 3.1, 6, 11 RF-001 a RF-014.
@@ -37,6 +39,30 @@ Transicion:
 - Si se migra lockfile, hacerlo en cambio separado.
 
 ## Cambios requeridos
+
+### 09a: Skeleton temprano
+
+Debe implementarse desde Corte 1:
+
+- command registry compartible entre slash y headless;
+- `pnpm gana` y `pnpm gana tui`;
+- `pnpm gana db status`;
+- `pnpm gana football status`;
+- `pnpm gana filters show`;
+- slash commands `/session`, `/profile`, `/approval`, `/db`, `/football`, `/filters`;
+- respuestas de estado accionables cuando DB/API aun no esten configuradas.
+
+Este skeleton no debe contener logica de dominio. Solo conecta config/runtime/status services disponibles.
+
+### 09b: Experiencia final
+
+Debe completarse cuando DB, API-Football, filtros, scoring, parlay y validation ya existan:
+
+- renderer extendido;
+- comandos deportivos completos;
+- `/run`;
+- `/export`;
+- handoff/evidence pack visible desde TUI.
 
 ### Parser headless
 
@@ -144,6 +170,8 @@ Los checks externos lentos deben mostrar loader y no congelar input.
 
 ## Criterios de aceptacion
 
+- 09a: `pnpm gana db status`, `pnpm gana football status` y `pnpm gana filters show` existen desde el primer corte.
+- 09a: `/session`, `/profile`, `/approval`, `/db`, `/football`, `/filters` existen y no exponen secretos.
 - `pnpm gana` abre TUI.
 - `npm start` sigue funcionando o el README documenta claramente el cambio.
 - Slash commands actuales siguen funcionando.
@@ -170,4 +198,3 @@ Los checks externos lentos deben mostrar loader y no congelar input.
 - Meter demasiada logica en `commands.ts`; mantener servicios separados.
 - Checks iniciales lentos pueden degradar la TUI; correr status con timeout y mensajes accionables.
 - Migrar a `pnpm` puede generar churn; hacerlo como cambio intencional.
-

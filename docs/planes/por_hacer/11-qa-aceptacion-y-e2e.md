@@ -43,7 +43,7 @@ Usar fixtures JSON redacted para:
 - provider agentic structured output;
 - DB repositories con test DB o mocks controlados.
 
-Estos tests no son "modo simulado" del producto; son aislamiento de pruebas.
+Las pruebas pueden usar fixtures y mocks controlados para aislamiento tecnico, pero el producto MVP no ofrece un modo operativo offline ni simulado.
 
 ### Nivel 3: smoke productivo controlado
 

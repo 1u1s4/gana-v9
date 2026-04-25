@@ -4,6 +4,8 @@
 
 Definir el dominio deportivo minimo para Gana v9 y las reglas versionadas de settlement para los mercados iniciales: `h2h`, `double_chance`, `goals_over_under`, `corners_over_under`, `btts`.
 
+Aunque este archivo conserve el numero `06`, su contenido debe ejecutarse temprano, antes de API-Football y filtros. Es el dueno unico de `src/domain/*` y de `src/validation/settlement-rules.ts`.
+
 ## SRS cubierto
 
 - Secciones 8.3, 11 RF-010, RF-012.
@@ -13,6 +15,8 @@ Definir el dominio deportivo minimo para Gana v9 y las reglas versionadas de set
 ## Contexto actual
 
 No existen `src/domain`, `src/prediction`, `src/parlay` ni `src/validation`. Los nombres y reglas de mercado deben quedar estables antes de construir scoring, parlays y validation.
+
+Tambien deben quedar estables antes de mapear API-Football y antes de implementar low-odds, porque ambos necesitan `MarketKey`, selections y lineas canonicas.
 
 ## Modulos nuevos
 
@@ -41,6 +45,22 @@ type MarketSelection = {
   line?: number;
   odds: number;
   impliedProbability: number;
+  sourceSnapshotId: string;
+};
+```
+
+Agregar tambien `OddsQuote` canonico para que API-Football, filtros y scoring no inventen formas paralelas:
+
+```ts
+type OddsQuote = {
+  fixtureId: string;
+  market: MarketKey;
+  selection: string;
+  line?: number;
+  price: number;
+  impliedProbability: number;
+  bookmaker?: string;
+  capturedAt: string;
   sourceSnapshotId: string;
 };
 ```
@@ -165,8 +185,9 @@ Los mappers de API-Football deben traducir markets nativos al `MarketKey` canoni
 ## Criterios de aceptacion
 
 - Existe una sola definicion canonica de `MarketKey`.
+- Existe una sola definicion canonica de `Fixture` y `OddsQuote`.
 - Todos los mercados iniciales tienen selections validas y settlement versionado.
-- Scoring, parlay y validation usan estos tipos, no strings ad hoc.
+- API-Football, filtros, scoring, parlay y validation usan estos tipos, no strings ad hoc.
 - `corners_over_under` bloquea si faltan estadisticas.
 - `goals_over_under` maneja push.
 - `npm run typecheck` pasa.
@@ -186,4 +207,3 @@ Los mappers de API-Football deben traducir markets nativos al `MarketKey` canoni
 
 - Bookmakers pueden usar nombres distintos para el mismo mercado. Resolver en mapper con tabla explicita y tests.
 - No ampliar mercados antes de estabilizar el MVP; nuevos markets requieren version de reglas.
-

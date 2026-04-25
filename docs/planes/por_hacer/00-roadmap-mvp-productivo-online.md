@@ -32,46 +32,54 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 ## Orden de implementacion
 
 1. `01-runtime-config-perfiles-y-artifacts.md`
-   - Preparar configuracion, perfiles, artifact root y contratos transversales.
-   - Debe dejar listo el suelo para que los planes siguientes registren runs y eventos sin inventar formatos distintos.
+   - Preparar configuracion, perfiles, artifact root, redaccion obligatoria y audit events minimos.
+   - Debe dejar listo el suelo para que los planes siguientes registren runs/eventos sin inventar formatos distintos ni filtrar secretos.
 
-2. `02-provider-agentic-y-sesiones.md`
+2. Skeleton temprano de comandos desde `09-tui-cli-headless.md`
+   - Crear command registry minimo y CLI headless base para `/session`, `/profile`, `/approval`, `/db`, `/football` y `/filters`.
+   - Debe existir desde el Corte 1 para preservar el enfoque TUI-first mientras los servicios reales se conectan progresivamente.
+
+3. `06-domain-mercados-y-settlement.md`
+   - Fijar dominio minimo antes de API-Football y filtros: `Fixture`, `Odds`, `MarketKey`, selections, lineas e inicio de `settlement-v1`.
+   - Este plan es dueno de `src/domain/*` y `src/validation/settlement-rules.ts`.
+
+4. `03-db-digitalocean-postgres.md`
+   - Crear el baseline de DigitalOcean PostgreSQL + Prisma.
+   - Partir la implementacion en baseline de discovery y expansion de prediccion para no bloquear fixtures/odds por research/parlays.
+
+5. `04-api-football-provider-y-normalizacion.md`
+   - Implementar el proveedor deportivo real y snapshots.
+   - Debe consumir los tipos canonicos del dominio para mapear markets, selections, lineas, odds y resultados.
+
+6. `05-filtros-fixtures-y-low-odds.md`
+   - Construir los filtros operativos del MVP: ligas, equipos, mercados y threshold `1.20`.
+   - Usa `MarketKey`, `Fixture` y `OddsQuote` del dominio; no crea tipos paralelos.
+
+7. `02-provider-agentic-y-sesiones.md`
    - Consolidar el contrato Codex/Gemini/Cursor que ya existe en `src/agent.ts`.
    - Agregar estado de sesion, web search requerido, profile awareness y eventos normalizados.
 
-3. `03-db-digitalocean-postgres.md`
-   - Crear el baseline de DigitalOcean PostgreSQL + Prisma.
-   - Este plan bloquea cualquier persistencia productiva, evidence durable y validation historica.
-
-4. `04-api-football-provider-y-normalizacion.md`
-   - Implementar el proveedor deportivo real y snapshots.
-   - Este plan desbloquea fixtures, odds, resultados y estadisticas reales.
-
-5. `05-filtros-fixtures-y-low-odds.md`
-   - Construir los filtros operativos del MVP: ligas, equipos, mercados y threshold `1.20`.
-   - Depende de DB y API-Football para persistir presets, scans y hits.
-
-6. `06-domain-mercados-y-settlement.md`
-   - Fijar los tipos y reglas de mercados.
-   - Debe ser estable antes de scoring, parlay y validation.
-
-7. `07-research-scoring-y-predictions.md`
+8. `07-research-scoring-y-predictions.md`
    - Generar evidencia, claims y predicciones atomicas estructuradas.
    - Depende de provider agentic, dominio, DB, snapshots y filtros.
 
-8. `08-parlay-builder-y-validation.md`
-   - Construir parlays desde predicciones y validar settlement.
-   - Depende de reglas de mercado, resultados finales y estadisticas.
+9. `08-parlay-builder-y-validation.md` fase parlay
+   - Construir parlays desde predicciones estructuradas.
+   - Debe consumir settlement rules del dominio, no redefinirlas.
 
-9. `09-tui-cli-headless.md`
-   - Cerrar la experiencia operativa: TUI, slash commands y CLI headless.
-   - Debe exponer capacidades ya implementadas, no duplicar logica.
+10. `08-parlay-builder-y-validation.md` fase validation
+    - Validar predictions/parlays contra resultados y estadisticas finales.
+    - Debe enlazar provider snapshots y `settlement-v1`.
 
-10. `10-permisos-auditoria-y-seguridad.md`
+11. `09-tui-cli-headless.md` cierre de experiencia
+    - Completar renderer extendido, comandos finales, `/run` y `/export`.
+    - Debe exponer capacidades ya implementadas, no duplicar logica.
+
+12. `10-permisos-auditoria-y-seguridad.md`
     - Completar approvals, auto-approvals, audit log y redaccion.
-    - Se puede iniciar temprano, pero debe cerrar despues de conocer todos los eventos sensibles.
+    - Redaccion/audit basicos empiezan en el plan 01; este plan cierra la policy completa.
 
-11. `11-qa-aceptacion-y-e2e.md`
+13. `11-qa-aceptacion-y-e2e.md`
     - Definir matriz final de pruebas y aceptacion.
     - Debe ejecutarse como cierre del MVP vertical.
 
@@ -79,8 +87,10 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 
 ### Corte 1: Harness arranca con estado real
 
-- Config extendida con runtime, profile, DB/API env vars redacted y artifacts.
-- `/session`, `/profile`, `/approval`, `/db`, `/football` existen aunque algunas respuestas iniciales sean de estado/configuracion.
+- Config extendida con runtime, profile, DB/API env vars redacted, artifacts y audit events minimos.
+- Command registry minimo: `/session`, `/profile`, `/approval`, `/db`, `/football`, `/filters` y equivalentes headless de status existen aunque algunas respuestas iniciales sean de estado/configuracion.
+- Dominio minimo definido: `Fixture`, `Odds`, `MarketKey`, selections y `settlement-v1` inicial.
+- DB baseline preparado para discovery: provider, competitions, teams, fixtures, snapshots, odds quotes, runs, artifacts, audit logs, presets y low-odds.
 - `pnpm gana` queda definido como target del producto.
 - Aceptacion: la TUI muestra provider agentic, modelo, perfil, artifact root, DB status y API-Football status sin exponer secretos.
 
@@ -106,10 +116,11 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 
 ## Dependencias entre planes
 
-- `03-db-digitalocean-postgres` debe decidir schema antes de que `04`, `05`, `07`, `08`, `09` escriban persistencia.
-- `06-domain-mercados-y-settlement` debe fijar `MarketKey`, selections y settlement antes de scoring y validation.
-- `10-permisos-auditoria-y-seguridad` debe integrarse con `src/tools/*`, proveedores CLI, DB writes, artifact writes y comandos de promocion.
-- `09-tui-cli-headless` debe llamar servicios del runtime; no debe poner reglas de negocio en `src/cli.ts` ni `src/commands.ts`.
+- `06-domain-mercados-y-settlement` debe ejecutarse antes de `04-api-football-provider-y-normalizacion` y `05-filtros-fixtures-y-low-odds`, porque ambos necesitan `MarketKey`, selections, lineas y odds canonicas.
+- `06-domain-mercados-y-settlement` es el unico dueno de `src/domain/*` y `src/validation/settlement-rules.ts`; los demas planes consumen esos tipos.
+- `03-db-digitalocean-postgres` debe entregar primero el baseline de discovery; research/predictions/parlays/validation entran en la expansion.
+- `09-tui-cli-headless` se divide en skeleton temprano y cierre final. El skeleton llama servicios disponibles; la TUI final no debe poner reglas de negocio en `src/cli.ts` ni `src/commands.ts`.
+- `10-permisos-auditoria-y-seguridad` cierra la policy completa, pero redaccion, profile y audit events minimos son obligatorios desde `01-runtime-config-perfiles-y-artifacts`.
 
 ## Reglas de alcance
 
@@ -146,4 +157,4 @@ Fuera:
 - Listar `docs/planes/por_hacer` y confirmar que existen los archivos `00` a `11`.
 - Buscar `SRS cubierto`, `Criterios de aceptacion` y `Pruebas` en cada plan operativo.
 - Revisar que ningun plan agregue dashboard web obligatorio, API publica obligatoria, multi-worker obligatorio o automatizacion monetaria.
-- Revisar que el roadmap preserve la secuencia de dependencias: runtime/config, providers, DB, API-Football, filtros, dominio, scoring, parlay, TUI/CLI, seguridad y QA.
+- Revisar que el roadmap preserve la secuencia ajustada: runtime/config/redaccion, command skeleton, dominio minimo, DB baseline, API-Football, filtros, providers agentic, scoring, parlay, validation, TUI final, seguridad completa y QA.

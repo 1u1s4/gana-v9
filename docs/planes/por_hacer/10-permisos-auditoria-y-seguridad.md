@@ -4,6 +4,8 @@
 
 Implementar perfiles `standard` y `full-permissions`, approvals auditados, redaccion de secretos, metadata de tools, audit log durable y restriccion explicita de no automatizacion monetaria.
 
+La redaccion, profile basico y audit events minimos empiezan en `01-runtime-config-perfiles-y-artifacts.md`. Este plan cierra la politica completa cuando ya se conocen las acciones sensibles reales.
+
 ## SRS cubierto
 
 - Secciones 2.9, 2.10, 4.4, 4.5.
@@ -13,6 +15,8 @@ Implementar perfiles `standard` y `full-permissions`, approvals auditados, redac
 ## Contexto actual
 
 `src/tools/*` puede leer, escribir, editar y ejecutar shell en el backend OpenRouter, pero no hay metadata de permisos ni audit log. Los proveedores CLI externos tambien pueden ejecutar herramientas propias. El repo ya usa `codexSandbox`, `geminiApprovalMode` y `cursorForce`, pero no los modela como policy del producto.
+
+No se debe esperar a este plan para ocultar `DATABASE_URL`, `API_FOOTBALL_KEY` o headers de auth; esos controles son baseline del Corte 1.
 
 ## Modulos nuevos
 
@@ -167,4 +171,3 @@ Los comandos `/parlay`, `/score`, `/run` deben incluir en metadata que producen 
 - No se puede interceptar todo lo que haga un CLI externo si opera fuera del harness. Mitigar pasando flags de sandbox/approval y registrando eventos observables.
 - Redaccion debe ser conservadora: mejor ocultar de mas que filtrar secretos.
 - No mezclar aprobacion productiva con permisos del sandbox de Codex sin audit.
-

@@ -14,6 +14,8 @@ Implementar API-Football como proveedor deportivo obligatorio del MVP, con clien
 
 No existe `src/providers/sports`, cliente HTTP deportivo, config API-Football ni persistencia de snapshots. El SRS exige datos reales desde el inicio; no se debe crear una ruta simulada como producto.
 
+Este plan depende del dominio minimo de `06-domain-mercados-y-settlement.md`: los mappers deben consumir `Fixture`, `MarketKey`, selections, lineas y odds canonicas desde `src/domain/*`.
+
 ## Cambios requeridos
 
 ### Modulos nuevos
@@ -87,6 +89,8 @@ Convertir payloads externos a dominio interno:
 - estadisticas finales, especialmente corners.
 
 El dominio no debe depender de nombres nativos del proveedor.
+
+El adapter debe fallar con `mapping_error` si API-Football entrega un mercado que no se puede traducir a los `MarketKey` canonicos. No debe crear strings de mercado nuevos dentro del provider.
 
 ### Snapshots
 
@@ -174,6 +178,7 @@ Headless:
 - Con API key valida, `football status` muestra `ready` y metadata redacted.
 - `listFixtures` normaliza fixtures reales para una fecha.
 - `getOdds` produce quotes por market/selection/line/bookmaker.
+- Los mappers usan `MarketKey` y validators canonicos de `src/domain/*`.
 - Cada request relevante genera hash y snapshot.
 - `getFixtureStatistics` puede distinguir `corners-statistics-unavailable`.
 - Errores de provider son legibles y accionables.
@@ -195,4 +200,3 @@ Headless:
 - API-Football puede cambiar nombres de mercados/bookmakers. Mantener mapper defensivo y registrar `mapping_error`.
 - No asumir que todos los mercados estan disponibles para todos los fixtures.
 - Proteger cuota con `maxFixturesPerRun`, caching/snapshots y errores de rate limit.
-

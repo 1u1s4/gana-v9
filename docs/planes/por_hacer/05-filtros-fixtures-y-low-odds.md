@@ -23,8 +23,8 @@ No existen `src/filters`, entidades deportivas ni comandos `/filters`, `/leagues
 - `src/filters/presets.ts`
 - `src/filters/engine.ts`
 - `src/filters/low-odds.ts`
-- `src/domain/fixtures.ts`
-- `src/domain/markets.ts`
+
+Este plan no crea `src/domain/*`. Debe consumir `Fixture`, `MarketKey`, `MarketSelection` y `OddsQuote` definidos por `06-domain-mercados-y-settlement.md`.
 
 ### Config de filtros
 
@@ -171,5 +171,4 @@ La TUI debe mostrar:
 
 - Scans amplios pueden agotar cuota. Aplicar limites antes de pedir odds.
 - Equipos pueden compartir nombres; usar IDs de provider como fuente.
-- No considerar una cuota baja como recomendacion automatica; solo es filtro de elegibilidad analitica.
-
+- Una cuota baja `<= 1.20` es un filtro de descubrimiento, no una recomendacion automatica ni una senal de promocion.

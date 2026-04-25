@@ -14,6 +14,8 @@ Construir candidatos de parlay desde predicciones atomicas estructuradas y valid
 
 No existen `src/parlay` ni `src/validation`. El SRS prohibe automatizacion monetaria: los parlays son artifacts analiticos, no apuestas ejecutables.
 
+`src/validation/settlement-rules.ts` no pertenece a este plan; lo crea `06-domain-mercados-y-settlement.md`. Este plan lo consume para settlement de predictions/parlays y solo agrega orchestration, result fetching y persistence.
+
 ## Modulos nuevos
 
 - `src/parlay/types.ts`
@@ -22,7 +24,6 @@ No existen `src/parlay` ni `src/validation`. El SRS prohibe automatizacion monet
 - `src/parlay/service.ts`
 - `src/validation/types.ts`
 - `src/validation/service.ts`
-- `src/validation/settlement-rules.ts`
 - `src/validation/result-fetcher.ts`
 
 ## Parlay
@@ -176,4 +177,3 @@ No guardar parlay legs como JSON de IDs; usar tabla normalizada.
 - Parlays pueden inducir interpretacion monetaria. Mantener lenguaje de artifact analitico y prohibicion explicita.
 - Resultados finales pueden tardar; usar `pending` y permitir revalidacion.
 - Estadisticas de corners pueden no estar disponibles por liga/proveedor.
-

@@ -4,6 +4,8 @@
 
 Extender la base actual para que Gana v9 opere como `mvp-productivo-online` desde el primer corte: configuracion durable, perfiles operativos, artifact root, redaccion de secretos y contratos transversales para runs/events.
 
+Este plan debe implementar la seguridad basica temprano: redaccion, profile, approval mode y audit events minimos no se postergan al cierre de seguridad.
+
 ## SRS cubierto
 
 - Secciones 0, 2.1, 2.2, 2.3, 2.6, 2.8, 2.9.
@@ -168,7 +170,7 @@ Run directory:
 
 ### Redaccion
 
-Crear `src/security/redaction.ts` o `src/permissions/redaction.ts`:
+Crear `src/permissions/redaction.ts` como ubicacion canonica. `src/security/redaction.ts` solo puede existir como reexport si se necesita compatibilidad.
 
 - `redactSecrets(value: unknown): unknown`
 - `redactConnectionUrl(url: string): string`
@@ -193,6 +195,24 @@ Aplicar redaccion en:
 - audit logs;
 - renderer si muestra argumentos.
 
+### Audit minimo de Corte 1
+
+Crear `src/permissions/audit.ts` con una primera version append-only para artifacts:
+
+- `appendAuditEvent(context, event)`
+- `appendAutoApproval(context, action)`
+- `appendConfigStatusEvent(context, status)`
+
+En Corte 1 puede persistir solo en `.artifacts/gana-v9/runs/<run-id>/audit-log.jsonl` o en session/artifact local si la DB aun no esta lista. Cuando `03-db-digitalocean-postgres` entregue `audit_logs`, el mismo contrato debe escribir tambien en DB.
+
+Eventos minimos:
+
+- cambio de profile;
+- DB/API status checks;
+- errores redacted de config;
+- artifact writes;
+- auto-approval bajo `full-permissions`.
+
 ## Interfaz esperada
 
 `loadConfig()` debe devolver una configuracion extendida compatible con los campos actuales. Ningun consumidor existente debe romperse por falta de nuevos env vars excepto comandos productivos que requieran DB/API.
@@ -215,6 +235,8 @@ Aplicar redaccion en:
 - `artifactRoot` se crea al iniciar un run, no necesariamente al abrir la TUI.
 - Ningun log/status imprime secretos completos.
 - `profile full-permissions` no elimina auditoria; solo cambia aprobacion a auto-grant auditada.
+- Existe `src/permissions/redaction.ts` como modulo canonico de redaccion.
+- Existe audit append-only minimo antes de conectar DB.
 
 ## Pruebas
 
@@ -227,4 +249,3 @@ Aplicar redaccion en:
 
 - Extender `AgentConfig` demasiado puede mezclar config agentic con config deportiva. Si crece, dividir en `AgentConfig` y `GanaConfig`, pero mantener `loadConfig` como fachada publica.
 - No crear runs implicitos para cada mensaje agentic todavia si no hay flujo deportivo; registrar session y run solo cuando un comando productivo lo requiere.
-
