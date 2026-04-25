@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import 'dotenv/config';
-import { DEFAULT_MARKETS, type MarketKey } from './domain/markets.js';
+import { DEFAULT_MARKETS, isMarketKey, type MarketKey } from './domain/markets.js';
 import type { ApiFootballLeagueRef, ApiFootballTeamRef } from './filters/types.js';
 
 export type GanaRuntime = 'mvp-productivo-online';
@@ -102,10 +102,6 @@ function isProfile(value: unknown): value is GanaProfile {
 
 function isApprovalMode(value: unknown): value is ApprovalMode {
   return value === 'manual' || value === 'auto-grant';
-}
-
-function isMarketKey(value: unknown): value is MarketKey {
-  return typeof value === 'string' && DEFAULT_MARKETS.includes(value as MarketKey);
 }
 
 function parseMarkets(value: string | undefined): MarketKey[] | undefined {
