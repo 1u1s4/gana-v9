@@ -15,7 +15,7 @@ export interface DisplayConfig {
 }
 
 export interface AgentConfig {
-  provider: 'codex' | 'gemini' | 'openrouter';
+  provider: 'codex' | 'gemini' | 'cursor' | 'openrouter';
   apiKey: string;
   model: string;
   name: string;
@@ -33,6 +33,9 @@ export interface AgentConfig {
   geminiModelListPath: string;
   geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
   geminiSessionId?: string;
+  cursorModelListPath: string;
+  cursorForce: boolean;
+  cursorSessionId?: string;
 }
 
 const DEFAULTS: AgentConfig = {
@@ -71,6 +74,8 @@ const DEFAULTS: AgentConfig = {
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
   geminiApprovalMode: 'yolo',
+  cursorModelListPath: 'config/cursor-models.json',
+  cursorForce: true,
 };
 
 export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipApiKey?: boolean }): AgentConfig {
@@ -86,7 +91,12 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   }
 
   if (process.env.OPENROUTER_API_KEY) config.apiKey = process.env.OPENROUTER_API_KEY;
-  if (process.env.AGENT_PROVIDER === 'codex' || process.env.AGENT_PROVIDER === 'gemini' || process.env.AGENT_PROVIDER === 'openrouter') {
+  if (
+    process.env.AGENT_PROVIDER === 'codex'
+    || process.env.AGENT_PROVIDER === 'gemini'
+    || process.env.AGENT_PROVIDER === 'cursor'
+    || process.env.AGENT_PROVIDER === 'openrouter'
+  ) {
     config.provider = process.env.AGENT_PROVIDER;
   }
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
@@ -95,6 +105,7 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
   if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
   if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
+  if (process.env.CURSOR_MODEL_LIST_PATH) config.cursorModelListPath = process.env.CURSOR_MODEL_LIST_PATH;
 
   if (overrides.display) {
     config.display = { ...config.display, ...overrides.display };
@@ -108,6 +119,10 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   }
   if (config.provider === 'gemini' && !opts?.skipApiKey && !existsSync(resolve(config.geminiHome, 'oauth_creds.json'))) {
     throw new Error(`Gemini auth not found at ${resolve(config.geminiHome, 'oauth_creds.json')}. Run "gemini" and complete login first.`);
+  }
+  if (config.provider === 'cursor' && !opts?.skipApiKey) {
+    const ok = existsSync(resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json'));
+    if (!ok) throw new Error('Cursor Agent auth/config not found. Run "cursor-agent login" first.');
   }
   return config;
 }

@@ -89,6 +89,22 @@ function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
     .map((id) => ({ id, name: names.get(id) ?? id }));
 }
 
+function loadCursorModels(ctx: CommandContext): { id: string; name: string }[] {
+  const path = resolve(ctx.config.cursorModelListPath);
+  if (!existsSync(path)) return [];
+
+  const raw = JSON.parse(readFileSync(path, 'utf-8')) as { models?: unknown };
+  const models = raw.models;
+  if (!Array.isArray(models)) return [];
+
+  return models
+    .map((model: any) => ({
+      id: String(model.id ?? model.modelId ?? ''),
+      name: String(model.name ?? model.displayName ?? model.id ?? ''),
+    }))
+    .filter((model) => model.id);
+}
+
 async function loadOpenRouterModels() {
   const res = await fetch('https://openrouter.ai/api/v1/models');
   const { data } = await res.json() as { data: { id: string; name: string }[] };
@@ -107,7 +123,9 @@ commands.push({
       ? loadCodexModels(ctx)
       : ctx.config.provider === 'gemini'
         ? loadGeminiModels(ctx)
-        : await loadOpenRouterModels();
+        : ctx.config.provider === 'cursor'
+          ? loadCursorModels(ctx)
+          : await loadOpenRouterModels();
     process.stdout.write('\r\x1b[K');
     const q = query.toLowerCase();
     const matches = data
@@ -131,6 +149,7 @@ commands.push({
     ctx.messages.length = 0;
     ctx.config.codexThreadId = undefined;
     ctx.config.geminiSessionId = undefined;
+    ctx.config.cursorSessionId = undefined;
     ctx.sessionPath = ctx.resetSession();
     console.log(`  ${GREEN}✓${RESET} ${DIM}New session started.${RESET}`);
   },

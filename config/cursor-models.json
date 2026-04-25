@@ -1,0 +1,399 @@
+{
+  "updatedAt": "2026-04-25T11:35:45.400Z",
+  "models": [
+    {
+      "id": "auto",
+      "name": "Auto"
+    },
+    {
+      "id": "composer-2-fast",
+      "name": "Composer 2 Fast",
+      "isDefault": true,
+      "isCurrent": true
+    },
+    {
+      "id": "composer-2",
+      "name": "Composer 2"
+    },
+    {
+      "id": "composer-1.5",
+      "name": "Composer 1.5"
+    },
+    {
+      "id": "gpt-5.3-codex-low",
+      "name": "Codex 5.3 Low"
+    },
+    {
+      "id": "gpt-5.3-codex-low-fast",
+      "name": "Codex 5.3 Low Fast"
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "name": "Codex 5.3"
+    },
+    {
+      "id": "gpt-5.3-codex-fast",
+      "name": "Codex 5.3 Fast"
+    },
+    {
+      "id": "gpt-5.3-codex-high",
+      "name": "Codex 5.3 High"
+    },
+    {
+      "id": "gpt-5.3-codex-high-fast",
+      "name": "Codex 5.3 High Fast"
+    },
+    {
+      "id": "gpt-5.3-codex-xhigh",
+      "name": "Codex 5.3 Extra High"
+    },
+    {
+      "id": "gpt-5.3-codex-xhigh-fast",
+      "name": "Codex 5.3 Extra High Fast"
+    },
+    {
+      "id": "gpt-5.2",
+      "name": "GPT-5.2"
+    },
+    {
+      "id": "gpt-5.3-codex-spark-preview-low",
+      "name": "Codex 5.3 Spark Low"
+    },
+    {
+      "id": "gpt-5.3-codex-spark-preview",
+      "name": "Codex 5.3 Spark"
+    },
+    {
+      "id": "gpt-5.3-codex-spark-preview-high",
+      "name": "Codex 5.3 Spark High"
+    },
+    {
+      "id": "gpt-5.3-codex-spark-preview-xhigh",
+      "name": "Codex 5.3 Spark Extra High"
+    },
+    {
+      "id": "gpt-5.2-codex-low",
+      "name": "Codex 5.2 Low"
+    },
+    {
+      "id": "gpt-5.2-codex-low-fast",
+      "name": "Codex 5.2 Low Fast"
+    },
+    {
+      "id": "gpt-5.2-codex",
+      "name": "Codex 5.2"
+    },
+    {
+      "id": "gpt-5.2-codex-fast",
+      "name": "Codex 5.2 Fast"
+    },
+    {
+      "id": "gpt-5.2-codex-high",
+      "name": "Codex 5.2 High"
+    },
+    {
+      "id": "gpt-5.2-codex-high-fast",
+      "name": "Codex 5.2 High Fast"
+    },
+    {
+      "id": "gpt-5.2-codex-xhigh",
+      "name": "Codex 5.2 Extra High"
+    },
+    {
+      "id": "gpt-5.2-codex-xhigh-fast",
+      "name": "Codex 5.2 Extra High Fast"
+    },
+    {
+      "id": "gpt-5.1-codex-max-low",
+      "name": "Codex 5.1 Max Low"
+    },
+    {
+      "id": "gpt-5.1-codex-max-low-fast",
+      "name": "Codex 5.1 Max Low Fast"
+    },
+    {
+      "id": "gpt-5.1-codex-max-medium",
+      "name": "Codex 5.1 Max"
+    },
+    {
+      "id": "gpt-5.1-codex-max-medium-fast",
+      "name": "Codex 5.1 Max Medium Fast"
+    },
+    {
+      "id": "gpt-5.1-codex-max-high",
+      "name": "Codex 5.1 Max High"
+    },
+    {
+      "id": "gpt-5.1-codex-max-high-fast",
+      "name": "Codex 5.1 Max High Fast"
+    },
+    {
+      "id": "gpt-5.1-codex-max-xhigh",
+      "name": "Codex 5.1 Max Extra High"
+    },
+    {
+      "id": "gpt-5.1-codex-max-xhigh-fast",
+      "name": "Codex 5.1 Max Extra High Fast"
+    },
+    {
+      "id": "gpt-5.5-medium",
+      "name": "GPT-5.5 1M"
+    },
+    {
+      "id": "claude-opus-4-7-thinking-high",
+      "name": "Opus 4.7 1M High Thinking"
+    },
+    {
+      "id": "gpt-5.4-high",
+      "name": "GPT-5.4 1M High"
+    },
+    {
+      "id": "gpt-5.4-high-fast",
+      "name": "GPT-5.4 High Fast"
+    },
+    {
+      "id": "claude-4.6-opus-high-thinking-fast",
+      "name": "Opus 4.6 1M Thinking Fast"
+    },
+    {
+      "id": "gpt-5.5-high",
+      "name": "GPT-5.5 1M High"
+    },
+    {
+      "id": "gpt-5.5-extra-high",
+      "name": "GPT-5.5 1M Extra High"
+    },
+    {
+      "id": "claude-4.6-sonnet-medium",
+      "name": "Sonnet 4.6 1M"
+    },
+    {
+      "id": "claude-4.6-sonnet-medium-thinking",
+      "name": "Sonnet 4.6 1M Thinking"
+    },
+    {
+      "id": "claude-opus-4-7-low",
+      "name": "Opus 4.7 1M Low"
+    },
+    {
+      "id": "claude-opus-4-7-medium",
+      "name": "Opus 4.7 1M Medium"
+    },
+    {
+      "id": "claude-opus-4-7-high",
+      "name": "Opus 4.7 1M High"
+    },
+    {
+      "id": "claude-opus-4-7-xhigh",
+      "name": "Opus 4.7 1M"
+    },
+    {
+      "id": "claude-opus-4-7-max",
+      "name": "Opus 4.7 1M Max"
+    },
+    {
+      "id": "claude-opus-4-7-thinking-low",
+      "name": "Opus 4.7 1M Low Thinking"
+    },
+    {
+      "id": "claude-opus-4-7-thinking-medium",
+      "name": "Opus 4.7 1M Medium Thinking"
+    },
+    {
+      "id": "claude-opus-4-7-thinking-xhigh",
+      "name": "Opus 4.7 1M Thinking"
+    },
+    {
+      "id": "claude-opus-4-7-thinking-max",
+      "name": "Opus 4.7 1M Max Thinking"
+    },
+    {
+      "id": "gpt-5.4-low",
+      "name": "GPT-5.4 1M Low"
+    },
+    {
+      "id": "gpt-5.4-medium",
+      "name": "GPT-5.4 1M"
+    },
+    {
+      "id": "gpt-5.4-medium-fast",
+      "name": "GPT-5.4 Fast"
+    },
+    {
+      "id": "gpt-5.4-xhigh",
+      "name": "GPT-5.4 1M Extra High"
+    },
+    {
+      "id": "gpt-5.4-xhigh-fast",
+      "name": "GPT-5.4 Extra High Fast"
+    },
+    {
+      "id": "claude-4.6-opus-high",
+      "name": "Opus 4.6 1M"
+    },
+    {
+      "id": "claude-4.6-opus-max",
+      "name": "Opus 4.6 1M Max"
+    },
+    {
+      "id": "claude-4.6-opus-high-thinking",
+      "name": "Opus 4.6 1M Thinking"
+    },
+    {
+      "id": "claude-4.6-opus-max-thinking",
+      "name": "Opus 4.6 1M Max Thinking"
+    },
+    {
+      "id": "claude-4.6-opus-max-thinking-fast",
+      "name": "Opus 4.6 1M Max Thinking Fast"
+    },
+    {
+      "id": "claude-4.5-opus-high",
+      "name": "Opus 4.5"
+    },
+    {
+      "id": "claude-4.5-opus-high-thinking",
+      "name": "Opus 4.5 Thinking"
+    },
+    {
+      "id": "gpt-5.2-low",
+      "name": "GPT-5.2 Low"
+    },
+    {
+      "id": "gpt-5.2-low-fast",
+      "name": "GPT-5.2 Low Fast"
+    },
+    {
+      "id": "gpt-5.2-fast",
+      "name": "GPT-5.2 Fast"
+    },
+    {
+      "id": "gpt-5.2-high",
+      "name": "GPT-5.2 High"
+    },
+    {
+      "id": "gpt-5.2-high-fast",
+      "name": "GPT-5.2 High Fast"
+    },
+    {
+      "id": "gpt-5.2-xhigh",
+      "name": "GPT-5.2 Extra High"
+    },
+    {
+      "id": "gpt-5.2-xhigh-fast",
+      "name": "GPT-5.2 Extra High Fast"
+    },
+    {
+      "id": "gemini-3.1-pro",
+      "name": "Gemini 3.1 Pro"
+    },
+    {
+      "id": "gpt-5.4-mini-none",
+      "name": "GPT-5.4 Mini None"
+    },
+    {
+      "id": "gpt-5.4-mini-low",
+      "name": "GPT-5.4 Mini Low"
+    },
+    {
+      "id": "gpt-5.4-mini-medium",
+      "name": "GPT-5.4 Mini"
+    },
+    {
+      "id": "gpt-5.4-mini-high",
+      "name": "GPT-5.4 Mini High"
+    },
+    {
+      "id": "gpt-5.4-mini-xhigh",
+      "name": "GPT-5.4 Mini Extra High"
+    },
+    {
+      "id": "gpt-5.4-nano-none",
+      "name": "GPT-5.4 Nano None"
+    },
+    {
+      "id": "gpt-5.4-nano-low",
+      "name": "GPT-5.4 Nano Low"
+    },
+    {
+      "id": "gpt-5.4-nano-medium",
+      "name": "GPT-5.4 Nano"
+    },
+    {
+      "id": "gpt-5.4-nano-high",
+      "name": "GPT-5.4 Nano High"
+    },
+    {
+      "id": "gpt-5.4-nano-xhigh",
+      "name": "GPT-5.4 Nano Extra High"
+    },
+    {
+      "id": "grok-4-20",
+      "name": "Grok 4.20"
+    },
+    {
+      "id": "grok-4-20-thinking",
+      "name": "Grok 4.20 Thinking"
+    },
+    {
+      "id": "claude-4.5-sonnet",
+      "name": "Sonnet 4.5 1M"
+    },
+    {
+      "id": "claude-4.5-sonnet-thinking",
+      "name": "Sonnet 4.5 1M Thinking"
+    },
+    {
+      "id": "gpt-5.1-low",
+      "name": "GPT-5.1 Low"
+    },
+    {
+      "id": "gpt-5.1",
+      "name": "GPT-5.1"
+    },
+    {
+      "id": "gpt-5.1-high",
+      "name": "GPT-5.1 High"
+    },
+    {
+      "id": "gemini-3-flash",
+      "name": "Gemini 3 Flash"
+    },
+    {
+      "id": "gpt-5.1-codex-mini-low",
+      "name": "Codex 5.1 Mini Low"
+    },
+    {
+      "id": "gpt-5.1-codex-mini",
+      "name": "Codex 5.1 Mini"
+    },
+    {
+      "id": "gpt-5.1-codex-mini-high",
+      "name": "Codex 5.1 Mini High"
+    },
+    {
+      "id": "claude-4-sonnet",
+      "name": "Sonnet 4"
+    },
+    {
+      "id": "claude-4-sonnet-1m",
+      "name": "Sonnet 4 1M"
+    },
+    {
+      "id": "claude-4-sonnet-thinking",
+      "name": "Sonnet 4 Thinking"
+    },
+    {
+      "id": "claude-4-sonnet-1m-thinking",
+      "name": "Sonnet 4 1M Thinking"
+    },
+    {
+      "id": "gpt-5-mini",
+      "name": "GPT-5 Mini"
+    },
+    {
+      "id": "kimi-k2.5",
+      "name": "Kimi K2.5"
+    }
+  ]
+}

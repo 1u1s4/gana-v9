@@ -24,6 +24,9 @@ export async function runAgent(
   if (config.provider === 'gemini') {
     return runGeminiAgent(config, input, options);
   }
+  if (config.provider === 'cursor') {
+    return runCursorAgent(config, input, options);
+  }
 
   const client = new OpenRouter({ apiKey: config.apiKey });
 
@@ -116,6 +119,26 @@ interface GeminiJsonEvent {
   };
 }
 
+interface CursorJsonEvent {
+  type: string;
+  subtype?: string;
+  session_id?: string;
+  timestamp_ms?: number;
+  message?: {
+    role?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  };
+  tool_call?: Record<string, any>;
+  call_id?: string;
+  result?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
+}
+
 function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
   const userPrompt = typeof input === 'string'
     ? input
@@ -184,6 +207,60 @@ function geminiArgs(config: AgentConfig, prompt: string): string[] {
   }
 
   return args;
+}
+
+function inputToCursorPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
+  const userPrompt = typeof input === 'string'
+    ? input
+    : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
+
+  if (config.cursorSessionId) return userPrompt;
+
+  return [
+    config.systemPrompt.replace('{cwd}', process.cwd()),
+    '',
+    'User request:',
+    userPrompt,
+  ].join('\n');
+}
+
+function cursorArgs(config: AgentConfig, prompt: string): string[] {
+  const args = [
+    '--print',
+    '--output-format',
+    'stream-json',
+    '--stream-partial-output',
+    '--trust',
+    '--workspace',
+    process.cwd(),
+    '--model',
+    config.model,
+  ];
+
+  if (config.cursorForce) args.push('--force');
+  if (config.cursorSessionId) args.push('--resume', config.cursorSessionId);
+  args.push(prompt);
+
+  return args;
+}
+
+function cursorToolName(toolCall: Record<string, any> | undefined): string {
+  const key = Object.keys(toolCall ?? {})[0];
+  if (!key) return 'tool';
+  return key.replace(/ToolCall$/, '').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function cursorToolArgs(toolCall: Record<string, any> | undefined): Record<string, unknown> {
+  const key = Object.keys(toolCall ?? {})[0];
+  if (!key) return {};
+  return toolCall?.[key]?.args ?? {};
+}
+
+function cursorToolOutput(toolCall: Record<string, any> | undefined): string {
+  const key = Object.keys(toolCall ?? {})[0];
+  const result = key ? toolCall?.[key]?.result : undefined;
+  if (typeof result === 'string') return result;
+  return result ? JSON.stringify(result) : '';
 }
 
 async function runCodexAgent(
@@ -403,6 +480,128 @@ async function runGeminiAgent(
 
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `gemini exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
+  }
+
+  return { text, usage, output: text };
+}
+
+async function runCursorAgent(
+  config: AgentConfig,
+  input: string | ChatMessage[],
+  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal },
+) {
+  const prompt = inputToCursorPrompt(config, input);
+  const child = spawn('cursor-agent', cursorArgs(config, prompt), {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stdoutBuffer = '';
+  let stderr = '';
+  let text = '';
+  let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; cacheWriteTokens?: number } = {};
+  let sawPartialAssistant = false;
+
+  const handleEvent = (event: CursorJsonEvent) => {
+    if (event.session_id) config.cursorSessionId = event.session_id;
+
+    if (event.type === 'tool_call' && event.subtype === 'started') {
+      options?.onEvent?.({
+        type: 'tool_call',
+        name: cursorToolName(event.tool_call),
+        callId: event.call_id ?? `cursor-${Date.now()}`,
+        args: cursorToolArgs(event.tool_call),
+      });
+      return;
+    }
+
+    if (event.type === 'tool_call' && event.subtype === 'completed') {
+      options?.onEvent?.({
+        type: 'tool_result',
+        name: cursorToolName(event.tool_call),
+        callId: event.call_id ?? `cursor-${Date.now()}`,
+        output: cursorToolOutput(event.tool_call),
+      });
+      return;
+    }
+
+    if (event.type === 'thinking' && event.subtype === 'delta' && event.message?.content) {
+      const delta = event.message.content.map((c) => c.text ?? '').join('');
+      if (delta) options?.onEvent?.({ type: 'reasoning', delta });
+      return;
+    }
+
+    if (event.type === 'assistant' && event.message?.content) {
+      const delta = event.message.content.map((c) => c.text ?? '').join('');
+      if (!delta) return;
+
+      if (event.timestamp_ms) {
+        sawPartialAssistant = true;
+        text += delta;
+        options?.onEvent?.({ type: 'text', delta });
+      } else if (!sawPartialAssistant) {
+        text += delta;
+        options?.onEvent?.({ type: 'text', delta });
+      }
+      return;
+    }
+
+    if (event.type === 'result') {
+      if (!sawPartialAssistant && event.result && !text) {
+        text = event.result;
+        options?.onEvent?.({ type: 'text', delta: event.result });
+      }
+      usage = {
+        inputTokens: event.usage?.inputTokens,
+        outputTokens: event.usage?.outputTokens,
+        cachedInputTokens: event.usage?.cacheReadTokens,
+        cacheWriteTokens: event.usage?.cacheWriteTokens,
+      };
+    }
+  };
+
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => {
+    stdoutBuffer += chunk;
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        handleEvent(JSON.parse(line) as CursorJsonEvent);
+      } catch {
+        text += line + '\n';
+        options?.onEvent?.({ type: 'text', delta: line + '\n' });
+      }
+    }
+  });
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk: string) => {
+    stderr += chunk;
+  });
+
+  options?.signal?.addEventListener('abort', () => {
+    child.kill('SIGTERM');
+  }, { once: true });
+
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', resolve);
+  });
+
+  if (stdoutBuffer.trim()) {
+    try {
+      handleEvent(JSON.parse(stdoutBuffer) as CursorJsonEvent);
+    } catch {
+      text += stdoutBuffer;
+    }
+  }
+
+  if (exitCode !== 0) {
+    throw new Error((stderr.trim() || `cursor-agent exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
 
   return { text, usage, output: text };

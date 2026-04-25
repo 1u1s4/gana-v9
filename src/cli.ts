@@ -38,6 +38,7 @@ function textBanner(name: string, model: string, provider: string) {
 function providerLabel(provider: string): string {
   if (provider === 'codex') return 'local codex auth';
   if (provider === 'gemini') return 'local gemini auth';
+  if (provider === 'cursor') return 'local cursor auth';
   return 'openrouter';
 }
 

@@ -34,6 +34,7 @@ Providers validos:
 
 - `codex` con modelos como `gpt-5.5`.
 - `gemini` con modelos como `gemini-2.5-flash`.
+- `cursor` con modelos como `composer-2-fast`.
 - `openrouter` con IDs de OpenRouter.
 
 Comandos disponibles dentro de la TUI:
@@ -65,6 +66,20 @@ npm run update:gemini-models
 ```
 
 El script lee modelos desde el Gemini CLI instalado. Si defines `GEMINI_API_KEY` o `GOOGLE_API_KEY`, tambien intenta consultar la API de Gemini y fusionar esos resultados.
+
+Backend Cursor Agent:
+
+- Disponible configurando `provider: "cursor"` y un modelo como `composer-2-fast`.
+- Usa `cursor-agent --print --output-format stream-json` como subprocess.
+- Lee tu autenticacion local de Cursor Agent.
+- Reanuda la sesion de Cursor entre turnos hasta usar `/new`.
+- `/model` lee `config/cursor-models.json`.
+
+Actualizar el listado de modelos Cursor:
+
+```bash
+npm run update:cursor-models
+```
 
 Backend OpenRouter:
 

@@ -10,6 +10,8 @@
   "geminiHome": "/Users/luisalvarado/.gemini",
   "geminiModelListPath": "config/gemini-models.json",
   "geminiApprovalMode": "yolo",
+  "cursorModelListPath": "config/cursor-models.json",
+  "cursorForce": true,
   "showBanner": true,
   "display": {
     "inputStyle": "block",
