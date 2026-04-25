@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "create-agent-tui": {
+      "source": "OpenRouterTeam/skills",
+      "sourceType": "github",
+      "computedHash": "0e55cbd5f0a2f7dd1e18a1c73ff354cff496776aeefa5b8f56405544edd0b3ea"
+    }
+  }
+}
