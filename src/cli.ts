@@ -22,17 +22,23 @@ function parseArg(flag: string): string | undefined {
   return i !== -1 && i + 1 < process.argv.length ? process.argv[i + 1] : undefined;
 }
 
-function textBanner(name: string, model: string) {
+function textBanner(name: string, model: string, provider: string) {
   const width = Math.min(process.stdout.columns || 60, 60);
   const line = GRAY + '─'.repeat(width) + RESET;
   console.log();
   console.log(line);
   console.log(`  ${BOLD}${name}${RESET}`);
-  console.log(`  ${DIM}provider${RESET}  ${CYAN}local codex auth${RESET}`);
+  console.log(`  ${DIM}provider${RESET}  ${CYAN}${providerLabel(provider)}${RESET}`);
   console.log(`  ${DIM}model${RESET}  ${CYAN}${model}${RESET}`);
   console.log(line);
   console.log(`  ${DIM}Type a message to start. "exit" to quit.${RESET}`);
   console.log();
+}
+
+function providerLabel(provider: string): string {
+  if (provider === 'codex') return 'local codex auth';
+  if (provider === 'gemini') return 'local gemini auth';
+  return 'openrouter';
 }
 
 function formatTokens(n: number): string {
@@ -179,9 +185,9 @@ async function main() {
   if (config.showBanner) {
     printBanner(config.model);
   } else {
-    textBanner(config.name, config.model);
+    textBanner(config.name, config.model, config.provider);
   }
-  if (config.showBanner) console.log(`  ${DIM}provider  ${RESET}${config.provider === 'codex' ? 'local codex auth' : 'openrouter'}\n`);
+  if (config.showBanner) console.log(`  ${DIM}provider  ${RESET}${providerLabel(config.provider)}\n`);
   if (config.slashCommands) console.log(`  ${DIM}/help for commands${RESET}\n`);
 
   const renderer = new TuiRenderer({ display: config.display });

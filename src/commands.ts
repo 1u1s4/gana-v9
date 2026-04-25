@@ -51,6 +51,39 @@ function loadCodexModels(ctx: CommandContext): { id: string; name: string }[] {
     .filter((model) => model.id);
 }
 
+function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
+  const settingsPath = join(ctx.config.geminiHome, 'settings.json');
+  const settings = existsSync(settingsPath)
+    ? JSON.parse(readFileSync(settingsPath, 'utf-8'))
+    : {};
+
+  const configured = settings?.model?.name;
+  const configuredList = Array.isArray(settings?.model?.available)
+    ? settings.model.available
+    : Array.isArray(settings?.model?.availableModels)
+      ? settings.model.availableModels
+      : [];
+
+  const models = [
+    ...configuredList.map((model: any) => typeof model === 'string' ? model : model?.id ?? model?.name),
+    ...Object.keys(settings?.modelConfigs?.modelDefinitions ?? {}),
+    ...Object.keys(settings?.modelConfigs?.customAliases ?? {}),
+    'gemini-3-pro-preview',
+    'gemini-3-flash-preview',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+  ];
+
+  if (configured && !models.includes(configured)) {
+    models.unshift(configured);
+  }
+
+  return [...new Set(models.filter(Boolean))]
+    .map((id) => ({ id, name: id }));
+}
+
 async function loadOpenRouterModels() {
   const res = await fetch('https://openrouter.ai/api/v1/models');
   const { data } = await res.json() as { data: { id: string; name: string }[] };
@@ -67,7 +100,9 @@ commands.push({
     process.stdout.write(`  ${DIM}Fetching…${RESET}`);
     const data = ctx.config.provider === 'codex'
       ? loadCodexModels(ctx)
-      : await loadOpenRouterModels();
+      : ctx.config.provider === 'gemini'
+        ? loadGeminiModels(ctx)
+        : await loadOpenRouterModels();
     process.stdout.write('\r\x1b[K');
     const q = query.toLowerCase();
     const matches = data
@@ -85,11 +120,22 @@ commands.push({
 });
 
 commands.push({
+  name: '/tokens',
+  description: 'Display total input/output tokens',
+  execute: async (_args, ctx) => {
+    console.log(`  ${DIM}Input tokens:${RESET}  ${CYAN}${ctx.totalTokens.input}${RESET}`);
+    console.log(`  ${DIM}Output tokens:${RESET} ${CYAN}${ctx.totalTokens.output}${RESET}`);
+    console.log(`  ${DIM}Total tokens:${RESET}  ${CYAN}${ctx.totalTokens.input + ctx.totalTokens.output}${RESET}`);
+  },
+});
+
+commands.push({
   name: '/new',
   description: 'Start a fresh conversation',
   execute: async (_args, ctx) => {
     ctx.messages.length = 0;
     ctx.config.codexThreadId = undefined;
+    ctx.config.geminiSessionId = undefined;
     ctx.sessionPath = ctx.resetSession();
     console.log(`  ${GREEN}✓${RESET} ${DIM}New session started.${RESET}`);
   },

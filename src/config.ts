@@ -15,7 +15,7 @@ export interface DisplayConfig {
 }
 
 export interface AgentConfig {
-  provider: 'codex' | 'openrouter';
+  provider: 'codex' | 'gemini' | 'openrouter';
   apiKey: string;
   model: string;
   name: string;
@@ -29,6 +29,9 @@ export interface AgentConfig {
   codexHome: string;
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
   codexThreadId?: string;
+  geminiHome: string;
+  geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
+  geminiSessionId?: string;
 }
 
 const DEFAULTS: AgentConfig = {
@@ -64,6 +67,8 @@ const DEFAULTS: AgentConfig = {
   slashCommands: true,
   codexHome: join(process.env.HOME ?? '', '.codex'),
   codexSandbox: 'workspace-write',
+  geminiHome: join(process.env.HOME ?? '', '.gemini'),
+  geminiApprovalMode: 'yolo',
 };
 
 export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipApiKey?: boolean }): AgentConfig {
@@ -79,13 +84,14 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   }
 
   if (process.env.OPENROUTER_API_KEY) config.apiKey = process.env.OPENROUTER_API_KEY;
-  if (process.env.AGENT_PROVIDER === 'codex' || process.env.AGENT_PROVIDER === 'openrouter') {
+  if (process.env.AGENT_PROVIDER === 'codex' || process.env.AGENT_PROVIDER === 'gemini' || process.env.AGENT_PROVIDER === 'openrouter') {
     config.provider = process.env.AGENT_PROVIDER;
   }
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
   if (process.env.AGENT_MAX_STEPS) config.maxSteps = Number(process.env.AGENT_MAX_STEPS);
   if (process.env.AGENT_MAX_COST) config.maxCost = Number(process.env.AGENT_MAX_COST);
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
+  if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
 
   if (overrides.display) {
     config.display = { ...config.display, ...overrides.display };
@@ -96,6 +102,9 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
   }
   if (config.provider === 'codex' && !opts?.skipApiKey && !existsSync(resolve(config.codexHome, 'auth.json'))) {
     throw new Error(`Codex auth not found at ${resolve(config.codexHome, 'auth.json')}. Run "codex login" first.`);
+  }
+  if (config.provider === 'gemini' && !opts?.skipApiKey && !existsSync(resolve(config.geminiHome, 'oauth_creds.json'))) {
+    throw new Error(`Gemini auth not found at ${resolve(config.geminiHome, 'oauth_creds.json')}. Run "gemini" and complete login first.`);
   }
   return config;
 }

@@ -7,6 +7,8 @@
   "sessionDir": ".sessions",
   "codexHome": "/Users/luisalvarado/.codex",
   "codexSandbox": "workspace-write",
+  "geminiHome": "/Users/luisalvarado/.gemini",
+  "geminiApprovalMode": "yolo",
   "showBanner": true,
   "display": {
     "inputStyle": "block",

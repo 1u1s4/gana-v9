@@ -21,6 +21,9 @@ export async function runAgent(
   if (config.provider === 'codex') {
     return runCodexAgent(config, input, options);
   }
+  if (config.provider === 'gemini') {
+    return runGeminiAgent(config, input, options);
+  }
 
   const client = new OpenRouter({ apiKey: config.apiKey });
 
@@ -92,6 +95,27 @@ interface CodexJsonEvent {
   };
 }
 
+interface GeminiJsonEvent {
+  type: string;
+  session_id?: string;
+  role?: string;
+  content?: string;
+  delta?: boolean;
+  tool_name?: string;
+  tool_id?: string;
+  parameters?: Record<string, unknown>;
+  output?: string;
+  status?: string;
+  stats?: {
+    total_tokens?: number;
+    input_tokens?: number;
+    output_tokens?: number;
+    cached?: number;
+    duration_ms?: number;
+    tool_calls?: number;
+  };
+}
+
 function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
   const userPrompt = typeof input === 'string'
     ? input
@@ -125,6 +149,41 @@ function codexArgs(config: AgentConfig, prompt: string): string[] {
     config.model,
     prompt,
   ];
+}
+
+function inputToGeminiPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
+  const userPrompt = typeof input === 'string'
+    ? input
+    : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
+
+  if (config.geminiSessionId) return userPrompt;
+
+  return [
+    config.systemPrompt.replace('{cwd}', process.cwd()),
+    '',
+    'User request:',
+    userPrompt,
+  ].join('\n');
+}
+
+function geminiArgs(config: AgentConfig, prompt: string): string[] {
+  const args = [
+    '--prompt',
+    prompt,
+    '--output-format',
+    'stream-json',
+    '--model',
+    config.model,
+    '--approval-mode',
+    config.geminiApprovalMode,
+    '--skip-trust',
+  ];
+
+  if (config.geminiSessionId) {
+    args.push('--resume', config.geminiSessionId);
+  }
+
+  return args;
 }
 
 async function runCodexAgent(
@@ -233,6 +292,117 @@ async function runCodexAgent(
 
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `codex exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
+  }
+
+  return { text, usage, output: text };
+}
+
+async function runGeminiAgent(
+  config: AgentConfig,
+  input: string | ChatMessage[],
+  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal },
+) {
+  const prompt = inputToGeminiPrompt(config, input);
+  const child = spawn('gemini', geminiArgs(config, prompt), {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      GEMINI_MODEL: config.model,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  let stdoutBuffer = '';
+  let stderr = '';
+  let text = '';
+  let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number } = {};
+  const toolNames = new Map<string, string>();
+
+  const handleEvent = (event: GeminiJsonEvent) => {
+    if (event.type === 'init' && event.session_id) {
+      config.geminiSessionId = event.session_id;
+      return;
+    }
+
+    if (event.type === 'tool_use') {
+      const callId = event.tool_id ?? `gemini-${Date.now()}`;
+      toolNames.set(callId, event.tool_name ?? 'tool');
+      options?.onEvent?.({
+        type: 'tool_call',
+        name: event.tool_name ?? 'tool',
+        callId,
+        args: event.parameters ?? {},
+      });
+      return;
+    }
+
+    if (event.type === 'tool_result') {
+      const callId = event.tool_id ?? `gemini-${Date.now()}`;
+      options?.onEvent?.({
+        type: 'tool_result',
+        name: toolNames.get(callId) ?? 'tool',
+        callId,
+        output: event.output ?? event.status ?? '',
+      });
+      return;
+    }
+
+    if (event.type === 'message' && event.role === 'assistant' && event.content) {
+      text += event.content;
+      options?.onEvent?.({ type: 'text', delta: event.content });
+      return;
+    }
+
+    if (event.type === 'result' && event.stats) {
+      usage = {
+        inputTokens: event.stats.input_tokens,
+        outputTokens: event.stats.output_tokens,
+        cachedInputTokens: event.stats.cached,
+      };
+    }
+  };
+
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk: string) => {
+    stdoutBuffer += chunk;
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        handleEvent(JSON.parse(line) as GeminiJsonEvent);
+      } catch {
+        text += line + '\n';
+        options?.onEvent?.({ type: 'text', delta: line + '\n' });
+      }
+    }
+  });
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk: string) => {
+    stderr += chunk;
+  });
+
+  options?.signal?.addEventListener('abort', () => {
+    child.kill('SIGTERM');
+  }, { once: true });
+
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', resolve);
+  });
+
+  if (stdoutBuffer.trim()) {
+    try {
+      handleEvent(JSON.parse(stdoutBuffer) as GeminiJsonEvent);
+    } catch {
+      text += stdoutBuffer;
+    }
+  }
+
+  if (exitCode !== 0) {
+    throw new Error((stderr.trim() || `gemini exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
 
   return { text, usage, output: text };
