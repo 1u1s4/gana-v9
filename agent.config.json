@@ -2,6 +2,7 @@
   "name": "Gana Agent",
   "provider": "codex",
   "model": "gpt-5.5",
+  "fastMode": false,
   "maxSteps": 20,
   "maxCost": 1,
   "sessionDir": ".sessions",

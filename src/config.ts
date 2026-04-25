@@ -26,6 +26,8 @@ export interface AgentConfig {
   showBanner: boolean;
   display: DisplayConfig;
   slashCommands: boolean;
+  fastMode: boolean;
+  reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
   codexHome: string;
   codexModelListPath: string;
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
@@ -70,6 +72,8 @@ const DEFAULTS: AgentConfig = {
     loader: { text: 'Working', style: 'spinner' },
   },
   slashCommands: true,
+  fastMode: false,
+  reasoningEffort: undefined,
   codexHome: join(process.env.HOME ?? '', '.codex'),
   codexModelListPath: 'config/codex-models.json',
   codexSandbox: 'workspace-write',
@@ -102,6 +106,15 @@ export function loadConfig(overrides: Partial<AgentConfig> = {}, opts?: { skipAp
     config.provider = process.env.AGENT_PROVIDER;
   }
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
+  if (process.env.AGENT_FAST_MODE === 'true') config.fastMode = true;
+  if (
+    process.env.AGENT_REASONING_EFFORT === 'low'
+    || process.env.AGENT_REASONING_EFFORT === 'medium'
+    || process.env.AGENT_REASONING_EFFORT === 'high'
+    || process.env.AGENT_REASONING_EFFORT === 'xhigh'
+  ) {
+    config.reasoningEffort = process.env.AGENT_REASONING_EFFORT;
+  }
   if (process.env.AGENT_MAX_STEPS) config.maxSteps = Number(process.env.AGENT_MAX_STEPS);
   if (process.env.AGENT_MAX_COST) config.maxCost = Number(process.env.AGENT_MAX_COST);
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;

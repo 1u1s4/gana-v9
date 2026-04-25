@@ -40,7 +40,10 @@ Providers validos:
 Comandos disponibles dentro de la TUI:
 
 - `/help`: lista comandos.
-- `/model`: busca y cambia modelo desde Codex u OpenRouter, segun el provider activo.
+- `/provider`: lista providers disponibles y cambia entre `codex`, `gemini`, `cursor` y `openrouter`.
+- `/model`: lista, busca y cambia modelos del provider activo.
+- `/fast`: alterna modo rapido cuando el provider/modelo lo soporta.
+- `/think low|medium|high|xhigh`: ajusta nivel de razonamiento en Codex o cambia a una variante equivalente en Cursor cuando exista.
 - `/new`: inicia una conversacion nueva.
 - `exit`: cierra la TUI.
 

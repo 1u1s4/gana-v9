@@ -155,13 +155,22 @@ function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[]):
 }
 
 function codexArgs(config: AgentConfig, prompt: string): string[] {
+  const configArgs: string[] = [];
+  if (config.reasoningEffort) {
+    configArgs.push('-c', `model_reasoning_effort="${config.reasoningEffort}"`);
+  }
+  if (config.fastMode) {
+    configArgs.push('-c', 'service_tier="fast"');
+  }
+
   if (config.codexThreadId) {
-    return ['exec', 'resume', '--json', '-m', config.model, config.codexThreadId, prompt];
+    return ['exec', 'resume', '--json', ...configArgs, '-m', config.model, config.codexThreadId, prompt];
   }
 
   return [
     'exec',
     '--json',
+    ...configArgs,
     '--color',
     'never',
     '-C',
