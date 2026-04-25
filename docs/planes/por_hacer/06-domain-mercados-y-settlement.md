@@ -29,6 +29,8 @@ Tambien deben quedar estables antes de mapear API-Football y antes de implementa
 - `src/validation/settlement-rules.ts`
 - `src/validation/types.ts`
 
+`src/validation/types.ts` contiene solo tipos base de settlement y validation status compartidos. La orquestacion, fetching de resultados y persistencia de `ValidationArtifact` pertenecen al plan 08.
+
 ## Tipos base
 
 ```ts

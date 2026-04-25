@@ -64,7 +64,8 @@ Defaults iniciales:
 - `apiFootballBaseUrl`: `https://v3.football.api-sports.io`.
 - `apiFootball.lowOddsThreshold`: `1.2`.
 - `apiFootball.defaultMarkets`: `h2h`, `double_chance`, `goals_over_under`, `corners_over_under`, `btts`.
-- `apiFootball.defaultSeason`: año configurable por env; default inicial `2025` mientras el SRS lo mantenga.
+- `apiFootball.defaultSeason`: resolver desde `GANA_DEFAULT_SEASON` o `inferSeasonFromDate(new Date())`.
+- Si la temporada no se puede inferir con seguridad, los scans productivos deben mostrar warning accionable y exigir `GANA_DEFAULT_SEASON`.
 
 Variables de entorno:
 
@@ -120,7 +121,13 @@ type HarnessEventType =
   | 'db.write'
   | 'agent.started'
   | 'agent.delta'
+  | 'agent.tool_call'
+  | 'agent.tool_result'
+  | 'agent.reasoning'
   | 'agent.completed'
+  | 'agent.failed'
+  | 'agent.provider_changed'
+  | 'agent.session_reset'
   | 'approval.requested'
   | 'approval.granted'
   | 'approval.auto_granted'
@@ -230,6 +237,7 @@ Eventos minimos:
 
 - `npm run typecheck` pasa.
 - `loadConfig({})` funciona sin `DATABASE_URL` ni `API_FOOTBALL_KEY` para abrir TUI, pero `/db` y `/football` reportan configuracion faltante.
+- `defaultSeason` se resuelve por env o inferencia; si no es seguro, los scans productivos exigen `GANA_DEFAULT_SEASON` con warning accionable.
 - `agent.config.json` puede definir `runtime`, `profile`, `artifactRoot`, `approvalMode` y `apiFootball`.
 - `.env.example` documenta todas las variables nuevas.
 - `artifactRoot` se crea al iniciar un run, no necesariamente al abrir la TUI.

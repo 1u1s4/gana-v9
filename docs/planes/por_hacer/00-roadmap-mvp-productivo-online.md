@@ -45,7 +45,7 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 
 4. `03-db-digitalocean-postgres.md`
    - Crear el baseline de DigitalOcean PostgreSQL + Prisma.
-   - Partir la implementacion en baseline de discovery y expansion de prediccion para no bloquear fixtures/odds por research/parlays.
+   - Partir la implementacion en baseline de discovery + runs/audit/tasks minimos y expansion de prediccion para no bloquear fixtures/odds por research/parlays.
 
 5. `04-api-football-provider-y-normalizacion.md`
    - Implementar el proveedor deportivo real y snapshots.
@@ -72,7 +72,7 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
     - Debe enlazar provider snapshots y `settlement-v1`.
 
 11. `09-tui-cli-headless.md` cierre de experiencia
-    - Completar renderer extendido, comandos finales, `/run` y `/export`.
+    - Completar renderer extendido, comandos finales, `/run`, `/export`, `src/runtime/run-service.ts` y `src/runtime/pipeline.ts`.
     - Debe exponer capacidades ya implementadas, no duplicar logica.
 
 12. `10-permisos-auditoria-y-seguridad.md`
@@ -90,7 +90,7 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
 - Config extendida con runtime, profile, DB/API env vars redacted, artifacts y audit events minimos.
 - Command registry minimo: `/session`, `/profile`, `/approval`, `/db`, `/football`, `/filters` y equivalentes headless de status existen aunque algunas respuestas iniciales sean de estado/configuracion.
 - Dominio minimo definido: `Fixture`, `Odds`, `MarketKey`, selections y `settlement-v1` inicial.
-- DB baseline preparado para discovery: provider, competitions, teams, fixtures, snapshots, odds quotes, runs, artifacts, audit logs, presets y low-odds.
+- DB baseline preparado para discovery: provider, competitions, teams, fixtures, snapshots, odds quotes, runs, tasks minimos, artifacts, audit logs, presets y low-odds.
 - `pnpm gana` queda definido como target del producto.
 - Aceptacion: la TUI muestra provider agentic, modelo, perfil, artifact root, DB status y API-Football status sin exponer secretos.
 

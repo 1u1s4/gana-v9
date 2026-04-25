@@ -61,6 +61,7 @@ Esta fase debe desbloquear `/db status`, `/football status`, fixtures, odds, fil
 - `odds_snapshots`
 - `odds_quotes`
 - `harness_runs`
+- `harness_tasks`
 - `artifacts`
 - `audit_logs`
 - `league_presets`
@@ -255,6 +256,7 @@ Salida minima:
 - `prisma/schema.prisma` usa `postgresql`.
 - No hay tablas con nombres MySQL heredados tipo `fac_*` salvo decision explicita documentada.
 - Fase A: la DB puede persistir un run, fixture, provider snapshot, odds quote, low-odds scan/hit, artifact y audit log.
+- Fase A: `harness_tasks` existe en version minima para trazabilidad de `/run`, aunque el MVP inicial ejecute comandos directos sin cola distribuida.
 - Fase B: la DB puede persistir agent run, research bundle, prediction, parlay, validation y approval.
 - `db status` no imprime credenciales.
 - Cada FK relevante tiene indice.

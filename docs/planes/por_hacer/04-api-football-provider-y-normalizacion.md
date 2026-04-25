@@ -36,12 +36,25 @@ interface SportsDataProvider {
   getQuota(): Promise<QuotaStatus>;
   listFixtures(input: FixtureQuery): Promise<Fixture[]>;
   getFixture(input: FixtureByIdQuery): Promise<Fixture>;
-  getOdds(input: OddsQuery): Promise<CanonicalMarketSnapshot[]>;
+  getOdds(input: OddsQuery): Promise<OddsQuote[]>;
   scanOdds(input: OddsScanQuery): Promise<OddsScanResult[]>;
   getFinalResult(input: ResultQuery): Promise<FinalResult>;
   getFixtureStatistics(input: FixtureStatisticsQuery): Promise<FixtureStatistics>;
 }
 ```
+
+Si se necesita agrupar quotes por captura, usar un wrapper canonico:
+
+```ts
+type CanonicalMarketSnapshot = {
+  fixtureId: string;
+  capturedAt: string;
+  sourceSnapshotId: string;
+  quotes: OddsQuote[];
+};
+```
+
+`OddsQuote` sigue siendo el contrato compartido entre API-Football, filtros, low-odds, scoring y DB.
 
 ### Config
 
@@ -177,7 +190,7 @@ Headless:
 - `football status` detecta config faltante sin crash.
 - Con API key valida, `football status` muestra `ready` y metadata redacted.
 - `listFixtures` normaliza fixtures reales para una fecha.
-- `getOdds` produce quotes por market/selection/line/bookmaker.
+- `getOdds` retorna `OddsQuote[]` canonico por market/selection/line/bookmaker.
 - Los mappers usan `MarketKey` y validators canonicos de `src/domain/*`.
 - Cada request relevante genera hash y snapshot.
 - `getFixtureStatistics` puede distinguir `corners-statistics-unavailable`.

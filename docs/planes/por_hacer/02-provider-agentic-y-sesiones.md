@@ -125,6 +125,8 @@ interface NativeWebSearchRequirement {
 
 ### Eventos agentic
 
+Consumir la taxonomia canonica definida en `src/runtime/events.ts`. No crear una lista paralela en provider agentic.
+
 Persistir en session/artifacts:
 
 - `agent.started`
@@ -134,6 +136,8 @@ Persistir en session/artifacts:
 - `agent.reasoning`
 - `agent.completed`
 - `agent.failed`
+- `agent.provider_changed`
+- `agent.session_reset`
 
 Cada evento debe incluir:
 
@@ -182,4 +186,3 @@ No debe bloquear los planes deportivos. Los nuevos comandos productivos deben pr
 - Cursor/Gemini/Codex pueden cambiar JSON events. Mantener parsers defensivos y tests con muestras reales.
 - No guardar prompt completo en audit log sin pasar por redaccion.
 - No tratar OpenRouter como dependencia requerida para comandos deportivos.
-

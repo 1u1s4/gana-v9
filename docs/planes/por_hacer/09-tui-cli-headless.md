@@ -64,6 +64,32 @@ Debe completarse cuando DB, API-Football, filtros, scoring, parlay y validation 
 - `/export`;
 - handoff/evidence pack visible desde TUI.
 
+### Orquestacion de runs
+
+Crear el servicio que concentra el flujo completo para que `/run`, `/score`, `/parlay`, `/validate` y `export` no dupliquen logica:
+
+- `src/runtime/run-service.ts`
+- `src/runtime/pipeline.ts`
+
+Flujo canonico:
+
+```text
+create run
+apply filters
+fetch fixtures
+fetch odds
+scan low odds
+research
+score
+build parlay
+validate si aplica
+write evidence pack
+write handoff
+set verdict
+```
+
+La TUI y el CLI solo llaman este servicio y renderizan eventos.
+
 ### Parser headless
 
 Crear `src/headless.ts` o dividir `src/cli.ts`:
@@ -178,6 +204,7 @@ Los checks externos lentos deben mostrar loader y no congelar input.
 - Headless commands devuelven exit code no-cero en errores productivos.
 - Los comandos no exponen secretos.
 - Renderer muestra eventos DB/API/filters sin solapar el output agentic.
+- `src/runtime/run-service.ts` y `src/runtime/pipeline.ts` concentran la orquestacion; `/run`, `/score`, `/parlay`, `/validate` y `/export` no duplican logica.
 - `pnpm gana run --date YYYY-MM-DD` orquesta flujo canonico cuando los planes previos esten listos.
 - `npm run typecheck` pasa.
 
