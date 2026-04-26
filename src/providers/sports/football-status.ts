@@ -34,7 +34,7 @@ export function getFootballStatus(config: FootballStatusConfig = {}): ServiceSta
       { key: 'provider', value: provider },
       { key: 'credential', value: credential },
     ],
-    readyWhenConfigured: true,
+    readyWhenConfigured: false,
     config: {
       apiFootballKey: config.apiFootballKey,
       apiFootballBaseUrl: config.apiFootballBaseUrl,
@@ -46,7 +46,7 @@ export function getFootballStatus(config: FootballStatusConfig = {}): ServiceSta
       league: football.league,
     },
     missingMessage: 'Football provider configuration is missing required provider or credential values.',
-    readyMessage: 'Football provider configuration is present, but execution is not implemented yet.',
+    configuredMessage: 'Football provider configuration is present. Run "football status" for a live provider check.',
   });
 }
 

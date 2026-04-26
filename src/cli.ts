@@ -440,7 +440,16 @@ async function main() {
     return;
   }
 
-  if (command === 'db' || command === 'football' || command === 'filters') {
+  if (
+    command === 'db'
+    || command === 'football'
+    || command === 'filters'
+    || command === 'fixtures'
+    || command === 'odds'
+    || command === 'leagues'
+    || command === 'teams'
+    || command === 'scan'
+  ) {
     const config = loadConfig({}, { skipApiKey: true });
     ensureArtifactRoot(config);
     initSessionDir(config.sessionDir);

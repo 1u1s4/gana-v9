@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import type { AgentConfig } from '../config.js';
+import { DEFAULT_MARKETS } from '../domain/markets.js';
+import type { Fixture } from '../domain/fixtures.js';
+import { evaluateExclusions } from './engine.js';
+
+function fixture(overrides: Partial<Fixture> = {}): Fixture {
+  return {
+    id: 'fixture-1',
+    provider: 'api-football',
+    providerFixtureId: '100',
+    homeTeamId: 'home-1',
+    awayTeamId: 'away-1',
+    scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    status: 'scheduled',
+    includedByFilters: [],
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+    ...overrides,
+  };
+}
+
+const config: Pick<AgentConfig, 'apiFootball'> = {
+  apiFootball: {
+    defaultSeason: 2026,
+    defaultSeasonInferred: false,
+    defaultLeagues: [],
+    defaultTeams: [],
+    defaultMarkets: DEFAULT_MARKETS,
+    lowOddsThreshold: 1.2,
+    kickoffWindowHours: 36,
+    includeLiveFixtures: false,
+    includeCompletedFixtures: false,
+    maxFixturesPerRun: 80,
+  },
+};
+
+describe('filter engine', () => {
+  it('keeps scheduled fixtures inside the kickoff window', () => {
+    assert.deepEqual(evaluateExclusions(fixture(), config), []);
+  });
+
+  it('excludes scheduled fixtures outside the kickoff window', () => {
+    const scheduledAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
+    assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config), ['excluded-outside-window']);
+  });
+
+  it('excludes live and completed fixtures unless config allows them', () => {
+    assert.deepEqual(evaluateExclusions(fixture({ status: 'live' }), config), ['excluded-outside-window']);
+    assert.deepEqual(evaluateExclusions(fixture({ status: 'completed' }), config), ['excluded-outside-window']);
+  });
+});

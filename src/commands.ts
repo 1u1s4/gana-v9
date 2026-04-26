@@ -3,12 +3,26 @@ import { existsSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import type { AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
+import type { FilterCombineMode, LowOddsScanView } from './filters/types.js';
+import { discoverFixtures } from './filters/engine.js';
+import { scanLowOdds } from './filters/low-odds.js';
+import {
+  addLeaguePreset,
+  addTeamPreset,
+  listLeaguePresets,
+  listTeamPresets,
+  removeLeaguePreset,
+  removeTeamPreset,
+} from './filters/presets.js';
 import { getFiltersStatus, type FiltersStatus, type ServiceStatusReport } from './filters/status.js';
 import { appendAuditEvent, appendConfigStatusEvent } from './permissions/audit.js';
 import { redactSecrets } from './permissions/redaction.js';
-import { getFootballStatus } from './providers/sports/football-status.js';
+import { actionableProviderErrorMessage } from './providers/sports/api-football-errors.js';
+import { checkApiFootballStatus, getApiFootballOddsSnapshot, listApiFootballFixtures } from './providers/sports/api-football.js';
 import { updateRuntimeContext, type RuntimeContext } from './runtime/context.js';
 import { getDbStatus } from './storage/db-status.js';
+import type { Fixture } from './domain/fixtures.js';
+import type { OddsQuote } from './domain/odds.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -209,6 +223,126 @@ function printFiltersStatus(status: FiltersStatus): void {
   printKeyValue('includeLiveFixtures', status.filters.includeLiveFixtures);
   printKeyValue('includeCompletedFixtures', status.filters.includeCompletedFixtures);
   printKeyValue('maxFixturesPerRun', status.filters.maxFixturesPerRun);
+}
+
+function parseFlags(args: string[]): Record<string, string | true> {
+  const flags: Record<string, string | true> = {};
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg?.startsWith('--')) continue;
+    const key = arg.slice(2);
+    const next = args[i + 1];
+    if (next && !next.startsWith('--')) {
+      flags[key] = next;
+      i++;
+    } else {
+      flags[key] = true;
+    }
+  }
+  return flags;
+}
+
+function requireDateFlag(flags: Record<string, string | true>): string {
+  const date = flags.date;
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error('fixtures requires --date YYYY-MM-DD.');
+  }
+  return date;
+}
+
+function optionalNumberFlag(flags: Record<string, string | true>, key: string): number | undefined {
+  const value = flags[key];
+  if (typeof value !== 'string') return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new Error(`--${key} must be an integer.`);
+  return parsed;
+}
+
+function requireStringFlag(flags: Record<string, string | true>, key: string): string {
+  const value = flags[key];
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`--${key} is required.`);
+  return value.trim();
+}
+
+function optionalStringFlag(flags: Record<string, string | true>, key: string): string | undefined {
+  const value = flags[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function optionalFloatFlag(flags: Record<string, string | true>, key: string): number | undefined {
+  const value = flags[key];
+  if (typeof value !== 'string') return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`--${key} must be a number.`);
+  return parsed;
+}
+
+function optionalCombineModeFlag(flags: Record<string, string | true>): FilterCombineMode | undefined {
+  const value = flags.combine;
+  if (value === undefined) return undefined;
+  const normalized = String(value).toUpperCase();
+  if (normalized === 'OR' || normalized === 'AND') return normalized;
+  throw new Error('--combine must be OR or AND.');
+}
+
+function wantsDefault(flags: Record<string, string | true>, key: string): boolean {
+  return flags[key] === true || flags[key] === 'default';
+}
+
+async function printPresetCounts(config: AgentConfig): Promise<void> {
+  if (!config.databaseUrl) return;
+  try {
+    const [leagues, teams] = await Promise.all([
+      listLeaguePresets(config),
+      listTeamPresets(config),
+    ]);
+    printKeyValue('activeLeaguePresets', leagues.length);
+    printKeyValue('activeTeamPresets', teams.length);
+  } catch (err: any) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}Could not load preset counts: ${err?.message ?? err}${RESET}`);
+  }
+}
+
+function printFixtures(fixtures: Fixture[]): void {
+  if (!fixtures.length) {
+    console.log(`  ${DIM}No fixtures found.${RESET}`);
+    return;
+  }
+
+  console.log(`  ${CYAN}fixtures${RESET} ${DIM}${fixtures.length}${RESET}`);
+  for (const fixture of fixtures) {
+    const kickoff = fixture.scheduledAt.replace('T', ' ').replace('.000Z', 'Z');
+    const score = fixture.scoreHome !== undefined && fixture.scoreAway !== undefined
+      ? ` ${fixture.scoreHome}-${fixture.scoreAway}`
+      : '';
+    console.log(
+      `  ${GREEN}•${RESET} ${CYAN}${fixture.providerFixtureId}${RESET} ${DIM}${kickoff}${RESET} ${fixture.status}${score}`,
+    );
+  }
+}
+
+function printOdds(quotes: OddsQuote[], details?: { oddsSnapshotId?: string; providerSnapshotId?: string }): void {
+  console.log(`  ${CYAN}odds${RESET} ${DIM}${quotes.length}${RESET}`);
+  if (details?.providerSnapshotId) printKeyValue('providerSnapshotId', details.providerSnapshotId);
+  if (details?.oddsSnapshotId) printKeyValue('oddsSnapshotId', details.oddsSnapshotId);
+  for (const quote of quotes) {
+    const line = quote.line === undefined ? '' : ` ${quote.line}`;
+    const bookmaker = quote.bookmaker ? ` ${DIM}${quote.bookmaker}${RESET}` : '';
+    console.log(
+      `  ${GREEN}•${RESET} ${CYAN}${quote.market}${RESET} ${quote.selection}${line} ${quote.price.toFixed(3)} p=${quote.impliedProbability.toFixed(3)}${bookmaker}`,
+    );
+  }
+}
+
+function printLowOddsScan(scan: LowOddsScanView): void {
+  console.log(`  ${CYAN}low-odds${RESET} ${DIM}scan=${scan.scanId ?? 'none'} fixtures=${scan.fixtureCount} hits=${scan.hitCount} threshold=${scan.threshold}${RESET}`);
+  for (const hit of scan.hits) {
+    const line = hit.line === undefined ? '' : ` ${hit.line}`;
+    const bookmaker = hit.bookmaker ? ` ${DIM}${hit.bookmaker}${RESET}` : '';
+    console.log(
+      `  ${GREEN}•${RESET} ${CYAN}${hit.providerFixtureId}${RESET} ${hit.market} ${hit.selection}${line} ${hit.odds.toFixed(3)} p=${hit.impliedProbability.toFixed(3)}${bookmaker}`,
+    );
+  }
 }
 
 function printSessionStatus(ctx: CommandContext): void {
@@ -556,11 +690,49 @@ commands.push({
 
 commands.push({
   name: '/football',
-  description: 'Show API-Football skeleton status',
+  description: 'Show API-Football provider status',
   execute: async (_args, ctx) => {
-    const status = getFootballStatus(ctx.config);
+    const status = await checkApiFootballStatus(ctx.config, ctx.runtime);
     printServiceStatus(status);
     appendConfigStatusEvent(ctx.runtime, { command: '/football', status });
+  },
+});
+
+commands.push({
+  name: '/fixtures',
+  description: 'List API-Football fixtures by date',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    if (wantsDefault(flags, 'leagues') || wantsDefault(flags, 'teams')) {
+      const result = await discoverFixtures(ctx.config, {
+        date: requireDateFlag(flags),
+        leaguesDefault: wantsDefault(flags, 'leagues'),
+        teamsDefault: wantsDefault(flags, 'teams'),
+        combineMode: optionalCombineModeFlag(flags),
+      }, ctx.runtime);
+      printFixtures(result.fixtures);
+      return;
+    }
+    printFixtures(await listApiFootballFixtures(ctx.config, {
+      date: requireDateFlag(flags),
+      league: optionalNumberFlag(flags, 'league'),
+      team: optionalNumberFlag(flags, 'team'),
+      season: optionalNumberFlag(flags, 'season'),
+      maxFixtures: ctx.config.apiFootball.maxFixturesPerRun,
+    }, ctx.runtime));
+  },
+});
+
+commands.push({
+  name: '/odds',
+  description: 'Normalize odds for a provider fixture',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const snapshot = await getApiFootballOddsSnapshot(ctx.config, requireStringFlag(flags, 'fixture-id'), ctx.runtime);
+    printOdds(snapshot.quotes, {
+      oddsSnapshotId: snapshot.oddsSnapshotId,
+      providerSnapshotId: snapshot.providerSnapshotId,
+    });
   },
 });
 
@@ -570,7 +742,100 @@ commands.push({
   execute: async (_args, ctx) => {
     const status = getFiltersStatus(ctx.config);
     printFiltersStatus(status);
+    await printPresetCounts(ctx.config);
     appendConfigStatusEvent(ctx.runtime, { command: '/filters', status });
+  },
+});
+
+commands.push({
+  name: '/leagues',
+  description: 'List or edit league presets',
+  execute: async (args, ctx) => {
+    const [action, ...rest] = args.split(' ').filter(Boolean);
+    const flags = parseFlags(rest);
+    if (!action || action === 'list') {
+      const leagues = await listLeaguePresets(ctx.config);
+      for (const league of leagues) {
+        console.log(`  ${CYAN}${league.providerCompetitionId}${RESET} ${league.name} ${DIM}${league.country ?? ''}${RESET}`);
+      }
+      return;
+    }
+    if (action === 'add') {
+      const league = await addLeaguePreset(ctx.config, {
+        id: requireStringFlag(flags, 'id'),
+        name: requireStringFlag(flags, 'name'),
+        country: optionalStringFlag(flags, 'country'),
+        season: optionalNumberFlag(flags, 'season'),
+      });
+      console.log(`  ${GREEN}✓${RESET} ${DIM}league preset${RESET} ${CYAN}${league.providerCompetitionId}${RESET}`);
+      return;
+    }
+    if (action === 'remove') {
+      const league = await removeLeaguePreset(ctx.config, requireStringFlag(flags, 'id'));
+      console.log(`  ${GREEN}✓${RESET} ${DIM}disabled league preset${RESET} ${CYAN}${league.providerCompetitionId}${RESET}`);
+    }
+  },
+});
+
+commands.push({
+  name: '/teams',
+  description: 'List or edit team presets',
+  execute: async (args, ctx) => {
+    const [action, ...rest] = args.split(' ').filter(Boolean);
+    const flags = parseFlags(rest);
+    if (!action || action === 'list') {
+      const teams = await listTeamPresets(ctx.config);
+      for (const team of teams) {
+        console.log(`  ${CYAN}${team.providerTeamId}${RESET} ${team.name} ${DIM}${team.providerLeagueId ?? ''}${RESET}`);
+      }
+      return;
+    }
+    if (action === 'add') {
+      const team = await addTeamPreset(ctx.config, {
+        id: requireStringFlag(flags, 'id'),
+        name: requireStringFlag(flags, 'name'),
+        country: optionalStringFlag(flags, 'country'),
+        league: optionalStringFlag(flags, 'league'),
+      });
+      console.log(`  ${GREEN}✓${RESET} ${DIM}team preset${RESET} ${CYAN}${team.providerTeamId}${RESET}`);
+      return;
+    }
+    if (action === 'remove') {
+      const team = await removeTeamPreset(ctx.config, requireStringFlag(flags, 'id'));
+      console.log(`  ${GREEN}✓${RESET} ${DIM}disabled team preset${RESET} ${CYAN}${team.providerTeamId}${RESET}`);
+    }
+  },
+});
+
+commands.push({
+  name: '/threshold',
+  description: 'Show or change low-odds threshold',
+  execute: async (args, ctx) => {
+    const next = args.trim();
+    if (!next) {
+      printKeyValue('lowOddsThreshold', ctx.config.apiFootball.lowOddsThreshold);
+      return;
+    }
+    const parsed = Number(next);
+    if (!Number.isFinite(parsed) || parsed <= 1) throw new Error('/threshold requires a decimal odds value greater than 1.');
+    ctx.config.apiFootball.lowOddsThreshold = parsed;
+    printKeyValue('lowOddsThreshold', ctx.config.apiFootball.lowOddsThreshold);
+  },
+});
+
+commands.push({
+  name: '/low-odds',
+  description: 'Scan fixtures for low odds',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const scan = await scanLowOdds(ctx.config, {
+      date: requireDateFlag(flags),
+      threshold: optionalFloatFlag(flags, 'threshold'),
+      leaguesDefault: wantsDefault(flags, 'leagues'),
+      teamsDefault: wantsDefault(flags, 'teams'),
+      combineMode: optionalCombineModeFlag(flags),
+    }, ctx.runtime);
+    printLowOddsScan(scan);
   },
 });
 
@@ -610,23 +875,117 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
     }
 
     if (area === 'football' && action === 'status') {
-      const status = getFootballStatus(ctx.config);
+      const status = await checkApiFootballStatus(ctx.config, ctx.runtime);
       printServiceStatus(status);
       appendConfigStatusEvent(ctx.runtime, { command: 'football status', status });
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'fixtures') {
+      const flags = parseFlags(argv.slice(1));
+      if (wantsDefault(flags, 'leagues') || wantsDefault(flags, 'teams')) {
+        const result = await discoverFixtures(ctx.config, {
+          date: requireDateFlag(flags),
+          leaguesDefault: wantsDefault(flags, 'leagues'),
+          teamsDefault: wantsDefault(flags, 'teams'),
+          combineMode: optionalCombineModeFlag(flags),
+        }, ctx.runtime);
+        printFixtures(result.fixtures);
+        return { ok: true, exitCode: 0 };
+      }
+      printFixtures(await listApiFootballFixtures(ctx.config, {
+        date: requireDateFlag(flags),
+        league: optionalNumberFlag(flags, 'league'),
+        team: optionalNumberFlag(flags, 'team'),
+        season: optionalNumberFlag(flags, 'season'),
+        maxFixtures: ctx.config.apiFootball.maxFixturesPerRun,
+      }, ctx.runtime));
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'odds') {
+      const flags = parseFlags(argv.slice(1));
+      const snapshot = await getApiFootballOddsSnapshot(ctx.config, requireStringFlag(flags, 'fixture-id'), ctx.runtime);
+      printOdds(snapshot.quotes, {
+        oddsSnapshotId: snapshot.oddsSnapshotId,
+        providerSnapshotId: snapshot.providerSnapshotId,
+      });
       return { ok: true, exitCode: 0 };
     }
 
     if (area === 'filters' && action === 'show') {
       const status = getFiltersStatus(ctx.config);
       printFiltersStatus(status);
+      await printPresetCounts(ctx.config);
       appendConfigStatusEvent(ctx.runtime, { command: 'filters show', status });
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'leagues') {
+      const flags = parseFlags(argv.slice(2));
+      if (action === 'list') {
+        const leagues = await listLeaguePresets(ctx.config);
+        for (const league of leagues) console.log(`  ${CYAN}${league.providerCompetitionId}${RESET} ${league.name} ${DIM}${league.country ?? ''}${RESET}`);
+        return { ok: true, exitCode: 0 };
+      }
+      if (action === 'add') {
+        const league = await addLeaguePreset(ctx.config, {
+          id: requireStringFlag(flags, 'id'),
+          name: requireStringFlag(flags, 'name'),
+          country: optionalStringFlag(flags, 'country'),
+          season: optionalNumberFlag(flags, 'season'),
+        });
+        console.log(`  ${GREEN}✓${RESET} ${DIM}league preset${RESET} ${CYAN}${league.providerCompetitionId}${RESET}`);
+        return { ok: true, exitCode: 0 };
+      }
+      if (action === 'remove') {
+        const league = await removeLeaguePreset(ctx.config, requireStringFlag(flags, 'id'));
+        console.log(`  ${GREEN}✓${RESET} ${DIM}disabled league preset${RESET} ${CYAN}${league.providerCompetitionId}${RESET}`);
+        return { ok: true, exitCode: 0 };
+      }
+    }
+
+    if (area === 'teams') {
+      const flags = parseFlags(argv.slice(2));
+      if (action === 'list') {
+        const teams = await listTeamPresets(ctx.config);
+        for (const team of teams) console.log(`  ${CYAN}${team.providerTeamId}${RESET} ${team.name} ${DIM}${team.providerLeagueId ?? ''}${RESET}`);
+        return { ok: true, exitCode: 0 };
+      }
+      if (action === 'add') {
+        const team = await addTeamPreset(ctx.config, {
+          id: requireStringFlag(flags, 'id'),
+          name: requireStringFlag(flags, 'name'),
+          country: optionalStringFlag(flags, 'country'),
+          league: optionalStringFlag(flags, 'league'),
+        });
+        console.log(`  ${GREEN}✓${RESET} ${DIM}team preset${RESET} ${CYAN}${team.providerTeamId}${RESET}`);
+        return { ok: true, exitCode: 0 };
+      }
+      if (action === 'remove') {
+        const team = await removeTeamPreset(ctx.config, requireStringFlag(flags, 'id'));
+        console.log(`  ${GREEN}✓${RESET} ${DIM}disabled team preset${RESET} ${CYAN}${team.providerTeamId}${RESET}`);
+        return { ok: true, exitCode: 0 };
+      }
+    }
+
+    if (area === 'scan' && action === 'low-odds') {
+      const flags = parseFlags(argv.slice(2));
+      const scan = await scanLowOdds(ctx.config, {
+        date: requireDateFlag(flags),
+        threshold: optionalFloatFlag(flags, 'threshold'),
+        leaguesDefault: wantsDefault(flags, 'leagues'),
+        teamsDefault: wantsDefault(flags, 'teams'),
+        combineMode: optionalCombineModeFlag(flags),
+      }, ctx.runtime);
+      printLowOddsScan(scan);
       return { ok: true, exitCode: 0 };
     }
 
     printHeadlessUsage();
     return { ok: false, exitCode: 1, message: `Unknown command: ${argv.join(' ')}` };
   } catch (err: any) {
-    const message = String(redactSecrets(err?.message ?? err));
+    const message = actionableProviderErrorMessage(err);
     console.log(`  ${YELLOW}!${RESET} ${DIM}${message}${RESET}`);
     return { ok: false, exitCode: 1, message };
   }
@@ -638,5 +997,10 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana tui${RESET}`);
   console.log(`  ${CYAN}pnpm gana db status${RESET}`);
   console.log(`  ${CYAN}pnpm gana football status${RESET}`);
+  console.log(`  ${CYAN}pnpm gana fixtures --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana odds --fixture-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
+  console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
+  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);
   console.log(`  ${CYAN}pnpm gana filters show${RESET}`);
 }

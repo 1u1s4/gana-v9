@@ -16,6 +16,7 @@ export interface LowOddsScanStatusUpdate {
   fixtureCount?: number;
   hitCount?: number;
   errorRedacted?: string | null;
+  querySnapshot?: JsonValue | null;
 }
 
 export interface LowOddsHitQuery {
