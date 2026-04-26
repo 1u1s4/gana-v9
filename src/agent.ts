@@ -3,20 +3,27 @@ import type { Item } from '@openrouter/agent';
 import { stepCountIs, maxCost } from '@openrouter/agent/stop-conditions';
 import { spawn } from 'child_process';
 import type { AgentConfig } from './config.js';
+import {
+  deriveNativeWebSearchRequirement,
+  formatNativeWebSearchEnforcementError,
+} from './providers/agentic/helpers.js';
+import type { AgentEvent, AgentUsage, NativeWebSearchRequirement } from './providers/agentic/types.js';
 import { tools } from './tools/index.js';
 
 export type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
 
-export type AgentEvent =
-  | { type: 'text'; delta: string }
-  | { type: 'tool_call'; name: string; callId: string; args: Record<string, unknown> }
-  | { type: 'tool_result'; name: string; callId: string; output: string }
-  | { type: 'reasoning'; delta: string };
+export type { AgentEvent } from './providers/agentic/types.js';
+
+interface RunAgentOptions {
+  onEvent?: (event: AgentEvent) => void;
+  signal?: AbortSignal;
+  nativeWebSearchRequirement?: NativeWebSearchRequirement;
+}
 
 export async function runAgent(
   config: AgentConfig,
   input: string | ChatMessage[],
-  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal },
+  options?: RunAgentOptions,
 ) {
   if (config.provider === 'codex') {
     return runCodexAgent(config, input, options);
@@ -141,12 +148,17 @@ interface CursorJsonEvent {
   };
 }
 
-function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
+function nativeWebRequirement(config: AgentConfig, options?: RunAgentOptions): NativeWebSearchRequirement {
+  return options?.nativeWebSearchRequirement
+    ?? deriveNativeWebSearchRequirement(config, { required: false });
+}
+
+function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[], requirement: NativeWebSearchRequirement): string {
   const userPrompt = typeof input === 'string'
     ? input
     : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
 
-  const prompt = withNativeWebSearchRequirement(config, userPrompt);
+  const prompt = withNativeWebSearchRequirement(userPrompt, requirement);
 
   if (config.codexThreadId) return prompt;
 
@@ -158,32 +170,24 @@ function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[]):
   ].join('\n');
 }
 
-function withNativeWebSearchRequirement(config: AgentConfig, prompt: string): string {
-  if (!config.nativeWebSearch) return prompt;
-
-  const toolName = config.provider === 'codex'
-    ? 'Codex web_search'
-    : config.provider === 'gemini'
-      ? 'Gemini google_web_search'
-      : config.provider === 'cursor'
-        ? 'Cursor WebSearch'
-        : 'OpenRouter web_search';
+function withNativeWebSearchRequirement(prompt: string, requirement: NativeWebSearchRequirement): string {
+  if (!requirement.required || !requirement.displayToolName) return prompt;
 
   return [
-    `Native web search requirement: before answering, call the embedded ${toolName} tool for this request. After the tool call returns, answer the user normally using the result. The harness will reject the turn if the native web search tool is not used.`,
+    `Native web search requirement: before answering, call the embedded ${requirement.displayToolName} tool for this request. After the tool call returns, answer the user normally using the result. The harness will reject the turn if the native web search tool is not used.`,
     '',
     prompt,
   ].join('\n');
 }
 
-function requiresNativeWebSearch(config: AgentConfig): boolean {
-  return config.nativeWebSearch && ['codex', 'gemini', 'cursor'].includes(config.provider);
+function requiresNativeWebSearch(requirement: NativeWebSearchRequirement): boolean {
+  return requirement.required && requirement.enforce;
 }
 
-function codexArgs(config: AgentConfig, prompt: string): string[] {
+function codexArgs(config: AgentConfig, prompt: string, requirement: NativeWebSearchRequirement): string[] {
   const configArgs: string[] = [];
-  if (config.nativeWebSearch) {
-    configArgs.push('-c', `web_search="${config.nativeWebSearchMode}"`);
+  if (config.nativeWebSearch || requirement.required) {
+    configArgs.push('-c', `web_search="${requirement.mode ?? config.nativeWebSearchMode}"`);
   }
   if (config.reasoningEffort) {
     configArgs.push('-c', `model_reasoning_effort="${config.reasoningEffort}"`);
@@ -205,19 +209,19 @@ function codexArgs(config: AgentConfig, prompt: string): string[] {
     '-C',
     process.cwd(),
     '--sandbox',
-    config.codexSandbox,
+    effectiveCodexSandbox(config),
     '-m',
     config.model,
     prompt,
   ];
 }
 
-function inputToGeminiPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
+function inputToGeminiPrompt(config: AgentConfig, input: string | ChatMessage[], requirement: NativeWebSearchRequirement): string {
   const userPrompt = typeof input === 'string'
     ? input
     : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
 
-  const prompt = withNativeWebSearchRequirement(config, userPrompt);
+  const prompt = withNativeWebSearchRequirement(userPrompt, requirement);
 
   if (config.geminiSessionId) return prompt;
 
@@ -238,7 +242,7 @@ function geminiArgs(config: AgentConfig, prompt: string): string[] {
     '--model',
     config.model,
     '--approval-mode',
-    config.geminiApprovalMode,
+    effectiveGeminiApprovalMode(config),
     '--skip-trust',
   ];
 
@@ -249,12 +253,12 @@ function geminiArgs(config: AgentConfig, prompt: string): string[] {
   return args;
 }
 
-function inputToCursorPrompt(config: AgentConfig, input: string | ChatMessage[]): string {
+function inputToCursorPrompt(config: AgentConfig, input: string | ChatMessage[], requirement: NativeWebSearchRequirement): string {
   const userPrompt = typeof input === 'string'
     ? input
     : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
 
-  const prompt = withNativeWebSearchRequirement(config, userPrompt);
+  const prompt = withNativeWebSearchRequirement(userPrompt, requirement);
 
   if (config.cursorSessionId) return prompt;
 
@@ -266,24 +270,38 @@ function inputToCursorPrompt(config: AgentConfig, input: string | ChatMessage[])
   ].join('\n');
 }
 
-function cursorArgs(config: AgentConfig, prompt: string): string[] {
+function cursorArgs(config: AgentConfig, prompt: string, requirement: NativeWebSearchRequirement): string[] {
   const args = [
     '--print',
     '--output-format',
     'stream-json',
     '--stream-partial-output',
-    '--trust',
     '--workspace',
     process.cwd(),
     '--model',
     config.model,
   ];
 
-  if (config.cursorForce || config.nativeWebSearch) args.push('--force');
+  if (config.profile === 'full-permissions' || config.cursorForce) args.push('--trust');
+  if (config.cursorForce || (config.profile === 'full-permissions' && requirement.required)) args.push('--force');
   if (config.cursorSessionId) args.push('--resume', config.cursorSessionId);
   args.push(prompt);
 
   return args;
+}
+
+function effectiveCodexSandbox(config: AgentConfig): AgentConfig['codexSandbox'] {
+  if (config.codexSandbox === 'danger-full-access' && config.profile !== 'full-permissions') {
+    return 'workspace-write';
+  }
+  return config.codexSandbox;
+}
+
+function effectiveGeminiApprovalMode(config: AgentConfig): AgentConfig['geminiApprovalMode'] {
+  if (config.profile === 'full-permissions' && config.approvalMode === 'auto-grant') {
+    return config.geminiApprovalMode === 'default' ? 'yolo' : config.geminiApprovalMode;
+  }
+  return config.geminiApprovalMode === 'yolo' ? 'default' : config.geminiApprovalMode;
 }
 
 function cursorToolName(toolCall: Record<string, any> | undefined): string {
@@ -313,10 +331,11 @@ function cursorToolOutput(toolCall: Record<string, any> | undefined): string {
 async function runCodexAgent(
   config: AgentConfig,
   input: string | ChatMessage[],
-  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal },
+  options?: RunAgentOptions,
 ) {
-  const prompt = inputToCodexPrompt(config, input);
-  const child = spawn('codex', codexArgs(config, prompt), {
+  const requirement = nativeWebRequirement(config, options);
+  const prompt = inputToCodexPrompt(config, input, requirement);
+  const child = spawn('codex', codexArgs(config, prompt, requirement), {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -328,7 +347,7 @@ async function runCodexAgent(
   let stdoutBuffer = '';
   let stderr = '';
   let text = '';
-  let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; reasoningOutputTokens?: number } = {};
+  let usage: AgentUsage = {};
   let sawNativeWebSearch = false;
 
   const handleEvent = (event: CodexJsonEvent) => {
@@ -442,8 +461,8 @@ async function runCodexAgent(
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `codex exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
-  if (requiresNativeWebSearch(config) && !sawNativeWebSearch) {
-    throw new Error('Native Codex web_search was required but was not used.');
+  if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
+    throw new Error(formatNativeWebSearchEnforcementError(requirement));
   }
 
   return { text, usage, output: text };
@@ -452,9 +471,10 @@ async function runCodexAgent(
 async function runGeminiAgent(
   config: AgentConfig,
   input: string | ChatMessage[],
-  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal },
+  options?: RunAgentOptions,
 ) {
-  const prompt = inputToGeminiPrompt(config, input);
+  const requirement = nativeWebRequirement(config, options);
+  const prompt = inputToGeminiPrompt(config, input, requirement);
   const child = spawn('gemini', geminiArgs(config, prompt), {
     cwd: process.cwd(),
     env: {
@@ -467,7 +487,7 @@ async function runGeminiAgent(
   let stdoutBuffer = '';
   let stderr = '';
   let text = '';
-  let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number } = {};
+  let usage: AgentUsage = {};
   const toolNames = new Map<string, string>();
   let sawNativeWebSearch = false;
 
@@ -558,8 +578,8 @@ async function runGeminiAgent(
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `gemini exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
-  if (requiresNativeWebSearch(config) && !sawNativeWebSearch) {
-    throw new Error('Native Gemini google_web_search was required but was not used.');
+  if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
+    throw new Error(formatNativeWebSearchEnforcementError(requirement));
   }
 
   return { text, usage, output: text };
@@ -568,10 +588,11 @@ async function runGeminiAgent(
 async function runCursorAgent(
   config: AgentConfig,
   input: string | ChatMessage[],
-  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal },
+  options?: RunAgentOptions,
 ) {
-  const prompt = inputToCursorPrompt(config, input);
-  const child = spawn('cursor-agent', cursorArgs(config, prompt), {
+  const requirement = nativeWebRequirement(config, options);
+  const prompt = inputToCursorPrompt(config, input, requirement);
+  const child = spawn('cursor-agent', cursorArgs(config, prompt, requirement), {
     cwd: process.cwd(),
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -580,7 +601,7 @@ async function runCursorAgent(
   let stdoutBuffer = '';
   let stderr = '';
   let text = '';
-  let usage: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; cacheWriteTokens?: number } = {};
+  let usage: AgentUsage = {};
   let sawPartialAssistant = false;
   let sawNativeWebSearch = false;
 
@@ -686,8 +707,8 @@ async function runCursorAgent(
   if (exitCode !== 0) {
     throw new Error((stderr.trim() || `cursor-agent exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
-  if (requiresNativeWebSearch(config) && !sawNativeWebSearch) {
-    throw new Error('Native Cursor WebSearch was required but was not used.');
+  if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
+    throw new Error(formatNativeWebSearchEnforcementError(requirement));
   }
 
   return { text, usage, output: text };
@@ -696,7 +717,7 @@ async function runCursorAgent(
 export async function runAgentWithRetry(
   config: AgentConfig,
   input: string | ChatMessage[],
-  options?: { onEvent?: (event: AgentEvent) => void; signal?: AbortSignal; maxRetries?: number },
+  options?: RunAgentOptions & { maxRetries?: number },
 ) {
   for (let attempt = 0, max = options?.maxRetries ?? 3; attempt <= max; attempt++) {
     try { return await runAgent(config, input, options); }

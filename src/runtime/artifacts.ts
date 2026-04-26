@@ -52,6 +52,17 @@ export function appendEventJsonl(
   return path;
 }
 
+export function appendAgentEventJsonl(
+  config: Pick<AgentConfig, 'artifactRoot'>,
+  runId: string,
+  event: HarnessEvent,
+): string {
+  const dir = createRunArtifactDir(config, runId);
+  const path = join(dir, 'agent-events.jsonl');
+  appendFileSync(path, `${stableStringify(redactSecrets(event))}\n`);
+  return path;
+}
+
 export function writeArtifact(
   config: Pick<AgentConfig, 'artifactRoot'>,
   runId: string,

@@ -194,9 +194,9 @@ const DEFAULTS: AgentConfig = {
   codexSandbox: 'workspace-write',
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
-  geminiApprovalMode: 'yolo',
+  geminiApprovalMode: 'default',
   cursorModelListPath: 'config/cursor-models.json',
-  cursorForce: true,
+  cursorForce: false,
 };
 
 export function loadConfig(

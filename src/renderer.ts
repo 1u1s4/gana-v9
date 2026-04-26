@@ -1,6 +1,6 @@
-import type { AgentEvent } from './agent.js';
 import type { DisplayConfig } from './config.js';
 import { redactSecrets } from './permissions/redaction.js';
+import type { AgentEvent } from './providers/agentic/types.js';
 
 const RESET = '\x1b[0m';
 const DIM = '\x1b[2m';

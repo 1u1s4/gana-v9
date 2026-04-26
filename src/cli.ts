@@ -1,7 +1,8 @@
 import { createInterface } from 'readline';
+import { basename, extname } from 'path';
 import { loadConfig, type DisplayConfig } from './config.js';
 import { runAgentWithRetry, type ChatMessage } from './agent.js';
-import { initSessionDir, saveMessage, newSessionPath } from './session.js';
+import { initSessionDir, saveMessage, saveSessionEvent, newSessionPath } from './session.js';
 import { printBanner } from './banner.js';
 import { TuiRenderer } from './renderer.js';
 import { dispatch, printHeadlessUsage, type CommandContext } from './commands.js';
@@ -10,9 +11,19 @@ import { Loader } from './loader.js';
 import { getFiltersStatus } from './filters/status.js';
 import { runHeadless } from './headless.js';
 import { redactSecrets } from './permissions/redaction.js';
+import { appendAutoApproval } from './permissions/audit.js';
+import { deriveNativeWebSearchRequirement, redactProviderSessionId } from './providers/agentic/helpers.js';
+import type { AgentEvent, AgentUsage, NativeWebSearchRequirement } from './providers/agentic/types.js';
 import { getFootballStatus } from './providers/sports/football-status.js';
 import { createRuntimeContext } from './runtime/context.js';
-import { ensureArtifactRoot } from './runtime/artifacts.js';
+import { appendAgentEventJsonl, appendEventJsonl, ensureArtifactRoot } from './runtime/artifacts.js';
+import {
+  createHarnessCorrelationId,
+  createHarnessEvent,
+  createHarnessTraceId,
+  type HarnessEvent,
+  type HarnessEventType,
+} from './runtime/events.js';
 import { getDbStatus } from './storage/db-status.js';
 
 const DIM = '\x1b[2m';
@@ -55,6 +66,100 @@ function formatTokens(n: number): string {
 
 function firstCommandArg(argv: string[]): string | undefined {
   return argv[0]?.startsWith('-') ? undefined : argv[0];
+}
+
+function sessionRunId(sessionPath: string): string {
+  const name = basename(sessionPath, extname(sessionPath)) || 'session';
+  return `session-${name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+}
+
+function providerNativeSession(config: ReturnType<typeof loadConfig>): Record<string, unknown> {
+  if (config.provider === 'codex') return { codexThreadId: redactProviderSessionId(config.codexThreadId) ?? null };
+  if (config.provider === 'gemini') return { geminiSessionId: redactProviderSessionId(config.geminiSessionId) ?? null };
+  if (config.provider === 'cursor') return { cursorSessionId: redactProviderSessionId(config.cursorSessionId) ?? null };
+  return {};
+}
+
+function shouldRequireNativeWebSearch(input: string, config: ReturnType<typeof loadConfig>): { required: boolean; reason?: string } {
+  if (!config.nativeWebSearch) return { required: false };
+  if (/\b(web\s+live|current|latest|today|research|investiga|investigar|buscar|busca|actual|reciente|noticias)\b/i.test(input)) {
+    return { required: true, reason: 'current-info or research request' };
+  }
+  return { required: false };
+}
+
+function buildNativeWebRequirement(input: string, config: ReturnType<typeof loadConfig>): NativeWebSearchRequirement {
+  const decision = shouldRequireNativeWebSearch(input, config);
+  return deriveNativeWebSearchRequirement(config, decision);
+}
+
+function persistAgentEvent(
+  config: ReturnType<typeof loadConfig>,
+  runtime: ReturnType<typeof createRuntimeContext>,
+  sessionPath: string,
+  type: HarnessEventType,
+  payload: Record<string, unknown> = {},
+  severity: HarnessEvent['severity'] = 'info',
+): HarnessEvent {
+  const runId = runtime.runId ?? sessionRunId(sessionPath);
+  const event = createHarnessEvent({
+    type,
+    runId,
+    taskId: runtime.taskId,
+    correlationId: createHarnessCorrelationId(),
+    traceId: createHarnessTraceId(),
+    runtime: config.runtime,
+    profile: runtime.profile,
+    providerAgentic: runtime.providerAgentic,
+    providerSports: runtime.providerSports,
+    severity,
+    payload: {
+      provider: config.provider,
+      model: config.model,
+      ...providerNativeSession(config),
+      ...payload,
+    },
+  });
+  saveSessionEvent(sessionPath, event);
+  appendEventJsonl(config, runId, event);
+  appendAgentEventJsonl(config, runId, event);
+  return event;
+}
+
+function persistStreamEvent(
+  config: ReturnType<typeof loadConfig>,
+  runtime: ReturnType<typeof createRuntimeContext>,
+  sessionPath: string,
+  event: AgentEvent,
+): void {
+  const payload = event.type === 'text'
+    ? { deltaLength: event.delta.length }
+    : event.type === 'reasoning'
+      ? { deltaLength: event.delta.length }
+      : event.type === 'tool_call'
+        ? { toolName: event.name, callId: event.callId, args: event.args }
+        : { toolName: event.name, callId: event.callId, output: event.output };
+  const type = event.type === 'text'
+    ? 'agent.delta'
+    : event.type === 'reasoning'
+      ? 'agent.reasoning'
+      : event.type === 'tool_call'
+        ? 'agent.tool_call'
+        : 'agent.tool_result';
+  persistAgentEvent(config, runtime, sessionPath, type, payload, 'debug');
+}
+
+function usagePayload(usage: AgentUsage | undefined): Record<string, unknown> {
+  return usage ? { usage } : {};
+}
+
+function recordAutoGrantedProviderOptions(config: ReturnType<typeof loadConfig>, runtime: ReturnType<typeof createRuntimeContext>): void {
+  if (config.profile !== 'full-permissions' || config.approvalMode !== 'auto-grant') return;
+  const actions: string[] = [];
+  if (config.provider === 'codex' && config.codexSandbox === 'danger-full-access') actions.push('codex.danger-full-access');
+  if (config.provider === 'gemini' && config.geminiApprovalMode === 'yolo') actions.push('gemini.yolo');
+  if (config.provider === 'cursor' && config.cursorForce) actions.push('cursor.force');
+  for (const action of actions) appendAutoApproval(runtime, action);
 }
 
 async function printStartupStatus(config: ReturnType<typeof loadConfig>) {
@@ -303,7 +408,7 @@ export async function runTui() {
 
   async function runDemo() {
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    const emit = (e: import('./agent.js').AgentEvent) => renderer.handle(e);
+    const emit = (e: AgentEvent) => renderer.handle(e);
 
     if (config.display.inputStyle === 'block') {
       process.stdout.write(`${DIM}> what's in this repo${RESET}\n`);
@@ -393,10 +498,18 @@ export async function runTui() {
 
       try {
         const agentInput = messages.length > 1 ? messages : trimmed;
+        const nativeWebSearchRequirement = buildNativeWebRequirement(trimmed, config);
+        recordAutoGrantedProviderOptions(config, runtime);
+        persistAgentEvent(config, runtime, sessionPath, 'agent.started', {
+          inputLength: trimmed.length,
+          nativeWebSearchRequirement,
+        });
         const result = await runAgentWithRetry(config, agentInput, {
+          nativeWebSearchRequirement,
           onEvent: (e) => {
             if (!started) { started = true; loader.stop(); }
             renderer.handle(e);
+            persistStreamEvent(config, runtime, sessionPath, e);
             if (e.type === 'tool_result') {
               started = false;
               loader.start();
@@ -413,10 +526,17 @@ export async function runTui() {
         const outT = result.usage?.outputTokens ?? 0;
         cmdCtx.totalTokens.input += inT;
         cmdCtx.totalTokens.output += outT;
+        persistAgentEvent(config, runtime, sessionPath, 'agent.completed', {
+          ...usagePayload(result.usage ?? undefined),
+          outputLength: result.text.length,
+        });
         console.log(`\n${GRAY}  ${formatTokens(inT)} in · ${formatTokens(outT)} out${RESET}\n`);
       } catch (err: any) {
         loader.stop();
         renderer.endTurn();
+        persistAgentEvent(config, runtime, sessionPath, 'agent.failed', {
+          error: redactSecrets(err.message),
+        }, 'error');
         console.log(`\n${YELLOW}  Error: ${redactSecrets(err.message)}${RESET}\n`);
       }
     }

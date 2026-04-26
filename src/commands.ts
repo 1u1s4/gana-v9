@@ -17,6 +17,15 @@ import {
 import { getFiltersStatus, type FiltersStatus, type ServiceStatusReport } from './filters/status.js';
 import { appendAuditEvent, appendConfigStatusEvent } from './permissions/audit.js';
 import { redactSecrets } from './permissions/redaction.js';
+import { saveSessionEvent } from './session.js';
+import {
+  AGENT_PROVIDER_DEFAULT_MODELS,
+  buildAgentProviderState,
+  providerLabel as agentProviderLabel,
+  redactProviderSessionId,
+  selectDefaultModelForProvider,
+} from './providers/agentic/helpers.js';
+import type { AgentProviderCompat } from './providers/agentic/types.js';
 import { actionableProviderErrorMessage } from './providers/sports/api-football-errors.js';
 import { checkApiFootballStatus, getApiFootballOddsSnapshot, listApiFootballFixtures } from './providers/sports/api-football.js';
 import { updateRuntimeContext, type RuntimeContext } from './runtime/context.js';
@@ -37,15 +46,15 @@ type ModelInfo = {
   speedTiers?: string[];
 };
 
-type Provider = AgentConfig['provider'];
+type Provider = AgentProviderCompat;
 
 const PROVIDERS: Provider[] = ['codex', 'gemini', 'cursor', 'openrouter'];
 
 const PROVIDER_DEFAULT_MODELS: Record<Provider, string[]> = {
-  codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
-  gemini: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
-  cursor: ['composer-2-fast', 'composer-2', 'auto'],
-  openrouter: ['anthropic/claude-haiku-4.5'],
+  codex: [...AGENT_PROVIDER_DEFAULT_MODELS.codex],
+  gemini: [...AGENT_PROVIDER_DEFAULT_MODELS.gemini],
+  cursor: [...AGENT_PROVIDER_DEFAULT_MODELS.cursor],
+  openrouter: [...AGENT_PROVIDER_DEFAULT_MODELS.openrouter],
 };
 
 export interface CommandContext {
@@ -175,10 +184,7 @@ function loadProviderModels(ctx: CommandContext): ModelInfo[] {
 }
 
 function providerLabel(provider: Provider): string {
-  if (provider === 'codex') return 'Codex';
-  if (provider === 'gemini') return 'Gemini CLI';
-  if (provider === 'cursor') return 'Cursor Agent';
-  return 'OpenRouter';
+  return agentProviderLabel(provider);
 }
 
 function syncRuntime(ctx: CommandContext): void {
@@ -193,6 +199,34 @@ function statusMarker(status: string): string {
 function printKeyValue(key: string, value: unknown): void {
   const safe = redactSecrets(value);
   console.log(`  ${DIM}${key}:${RESET} ${CYAN}${String(safe)}${RESET}`);
+}
+
+function saveAgentCommandEvent(ctx: CommandContext, type: string, payload: Record<string, unknown> = {}): void {
+  const event = {
+    type,
+    provider: ctx.config.provider,
+    model: ctx.config.model,
+    sessionPath: ctx.sessionPath,
+    codexThreadId: redactProviderSessionId(ctx.config.codexThreadId) ?? null,
+    geminiSessionId: redactProviderSessionId(ctx.config.geminiSessionId) ?? null,
+    cursorSessionId: redactProviderSessionId(ctx.config.cursorSessionId) ?? null,
+    payload,
+  };
+  saveSessionEvent(ctx.sessionPath, event);
+  appendAuditEvent(ctx.runtime, { type, payload: event });
+}
+
+function providerCatalogHint(ctx: CommandContext): { path?: string; script?: string } {
+  if (ctx.config.provider === 'codex') {
+    return { path: resolve(ctx.config.codexModelListPath), script: 'npm run update:codex-models' };
+  }
+  if (ctx.config.provider === 'gemini') {
+    return { path: resolve(ctx.config.geminiModelListPath), script: 'npm run update:gemini-models' };
+  }
+  if (ctx.config.provider === 'cursor') {
+    return { path: resolve(ctx.config.cursorModelListPath), script: 'npm run update:cursor-models' };
+  }
+  return {};
 }
 
 function printServiceStatus(report: ServiceStatusReport): void {
@@ -347,11 +381,25 @@ function printLowOddsScan(scan: LowOddsScanView): void {
 
 function printSessionStatus(ctx: CommandContext): void {
   syncRuntime(ctx);
+  const providerState = buildAgentProviderState(ctx.config, {
+    codexAuthPath: resolve(ctx.config.codexHome, 'auth.json'),
+    codexAuthConfigured: existsSync(resolve(ctx.config.codexHome, 'auth.json')),
+    geminiAuthPath: resolve(ctx.config.geminiHome, 'oauth_creds.json'),
+    geminiAuthConfigured: existsSync(resolve(ctx.config.geminiHome, 'oauth_creds.json')),
+    cursorAuthPath: resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json'),
+    cursorAuthConfigured: existsSync(resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json')),
+    openrouterConfigured: Boolean(ctx.config.apiKey || process.env.OPENROUTER_API_KEY),
+  });
   printKeyValue('sessionPath', ctx.sessionPath);
   printKeyValue('runId', ctx.runtime.runId ?? 'none');
   printKeyValue('runtime', ctx.config.runtime);
-  printKeyValue('provider', providerLabel(ctx.config.provider));
+  printKeyValue('provider', providerState.label);
+  printKeyValue('authStatus', providerState.auth.configured ? 'ready' : 'missing');
   printKeyValue('model', ctx.config.model);
+  printKeyValue('codexThreadId', redactProviderSessionId(ctx.config.codexThreadId) ?? 'none');
+  printKeyValue('geminiSessionId', redactProviderSessionId(ctx.config.geminiSessionId) ?? 'none');
+  printKeyValue('cursorSessionId', redactProviderSessionId(ctx.config.cursorSessionId) ?? 'none');
+  printKeyValue('nativeWebSearch', ctx.config.nativeWebSearch ? `${ctx.config.nativeWebSearchMode} available` : 'off');
   printKeyValue('profile', ctx.config.profile);
   printKeyValue('approvalMode', ctx.config.approvalMode);
   printKeyValue('artifactRoot', ctx.config.artifactRoot);
@@ -394,10 +442,10 @@ function defaultModelForProvider(ctx: CommandContext, provider: Provider): strin
   ctx.config.provider = original;
 
   const candidates = PROVIDER_DEFAULT_MODELS[provider];
-  return candidates.find((candidate) => models.some((model) => model.id === candidate))
-    ?? models[0]?.id
-    ?? candidates[0]
-    ?? ctx.config.model;
+  return selectDefaultModelForProvider(
+    provider,
+    models.length ? models.map((model) => model.id) : candidates,
+  ) ?? ctx.config.model;
 }
 
 function resetProviderSession(ctx: CommandContext): void {
@@ -476,6 +524,14 @@ commands.push({
     ctx.config.provider = next;
     ctx.config.model = defaultModelForProvider(ctx, next);
     resetProviderSession(ctx);
+    saveAgentCommandEvent(ctx, 'agent.provider_changed', { provider: next, model: ctx.config.model });
+    saveAgentCommandEvent(ctx, 'agent.session_reset', { reason: 'provider_changed' });
+    if (ctx.config.profile === 'full-permissions' && ctx.config.approvalMode === 'auto-grant') {
+      appendAuditEvent(ctx.runtime, {
+        type: 'approval.auto_granted',
+        payload: { action: 'agent.provider_changed', provider: next },
+      });
+    }
     console.log(`  ${GREEN}✓${RESET} ${DIM}Provider →${RESET} ${CYAN}${providerLabel(next)}${RESET}`);
     console.log(`  ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
   },
@@ -489,10 +545,18 @@ commands.push({
     console.log(`  ${DIM}Current:${RESET} ${CYAN}${ctx.config.model}${RESET}`);
     const query = args.trim() || await ask(ctx.rl, `  ${DIM}Search models (empty lists first page):${RESET} `);
     process.stdout.write(`  ${DIM}Fetching…${RESET}`);
-    const data = ctx.config.provider === 'openrouter'
+    let data = ctx.config.provider === 'openrouter'
       ? await loadOpenRouterModels()
       : loadProviderModels(ctx);
     process.stdout.write('\r\x1b[K');
+    if (ctx.config.provider !== 'openrouter' && !data.length) {
+      const hint = providerCatalogHint(ctx);
+      console.log(`  ${YELLOW}!${RESET} ${DIM}No local model catalog found for ${providerLabel(ctx.config.provider)}.${RESET}`);
+      if (hint.path) printKeyValue('expectedPath', hint.path);
+      if (hint.script) printKeyValue('updateScript', hint.script);
+      console.log(`  ${DIM}Using explicit fallback defaults only.${RESET}`);
+      data = PROVIDER_DEFAULT_MODELS[ctx.config.provider].map((id) => ({ id, name: id }));
+    }
     const q = query.toLowerCase();
     const matches = data
       .filter((m) => !q || m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
@@ -507,6 +571,7 @@ commands.push({
     if (idx >= 0 && idx < matches.length) {
       ctx.config.model = matches[idx].id;
       syncRuntime(ctx);
+      saveAgentCommandEvent(ctx, 'agent.model_changed', { model: ctx.config.model });
       console.log(`  ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
     } else { console.log(`  ${DIM}Cancelled.${RESET}`); }
   },
@@ -605,12 +670,16 @@ commands.push({
 
     if (mode === 'on') {
       ctx.config.nativeWebSearch = true;
+      syncRuntime(ctx);
+      saveAgentCommandEvent(ctx, 'agent.web_changed', { nativeWebSearch: true, mode: ctx.config.nativeWebSearchMode });
       console.log(`  ${GREEN}✓${RESET} ${DIM}Native web search enabled.${RESET}`);
       return;
     }
 
     if (mode === 'off') {
       ctx.config.nativeWebSearch = false;
+      syncRuntime(ctx);
+      saveAgentCommandEvent(ctx, 'agent.web_changed', { nativeWebSearch: false, mode: ctx.config.nativeWebSearchMode });
       console.log(`  ${GREEN}✓${RESET} ${DIM}Native web search disabled.${RESET}`);
       return;
     }
@@ -618,6 +687,8 @@ commands.push({
     if (mode === 'cached' || mode === 'live') {
       ctx.config.nativeWebSearch = true;
       ctx.config.nativeWebSearchMode = mode;
+      syncRuntime(ctx);
+      saveAgentCommandEvent(ctx, 'agent.web_changed', { nativeWebSearch: true, mode });
       console.log(`  ${GREEN}✓${RESET} ${DIM}Native web search enabled. Codex mode →${RESET} ${CYAN}${mode}${RESET}`);
       return;
     }
@@ -631,6 +702,7 @@ commands.push({
   description: 'Start a fresh conversation',
   execute: async (_args, ctx) => {
     resetProviderSession(ctx);
+    saveAgentCommandEvent(ctx, 'agent.session_reset', { reason: 'new_command' });
     appendAuditEvent(ctx.runtime, { type: 'agent.session_reset', payload: { sessionPath: ctx.sessionPath } });
     console.log(`  ${GREEN}✓${RESET} ${DIM}New session started.${RESET}`);
   },
