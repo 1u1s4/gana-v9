@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { buildResearchFixturePrompt, RESEARCH_FIXTURE_PROMPT_VERSION } from './prompts.js';
+import type { Fixture } from '../domain/fixtures.js';
+
+const fixture: Fixture = {
+  id: 'fixture-1',
+  provider: 'api-football',
+  providerFixtureId: '1001',
+  homeTeamId: 'home-1',
+  awayTeamId: 'away-1',
+  scheduledAt: '2026-04-26T18:00:00.000Z',
+  status: 'scheduled',
+  includedByFilters: ['manual-include'],
+  createdAt: '2026-04-25T12:00:00.000Z',
+  updatedAt: '2026-04-25T12:00:00.000Z',
+};
+
+describe('research prompts', () => {
+  it('exports the research fixture prompt version', () => {
+    assert.equal(RESEARCH_FIXTURE_PROMPT_VERSION, 'research-fixture-v1');
+  });
+
+  it('requires JSON-only structured research with evidence references', () => {
+    const prompt = buildResearchFixturePrompt({
+      fixture,
+      web: 'live',
+      runId: 'run-1',
+      createdAt: '2026-04-25T12:00:00.000Z',
+    });
+
+    assert.match(prompt, /Return only valid JSON/);
+    assert.match(prompt, /sources/);
+    assert.match(prompt, /evidenceItems/);
+    assert.match(prompt, /claims/);
+    assert.match(prompt, /Every EvidenceItem\.sourceId/);
+    assert.match(prompt, /Every Claim\.evidenceIds/);
+    assert.match(prompt, /web-search/);
+    assert.match(prompt, /research-fixture-v1/);
+  });
+});

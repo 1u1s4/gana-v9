@@ -18,6 +18,7 @@ export interface LatestProviderSnapshotQuery {
 
 export interface LatestOddsQuoteQuery {
   fixtureId: string;
+  snapshotId?: string;
   marketKey?: string;
   selectionKey?: string;
   line?: number | null;
@@ -104,6 +105,7 @@ export function createOddsQuoteRepository(db: Pick<StoragePrismaClient, 'oddsQuo
       return db.oddsQuote.findMany({
         where: compactData({
           fixtureId: query.fixtureId,
+          snapshotId: query.snapshotId,
           marketKey: query.marketKey,
           selectionKey: query.selectionKey,
           line: query.line,

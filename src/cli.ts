@@ -566,6 +566,8 @@ async function main() {
     || command === 'filters'
     || command === 'fixtures'
     || command === 'odds'
+    || command === 'research'
+    || command === 'score'
     || command === 'leagues'
     || command === 'teams'
     || command === 'scan'

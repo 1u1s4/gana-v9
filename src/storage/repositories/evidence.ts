@@ -1,0 +1,390 @@
+import type {
+  ClaimInput,
+  ClaimRecord,
+  EvidenceItemInput,
+  EvidenceItemRecord,
+  JsonValue,
+  PrismaBatchPayload,
+  ResearchBundleInput,
+  ResearchBundleRecord,
+  ResearchBundleStatus,
+  SourceRecordInput,
+  SourceRecordRecord,
+  StoragePrismaClient,
+} from '../types.js';
+import { compactData, takeArg } from './helpers.js';
+
+export interface ResearchBundleQuery {
+  runId?: string;
+  fixtureId?: string;
+  status?: ResearchBundleStatus | string;
+  take?: number;
+}
+
+export interface SourceRecordQuery {
+  bundleId?: string;
+  runId?: string;
+  fixtureId?: string;
+  sourceType?: string;
+  take?: number;
+}
+
+export interface EvidenceItemQuery {
+  bundleId?: string;
+  sourceId?: string;
+  fixtureId?: string;
+  take?: number;
+}
+
+export interface ClaimQuery {
+  bundleId?: string;
+  fixtureId?: string;
+  sourceId?: string;
+  supportLevel?: string;
+  conflictStatus?: string;
+  critical?: boolean;
+  take?: number;
+}
+
+export interface ResearchBundleGraphSource {
+  id?: string;
+  type?: string;
+  sourceType?: string;
+  url?: string;
+  snapshotId?: string;
+  artifactPath?: string;
+  externalId?: string;
+  title?: string;
+  capturedAt?: string | Date;
+  hash?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ResearchBundleGraphEvidenceItem {
+  id?: string;
+  sourceId: string;
+  claimIds?: string[];
+  snippet?: string;
+  summary?: string;
+  confidence?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ResearchBundleGraphClaim {
+  id?: string;
+  statement: string;
+  subject?: {
+    type?: string;
+    id?: string;
+    market?: string;
+  };
+  supportLevel?: string;
+  evidenceIds?: string[];
+  conflictStatus?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ResearchBundleGraphInput {
+  bundle: {
+    id?: string;
+    runId: string;
+    fixtureId: string;
+    providerFixtureId?: string;
+    sources?: ResearchBundleGraphSource[];
+    evidenceItems?: ResearchBundleGraphEvidenceItem[];
+    claims?: ResearchBundleGraphClaim[];
+    gateResult?: Record<string, unknown> | JsonValue;
+    providerAgentic?: string;
+    model?: string;
+    promptVersion?: string;
+    createdAt?: string | Date;
+    warnings?: string[] | JsonValue;
+    metadata?: Record<string, unknown> | JsonValue;
+  };
+  artifactPath?: string;
+  artifactHash?: string;
+}
+
+export function createResearchBundleRepository(
+  db: Pick<StoragePrismaClient, 'researchBundle' | 'sourceRecord' | 'evidenceItem' | 'claim' | 'artifact'>,
+) {
+  return {
+    create(input: ResearchBundleInput): Promise<ResearchBundleRecord> {
+      return db.researchBundle.create({
+        data: compactData({
+          status: 'created',
+          ...input,
+        }),
+      });
+    },
+
+    findById(id: string): Promise<ResearchBundleRecord | null> {
+      return db.researchBundle.findUnique({ where: { id } });
+    },
+
+    async createWithItems(input: ResearchBundleGraphInput): Promise<ResearchBundleRecord> {
+      const artifact = input.artifactPath
+        ? await db.artifact.create({
+            data: compactData({
+              name: basename(input.artifactPath),
+              kind: 'research-bundle',
+              path: input.artifactPath,
+              sha256: input.artifactHash,
+              runId: input.bundle.runId,
+              metadata: compactData({
+                bundleId: input.bundle.id,
+                promptVersion: input.bundle.promptVersion,
+              }) as JsonValue,
+            }),
+          })
+        : null;
+      const createdAt = coerceDate(input.bundle.createdAt);
+      const bundle = await db.researchBundle.create({
+        data: compactData({
+          id: input.bundle.id,
+          runId: input.bundle.runId,
+          fixtureId: input.bundle.fixtureId,
+          providerFixtureId: input.bundle.providerFixtureId,
+          artifactId: artifact?.id,
+          status: researchStatusFromGate(input.bundle.gateResult),
+          gateResult: input.bundle.gateResult,
+          providerAgentic: input.bundle.providerAgentic,
+          model: input.bundle.model,
+          promptVersion: input.bundle.promptVersion,
+          warnings: input.bundle.warnings,
+          metadata: input.bundle.metadata,
+          createdAt,
+        }),
+      });
+
+      const evidenceSourceIds = new Map<string, string>();
+      for (const source of input.bundle.sources ?? []) {
+        await db.sourceRecord.create({
+          data: compactData({
+            id: source.id,
+            bundleId: bundle.id,
+            runId: input.bundle.runId,
+            fixtureId: input.bundle.fixtureId,
+            sourceType: source.sourceType ?? source.type,
+            url: source.url,
+            title: source.title,
+            externalId: source.externalId ?? source.snapshotId,
+            hash: source.hash,
+            capturedAt: coerceDate(source.capturedAt) ?? new Date(),
+            metadata: compactData({
+              ...(source.metadata ?? {}),
+              artifactPath: source.artifactPath,
+              snapshotId: source.snapshotId,
+            }) as JsonValue,
+          }),
+        });
+      }
+
+      for (const evidence of input.bundle.evidenceItems ?? []) {
+        const record = await db.evidenceItem.create({
+          data: compactData({
+            id: evidence.id,
+            bundleId: bundle.id,
+            sourceId: evidence.sourceId,
+            fixtureId: input.bundle.fixtureId,
+            snippetRedacted: evidence.snippet,
+            summaryRedacted: evidence.summary,
+            confidence: evidence.confidence,
+            claimIds: evidence.claimIds,
+            metadata: evidence.metadata,
+          }),
+        });
+        evidenceSourceIds.set(record.id, record.sourceId);
+      }
+
+      for (const claim of input.bundle.claims ?? []) {
+        await db.claim.create({
+          data: compactData({
+            id: claim.id,
+            bundleId: bundle.id,
+            fixtureId: input.bundle.fixtureId,
+            sourceId: firstEvidenceSourceId(claim.evidenceIds, evidenceSourceIds),
+            statement: claim.statement,
+            subjectType: claim.subject?.type,
+            subjectKey: claim.subject?.id ?? claim.subject?.market,
+            marketKey: claim.subject?.market,
+            supportLevel: claim.supportLevel ?? 'unknown',
+            evidenceIds: claim.evidenceIds,
+            conflictStatus: claim.conflictStatus ?? 'unknown',
+            critical: false,
+            metadata: claim.metadata,
+          }),
+        });
+      }
+
+      return bundle;
+    },
+
+    list(query: ResearchBundleQuery = {}): Promise<ResearchBundleRecord[]> {
+      return db.researchBundle.findMany({
+        where: compactData({
+          runId: query.runId,
+          fixtureId: query.fixtureId,
+          status: query.status,
+        }),
+        orderBy: { createdAt: 'desc' },
+        ...takeArg(query.take),
+      });
+    },
+  };
+}
+
+export function createSourceRecordRepository(db: Pick<StoragePrismaClient, 'sourceRecord'>) {
+  return {
+    create(input: SourceRecordInput): Promise<SourceRecordRecord> {
+      return db.sourceRecord.create({
+        data: compactData({
+          ...input,
+          capturedAt: input.capturedAt ?? new Date(),
+        }),
+      });
+    },
+
+    createMany(inputs: SourceRecordInput[], skipDuplicates = true): Promise<PrismaBatchPayload> {
+      return db.sourceRecord.createMany({
+        data: inputs.map((input) =>
+          compactData({
+            ...input,
+            capturedAt: input.capturedAt ?? new Date(),
+          }),
+        ),
+        skipDuplicates,
+      });
+    },
+
+    findById(id: string): Promise<SourceRecordRecord | null> {
+      return db.sourceRecord.findUnique({ where: { id } });
+    },
+
+    list(query: SourceRecordQuery): Promise<SourceRecordRecord[]> {
+      return db.sourceRecord.findMany({
+        where: compactData({
+          bundleId: query.bundleId,
+          runId: query.runId,
+          fixtureId: query.fixtureId,
+          sourceType: query.sourceType,
+        }),
+        orderBy: { capturedAt: 'desc' },
+        ...takeArg(query.take),
+      });
+    },
+  };
+}
+
+export function createEvidenceItemRepository(db: Pick<StoragePrismaClient, 'evidenceItem'>) {
+  return {
+    create(input: EvidenceItemInput): Promise<EvidenceItemRecord> {
+      return db.evidenceItem.create({ data: compactData(input) });
+    },
+
+    createMany(inputs: EvidenceItemInput[], skipDuplicates = true): Promise<PrismaBatchPayload> {
+      return db.evidenceItem.createMany({
+        data: inputs.map((input) => compactData(input)),
+        skipDuplicates,
+      });
+    },
+
+    findById(id: string): Promise<EvidenceItemRecord | null> {
+      return db.evidenceItem.findUnique({ where: { id } });
+    },
+
+    list(query: EvidenceItemQuery): Promise<EvidenceItemRecord[]> {
+      return db.evidenceItem.findMany({
+        where: compactData({
+          bundleId: query.bundleId,
+          sourceId: query.sourceId,
+          fixtureId: query.fixtureId,
+        }),
+        orderBy: { createdAt: 'asc' },
+        ...takeArg(query.take),
+      });
+    },
+  };
+}
+
+export function createClaimRepository(db: Pick<StoragePrismaClient, 'claim'>) {
+  return {
+    create(input: ClaimInput): Promise<ClaimRecord> {
+      return db.claim.create({
+        data: compactData({
+          supportLevel: 'unknown',
+          conflictStatus: 'unknown',
+          critical: false,
+          ...input,
+        }),
+      });
+    },
+
+    createMany(inputs: ClaimInput[], skipDuplicates = true): Promise<PrismaBatchPayload> {
+      return db.claim.createMany({
+        data: inputs.map((input) =>
+          compactData({
+            supportLevel: 'unknown',
+            conflictStatus: 'unknown',
+            critical: false,
+            ...input,
+          }),
+        ),
+        skipDuplicates,
+      });
+    },
+
+    findById(id: string): Promise<ClaimRecord | null> {
+      return db.claim.findUnique({ where: { id } });
+    },
+
+    list(query: ClaimQuery): Promise<ClaimRecord[]> {
+      return db.claim.findMany({
+        where: compactData({
+          bundleId: query.bundleId,
+          fixtureId: query.fixtureId,
+          sourceId: query.sourceId,
+          supportLevel: query.supportLevel,
+          conflictStatus: query.conflictStatus,
+          critical: query.critical,
+        }),
+        orderBy: { createdAt: 'asc' },
+        ...takeArg(query.take),
+      });
+    },
+  };
+}
+
+export function createEvidenceRepositories(
+  db: Pick<StoragePrismaClient, 'researchBundle' | 'sourceRecord' | 'evidenceItem' | 'claim' | 'artifact'>,
+) {
+  return {
+    researchBundles: createResearchBundleRepository(db),
+    sourceRecords: createSourceRecordRepository(db),
+    evidenceItems: createEvidenceItemRepository(db),
+    claims: createClaimRepository(db),
+  };
+}
+
+function basename(path: string): string {
+  return path.split('/').filter(Boolean).at(-1) ?? 'research-bundle.json';
+}
+
+function coerceDate(value?: string | Date): Date | undefined {
+  if (!value) return undefined;
+  return value instanceof Date ? value : new Date(value);
+}
+
+function researchStatusFromGate(gateResult?: unknown): ResearchBundleStatus | string {
+  if (!gateResult || typeof gateResult !== 'object' || Array.isArray(gateResult)) return 'created';
+  const verdict = (gateResult as { verdict?: unknown }).verdict;
+  return typeof verdict === 'string' ? verdict : 'created';
+}
+
+function firstEvidenceSourceId(evidenceIds: string[] | undefined, evidenceSourceIds: Map<string, string>): string | undefined {
+  for (const evidenceId of evidenceIds ?? []) {
+    const sourceId = evidenceSourceIds.get(evidenceId);
+    if (sourceId) return sourceId;
+  }
+  return undefined;
+}

@@ -32,6 +32,9 @@ import { updateRuntimeContext, type RuntimeContext } from './runtime/context.js'
 import { getDbStatus } from './storage/db-status.js';
 import type { Fixture } from './domain/fixtures.js';
 import type { OddsQuote } from './domain/odds.js';
+import { runFixtureResearch, type FixtureResearchResult } from './evidence/research.js';
+import { runFixtureScoring, type FixtureScoringResult } from './prediction/service.js';
+import type { ResearchWebMode } from './prediction/prompts.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -303,6 +306,12 @@ function optionalStringFlag(flags: Record<string, string | true>, key: string): 
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function optionalResearchWebMode(flags: Record<string, string | true>): ResearchWebMode {
+  const value = optionalStringFlag(flags, 'web') ?? 'off';
+  if (value === 'off' || value === 'cached' || value === 'live') return value;
+  throw new Error('--web must be off, cached, or live.');
+}
+
 function optionalFloatFlag(flags: Record<string, string | true>, key: string): number | undefined {
   const value = flags[key];
   if (typeof value !== 'string') return undefined;
@@ -376,6 +385,42 @@ function printLowOddsScan(scan: LowOddsScanView): void {
     console.log(
       `  ${GREEN}•${RESET} ${CYAN}${hit.providerFixtureId}${RESET} ${hit.market} ${hit.selection}${line} ${hit.odds.toFixed(3)} p=${hit.impliedProbability.toFixed(3)}${bookmaker}`,
     );
+  }
+}
+
+function printResearchResult(result: FixtureResearchResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}research${RESET} ${DIM}${result.gateResult.verdict}${RESET}`);
+  if (result.bundle) {
+    printKeyValue('researchBundleId', result.bundle.id);
+    printKeyValue('fixtureId', result.bundle.fixtureId);
+    printKeyValue('providerFixtureId', result.bundle.providerFixtureId);
+    printKeyValue('sources', result.bundle.sources.length);
+    printKeyValue('evidenceItems', result.bundle.evidenceItems.length);
+    printKeyValue('claims', result.bundle.claims.length);
+  }
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  for (const reason of result.gateResult.reasons) {
+    console.log(`  ${DIM}reason:${RESET} ${CYAN}${reason}${RESET}`);
+  }
+  for (const warning of result.gateResult.warnings) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+  }
+}
+
+function printScoringResult(result: FixtureScoringResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}score${RESET} ${DIM}${result.gateResult.verdict}${RESET}`);
+  printKeyValue('runId', result.runId);
+  if (result.fixtureId) printKeyValue('fixtureId', result.fixtureId);
+  if (result.providerFixtureId) printKeyValue('providerFixtureId', result.providerFixtureId);
+  printKeyValue('predictions', result.predictions.length);
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  for (const reason of result.gateResult.reasons) {
+    console.log(`  ${DIM}reason:${RESET} ${CYAN}${reason}${RESET}`);
+  }
+  for (const warning of result.gateResult.warnings) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
   }
 }
 
@@ -809,6 +854,31 @@ commands.push({
 });
 
 commands.push({
+  name: '/research',
+  description: 'Run structured fixture research',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await runFixtureResearch(ctx.config, {
+      fixtureId: requireStringFlag(flags, 'fixture-id'),
+      web: optionalResearchWebMode(flags),
+    }, ctx.runtime);
+    printResearchResult(result);
+  },
+});
+
+commands.push({
+  name: '/score',
+  description: 'Score atomic fixture predictions',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await runFixtureScoring(ctx.config, {
+      fixtureId: requireStringFlag(flags, 'fixture-id'),
+    }, ctx.runtime);
+    printScoringResult(result);
+  },
+});
+
+commands.push({
   name: '/filters',
   description: 'Show active sports filter defaults',
   execute: async (_args, ctx) => {
@@ -985,6 +1055,25 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: true, exitCode: 0 };
     }
 
+    if (area === 'research') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await runFixtureResearch(ctx.config, {
+        fixtureId: requireStringFlag(flags, 'fixture-id'),
+        web: optionalResearchWebMode(flags),
+      }, ctx.runtime);
+      printResearchResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'score') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await runFixtureScoring(ctx.config, {
+        fixtureId: requireStringFlag(flags, 'fixture-id'),
+      }, ctx.runtime);
+      printScoringResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
     if (area === 'filters' && action === 'show') {
       const status = getFiltersStatus(ctx.config);
       printFiltersStatus(status);
@@ -1071,6 +1160,8 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana football status${RESET}`);
   console.log(`  ${CYAN}pnpm gana fixtures --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana odds --fixture-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live${RESET}`);
+  console.log(`  ${CYAN}pnpm gana score --fixture-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);

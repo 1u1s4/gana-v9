@@ -50,6 +50,25 @@ export function createHarnessRunRepository(db: Pick<StoragePrismaClient, 'harnes
         data: compactData(update),
       });
     },
+
+    upsertForRun(input: HarnessRunInput & { id: string }): Promise<HarnessRunRecord> {
+      return db.harnessRun.upsert({
+        where: { id: input.id },
+        create: compactData(input),
+        update: compactData({
+          runtime: input.runtime,
+          profile: input.profile,
+          providerSports: input.providerSports,
+          providerAgentic: input.providerAgentic,
+          model: input.model,
+          status: input.status,
+          verdict: input.verdict,
+          artifactDir: input.artifactDir,
+          completedAt: input.completedAt,
+          metadata: input.metadata,
+        }),
+      });
+    },
   };
 }
 

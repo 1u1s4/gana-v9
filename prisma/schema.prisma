@@ -8,21 +8,21 @@ datasource db {
 }
 
 model SportsProvider {
-  id          String   @id @default(uuid()) @db.Char(36)
-  code        String   @unique @db.VarChar(64)
-  name        String   @db.VarChar(160)
-  baseUrl     String?  @map("base_url") @db.VarChar(500)
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  id        String   @id @default(uuid()) @db.Char(36)
+  code      String   @unique @db.VarChar(64)
+  name      String   @db.VarChar(160)
+  baseUrl   String?  @map("base_url") @db.VarChar(500)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  competitions        Competition[]
-  teams               Team[]
-  fixtures            Fixture[]
-  providerSnapshots   ProviderSnapshot[]
+  competitions         Competition[]
+  teams                Team[]
+  fixtures             Fixture[]
+  providerSnapshots    ProviderSnapshot[]
   providerQuotaSamples ProviderQuotaSample[]
-  leaguePresets       LeaguePreset[]
-  teamPresets         TeamPreset[]
+  leaguePresets        LeaguePreset[]
+  teamPresets          TeamPreset[]
 
   @@map("sports_providers")
 }
@@ -38,8 +38,8 @@ model Competition {
   createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt             DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  fixtures Fixture[]
+  provider      SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  fixtures      Fixture[]
   leaguePresets LeaguePreset[]
 
   @@unique([providerId, providerCompetitionId], map: "competitions_provider_provider_competition_id_key")
@@ -57,10 +57,10 @@ model Team {
   createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  homeFixtures Fixture[] @relation("fixture_home_team")
-  awayFixtures Fixture[] @relation("fixture_away_team")
-  teamPresets TeamPreset[]
+  provider     SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  homeFixtures Fixture[]      @relation("fixture_home_team")
+  awayFixtures Fixture[]      @relation("fixture_away_team")
+  teamPresets  TeamPreset[]
 
   @@unique([providerId, providerTeamId], map: "teams_provider_provider_team_id_key")
   @@index([providerId], map: "teams_provider_id_idx")
@@ -84,13 +84,18 @@ model Fixture {
   createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
-  homeTeam Team? @relation("fixture_home_team", fields: [homeTeamId], references: [id], onDelete: SetNull)
-  awayTeam Team? @relation("fixture_away_team", fields: [awayTeamId], references: [id], onDelete: SetNull)
-  oddsSnapshots OddsSnapshot[]
-  oddsQuotes OddsQuote[]
-  lowOddsHits LowOddsHit[]
+  provider        SportsProvider   @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  competition     Competition?     @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  homeTeam        Team?            @relation("fixture_home_team", fields: [homeTeamId], references: [id], onDelete: SetNull)
+  awayTeam        Team?            @relation("fixture_away_team", fields: [awayTeamId], references: [id], onDelete: SetNull)
+  oddsSnapshots   OddsSnapshot[]
+  oddsQuotes      OddsQuote[]
+  lowOddsHits     LowOddsHit[]
+  researchBundles ResearchBundle[]
+  sourceRecords   SourceRecord[]
+  evidenceItems   EvidenceItem[]
+  claims          Claim[]
+  predictions     Prediction[]
 
   @@unique([providerId, providerFixtureId], map: "fixtures_provider_provider_fixture_id_key")
   @@index([status, scheduledAt], map: "fixtures_status_scheduled_at_idx")
@@ -117,10 +122,11 @@ model ProviderSnapshot {
   traceId         String?  @map("trace_id") @db.VarChar(80)
   createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
-  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
-  task HarnessTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  provider      SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  run           HarnessRun?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  task          HarnessTask?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
   oddsSnapshots OddsSnapshot[]
+  sourceRecords SourceRecord[]
 
   @@index([providerId, endpointName, capturedAt], map: "provider_snapshots_provider_endpoint_captured_at_idx")
   @@index([runId], map: "provider_snapshots_run_id_idx")
@@ -139,9 +145,10 @@ model OddsSnapshot {
   metadata           Json?
   createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
-  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  fixture          Fixture           @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
   providerSnapshot ProviderSnapshot? @relation(fields: [providerSnapshotId], references: [id], onDelete: SetNull)
-  oddsQuotes OddsQuote[]
+  oddsQuotes       OddsQuote[]
+  predictions      Prediction[]
 
   @@index([fixtureId, capturedAt], map: "odds_snapshots_fixture_captured_at_idx")
   @@index([providerSnapshotId], map: "odds_snapshots_provider_snapshot_id_idx")
@@ -156,16 +163,17 @@ model OddsQuote {
   bookmakerKey       String?  @map("bookmaker_key") @db.VarChar(120)
   marketKey          String   @map("market_key") @db.VarChar(80)
   selectionKey       String   @map("selection_key") @db.VarChar(120)
-  line               Decimal? @db.Decimal(12,6)
-  price              Decimal  @db.Decimal(12,6)
-  impliedProbability Decimal? @map("implied_probability") @db.Decimal(12,6)
+  line               Decimal? @db.Decimal(12, 6)
+  price              Decimal  @db.Decimal(12, 6)
+  impliedProbability Decimal? @map("implied_probability") @db.Decimal(12, 6)
   capturedAt         DateTime @default(now()) @map("captured_at") @db.DateTime(3)
   metadata           Json?
   createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
-  snapshot OddsSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
-  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  snapshot    OddsSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+  fixture     Fixture      @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
   lowOddsHits LowOddsHit[]
+  predictions Prediction[]
 
   @@index([fixtureId, marketKey, capturedAt], map: "odds_quotes_fixture_market_captured_at_idx")
   @@index([fixtureId, marketKey, selectionKey, line, capturedAt], map: "odds_quotes_fixture_market_selection_line_captured_at_idx")
@@ -174,28 +182,31 @@ model OddsQuote {
 }
 
 model HarnessRun {
-  id                String    @id @default(uuid()) @db.Char(36)
-  runtime           String    @db.VarChar(80)
-  profile           String    @db.VarChar(80)
-  providerSports    String    @map("provider_sports") @db.VarChar(80)
-  providerAgentic   String?   @map("provider_agentic") @db.VarChar(80)
-  model             String?   @db.VarChar(160)
-  filterPresetId    String?   @map("filter_preset_id") @db.Char(36)
-  status            String    @default("created") @db.VarChar(40)
-  verdict           String?   @db.VarChar(80)
-  artifactDir       String?   @map("artifact_dir") @db.VarChar(700)
-  startedAt         DateTime? @map("started_at") @db.DateTime(3)
-  completedAt       DateTime? @map("completed_at") @db.DateTime(3)
-  metadata          Json?
-  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id              String    @id @default(uuid()) @db.Char(36)
+  runtime         String    @db.VarChar(80)
+  profile         String    @db.VarChar(80)
+  providerSports  String    @map("provider_sports") @db.VarChar(80)
+  providerAgentic String?   @map("provider_agentic") @db.VarChar(80)
+  model           String?   @db.VarChar(160)
+  filterPresetId  String?   @map("filter_preset_id") @db.Char(36)
+  status          String    @default("created") @db.VarChar(40)
+  verdict         String?   @db.VarChar(80)
+  artifactDir     String?   @map("artifact_dir") @db.VarChar(700)
+  startedAt       DateTime? @map("started_at") @db.DateTime(3)
+  completedAt     DateTime? @map("completed_at") @db.DateTime(3)
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  filterPreset SearchFilterPreset? @relation(fields: [filterPresetId], references: [id], onDelete: SetNull)
-  tasks HarnessTask[]
-  artifacts Artifact[]
-  auditLogs AuditLog[]
+  filterPreset      SearchFilterPreset? @relation(fields: [filterPresetId], references: [id], onDelete: SetNull)
+  tasks             HarnessTask[]
+  artifacts         Artifact[]
+  auditLogs         AuditLog[]
   providerSnapshots ProviderSnapshot[]
-  lowOddsScans LowOddsScan[]
+  lowOddsScans      LowOddsScan[]
+  researchBundles   ResearchBundle[]
+  sourceRecords     SourceRecord[]
+  predictions       Prediction[]
 
   @@index([status, createdAt], map: "harness_runs_status_created_at_idx")
   @@index([filterPresetId], map: "harness_runs_filter_preset_id_idx")
@@ -203,21 +214,21 @@ model HarnessRun {
 }
 
 model HarnessTask {
-  id              String    @id @default(uuid()) @db.Char(36)
-  runId           String?   @map("run_id") @db.Char(36)
-  type            String    @db.VarChar(120)
-  status          String    @default("queued") @db.VarChar(40)
-  priority        Int       @default(0)
-  scheduledFor    DateTime? @map("scheduled_for") @db.DateTime(3)
-  leaseExpiresAt  DateTime? @map("lease_expires_at") @db.DateTime(3)
-  attempts        Int       @default(0)
-  maxAttempts     Int       @default(3) @map("max_attempts")
-  payload         Json?
-  lastErrorRedacted String? @map("last_error_redacted") @db.Text
-  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  id                String    @id @default(uuid()) @db.Char(36)
+  runId             String?   @map("run_id") @db.Char(36)
+  type              String    @db.VarChar(120)
+  status            String    @default("queued") @db.VarChar(40)
+  priority          Int       @default(0)
+  scheduledFor      DateTime? @map("scheduled_for") @db.DateTime(3)
+  leaseExpiresAt    DateTime? @map("lease_expires_at") @db.DateTime(3)
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(3) @map("max_attempts")
+  payload           Json?
+  lastErrorRedacted String?   @map("last_error_redacted") @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  run               HarnessRun?        @relation(fields: [runId], references: [id], onDelete: SetNull)
   providerSnapshots ProviderSnapshot[]
 
   @@index([status, scheduledFor, priority, createdAt], map: "harness_tasks_queue_idx")
@@ -237,7 +248,11 @@ model Artifact {
   metadata  Json?
   createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
-  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  run             HarnessRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  researchBundles ResearchBundle[]
+  sourceRecords   SourceRecord[]
+  evidenceItems   EvidenceItem[]
+  predictions     Prediction[]
 
   @@index([runId, createdAt], map: "artifacts_run_created_at_idx")
   @@map("artifacts")
@@ -263,19 +278,19 @@ model AuditLog {
 }
 
 model ProviderQuotaSample {
-  id              String   @id @default(uuid()) @db.Char(36)
-  providerId      String?  @map("provider_id") @db.Char(36)
-  providerCode    String   @map("provider_code") @db.VarChar(64)
-  endpointName    String?  @map("endpoint_name") @db.VarChar(120)
-  status          String   @db.VarChar(40)
-  quotaLimit      Int?     @map("quota_limit")
-  quotaRemaining  Int?     @map("quota_remaining")
-  resetAt         DateTime? @map("reset_at") @db.DateTime(3)
-  responseMs      Int?     @map("response_ms")
-  errorRedacted   String?  @map("error_redacted") @db.Text
-  metadata        Json?
-  sampledAt       DateTime @default(now()) @map("sampled_at") @db.DateTime(3)
-  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  id             String    @id @default(uuid()) @db.Char(36)
+  providerId     String?   @map("provider_id") @db.Char(36)
+  providerCode   String    @map("provider_code") @db.VarChar(64)
+  endpointName   String?   @map("endpoint_name") @db.VarChar(120)
+  status         String    @db.VarChar(40)
+  quotaLimit     Int?      @map("quota_limit")
+  quotaRemaining Int?      @map("quota_remaining")
+  resetAt        DateTime? @map("reset_at") @db.DateTime(3)
+  responseMs     Int?      @map("response_ms")
+  errorRedacted  String?   @map("error_redacted") @db.Text
+  metadata       Json?
+  sampledAt      DateTime  @default(now()) @map("sampled_at") @db.DateTime(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
 
   provider SportsProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
 
@@ -298,8 +313,8 @@ model LeaguePreset {
   createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt             DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  competition Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  provider    SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  competition Competition?   @relation(fields: [competitionId], references: [id], onDelete: SetNull)
 
   @@unique([presetKey, providerId, providerCompetitionId, season], map: "league_presets_preset_provider_competition_season_key")
   @@index([enabled, presetKey], map: "league_presets_enabled_preset_idx")
@@ -307,21 +322,21 @@ model LeaguePreset {
 }
 
 model TeamPreset {
-  id             String   @id @default(uuid()) @db.Char(36)
-  presetKey      String   @default("default") @map("preset_key") @db.VarChar(80)
-  providerId     String   @map("provider_id") @db.Char(36)
-  providerTeamId String   @map("provider_team_id") @db.VarChar(80)
-  teamId         String?  @map("team_id") @db.Char(36)
-  name           String   @db.VarChar(200)
-  country        String?  @db.VarChar(120)
-  providerLeagueId String? @map("provider_league_id") @db.VarChar(80)
-  enabled        Boolean  @default(true)
-  metadata       Json?
-  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+  id               String   @id @default(uuid()) @db.Char(36)
+  presetKey        String   @default("default") @map("preset_key") @db.VarChar(80)
+  providerId       String   @map("provider_id") @db.Char(36)
+  providerTeamId   String   @map("provider_team_id") @db.VarChar(80)
+  teamId           String?  @map("team_id") @db.Char(36)
+  name             String   @db.VarChar(200)
+  country          String?  @db.VarChar(120)
+  providerLeagueId String?  @map("provider_league_id") @db.VarChar(80)
+  enabled          Boolean  @default(true)
+  metadata         Json?
+  createdAt        DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
   provider SportsProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
-  team Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  team     Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@unique([presetKey, providerId, providerTeamId], map: "team_presets_preset_provider_team_key")
   @@index([enabled, presetKey], map: "team_presets_enabled_preset_idx")
@@ -334,7 +349,7 @@ model SearchFilterPreset {
   name                     String   @db.VarChar(160)
   season                   Int?
   markets                  Json?
-  threshold                Decimal? @db.Decimal(12,6)
+  threshold                Decimal? @db.Decimal(12, 6)
   kickoffWindowHours       Int?     @map("kickoff_window_hours")
   includeLiveFixtures      Boolean  @default(false) @map("include_live_fixtures")
   includeCompletedFixtures Boolean  @default(false) @map("include_completed_fixtures")
@@ -346,7 +361,7 @@ model SearchFilterPreset {
   createdAt                DateTime @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt                DateTime @updatedAt @map("updated_at") @db.DateTime(3)
 
-  harnessRuns HarnessRun[]
+  harnessRuns  HarnessRun[]
   lowOddsScans LowOddsScan[]
 
   @@index([enabled, key], map: "search_filter_presets_enabled_key_idx")
@@ -358,7 +373,7 @@ model LowOddsScan {
   runId          String?   @map("run_id") @db.Char(36)
   filterPresetId String?   @map("filter_preset_id") @db.Char(36)
   querySnapshot  Json?     @map("query_snapshot")
-  threshold      Decimal   @db.Decimal(12,6)
+  threshold      Decimal   @db.Decimal(12, 6)
   comparison     String    @default("lte") @db.VarChar(20)
   status         String    @default("created") @db.VarChar(40)
   fixtureCount   Int       @default(0) @map("fixture_count")
@@ -369,9 +384,9 @@ model LowOddsScan {
   createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
-  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  run          HarnessRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
   filterPreset SearchFilterPreset? @relation(fields: [filterPresetId], references: [id], onDelete: SetNull)
-  hits LowOddsHit[]
+  hits         LowOddsHit[]
 
   @@index([status, createdAt], map: "low_odds_scans_status_created_at_idx")
   @@index([runId], map: "low_odds_scans_run_id_idx")
@@ -386,9 +401,9 @@ model LowOddsHit {
   oddsQuoteId        String?  @map("odds_quote_id") @db.Char(36)
   marketKey          String   @map("market_key") @db.VarChar(80)
   selectionKey       String   @map("selection_key") @db.VarChar(120)
-  line               Decimal? @db.Decimal(12,6)
-  odds               Decimal  @db.Decimal(12,6)
-  impliedProbability Decimal? @map("implied_probability") @db.Decimal(12,6)
+  line               Decimal? @db.Decimal(12, 6)
+  odds               Decimal  @db.Decimal(12, 6)
+  impliedProbability Decimal? @map("implied_probability") @db.Decimal(12, 6)
   bookmaker          String?  @db.VarChar(160)
   includedReasons    Json?    @map("included_reasons")
   excludedReasons    Json?    @map("excluded_reasons")
@@ -396,12 +411,187 @@ model LowOddsHit {
   metadata           Json?
   createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
 
-  scan LowOddsScan @relation(fields: [scanId], references: [id], onDelete: Restrict)
-  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
-  oddsQuote OddsQuote? @relation(fields: [oddsQuoteId], references: [id], onDelete: SetNull)
+  scan      LowOddsScan @relation(fields: [scanId], references: [id], onDelete: Restrict)
+  fixture   Fixture     @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  oddsQuote OddsQuote?  @relation(fields: [oddsQuoteId], references: [id], onDelete: SetNull)
 
   @@index([scanId, odds], map: "low_odds_hits_scan_odds_idx")
   @@index([fixtureId], map: "low_odds_hits_fixture_id_idx")
   @@index([oddsQuoteId], map: "low_odds_hits_odds_quote_id_idx")
   @@map("low_odds_hits")
+}
+
+model ResearchBundle {
+  id                String   @id @default(uuid()) @db.Char(36)
+  runId             String?  @map("run_id") @db.Char(36)
+  fixtureId         String?  @map("fixture_id") @db.Char(36)
+  providerFixtureId String?  @map("provider_fixture_id") @db.VarChar(80)
+  artifactId        String?  @map("artifact_id") @db.Char(36)
+  status            String   @default("created") @db.VarChar(40)
+  gateResult        Json?    @map("gate_result")
+  providerAgentic   String?  @map("provider_agentic") @db.VarChar(80)
+  model             String?  @db.VarChar(160)
+  promptVersion     String?  @map("prompt_version") @db.VarChar(80)
+  warnings          Json?
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  run           HarnessRun?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  fixture       Fixture?       @relation(fields: [fixtureId], references: [id], onDelete: SetNull)
+  artifact      Artifact?      @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  sources       SourceRecord[]
+  evidenceItems EvidenceItem[]
+  claims        Claim[]
+  predictions   Prediction[]
+
+  @@index([runId, createdAt], map: "research_bundles_run_created_at_idx")
+  @@index([fixtureId, createdAt], map: "research_bundles_fixture_created_at_idx")
+  @@index([providerFixtureId, createdAt], map: "research_bundles_provider_fixture_created_at_idx")
+  @@index([status, createdAt], map: "research_bundles_status_created_at_idx")
+  @@index([artifactId], map: "research_bundles_artifact_id_idx")
+  @@map("research_bundles")
+}
+
+model SourceRecord {
+  id                 String   @id @default(uuid()) @db.VarChar(120)
+  bundleId           String   @map("bundle_id") @db.Char(36)
+  runId              String?  @map("run_id") @db.Char(36)
+  fixtureId          String?  @map("fixture_id") @db.Char(36)
+  artifactId         String?  @map("artifact_id") @db.Char(36)
+  providerSnapshotId String?  @map("provider_snapshot_id") @db.Char(36)
+  sourceType         String   @map("source_type") @db.VarChar(80)
+  url                String?  @db.VarChar(1000)
+  title              String?  @db.VarChar(500)
+  externalId         String?  @map("external_id") @db.VarChar(240)
+  hash               String?  @db.VarChar(64)
+  capturedAt         DateTime @default(now()) @map("captured_at") @db.DateTime(3)
+  warnings           Json?
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  bundle           ResearchBundle    @relation(fields: [bundleId], references: [id], onDelete: Restrict)
+  run              HarnessRun?       @relation(fields: [runId], references: [id], onDelete: SetNull)
+  fixture          Fixture?          @relation(fields: [fixtureId], references: [id], onDelete: SetNull)
+  artifact         Artifact?         @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  providerSnapshot ProviderSnapshot? @relation(fields: [providerSnapshotId], references: [id], onDelete: SetNull)
+  evidenceItems    EvidenceItem[]
+  claims           Claim[]
+
+  @@index([bundleId, capturedAt], map: "source_records_bundle_captured_at_idx")
+  @@index([sourceType, capturedAt], map: "source_records_source_type_captured_at_idx")
+  @@index([fixtureId, capturedAt], map: "source_records_fixture_captured_at_idx")
+  @@index([runId, capturedAt], map: "source_records_run_captured_at_idx")
+  @@index([artifactId], map: "source_records_artifact_id_idx")
+  @@index([providerSnapshotId], map: "source_records_provider_snapshot_id_idx")
+  @@index([hash], map: "source_records_hash_idx")
+  @@map("source_records")
+}
+
+model EvidenceItem {
+  id              String   @id @default(uuid()) @db.VarChar(120)
+  bundleId        String   @map("bundle_id") @db.Char(36)
+  sourceId        String   @map("source_id") @db.VarChar(120)
+  fixtureId       String?  @map("fixture_id") @db.Char(36)
+  artifactId      String?  @map("artifact_id") @db.Char(36)
+  kind            String?  @db.VarChar(80)
+  snippetRedacted String?  @map("snippet_redacted") @db.Text
+  summaryRedacted String?  @map("summary_redacted") @db.Text
+  confidence      Decimal? @db.Decimal(5, 4)
+  claimIds        Json?    @map("claim_ids")
+  warnings        Json?
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  bundle   ResearchBundle @relation(fields: [bundleId], references: [id], onDelete: Restrict)
+  source   SourceRecord   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  fixture  Fixture?       @relation(fields: [fixtureId], references: [id], onDelete: SetNull)
+  artifact Artifact?      @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@index([bundleId, createdAt], map: "evidence_items_bundle_created_at_idx")
+  @@index([sourceId, createdAt], map: "evidence_items_source_created_at_idx")
+  @@index([fixtureId, createdAt], map: "evidence_items_fixture_created_at_idx")
+  @@index([artifactId], map: "evidence_items_artifact_id_idx")
+  @@map("evidence_items")
+}
+
+model Claim {
+  id             String   @id @default(uuid()) @db.VarChar(120)
+  bundleId       String   @map("bundle_id") @db.Char(36)
+  fixtureId      String?  @map("fixture_id") @db.Char(36)
+  sourceId       String?  @map("source_id") @db.VarChar(120)
+  statement      String   @db.Text
+  subjectType    String?  @map("subject_type") @db.VarChar(80)
+  subjectKey     String?  @map("subject_key") @db.VarChar(160)
+  marketKey      String?  @map("market_key") @db.VarChar(80)
+  selectionKey   String?  @map("selection_key") @db.VarChar(120)
+  line           Decimal? @db.Decimal(12, 6)
+  supportLevel   String   @default("unknown") @map("support_level") @db.VarChar(40)
+  confidence     Decimal? @db.Decimal(5, 4)
+  evidenceIds    Json?    @map("evidence_ids")
+  conflictStatus String   @default("unknown") @map("conflict_status") @db.VarChar(40)
+  critical       Boolean  @default(false)
+  warnings       Json?
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  bundle  ResearchBundle @relation(fields: [bundleId], references: [id], onDelete: Restrict)
+  fixture Fixture?       @relation(fields: [fixtureId], references: [id], onDelete: SetNull)
+  source  SourceRecord?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([bundleId, createdAt], map: "claims_bundle_created_at_idx")
+  @@index([fixtureId, marketKey], map: "claims_fixture_market_idx")
+  @@index([sourceId], map: "claims_source_id_idx")
+  @@index([supportLevel, conflictStatus], map: "claims_support_conflict_idx")
+  @@map("claims")
+}
+
+model Prediction {
+  id                 String   @id @default(uuid()) @db.Char(36)
+  runId              String?  @map("run_id") @db.Char(36)
+  fixtureId          String   @map("fixture_id") @db.Char(36)
+  oddsSnapshotId     String   @map("odds_snapshot_id") @db.Char(36)
+  oddsQuoteId        String   @map("odds_quote_id") @db.Char(36)
+  researchBundleId   String?  @map("research_bundle_id") @db.Char(36)
+  artifactId         String?  @map("artifact_id") @db.Char(36)
+  marketKey          String   @map("market_key") @db.VarChar(80)
+  selectionKey       String   @map("selection_key") @db.VarChar(120)
+  line               Decimal? @db.Decimal(12, 6)
+  odds               Decimal  @db.Decimal(12, 6)
+  impliedProbability Decimal  @map("implied_probability") @db.Decimal(12, 6)
+  estimatedProbability Decimal? @map("estimated_probability") @db.Decimal(12, 6)
+  edge               Decimal? @db.Decimal(12, 6)
+  confidence         Decimal  @db.Decimal(5, 4)
+  quality            String   @default("low") @db.VarChar(40)
+  rationaleRedacted  String   @map("rationale_redacted") @db.Text
+  warnings           Json?
+  evidenceIds        Json?    @map("evidence_ids")
+  includedByFilters  Json?    @map("included_by_filters")
+  providerAgentic    String?  @map("provider_agentic") @db.VarChar(80)
+  model              String?  @db.VarChar(160)
+  promptVersion      String   @map("prompt_version") @db.VarChar(80)
+  scoringRuleVersion String   @map("scoring_rule_version") @db.VarChar(80)
+  status             String   @default("draft") @db.VarChar(40)
+  generatedAt        DateTime @default(now()) @map("generated_at") @db.DateTime(3)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  run            HarnessRun?     @relation(fields: [runId], references: [id], onDelete: SetNull)
+  fixture        Fixture         @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  oddsSnapshot   OddsSnapshot    @relation(fields: [oddsSnapshotId], references: [id], onDelete: Restrict)
+  oddsQuote      OddsQuote       @relation(fields: [oddsQuoteId], references: [id], onDelete: Restrict)
+  researchBundle ResearchBundle? @relation(fields: [researchBundleId], references: [id], onDelete: SetNull)
+  artifact       Artifact?       @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@index([fixtureId, status, generatedAt], map: "predictions_fixture_status_generated_at_idx")
+  @@index([runId, generatedAt], map: "predictions_run_generated_at_idx")
+  @@index([oddsSnapshotId], map: "predictions_odds_snapshot_id_idx")
+  @@index([oddsQuoteId], map: "predictions_odds_quote_id_idx")
+  @@index([researchBundleId], map: "predictions_research_bundle_id_idx")
+  @@index([artifactId], map: "predictions_artifact_id_idx")
+  @@index([scoringRuleVersion, generatedAt], map: "predictions_scoring_rule_generated_at_idx")
+  @@map("predictions")
 }

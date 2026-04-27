@@ -10,6 +10,10 @@ export type FixtureStatus = 'scheduled' | 'live' | 'completed' | 'cancelled' | '
 export type HarnessStatus = 'created' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type HarnessTaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type LowOddsScanStatus = 'created' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type ResearchBundleStatus = 'created' | 'running' | 'succeeded' | 'failed' | 'review-required' | 'blocked';
+export type ResearchSourceType = 'api-football' | 'provider-snapshot' | 'web-search' | 'db' | 'artifact' | string;
+export type ClaimConflictStatus = 'none' | 'conflict' | 'unknown' | string;
+export type PredictionStatus = 'draft' | 'candidate' | 'review-required' | 'promotable' | 'blocked' | string;
 
 export interface PrismaBatchPayload {
   count: number;
@@ -44,6 +48,11 @@ export interface StoragePrismaClient {
   searchFilterPreset: PrismaModelDelegate<SearchFilterPresetRecord>;
   lowOddsScan: PrismaModelDelegate<LowOddsScanRecord>;
   lowOddsHit: PrismaModelDelegate<LowOddsHitRecord>;
+  researchBundle: PrismaModelDelegate<ResearchBundleRecord>;
+  sourceRecord: PrismaModelDelegate<SourceRecordRecord>;
+  evidenceItem: PrismaModelDelegate<EvidenceItemRecord>;
+  claim: PrismaModelDelegate<ClaimRecord>;
+  prediction: PrismaModelDelegate<PredictionRecord>;
 }
 
 export interface SportsProviderRecord {
@@ -241,6 +250,7 @@ export interface HarnessRunRecord {
 }
 
 export interface HarnessRunInput {
+  id?: string;
   runtime: string;
   profile: string;
   providerSports: string;
@@ -511,5 +521,209 @@ export interface LowOddsHitInput {
   includedReasons?: string[] | JsonValue | null;
   excludedReasons?: string[] | JsonValue | null;
   eligible?: boolean;
+  metadata?: JsonValue | null;
+}
+
+export interface ResearchBundleRecord {
+  id: string;
+  runId: string | null;
+  fixtureId: string | null;
+  providerFixtureId: string | null;
+  artifactId: string | null;
+  status: ResearchBundleStatus | string;
+  gateResult: JsonValue | null;
+  providerAgentic: string | null;
+  model: string | null;
+  promptVersion: string | null;
+  warnings: JsonValue | null;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface ResearchBundleInput {
+  id?: string;
+  runId?: string | null;
+  fixtureId?: string | null;
+  providerFixtureId?: string | null;
+  artifactId?: string | null;
+  status?: ResearchBundleStatus | string;
+  gateResult?: JsonValue | null;
+  providerAgentic?: string | null;
+  model?: string | null;
+  promptVersion?: string | null;
+  warnings?: JsonValue | null;
+  metadata?: JsonValue | null;
+  createdAt?: Date;
+}
+
+export interface SourceRecordRecord {
+  id: string;
+  bundleId: string;
+  runId: string | null;
+  fixtureId: string | null;
+  artifactId: string | null;
+  providerSnapshotId: string | null;
+  sourceType: ResearchSourceType;
+  url: string | null;
+  title: string | null;
+  externalId: string | null;
+  hash: string | null;
+  capturedAt: DbDate;
+  warnings: JsonValue | null;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+}
+
+export interface SourceRecordInput {
+  id?: string;
+  bundleId: string;
+  sourceType: ResearchSourceType;
+  runId?: string | null;
+  fixtureId?: string | null;
+  artifactId?: string | null;
+  providerSnapshotId?: string | null;
+  url?: string | null;
+  title?: string | null;
+  externalId?: string | null;
+  hash?: string | null;
+  capturedAt?: Date;
+  warnings?: JsonValue | null;
+  metadata?: JsonValue | null;
+}
+
+export interface EvidenceItemRecord {
+  id: string;
+  bundleId: string;
+  sourceId: string;
+  fixtureId: string | null;
+  artifactId: string | null;
+  kind: string | null;
+  snippetRedacted: string | null;
+  summaryRedacted: string | null;
+  confidence: DbDecimal | null;
+  claimIds: JsonValue | null;
+  warnings: JsonValue | null;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface EvidenceItemInput {
+  id?: string;
+  bundleId: string;
+  sourceId: string;
+  fixtureId?: string | null;
+  artifactId?: string | null;
+  kind?: string | null;
+  snippetRedacted?: string | null;
+  summaryRedacted?: string | null;
+  confidence?: number | null;
+  claimIds?: string[] | JsonValue | null;
+  warnings?: JsonValue | null;
+  metadata?: JsonValue | null;
+}
+
+export interface ClaimRecord {
+  id: string;
+  bundleId: string;
+  fixtureId: string | null;
+  sourceId: string | null;
+  statement: string;
+  subjectType: string | null;
+  subjectKey: string | null;
+  marketKey: string | null;
+  selectionKey: string | null;
+  line: DbDecimal | null;
+  supportLevel: string;
+  confidence: DbDecimal | null;
+  evidenceIds: JsonValue | null;
+  conflictStatus: ClaimConflictStatus;
+  critical: boolean;
+  warnings: JsonValue | null;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface ClaimInput {
+  id?: string;
+  bundleId: string;
+  statement: string;
+  fixtureId?: string | null;
+  sourceId?: string | null;
+  subjectType?: string | null;
+  subjectKey?: string | null;
+  marketKey?: string | null;
+  selectionKey?: string | null;
+  line?: number | null;
+  supportLevel?: string;
+  confidence?: number | null;
+  evidenceIds?: string[] | JsonValue | null;
+  conflictStatus?: ClaimConflictStatus;
+  critical?: boolean;
+  warnings?: JsonValue | null;
+  metadata?: JsonValue | null;
+}
+
+export interface PredictionRecord {
+  id: string;
+  runId: string | null;
+  fixtureId: string;
+  oddsSnapshotId: string;
+  oddsQuoteId: string;
+  researchBundleId: string | null;
+  artifactId: string | null;
+  marketKey: string;
+  selectionKey: string;
+  line: DbDecimal | null;
+  odds: DbDecimal;
+  impliedProbability: DbDecimal;
+  estimatedProbability: DbDecimal | null;
+  edge: DbDecimal | null;
+  confidence: DbDecimal;
+  quality: string;
+  rationaleRedacted: string;
+  warnings: JsonValue | null;
+  evidenceIds: JsonValue | null;
+  includedByFilters: JsonValue | null;
+  providerAgentic: string | null;
+  model: string | null;
+  promptVersion: string;
+  scoringRuleVersion: string;
+  status: PredictionStatus;
+  generatedAt: DbDate;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface PredictionInput {
+  id?: string;
+  runId?: string | null;
+  fixtureId: string;
+  oddsSnapshotId: string;
+  oddsQuoteId: string;
+  researchBundleId?: string | null;
+  artifactId?: string | null;
+  marketKey: string;
+  selectionKey: string;
+  odds: number;
+  impliedProbability: number;
+  confidence: number;
+  rationaleRedacted: string;
+  promptVersion: string;
+  scoringRuleVersion: string;
+  status?: PredictionStatus;
+  line?: number | null;
+  estimatedProbability?: number | null;
+  edge?: number | null;
+  quality?: string;
+  warnings?: string[] | JsonValue | null;
+  evidenceIds?: string[] | JsonValue | null;
+  includedByFilters?: string[] | JsonValue | null;
+  providerAgentic?: string | null;
+  model?: string | null;
+  generatedAt?: Date;
   metadata?: JsonValue | null;
 }
