@@ -12,7 +12,7 @@ import {
 } from '../../domain/odds.js';
 import type { JsonValue } from '../../storage/types.js';
 import { ApiFootballProviderError } from './api-football-errors.js';
-import type { NormalizedFixture } from './types.js';
+import type { FixtureStatistics, NormalizedFixture } from './types.js';
 
 const SCHEDULED_STATUS = new Set(['NS', 'TBD']);
 const LIVE_STATUS = new Set(['1H', 'HT', '2H', 'ET', 'P', 'BT', 'SUSP', 'INT', 'LIVE']);
@@ -227,7 +227,26 @@ export function mapApiFootballOdds(raw: unknown, options: ApiFootballOddsMapperO
   return dedupeOddsQuotes(quotes);
 }
 
-export function extractApiFootballResponseArray(raw: unknown, endpointName: 'status' | 'fixtures' | 'odds'): unknown[] {
+export function mapApiFootballFixtureStatistics(
+  raw: unknown,
+  options: { providerFixtureId: string; capturedAt: Date; providerSnapshotId?: string },
+): FixtureStatistics {
+  const response = extractApiFootballResponseArray(raw, 'fixture_statistics');
+  const [home, away] = response;
+  const cornersHome = extractCornerKicks(home);
+  const cornersAway = extractCornerKicks(away);
+
+  return {
+    providerFixtureId: options.providerFixtureId,
+    ...(cornersHome !== undefined && { cornersHome }),
+    ...(cornersAway !== undefined && { cornersAway }),
+    ...(cornersHome !== undefined && cornersAway !== undefined && { totalCorners: cornersHome + cornersAway }),
+    capturedAt: options.capturedAt.toISOString(),
+    ...(options.providerSnapshotId && { providerSnapshotId: options.providerSnapshotId }),
+  };
+}
+
+export function extractApiFootballResponseArray(raw: unknown, endpointName: 'status' | 'fixtures' | 'odds' | 'fixture_statistics'): unknown[] {
   if (!raw || typeof raw !== 'object') {
     throw new ApiFootballFixtureMapperError(
       'invalid-provider-response',
@@ -254,6 +273,16 @@ export function extractApiFootballResponseArray(raw: unknown, endpointName: 'sta
   }
 
   return body.response;
+}
+
+function extractCornerKicks(teamStatistics: unknown): number | undefined {
+  if (!teamStatistics || typeof teamStatistics !== 'object') return undefined;
+  const statistics = (teamStatistics as { statistics?: unknown }).statistics;
+  if (!Array.isArray(statistics)) return undefined;
+
+  const corner = statistics.find((item) => normalizeMarketText((item as { type?: unknown } | null)?.type) === 'corner kicks');
+  if (!corner || typeof corner !== 'object') return undefined;
+  return optionalNumber((corner as { value?: unknown }).value);
 }
 
 function mapApiFootballBetToMarket(bet: any): MarketKey | undefined {
@@ -504,6 +533,15 @@ function optionalInteger(value: unknown): number | undefined {
   }
 
   return undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value.trim())
+      : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function optionalString(value: unknown): string | undefined {

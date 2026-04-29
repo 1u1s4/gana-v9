@@ -10,7 +10,12 @@ import { getPrismaClient } from '../../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../../storage/types.js';
 import type { ServiceStatusReport } from '../../filters/status.js';
 import { ApiFootballProviderError, mapHttpStatusToProviderError } from './api-football-errors.js';
-import { mapApiFootballFixtures, mapApiFootballOdds, oddsQuoteDedupeKey } from './api-football-mappers.js';
+import {
+  mapApiFootballFixtureStatistics,
+  mapApiFootballFixtures,
+  mapApiFootballOdds,
+  oddsQuoteDedupeKey,
+} from './api-football-mappers.js';
 import {
   buildApiFootballProviderSnapshot,
   parseApiFootballQuotaHeaders,
@@ -108,7 +113,11 @@ export class ApiFootballProvider implements SportsDataProvider {
       });
     }
     const persisted = await this.persistence.upsertFixtures?.([normalized]);
-    return persisted?.[0]?.fixture ?? fallbackFixtureFromNormalized(normalized);
+    const fixture = persisted?.[0]?.fixture ?? fallbackFixtureFromNormalized(normalized);
+    return {
+      ...fixture,
+      ...(response.providerSnapshotId && { providerSnapshotId: response.providerSnapshotId }),
+    };
   }
 
   async getOdds(input: OddsQuery): Promise<OddsQuote[]> {
@@ -121,7 +130,22 @@ export class ApiFootballProvider implements SportsDataProvider {
   }
 
   async getFinalResult(input: { providerFixtureId: string }): Promise<FinalResult> {
-    const fixture = await this.getFixture(input);
+    const response = await this.request('fixture_result', '/fixtures', { id: input.providerFixtureId });
+    const fixtures = mapApiFootballFixtures(response.payload, response.capturedAt);
+    const normalized = fixtures[0];
+    if (!normalized) {
+      throw new ApiFootballProviderError({
+        code: 'fixture_not_found',
+        endpointName: 'fixture_result',
+        fixtureId: input.providerFixtureId,
+        message: 'API-Football did not return the requested fixture.',
+        expected: 'One fixture in response array.',
+        received: response.payload,
+        nextAction: 'Verify the provider fixture ID and retry.',
+      });
+    }
+    const persisted = await this.persistence.upsertFixtures?.([normalized]);
+    const fixture = persisted?.[0]?.fixture ?? fallbackFixtureFromNormalized(normalized);
     if (!Number.isFinite(fixture.scoreHome) || !Number.isFinite(fixture.scoreAway)) {
       throw new ApiFootballProviderError({
         code: 'invalid_provider_response',
@@ -137,17 +161,16 @@ export class ApiFootballProvider implements SportsDataProvider {
       fixture,
       scoreHome: fixture.scoreHome as number,
       scoreAway: fixture.scoreAway as number,
+      ...(response.providerSnapshotId && { providerSnapshotId: response.providerSnapshotId }),
     };
   }
 
   async getFixtureStatistics(input: FixtureStatisticsQuery): Promise<FixtureStatistics> {
-    throw new ApiFootballProviderError({
-      code: 'incomplete_statistics',
-      endpointName: 'fixture_statistics',
-      fixtureId: input.providerFixtureId,
-      message: 'Fixture statistics normalization is outside PR-04 first-part implementation.',
-      expected: 'PR-04 first part only implements status/quota and fixtures.',
-      nextAction: 'Implement fixture statistics in the remaining PR-04 scope before marking the full plan completed.',
+    const response = await this.request('fixture_statistics', '/fixtures/statistics', { fixture: input.providerFixtureId });
+    return mapApiFootballFixtureStatistics(response.payload, {
+      providerFixtureId: input.providerFixtureId,
+      capturedAt: response.capturedAt,
+      providerSnapshotId: response.providerSnapshotId,
     });
   }
 

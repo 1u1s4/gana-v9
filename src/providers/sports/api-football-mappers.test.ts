@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   ApiFootballFixtureMapperError,
   mapApiFootballFixture,
+  mapApiFootballFixtureStatistics,
   mapApiFootballFixtureStatus,
   mapApiFootballOdds,
   type ApiFootballFixturePayload,
@@ -212,6 +213,41 @@ describe('api-football mappers', () => {
       }, { fixtureId: 'fixture-1', providerSnapshotId: 'snapshot-1', capturedAt }),
       (error: unknown) => error instanceof ApiFootballProviderError && error.code === 'mapping_error',
     );
+  });
+
+  it('maps fixture statistics corner kicks by team order', () => {
+    const result = mapApiFootballFixtureStatistics({
+      response: [
+        { team: { id: 33, name: 'Home' }, statistics: [{ type: 'Corner Kicks', value: 7 }] },
+        { team: { id: 40, name: 'Away' }, statistics: [{ type: 'Corner Kicks', value: '3' }] },
+      ],
+    }, {
+      providerFixtureId: '1001',
+      capturedAt,
+      providerSnapshotId: 'snapshot-statistics-1',
+    });
+
+    assert.equal(result.providerFixtureId, '1001');
+    assert.equal(result.cornersHome, 7);
+    assert.equal(result.cornersAway, 3);
+    assert.equal(result.totalCorners, 10);
+    assert.equal(result.providerSnapshotId, 'snapshot-statistics-1');
+  });
+
+  it('keeps missing corner statistics absent instead of inventing values', () => {
+    const result = mapApiFootballFixtureStatistics({
+      response: [
+        { team: { id: 33, name: 'Home' }, statistics: [{ type: 'Shots on Goal', value: 5 }] },
+        { team: { id: 40, name: 'Away' }, statistics: [{ type: 'Shots on Goal', value: 2 }] },
+      ],
+    }, {
+      providerFixtureId: '1001',
+      capturedAt,
+    });
+
+    assert.equal(result.cornersHome, undefined);
+    assert.equal(result.cornersAway, undefined);
+    assert.equal(result.totalCorners, undefined);
   });
 });
 

@@ -14,6 +14,11 @@ export interface PredictionQuery {
   take?: number;
 }
 
+export interface PredictionFixtureDateQuery {
+  status?: PredictionStatus | string | Array<PredictionStatus | string>;
+  take?: number;
+}
+
 export function createPredictionRepository(db: Pick<StoragePrismaClient, 'prediction'>) {
   return {
     create(input: PredictionInput): Promise<PredictionRecord> {
@@ -54,6 +59,24 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
         ...takeArg(query.take),
       });
     },
+
+    listForFixtureDate(date: Date | string, query: PredictionFixtureDateQuery = {}): Promise<PredictionRecord[]> {
+      const fixtureDate = dateRange(date);
+
+      return db.prediction.findMany({
+        where: compactData({
+          status: Array.isArray(query.status) ? { in: query.status } : query.status,
+          fixture: {
+            scheduledAt: {
+              gte: fixtureDate.start,
+              lt: fixtureDate.end,
+            },
+          },
+        }),
+        orderBy: { generatedAt: 'desc' },
+        ...takeArg(query.take),
+      });
+    },
   };
 }
 
@@ -61,4 +84,17 @@ export function createPredictionRepositories(db: Pick<StoragePrismaClient, 'pred
   return {
     predictions: createPredictionRepository(db),
   };
+}
+
+function dateRange(date: Date | string): { start: Date; end: Date } {
+  const value = coerceDate(date);
+  const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 1);
+  return { start, end };
+}
+
+function coerceDate(date: Date | string): Date {
+  if (date instanceof Date) return date;
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00.000Z`) : new Date(date);
 }

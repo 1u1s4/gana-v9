@@ -14,6 +14,9 @@ export type ResearchBundleStatus = 'created' | 'running' | 'succeeded' | 'failed
 export type ResearchSourceType = 'api-football' | 'provider-snapshot' | 'web-search' | 'db' | 'artifact' | string;
 export type ClaimConflictStatus = 'none' | 'conflict' | 'unknown' | string;
 export type PredictionStatus = 'draft' | 'candidate' | 'review-required' | 'promotable' | 'blocked' | string;
+export type ParlayStatus = 'draft' | 'candidate' | 'review-required' | 'promotable' | 'blocked' | string;
+export type ParlayLegStatus = 'pending' | 'won' | 'lost' | 'push' | 'voided' | 'error' | 'blocked' | string;
+export type ValidationArtifactStatus = 'pending' | 'won' | 'lost' | 'push' | 'voided' | 'error' | 'blocked' | string;
 
 export interface PrismaBatchPayload {
   count: number;
@@ -53,6 +56,9 @@ export interface StoragePrismaClient {
   evidenceItem: PrismaModelDelegate<EvidenceItemRecord>;
   claim: PrismaModelDelegate<ClaimRecord>;
   prediction: PrismaModelDelegate<PredictionRecord>;
+  parlay: PrismaModelDelegate<ParlayRecord>;
+  parlayLeg: PrismaModelDelegate<ParlayLegRecord>;
+  validationArtifact: PrismaModelDelegate<ValidationArtifactRecord>;
 }
 
 export interface SportsProviderRecord {
@@ -725,5 +731,105 @@ export interface PredictionInput {
   providerAgentic?: string | null;
   model?: string | null;
   generatedAt?: Date;
+  metadata?: JsonValue | null;
+}
+
+export interface ParlayRecord {
+  id: string;
+  runId: string | null;
+  artifactId: string | null;
+  combinedOdds: DbDecimal | null;
+  aggregateConfidence: DbDecimal;
+  aggregateQuality: DbDecimal;
+  rationaleRedacted: string;
+  warnings: JsonValue | null;
+  status: ParlayStatus;
+  generatedAt: DbDate;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface ParlayInput {
+  id?: string;
+  runId?: string | null;
+  artifactId?: string | null;
+  combinedOdds?: number | null;
+  aggregateConfidence: number;
+  aggregateQuality: number;
+  rationaleRedacted: string;
+  warnings?: string[] | JsonValue | null;
+  status?: ParlayStatus;
+  generatedAt?: Date;
+  metadata?: JsonValue | null;
+}
+
+export interface ParlayLegRecord {
+  id: string;
+  parlayId: string;
+  predictionId: string;
+  fixtureId: string;
+  marketKey: string;
+  selectionKey: string;
+  line: DbDecimal | null;
+  odds: DbDecimal;
+  status: ParlayLegStatus;
+  legIndex: number;
+  inclusionReason: string | null;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface ParlayLegInput {
+  id?: string;
+  parlayId: string;
+  predictionId: string;
+  fixtureId: string;
+  marketKey: string;
+  selectionKey: string;
+  odds: number;
+  status?: ParlayLegStatus;
+  legIndex: number;
+  line?: number | null;
+  inclusionReason?: string | null;
+  metadata?: JsonValue | null;
+}
+
+export interface ValidationArtifactRecord {
+  id: string;
+  runId: string | null;
+  predictionId: string | null;
+  parlayId: string | null;
+  fixtureId: string | null;
+  providerSnapshotId: string | null;
+  artifactId: string | null;
+  settlementRuleVersion: string;
+  status: ValidationArtifactStatus;
+  reason: string | null;
+  evaluatedAt: DbDate;
+  resultInput: JsonValue | null;
+  outcome: JsonValue | null;
+  evidenceIds: JsonValue | null;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+  updatedAt: DbDate;
+}
+
+export interface ValidationArtifactInput {
+  id?: string;
+  runId?: string | null;
+  predictionId?: string | null;
+  parlayId?: string | null;
+  fixtureId?: string | null;
+  providerSnapshotId?: string | null;
+  artifactId?: string | null;
+  settlementRuleVersion: string;
+  status: ValidationArtifactStatus;
+  reason?: string | null;
+  evaluatedAt?: Date;
+  resultInput?: JsonValue | null;
+  outcome?: JsonValue | null;
+  evidenceIds?: string[] | JsonValue | null;
   metadata?: JsonValue | null;
 }

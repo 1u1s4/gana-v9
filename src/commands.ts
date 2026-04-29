@@ -1,5 +1,5 @@
 import type { Interface } from 'readline';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import type { AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
@@ -29,11 +29,22 @@ import type { AgentProviderCompat } from './providers/agentic/types.js';
 import { actionableProviderErrorMessage } from './providers/sports/api-football-errors.js';
 import { checkApiFootballStatus, getApiFootballOddsSnapshot, listApiFootballFixtures } from './providers/sports/api-football.js';
 import { updateRuntimeContext, type RuntimeContext } from './runtime/context.js';
+import { ensureArtifactRoot } from './runtime/artifacts.js';
+import {
+  exportRunArtifacts as runServiceExportRunArtifacts,
+  runFixtureScoring as runServiceFixtureScoring,
+  runParlayBuild as runServiceParlayBuild,
+  runPipeline as runServicePipeline,
+  runValidation as runServiceValidation,
+} from './runtime/run-service.js';
 import { getDbStatus } from './storage/db-status.js';
 import type { Fixture } from './domain/fixtures.js';
 import type { OddsQuote } from './domain/odds.js';
 import { runFixtureResearch, type FixtureResearchResult } from './evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from './prediction/service.js';
+import { runParlayBuild, type ParlayBuildRunResult } from './parlay/service.js';
+import type { ParlayConfig } from './parlay/types.js';
+import { runValidation, type RunValidationInput, type ValidationRunResult } from './validation/service.js';
 import type { ResearchWebMode } from './prediction/prompts.js';
 
 const DIM = '\x1b[2m';
@@ -89,6 +100,44 @@ export interface CommandResult {
 
 const commands: SlashCommand[] = [];
 
+type OptionalRunService = {
+  runFixtureScoring?: typeof runFixtureScoring;
+  runParlayBuild?: typeof runParlayBuild;
+  runValidation?: typeof runValidation;
+  runPipeline?: (config: AgentConfig, input: { date: string }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
+  exportRunArtifacts?: (config: AgentConfig, input: { runId: string }, runtime: RuntimeContext) => Promise<RunExportResult>;
+};
+
+type RunPipelineResult = {
+  ok: boolean;
+  runId?: string;
+  date?: string;
+  verdict?: string;
+  artifactPath?: string;
+  handoffPath?: string;
+  evidencePackPath?: string;
+  error?: string;
+};
+
+type RunExportResult = {
+  ok: boolean;
+  runId: string;
+  artifactPath?: string;
+  handoffPath?: string;
+  evidencePackPath?: string;
+  files?: string[];
+  error?: string;
+};
+
+type ArtifactListResult = {
+  artifactRoot: string;
+  runId?: string;
+  path: string;
+  files: string[];
+};
+
+let runServicePromise: Promise<OptionalRunService> | undefined;
+
 function ask(rl: Interface, prompt: string): Promise<string> {
   return new Promise((r) => {
     process.stdin.resume();
@@ -96,6 +145,21 @@ function ask(rl: Interface, prompt: string): Promise<string> {
       r(answer);
     });
   });
+}
+
+async function loadOptionalRunService(): Promise<OptionalRunService> {
+  runServicePromise ??= importOptionalRunService();
+  return runServicePromise;
+}
+
+async function importOptionalRunService(): Promise<OptionalRunService> {
+  return {
+    runFixtureScoring: runServiceFixtureScoring,
+    runParlayBuild: runServiceParlayBuild,
+    runValidation: runServiceValidation,
+    runPipeline: runServicePipeline,
+    exportRunArtifacts: runServiceExportRunArtifacts,
+  };
 }
 
 function loadCodexModels(ctx: CommandContext): ModelInfo[] {
@@ -282,7 +346,7 @@ function parseFlags(args: string[]): Record<string, string | true> {
 function requireDateFlag(flags: Record<string, string | true>): string {
   const date = flags.date;
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new Error('fixtures requires --date YYYY-MM-DD.');
+    throw new Error('--date YYYY-MM-DD is required.');
   }
   return date;
 }
@@ -318,6 +382,102 @@ function optionalFloatFlag(flags: Record<string, string | true>, key: string): n
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw new Error(`--${key} must be a number.`);
   return parsed;
+}
+
+function optionalPositiveIntegerFlag(flags: Record<string, string | true>, key: string): number | undefined {
+  const value = flags[key];
+  if (typeof value !== 'string') return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`--${key} must be a positive integer.`);
+  return parsed;
+}
+
+function optionalProbabilityFlag(flags: Record<string, string | true>, key: string): number | undefined {
+  const value = optionalFloatFlag(flags, key);
+  if (value === undefined) return undefined;
+  if (value < 0 || value > 1) throw new Error(`--${key} must be between 0 and 1.`);
+  return value;
+}
+
+function optionalParlayConfig(flags: Record<string, string | true>): ParlayConfig {
+  return {
+    minLegs: optionalPositiveIntegerFlag(flags, 'min-legs'),
+    maxLegs: optionalPositiveIntegerFlag(flags, 'max-legs'),
+    allowMultipleLegsPerFixture: flags['allow-multiple-legs-per-fixture'] === true,
+    minPredictionConfidence: optionalProbabilityFlag(flags, 'min-confidence'),
+    maxCombinedOdds: optionalFloatFlag(flags, 'max-combined-odds'),
+  };
+}
+
+function requiredValidationTarget(flags: Record<string, string | true>): RunValidationInput {
+  const date = typeof flags.date === 'string' ? requireDateFlag(flags) : undefined;
+  const predictionId = optionalStringFlag(flags, 'prediction-id');
+  const parlayId = optionalStringFlag(flags, 'parlay-id');
+  const count = [date, predictionId, parlayId].filter(Boolean).length;
+  if (count !== 1) throw new Error('validate requires exactly one of --date, --prediction-id, or --parlay-id.');
+  return {
+    ...(date && { date }),
+    ...(predictionId && { predictionId }),
+    ...(parlayId && { parlayId }),
+  };
+}
+
+function requiredRunInput(flags: Record<string, string | true>): { date: string } {
+  return { date: requireDateFlag(flags) };
+}
+
+function requiredRunId(flags: Record<string, string | true>): string {
+  return requireStringFlag(flags, 'run-id');
+}
+
+async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<FixtureScoringResult> {
+  const fixtureId = requireStringFlag(flags, 'fixture-id');
+  const service = await loadOptionalRunService();
+  const runner = service.runFixtureScoring ?? runFixtureScoring;
+  return runner(ctx.config, { fixtureId }, ctx.runtime);
+}
+
+async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
+  const input = {
+    date: requireDateFlag(flags),
+    configOverrides: optionalParlayConfig(flags),
+  };
+  const service = await loadOptionalRunService();
+  const runner = service.runParlayBuild ?? runParlayBuild;
+  return runner(ctx.config, input, ctx.runtime);
+}
+
+async function validateResults(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ValidationRunResult> {
+  const input = requiredValidationTarget(flags);
+  const service = await loadOptionalRunService();
+  const runner = service.runValidation ?? runValidation;
+  return runner(ctx.config, input, ctx.runtime);
+}
+
+async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunPipelineResult> {
+  const input = requiredRunInput(flags);
+  const service = await loadOptionalRunService();
+  if (!service.runPipeline) {
+    throw new Error('run-service is not available yet; expected runPipeline in src/runtime/run-service.ts.');
+  }
+  return service.runPipeline(ctx.config, input, ctx.runtime);
+}
+
+async function exportRun(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunExportResult> {
+  const input = { runId: requiredRunId(flags) };
+  const service = await loadOptionalRunService();
+  if (!service.exportRunArtifacts) {
+    throw new Error('run-service is not available yet; expected exportRunArtifacts in src/runtime/run-service.ts.');
+  }
+  return service.exportRunArtifacts(ctx.config, input, ctx.runtime);
+}
+
+function listArtifacts(config: AgentConfig, flags: Record<string, string | true>): ArtifactListResult {
+  const artifactRoot = ensureArtifactRoot(config);
+  const runId = optionalStringFlag(flags, 'run-id');
+  const path = runId ? join(artifactRoot, 'runs', runId) : artifactRoot;
+  const files = existsSync(path) ? readdirSync(path).sort() : [];
+  return { artifactRoot, runId, path, files };
 }
 
 function optionalCombineModeFlag(flags: Record<string, string | true>): FilterCombineMode | undefined {
@@ -421,6 +581,81 @@ function printScoringResult(result: FixtureScoringResult): void {
   }
   for (const warning of result.gateResult.warnings) {
     console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+  }
+}
+
+function printParlayResult(result: ParlayBuildRunResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}parlay${RESET} ${DIM}${result.gateResult.verdict}${RESET}`);
+  printKeyValue('runId', result.runId);
+  printKeyValue('date', result.date);
+  printKeyValue('parlayId', result.build.parlay.id);
+  if (result.persistedParlayId) printKeyValue('persistedParlayId', result.persistedParlayId);
+  printKeyValue('legs', result.build.parlay.legs.length);
+  if (result.build.parlay.combinedOdds !== undefined) printKeyValue('combinedOdds', result.build.parlay.combinedOdds);
+  printKeyValue('aggregateConfidence', result.build.parlay.aggregateConfidence);
+  printKeyValue('aggregateQuality', result.build.parlay.aggregateQuality);
+  printKeyValue('artifactType', 'analytical only; not executable');
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  for (const reason of result.gateResult.reasons) {
+    console.log(`  ${DIM}reason:${RESET} ${CYAN}${reason}${RESET}`);
+  }
+  for (const warning of result.gateResult.warnings) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+  }
+}
+
+function printValidationResult(result: ValidationRunResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}validate${RESET} ${DIM}${result.gateResult.verdict}${RESET}`);
+  printKeyValue('runId', result.runId);
+  if (result.target.date) printKeyValue('date', result.target.date);
+  if (result.target.predictionId) printKeyValue('predictionId', result.target.predictionId);
+  if (result.target.parlayId) printKeyValue('parlayId', result.target.parlayId);
+  printKeyValue('validations', result.validations.length);
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  for (const reason of result.gateResult.reasons) {
+    console.log(`  ${DIM}reason:${RESET} ${CYAN}${reason}${RESET}`);
+  }
+  for (const warning of result.gateResult.warnings) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+  }
+}
+
+function printRunResult(result: RunPipelineResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}run${RESET} ${DIM}${result.verdict ?? (result.ok ? 'succeeded' : 'failed')}${RESET}`);
+  if (result.runId) printKeyValue('runId', result.runId);
+  if (result.date) printKeyValue('date', result.date);
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  if (result.handoffPath) printKeyValue('handoff', result.handoffPath);
+  if (result.evidencePackPath) printKeyValue('evidencePack', result.evidencePackPath);
+  if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
+}
+
+function printExportResult(result: RunExportResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}export${RESET} ${DIM}${result.ok ? 'ready' : 'failed'}${RESET}`);
+  printKeyValue('runId', result.runId);
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  if (result.handoffPath) printKeyValue('handoff', result.handoffPath);
+  if (result.evidencePackPath) printKeyValue('evidencePack', result.evidencePackPath);
+  for (const file of result.files ?? []) {
+    console.log(`  ${GREEN}•${RESET} ${CYAN}${file}${RESET}`);
+  }
+  if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
+}
+
+function printArtifacts(result: ArtifactListResult): void {
+  console.log(`  ${CYAN}artifacts${RESET} ${DIM}${result.path}${RESET}`);
+  printKeyValue('artifactRoot', result.artifactRoot);
+  if (result.runId) printKeyValue('runId', result.runId);
+  if (!result.files.length) {
+    console.log(`  ${DIM}No artifacts found.${RESET}`);
+    return;
+  }
+  for (const file of result.files) {
+    console.log(`  ${GREEN}•${RESET} ${CYAN}${file}${RESET}`);
   }
 }
 
@@ -871,10 +1106,57 @@ commands.push({
   description: 'Score atomic fixture predictions',
   execute: async (args, ctx) => {
     const flags = parseFlags(args.split(' ').filter(Boolean));
-    const result = await runFixtureScoring(ctx.config, {
-      fixtureId: requireStringFlag(flags, 'fixture-id'),
-    }, ctx.runtime);
+    const result = await scoreFixture(ctx, flags);
     printScoringResult(result);
+  },
+});
+
+commands.push({
+  name: '/parlay',
+  description: 'Build analytical parlay candidate',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await buildParlay(ctx, flags);
+    printParlayResult(result);
+  },
+});
+
+commands.push({
+  name: '/validate',
+  description: 'Validate predictions or parlays against final provider results',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await validateResults(ctx, flags);
+    printValidationResult(result);
+  },
+});
+
+commands.push({
+  name: '/run',
+  description: 'Run canonical headless pipeline for a date',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await runPipeline(ctx, flags);
+    printRunResult(result);
+  },
+});
+
+commands.push({
+  name: '/export',
+  description: 'Export handoff and evidence pack for a run',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await exportRun(ctx, flags);
+    printExportResult(result);
+  },
+});
+
+commands.push({
+  name: '/artifacts',
+  description: 'List artifact root or a run artifact directory',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    printArtifacts(listArtifacts(ctx.config, flags));
   },
 });
 
@@ -1067,11 +1349,43 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
 
     if (area === 'score') {
       const flags = parseFlags(argv.slice(1));
-      const result = await runFixtureScoring(ctx.config, {
-        fixtureId: requireStringFlag(flags, 'fixture-id'),
-      }, ctx.runtime);
+      const result = await scoreFixture(ctx, flags);
       printScoringResult(result);
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'parlay') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await buildParlay(ctx, flags);
+      printParlayResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'validate') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await validateResults(ctx, flags);
+      printValidationResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'run') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await runPipeline(ctx, flags);
+      printRunResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'export') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await exportRun(ctx, flags);
+      printExportResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'artifacts') {
+      const flags = parseFlags(argv.slice(1));
+      printArtifacts(listArtifacts(ctx.config, flags));
+      return { ok: true, exitCode: 0 };
     }
 
     if (area === 'filters' && action === 'show') {
@@ -1162,6 +1476,13 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana odds --fixture-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live${RESET}`);
   console.log(`  ${CYAN}pnpm gana score --fixture-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana export --run-id RUN_ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana artifacts --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);

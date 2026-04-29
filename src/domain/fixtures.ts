@@ -16,6 +16,7 @@ export interface Fixture {
   scoreHome?: number;
   scoreAway?: number;
   includedByFilters: string[];
+  providerSnapshotId?: string;
   createdAt: string;
   updatedAt: string;
 }

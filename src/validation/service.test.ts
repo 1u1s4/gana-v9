@@ -1,0 +1,275 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { loadConfig } from '../config.js';
+import type { Fixture } from '../domain/fixtures.js';
+import { createRuntimeContext } from '../runtime/context.js';
+import { runValidation } from './service.js';
+
+const now = new Date('2026-04-25T20:00:00.000Z');
+
+const finalFixture = {
+  id: 'fixture-1',
+  provider: 'api-football',
+  providerFixtureId: '1001',
+  homeTeamId: 'home-1',
+  awayTeamId: 'away-1',
+  scheduledAt: '2026-04-25T18:00:00.000Z',
+  status: 'completed',
+  scoreHome: 2,
+  scoreAway: 1,
+  includedByFilters: [],
+  providerSnapshotId: 'snapshot-result-1',
+  createdAt: '2026-04-25T12:00:00.000Z',
+  updatedAt: '2026-04-25T20:00:00.000Z',
+} satisfies Fixture;
+
+const fixtureRecord = {
+  id: 'fixture-1',
+  providerId: 'provider-1',
+  providerFixtureId: '1001',
+  competitionId: null,
+  season: 2026,
+  homeTeamId: 'home-1',
+  awayTeamId: 'away-1',
+  scheduledAt: new Date('2026-04-25T18:00:00.000Z'),
+  status: 'completed',
+  scoreHome: 2,
+  scoreAway: 1,
+  includedByFilters: [],
+  metadata: null,
+  createdAt: now,
+  updatedAt: now,
+};
+
+function config() {
+  return loadConfig({
+    databaseUrl: 'mysql://user:pass@localhost:3306/gana',
+    provider: 'codex',
+    model: 'gpt-5.5',
+  }, { skipApiKey: true });
+}
+
+function prediction(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'prediction-1',
+    runId: 'prediction-run-1',
+    fixtureId: 'fixture-1',
+    oddsSnapshotId: 'odds-snapshot-1',
+    oddsQuoteId: 'odds-quote-1',
+    researchBundleId: 'research-bundle-1',
+    artifactId: null,
+    marketKey: 'h2h',
+    selectionKey: 'home',
+    line: null,
+    odds: 2,
+    impliedProbability: 0.5,
+    estimatedProbability: null,
+    edge: null,
+    confidence: 0.8,
+    quality: 'high',
+    rationaleRedacted: 'Candidate rationale.',
+    warnings: [],
+    evidenceIds: ['evidence-1'],
+    includedByFilters: [],
+    providerAgentic: 'codex',
+    model: 'gpt-5.5',
+    promptVersion: 'score-prediction-v1',
+    scoringRuleVersion: 'scoring-v1',
+    status: 'candidate',
+    generatedAt: now,
+    metadata: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function repositories(overrides: Record<string, unknown> = {}) {
+  return {
+    predictions: {
+      findById: async (id: string) => id === 'missing' ? null : prediction({ id }),
+      listForFixtureDate: async () => [prediction({ id: 'prediction-date-1' })],
+    },
+    fixtures: { findById: async () => fixtureRecord },
+    parlays: {
+      findById: async (id: string) => id === 'missing' ? null : {
+        id,
+        runId: 'parlay-run-1',
+        artifactId: null,
+        combinedOdds: 3,
+        aggregateConfidence: 0.56,
+        aggregateQuality: 0.8,
+        rationaleRedacted: 'Analytical parlay.',
+        warnings: [],
+        status: 'candidate',
+        generatedAt: now,
+        metadata: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      listForFixtureDate: async () => [],
+    },
+    parlayLegs: {
+      list: async () => [
+        {
+          id: 'leg-1',
+          parlayId: 'parlay-1',
+          predictionId: 'prediction-1',
+          fixtureId: 'fixture-1',
+          marketKey: 'h2h',
+          selectionKey: 'home',
+          line: null,
+          odds: 2,
+          status: 'candidate',
+          legIndex: 0,
+          inclusionReason: 'included-eligible-prediction',
+          metadata: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 'leg-2',
+          parlayId: 'parlay-1',
+          predictionId: 'prediction-2',
+          fixtureId: 'fixture-1',
+          marketKey: 'btts',
+          selectionKey: 'no',
+          line: null,
+          odds: 2,
+          status: 'candidate',
+          legIndex: 1,
+          inclusionReason: 'included-eligible-prediction',
+          metadata: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      updateStatus: async (id: string, status: string) => ({ id, status }),
+    },
+    harnessRuns: { upsertForRun: async () => ({}) },
+    artifacts: { create: async () => ({ id: 'artifact-validation-1' }) },
+    validationArtifacts: { create: async (input: any) => ({ id: 'validation-1', ...input, createdAt: now, updatedAt: now }) },
+    ...overrides,
+  } as any;
+}
+
+function fetcher(statistics: Record<string, unknown> = {}) {
+  return {
+    fetch: async (input: any) => ({
+      fixture: finalFixture,
+      statistics: input.market === 'corners_over_under'
+        ? { fixtureId: input.fixtureId, capturedAt: now.toISOString(), sourceSnapshotId: 'snapshot-statistics-1', ...statistics }
+        : undefined,
+      providerSnapshotId: input.market === 'corners_over_under' ? 'snapshot-statistics-1' : 'snapshot-result-1',
+      resultProviderSnapshotId: 'snapshot-result-1',
+      statisticsProviderSnapshotId: input.market === 'corners_over_under' ? 'snapshot-statistics-1' : undefined,
+    }),
+  };
+}
+
+describe('runValidation prediction targets', () => {
+  const cases = [
+    ['h2h', 'home', null, 'won'],
+    ['double_chance', 'home_or_draw', null, 'won'],
+    ['goals_over_under', 'over', 2.5, 'won'],
+    ['btts', 'yes', null, 'won'],
+    ['corners_over_under', 'over', 9.5, 'won'],
+  ] as const;
+
+  for (const [market, selection, line, expected] of cases) {
+    it(`validates ${market} predictions`, async () => {
+      const cfg = config();
+      const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+      const result = await runValidation(cfg, { predictionId: 'prediction-1' }, runtime, {
+        now: () => now,
+        writeArtifact: () => '/tmp/validations.json',
+        fetcher: fetcher({ cornersHome: 6, cornersAway: 4 }),
+        repositories: repositories({
+          predictions: {
+            findById: async () => prediction({
+              marketKey: market,
+              selectionKey: selection,
+              line,
+              impliedProbability: 0.5,
+            }),
+            listForFixtureDate: async () => [],
+          },
+        }),
+      });
+
+      assert.equal(result.ok, true);
+      assert.equal(result.validations[0]?.status, expected);
+      assert.equal(result.validations[0]?.outcome.status, expected);
+    });
+  }
+
+  it('blocks corners validation when provider statistics omit corners', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runValidation(cfg, { predictionId: 'prediction-1' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations-blocked.json',
+      fetcher: fetcher(),
+      repositories: repositories({
+        predictions: {
+          findById: async () => prediction({ marketKey: 'corners_over_under', selectionKey: 'over', line: 9.5 }),
+          listForFixtureDate: async () => [],
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations[0]?.status, 'blocked');
+    assert.equal(result.validations[0]?.reason, 'corners-statistics-unavailable');
+  });
+});
+
+describe('runValidation parlay and date targets', () => {
+  it('aggregates parlay leg outcomes and updates leg statuses', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const statuses: string[] = [];
+
+    const result = await runValidation(cfg, { parlayId: 'parlay-1' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: fetcher(),
+      repositories: repositories({
+        parlayLegs: {
+          ...repositories().parlayLegs,
+          updateStatus: async (_id: string, status: string) => {
+            statuses.push(status);
+            return {} as any;
+          },
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations[0]?.status, 'lost');
+    assert.deepEqual(statuses, ['won', 'lost']);
+  });
+
+  it('validates predictions and parlays by UTC fixture date', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runValidation(cfg, { date: '2026-04-25' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: fetcher(),
+      repositories: repositories({
+        parlays: {
+          ...repositories().parlays,
+          listForFixtureDate: async () => [await repositories().parlays.findById('parlay-1')],
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations.length, 2);
+    assert.equal(result.target.date, '2026-04-25');
+  });
+});

@@ -73,6 +73,7 @@ export interface FinalResult {
   fixture: Fixture;
   scoreHome: number;
   scoreAway: number;
+  providerSnapshotId?: string;
 }
 
 export interface FixtureStatistics {
@@ -81,6 +82,7 @@ export interface FixtureStatistics {
   cornersAway?: number;
   totalCorners?: number;
   capturedAt: string;
+  providerSnapshotId?: string;
 }
 
 export interface OddsScanResult {
