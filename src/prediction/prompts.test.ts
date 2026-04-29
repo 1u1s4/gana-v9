@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildResearchFixturePrompt, RESEARCH_FIXTURE_PROMPT_VERSION } from './prompts.js';
+import { buildResearchFixturePrompt, buildScorePredictionPrompt, RESEARCH_FIXTURE_PROMPT_VERSION } from './prompts.js';
 import type { Fixture } from '../domain/fixtures.js';
 
 const fixture: Fixture = {
@@ -37,5 +37,14 @@ describe('research prompts', () => {
     assert.match(prompt, /Every Claim\.evidenceIds/);
     assert.match(prompt, /web-search/);
     assert.match(prompt, /research-fixture-v1/);
+    assert.match(prompt, /Monetary safety/);
+    assert.match(prompt, /analytical artifacts only/);
+  });
+
+  it('keeps score prompts analytical-only for monetary safety', () => {
+    const prompt = buildScorePredictionPrompt();
+
+    assert.match(prompt, /Monetary safety/);
+    assert.match(prompt, /analytical artifacts only/);
   });
 });

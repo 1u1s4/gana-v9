@@ -9,6 +9,7 @@
     "start": "tsx src/cli.ts",
     "dev": "tsx watch src/cli.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "smoke": "tsx scripts/smoke.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",

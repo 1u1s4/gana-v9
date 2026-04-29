@@ -1,0 +1,137 @@
+import type { ToolMetadata } from './types.js';
+
+export const TOOL_METADATA: Record<string, ToolMetadata> = {
+  file_read: {
+    name: 'file_read',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  grep: {
+    name: 'grep',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  glob: {
+    name: 'glob',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  list_dir: {
+    name: 'list_dir',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  file_write: {
+    name: 'file_write',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
+  file_edit: {
+    name: 'file_edit',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
+  shell: {
+    name: 'shell',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: true,
+    network: true,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
+  api_football_request: {
+    name: 'api_football_request',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: true,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  db_read: {
+    name: 'db_read',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  db_write: {
+    name: 'db_write',
+    readOnly: false,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
+  artifact_write: {
+    name: 'artifact_write',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'never',
+  },
+  artifact_promote: {
+    name: 'artifact_promote',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
+  prediction_promote: {
+    name: 'prediction_promote',
+    readOnly: false,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
+};
+
+export function getToolMetadata(name: string): ToolMetadata {
+  return TOOL_METADATA[name] ?? {
+    name,
+    readOnly: false,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'always',
+  };
+}
+
+export function listToolMetadata(): ToolMetadata[] {
+  return Object.values(TOOL_METADATA);
+}

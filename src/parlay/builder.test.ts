@@ -148,4 +148,19 @@ describe('parlay builder', () => {
     assert.deepEqual(result.evaluations[1]?.excludedReasons, ['excluded-combined-odds-limit']);
     assert.match(result.parlay.warnings.join('\n'), /Combined odds limit/);
   });
+
+  it('labels eligible parlays as analytical artifacts that cannot execute monetary actions', () => {
+    const result = buildParlay({
+      id: 'parlay-1',
+      generatedAt: '2026-04-25T12:00:00.000Z',
+      predictions: [
+        prediction({ id: 'prediction-1', fixtureId: 'fixture-1' }),
+        prediction({ id: 'prediction-2', fixtureId: 'fixture-2' }),
+      ],
+    });
+
+    assert.equal(result.parlay.status, 'candidate');
+    assert.match(result.parlay.rationale, /analytical artifact only/i);
+    assert.match(result.parlay.rationale, /cannot execute a wager or monetary action/i);
+  });
 });

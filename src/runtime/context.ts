@@ -10,6 +10,7 @@ export interface RuntimeContext {
   providerAgentic: AgentConfig['provider'];
   providerSports: 'api-football';
   model: string;
+  databaseUrl?: string;
 }
 
 export function createRuntimeContext(config: AgentConfig, sessionPath: string): RuntimeContext {
@@ -21,6 +22,7 @@ export function createRuntimeContext(config: AgentConfig, sessionPath: string): 
     providerAgentic: config.provider,
     providerSports: 'api-football',
     model: config.model,
+    databaseUrl: config.databaseUrl,
   };
 }
 
@@ -37,6 +39,7 @@ export function updateRuntimeContext(
     providerAgentic: config.provider,
     providerSports: 'api-football' as const,
     model: config.model,
+    databaseUrl: config.databaseUrl,
     ...patch,
   });
   return context;

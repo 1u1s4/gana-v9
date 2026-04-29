@@ -70,6 +70,7 @@ export interface AgentConfig extends GanaConfigExtension {
   geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
   geminiSessionId?: string;
   cursorModelListPath: string;
+  cursorTrust: boolean;
   cursorForce: boolean;
   cursorSessionId?: string;
 }
@@ -102,6 +103,14 @@ function isProfile(value: unknown): value is GanaProfile {
 
 function isApprovalMode(value: unknown): value is ApprovalMode {
   return value === 'manual' || value === 'auto-grant';
+}
+
+function isCodexSandbox(value: unknown): value is AgentConfig['codexSandbox'] {
+  return value === 'read-only' || value === 'workspace-write' || value === 'danger-full-access';
+}
+
+function isGeminiApprovalMode(value: unknown): value is AgentConfig['geminiApprovalMode'] {
+  return value === 'default' || value === 'auto_edit' || value === 'yolo' || value === 'plan';
 }
 
 function parseMarkets(value: string | undefined): MarketKey[] | undefined {
@@ -196,6 +205,7 @@ const DEFAULTS: AgentConfig = {
   geminiModelListPath: 'config/gemini-models.json',
   geminiApprovalMode: 'default',
   cursorModelListPath: 'config/cursor-models.json',
+  cursorTrust: false,
   cursorForce: false,
 };
 
@@ -255,9 +265,21 @@ export function loadConfig(
   if (process.env.AGENT_MAX_COST) config.maxCost = Number(process.env.AGENT_MAX_COST);
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
   if (process.env.CODEX_MODEL_LIST_PATH) config.codexModelListPath = process.env.CODEX_MODEL_LIST_PATH;
+  if (isCodexSandbox(process.env.AGENT_CODEX_SANDBOX)) config.codexSandbox = process.env.AGENT_CODEX_SANDBOX;
   if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
   if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
+  if (isGeminiApprovalMode(process.env.AGENT_GEMINI_APPROVAL_MODE)) {
+    config.geminiApprovalMode = process.env.AGENT_GEMINI_APPROVAL_MODE;
+  }
   if (process.env.CURSOR_MODEL_LIST_PATH) config.cursorModelListPath = process.env.CURSOR_MODEL_LIST_PATH;
+  {
+    const envCursorTrust = parseBoolean(process.env.AGENT_CURSOR_TRUST);
+    if (envCursorTrust !== undefined) config.cursorTrust = envCursorTrust;
+  }
+  {
+    const envCursorForce = parseBoolean(process.env.AGENT_CURSOR_FORCE);
+    if (envCursorForce !== undefined) config.cursorForce = envCursorForce;
+  }
 
   const envSeason = parseNumber(process.env.GANA_DEFAULT_SEASON);
   const envThreshold = parseNumber(process.env.GANA_LOW_ODDS_THRESHOLD);

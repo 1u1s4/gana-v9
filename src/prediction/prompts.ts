@@ -1,5 +1,6 @@
 import type { Fixture } from '../domain/fixtures.js';
 import type { CanonicalOddsSnapshot } from '../providers/sports/types.js';
+import { NO_MONETARY_ACTIONS_PROMPT } from '../security/no-monetary-actions.js';
 
 export const RESEARCH_FIXTURE_PROMPT_VERSION = 'research-fixture-v1';
 export const SCORE_PREDICTION_PROMPT_VERSION = 'score-prediction-v1';
@@ -51,6 +52,7 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
   return [
     'Produce structured football research for the fixture below.',
     'Return only valid JSON. Do not wrap it in markdown. Do not include prose outside JSON.',
+    NO_MONETARY_ACTIONS_PROMPT,
     '',
     'Allowed source types: api-football, provider-snapshot, web-search, db, artifact.',
     'If webMode is live or cached, use native web search and include at least one source with type "web-search".',
@@ -105,6 +107,7 @@ export function buildScorePredictionPrompt(): string {
   return [
     'Score football prediction candidates for the provided fixture context.',
     'Return only valid JSON. Do not wrap it in markdown. Do not include prose outside JSON.',
+    NO_MONETARY_ACTIONS_PROMPT,
     '',
     `Prompt version: ${SCORE_PREDICTION_PROMPT_VERSION}.`,
     'Every prediction must reference persisted oddsQuoteId values and evidenceIds from the supplied research bundle.',

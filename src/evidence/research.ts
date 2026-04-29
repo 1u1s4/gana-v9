@@ -117,7 +117,7 @@ export async function runFixtureResearch(
     runId,
     fixtureId: fixture.id,
     providerFixtureId: fixture.providerFixtureId,
-    sources: prependMissingSource(parsed.value.sources, baseSource),
+    sources: normalizeSourceRecords(prependMissingSource(parsed.value.sources, baseSource)),
     evidenceItems: parsed.value.evidenceItems,
     claims: parsed.value.claims,
     gateResult: parsed.value.gateResult,
@@ -175,9 +175,19 @@ export async function runFixtureResearch(
 }
 
 export function parseResearchJson(rawOutput: string): { ok: true; value: any } | { ok: false; error: string } {
+  const trimmed = rawOutput.trim();
   try {
-    return { ok: true, value: JSON.parse(rawOutput.trim()) };
+    return { ok: true, value: JSON.parse(trimmed) };
   } catch (err: any) {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try {
+        return { ok: true, value: JSON.parse(trimmed.slice(start, end + 1)) };
+      } catch {
+        // Fall through to the original strict JSON error for actionable debugging.
+      }
+    }
     return { ok: false, error: `Research output must be strict JSON: ${err?.message ?? err}` };
   }
 }
@@ -208,6 +218,26 @@ function apiFootballSource(fixture: Fixture, capturedAt: string): SourceRecord {
 function prependMissingSource(sources: SourceRecord[] | undefined, source: SourceRecord): SourceRecord[] {
   const existing = Array.isArray(sources) ? sources : [];
   return existing.some((item) => item.id === source.id) ? existing : [source, ...existing];
+}
+
+function normalizeSourceRecords(sources: SourceRecord[]): SourceRecord[] {
+  return sources.map((source) => {
+    if (!source.url || isValidUrl(source.url)) return source;
+    return {
+      ...source,
+      url: undefined,
+      artifactPath: source.artifactPath ?? source.url,
+    };
+  });
+}
+
+function isValidUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function writeBlockedArtifact(

@@ -120,6 +120,22 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
   });
 
+  it('accepts provider output with explanatory text around the JSON object', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = `I will return JSON now.\n${agentOutput()}\nDone.`;
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.claims.length, 1);
+  });
+
   it('returns blocked and writes redacted raw output when agent output is not JSON', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

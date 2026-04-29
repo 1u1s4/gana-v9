@@ -158,10 +158,14 @@ export function createResearchBundleRepository(
       });
 
       const evidenceSourceIds = new Map<string, string>();
+      const sourceIds = new Map<string, string>();
       for (const source of input.bundle.sources ?? []) {
+        const localSourceId = String(source.id);
+        const sourceId = scopedResearchId(bundle.id, localSourceId);
+        sourceIds.set(localSourceId, sourceId);
         await db.sourceRecord.create({
           data: compactData({
-            id: source.id,
+            id: sourceId,
             bundleId: bundle.id,
             runId: input.bundle.runId,
             fixtureId: input.bundle.fixtureId,
@@ -181,26 +185,29 @@ export function createResearchBundleRepository(
       }
 
       for (const evidence of input.bundle.evidenceItems ?? []) {
+        const localEvidenceId = String(evidence.id);
+        const evidenceId = scopedResearchId(bundle.id, localEvidenceId);
         const record = await db.evidenceItem.create({
           data: compactData({
-            id: evidence.id,
+            id: evidenceId,
             bundleId: bundle.id,
-            sourceId: evidence.sourceId,
+            sourceId: sourceIds.get(String(evidence.sourceId)) ?? evidence.sourceId,
             fixtureId: input.bundle.fixtureId,
             snippetRedacted: evidence.snippet,
             summaryRedacted: evidence.summary,
             confidence: evidence.confidence,
-            claimIds: evidence.claimIds,
+            claimIds: evidence.claimIds?.map((id) => scopedResearchId(bundle.id, String(id))),
             metadata: evidence.metadata,
           }),
         });
+        evidenceSourceIds.set(localEvidenceId, record.sourceId);
         evidenceSourceIds.set(record.id, record.sourceId);
       }
 
       for (const claim of input.bundle.claims ?? []) {
         await db.claim.create({
           data: compactData({
-            id: claim.id,
+            id: scopedResearchId(bundle.id, String(claim.id)),
             bundleId: bundle.id,
             fixtureId: input.bundle.fixtureId,
             sourceId: firstEvidenceSourceId(claim.evidenceIds, evidenceSourceIds),
@@ -209,7 +216,7 @@ export function createResearchBundleRepository(
             subjectKey: claim.subject?.id ?? claim.subject?.market,
             marketKey: claim.subject?.market,
             supportLevel: claim.supportLevel ?? 'unknown',
-            evidenceIds: claim.evidenceIds,
+            evidenceIds: claim.evidenceIds?.map((id) => scopedResearchId(bundle.id, String(id))),
             conflictStatus: claim.conflictStatus ?? 'unknown',
             critical: false,
             metadata: claim.metadata,
@@ -387,4 +394,9 @@ function firstEvidenceSourceId(evidenceIds: string[] | undefined, evidenceSource
     if (sourceId) return sourceId;
   }
   return undefined;
+}
+
+function scopedResearchId(bundleId: string, localId: string): string {
+  const scoped = `${bundleId}:${localId}`;
+  return scoped.length <= 120 ? scoped : scoped.slice(0, 120);
 }

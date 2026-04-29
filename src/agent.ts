@@ -8,7 +8,9 @@ import {
   formatNativeWebSearchEnforcementError,
 } from './providers/agentic/helpers.js';
 import type { AgentEvent, AgentUsage, NativeWebSearchRequirement } from './providers/agentic/types.js';
-import { tools } from './tools/index.js';
+import type { RuntimeContext } from './runtime/context.js';
+import { assertNoMonetaryAction, NO_MONETARY_ACTIONS_PROMPT } from './security/no-monetary-actions.js';
+import { createTools } from './tools/index.js';
 
 export type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -18,6 +20,7 @@ interface RunAgentOptions {
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
   nativeWebSearchRequirement?: NativeWebSearchRequirement;
+  runtime?: RuntimeContext;
 }
 
 export async function runAgent(
@@ -25,6 +28,8 @@ export async function runAgent(
   input: string | ChatMessage[],
   options?: RunAgentOptions,
 ) {
+  assertNoMonetaryAction(userTextFromInput(input));
+
   if (config.provider === 'codex') {
     return runCodexAgent(config, input, options);
   }
@@ -39,9 +44,9 @@ export async function runAgent(
 
   const result = client.callModel({
     model: config.model,
-    instructions: config.systemPrompt.replace('{cwd}', process.cwd()),
+    instructions: systemPromptWithGuards(config),
     input: input as string | Item[],
-    tools,
+    tools: createTools({ config, runtime: options?.runtime }),
     stopWhen: [stepCountIs(config.maxSteps), maxCost(config.maxCost)],
   });
 
@@ -153,6 +158,19 @@ function nativeWebRequirement(config: AgentConfig, options?: RunAgentOptions): N
     ?? deriveNativeWebSearchRequirement(config, { required: false });
 }
 
+function userTextFromInput(input: string | ChatMessage[]): string {
+  return typeof input === 'string'
+    ? input
+    : input.filter((message) => message.role === 'user').map((message) => message.content).join('\n');
+}
+
+function systemPromptWithGuards(config: AgentConfig): string {
+  return [
+    config.systemPrompt.replace('{cwd}', process.cwd()),
+    NO_MONETARY_ACTIONS_PROMPT,
+  ].join('\n\n');
+}
+
 function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[], requirement: NativeWebSearchRequirement): string {
   const userPrompt = typeof input === 'string'
     ? input
@@ -163,7 +181,7 @@ function inputToCodexPrompt(config: AgentConfig, input: string | ChatMessage[], 
   if (config.codexThreadId) return prompt;
 
   return [
-    config.systemPrompt.replace('{cwd}', process.cwd()),
+    systemPromptWithGuards(config),
     '',
     'User request:',
     prompt,
@@ -184,7 +202,7 @@ function requiresNativeWebSearch(requirement: NativeWebSearchRequirement): boole
   return requirement.required && requirement.enforce;
 }
 
-function codexArgs(config: AgentConfig, prompt: string, requirement: NativeWebSearchRequirement): string[] {
+export function codexArgs(config: AgentConfig, prompt: string, requirement: NativeWebSearchRequirement): string[] {
   const configArgs: string[] = [];
   if (config.nativeWebSearch || requirement.required) {
     configArgs.push('-c', `web_search="${requirement.mode ?? config.nativeWebSearchMode}"`);
@@ -209,7 +227,7 @@ function codexArgs(config: AgentConfig, prompt: string, requirement: NativeWebSe
     '-C',
     process.cwd(),
     '--sandbox',
-    effectiveCodexSandbox(config),
+    config.codexSandbox,
     '-m',
     config.model,
     prompt,
@@ -226,14 +244,14 @@ function inputToGeminiPrompt(config: AgentConfig, input: string | ChatMessage[],
   if (config.geminiSessionId) return prompt;
 
   return [
-    config.systemPrompt.replace('{cwd}', process.cwd()),
+    systemPromptWithGuards(config),
     '',
     'User request:',
     prompt,
   ].join('\n');
 }
 
-function geminiArgs(config: AgentConfig, prompt: string): string[] {
+export function geminiArgs(config: AgentConfig, prompt: string): string[] {
   const args = [
     '--prompt',
     prompt,
@@ -242,7 +260,7 @@ function geminiArgs(config: AgentConfig, prompt: string): string[] {
     '--model',
     config.model,
     '--approval-mode',
-    effectiveGeminiApprovalMode(config),
+    config.geminiApprovalMode,
     '--skip-trust',
   ];
 
@@ -263,14 +281,14 @@ function inputToCursorPrompt(config: AgentConfig, input: string | ChatMessage[],
   if (config.cursorSessionId) return prompt;
 
   return [
-    config.systemPrompt.replace('{cwd}', process.cwd()),
+    systemPromptWithGuards(config),
     '',
     'User request:',
     prompt,
   ].join('\n');
 }
 
-function cursorArgs(config: AgentConfig, prompt: string, requirement: NativeWebSearchRequirement): string[] {
+export function cursorArgs(config: AgentConfig, prompt: string, _requirement: NativeWebSearchRequirement): string[] {
   const args = [
     '--print',
     '--output-format',
@@ -282,26 +300,12 @@ function cursorArgs(config: AgentConfig, prompt: string, requirement: NativeWebS
     config.model,
   ];
 
-  if (config.profile === 'full-permissions' || config.cursorForce) args.push('--trust');
-  if (config.cursorForce || (config.profile === 'full-permissions' && requirement.required)) args.push('--force');
+  if (config.cursorTrust) args.push('--trust');
+  if (config.cursorForce) args.push('--force');
   if (config.cursorSessionId) args.push('--resume', config.cursorSessionId);
   args.push(prompt);
 
   return args;
-}
-
-function effectiveCodexSandbox(config: AgentConfig): AgentConfig['codexSandbox'] {
-  if (config.codexSandbox === 'danger-full-access' && config.profile !== 'full-permissions') {
-    return 'workspace-write';
-  }
-  return config.codexSandbox;
-}
-
-function effectiveGeminiApprovalMode(config: AgentConfig): AgentConfig['geminiApprovalMode'] {
-  if (config.profile === 'full-permissions' && config.approvalMode === 'auto-grant') {
-    return config.geminiApprovalMode === 'default' ? 'yolo' : config.geminiApprovalMode;
-  }
-  return config.geminiApprovalMode === 'yolo' ? 'default' : config.geminiApprovalMode;
 }
 
 function cursorToolName(toolCall: Record<string, any> | undefined): string {

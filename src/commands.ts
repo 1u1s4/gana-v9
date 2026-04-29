@@ -17,6 +17,8 @@ import {
 import { getFiltersStatus, type FiltersStatus, type ServiceStatusReport } from './filters/status.js';
 import { appendAuditEvent, appendConfigStatusEvent } from './permissions/audit.js';
 import { redactSecrets } from './permissions/redaction.js';
+import { listToolMetadata } from './permissions/tool-metadata.js';
+import { detectMonetaryAction } from './security/no-monetary-actions.js';
 import { saveSessionEvent } from './session.js';
 import {
   AGENT_PROVIDER_DEFAULT_MODELS,
@@ -687,12 +689,40 @@ function printSessionStatus(ctx: CommandContext): void {
 }
 
 function printApprovalStatus(ctx: Pick<CommandContext, 'config' | 'runtime'>): void {
+  const tools = listToolMetadata();
+  const autoGranted = ctx.config.profile === 'full-permissions' && ctx.config.approvalMode === 'auto-grant'
+    ? tools.filter((tool) => tool.requiresApproval === 'standard' && !tool.destructive).map((tool) => tool.name)
+    : [];
+  const manual = tools.filter((tool) => tool.requiresApproval === 'always' || tool.destructive).map((tool) => tool.name);
+  const standardManual = tools.filter((tool) => tool.requiresApproval === 'standard').map((tool) => tool.name);
   printKeyValue('profile', ctx.config.profile);
   printKeyValue('approvalMode', ctx.config.approvalMode);
   printKeyValue('policy', ctx.config.approvalMode === 'auto-grant'
-    ? 'auto-grant for configured PR-01 skeleton actions, audit retained'
+    ? 'auto-grant for configured standard actions, audit retained'
     : 'manual approvals for sensitive actions');
+  printKeyValue('autoGranted', autoGranted.length ? autoGranted.join(', ') : 'none');
+  printKeyValue('manualRequired', ctx.config.profile === 'standard' ? standardManual.join(', ') : manual.join(', ') || 'none');
   printKeyValue('audit', `${ctx.runtime.artifactRoot}/runs/<session-run>/audit-log.jsonl`);
+  printKeyValue('lastAuditEvent', latestAuditEvent(ctx.runtime));
+}
+
+function latestAuditEvent(runtime: RuntimeContext): string {
+  const runId = runtime.runId ?? sessionRunId(runtime.sessionPath);
+  const path = join(resolve(runtime.artifactRoot), 'runs', runId, 'audit-log.jsonl');
+  if (!existsSync(path)) return 'none';
+  const lines = readFileSync(path, 'utf-8').split('\n').filter(Boolean);
+  if (!lines.length) return 'none';
+  try {
+    const parsed = JSON.parse(lines[lines.length - 1]) as { type?: string; timestamp?: string };
+    return [parsed.type, parsed.timestamp].filter(Boolean).join(' @ ') || 'present';
+  } catch {
+    return 'present';
+  }
+}
+
+function sessionRunId(sessionPath: string): string {
+  const name = sessionPath.split('/').pop()?.replace(/\.[^.]+$/, '') || 'session';
+  return `session-${name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
 }
 
 function applyProfile(profile: AgentConfig['profile'], ctx: Pick<CommandContext, 'config' | 'runtime'>): void {
@@ -1278,6 +1308,15 @@ export function listCommands(): SlashCommand[] {
 }
 
 export async function dispatch(input: string, ctx: CommandContext): Promise<boolean> {
+  const monetary = detectMonetaryAction(input);
+  if (monetary.blocked) {
+    appendAuditEvent(ctx.runtime, {
+      type: 'action.blocked',
+      payload: { action: 'slash.command', input, reason: monetary.reason, matches: monetary.matches },
+    });
+    console.log(`  ${YELLOW}!${RESET} ${DIM}${monetary.reason}${RESET}`);
+    return true;
+  }
   const [name, ...rest] = input.split(' ');
   const cmd = commands.find((c) => c.name === name);
   if (!cmd) {
@@ -1291,6 +1330,16 @@ export async function dispatch(input: string, ctx: CommandContext): Promise<bool
 export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandContext): Promise<CommandResult> {
   const [area, action] = argv;
   try {
+    const monetary = detectMonetaryAction(argv.join(' '));
+    if (monetary.blocked) {
+      appendAuditEvent(ctx.runtime, {
+        type: 'action.blocked',
+        payload: { action: 'headless.command', argv, reason: monetary.reason, matches: monetary.matches },
+      });
+      console.log(`  ${YELLOW}!${RESET} ${DIM}${monetary.reason}${RESET}`);
+      return { ok: false, exitCode: 1, message: monetary.reason };
+    }
+
     if (area === 'db' && action === 'status') {
       const status = await getDbStatus(ctx.config);
       printServiceStatus(status);

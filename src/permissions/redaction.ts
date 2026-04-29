@@ -5,6 +5,7 @@ const SENSITIVE_KEY_PARTS = [
   'api-key',
   'apikey',
   'authorization',
+  'cookie',
   'database-url',
   'database_url',
   'databaseurl',
@@ -18,8 +19,13 @@ const SENSITIVE_KEY_PARTS = [
 
 const AUTH_SCHEME_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
 const ENV_ASSIGNMENT_PATTERN = /(^|\n)(\s*[\w.-]*(?:key|token|secret|password|authorization|database_url)[\w.-]*\s*=\s*)([^\n]*)/gi;
+const INLINE_SECRET_ASSIGNMENT_PATTERN = /(\b[\w.-]*(?:key|token|secret|password|authorization|database_url)[\w.-]*\s*=\s*)([^&\s"'`\\]+)/gi;
 const QUERY_SECRET_PATTERN = /([?&][^=\s&]*(?:key|token|secret|password|authorization)[^=\s&]*=)([^&\s]+)/gi;
 const URL_CREDENTIAL_PATTERN = /([a-z][a-z0-9+.-]*:\/\/)([^:@/\s]+)(?::([^@/\s]*))?@/gi;
+const OPENAI_STYLE_SECRET_PATTERN = /\b(sk-[A-Za-z0-9_-]{12,})\b/g;
+const GITHUB_TOKEN_PATTERN = /\b(gh[pousr]_[A-Za-z0-9_]{12,})\b/g;
+const JWT_PATTERN = /\b(eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b/g;
+const COOKIE_PAIR_PATTERN = /\b(cookie\s*[:=]\s*)([^\n]+)/gi;
 
 export function redactSecrets(value: unknown): unknown {
   return redactUnknown(value, new WeakSet<object>());
@@ -89,6 +95,11 @@ function redactNonUrlText(value: string): string {
   redacted = redacted.replace(ENV_ASSIGNMENT_PATTERN, (_match, prefix: string, assignment: string) => {
     return `${prefix}${assignment}${REDACTED}`;
   });
+  redacted = redacted.replace(INLINE_SECRET_ASSIGNMENT_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`);
+  redacted = redacted.replace(COOKIE_PAIR_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`);
+  redacted = redacted.replace(OPENAI_STYLE_SECRET_PATTERN, REDACTED);
+  redacted = redacted.replace(GITHUB_TOKEN_PATTERN, REDACTED);
+  redacted = redacted.replace(JWT_PATTERN, REDACTED);
   return redacted.replace(QUERY_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`);
 }
 

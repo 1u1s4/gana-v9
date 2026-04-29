@@ -33,15 +33,16 @@ export async function discoverFixtures(
       reason: 'included-by-default-team',
     });
   }
-  if (!requests.length) {
-    requests.push({ reason: 'included-by-manual-query' });
+  const validRequests = requests.filter((request) => {
+    return (request.league === undefined || Number.isFinite(request.league))
+      && (request.team === undefined || Number.isFinite(request.team));
+  });
+  if (!validRequests.length) {
+    validRequests.push({ reason: 'included-by-manual-query' });
   }
 
   const byProviderFixtureId = new Map<string, { fixture: Fixture; reasons: Set<FilterReason> }>();
-  for (const request of requests) {
-    if ((request.league !== undefined && !Number.isFinite(request.league)) || (request.team !== undefined && !Number.isFinite(request.team))) {
-      continue;
-    }
+  for (const request of validRequests) {
     const fixtures = await listApiFootballFixtures(config, {
       date: filters.date,
       season: config.apiFootball.defaultSeason,

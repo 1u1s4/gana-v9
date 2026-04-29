@@ -147,7 +147,7 @@ export async function executeRunPipeline(
   deps: RunPipelineDependencies = {},
 ): Promise<RunPipelineResult> {
   const now = deps.now ?? (() => new Date());
-  const runId = input.runId ?? runtime.runId ?? deps.createRunId?.() ?? `run_${randomUUID()}`;
+  const runId = input.runId ?? runtime.runId ?? deps.createRunId?.() ?? randomUUID();
   runtime.runId = runId;
   const artifactDir = createRunArtifactDir(config, runId);
   const repositories = deps.repositories ?? defaultRepositories(config);
@@ -324,13 +324,16 @@ export async function executeRunPipeline(
   }
   steps.push({
     name: 'build parlay',
-    ok: parlay.ok,
-    verdict: parlay.gateResult.verdict,
+    ok: parlay.ok || selectedFixtures.length < 2,
+    verdict: selectedFixtures.length < 2 && parlay.gateResult.verdict === 'blocked'
+      ? 'review-required'
+      : parlay.gateResult.verdict,
     warnings: [...parlay.gateResult.warnings, ...(parlay.error ? [parlay.error] : [])],
     artifactPath: parlay.artifactPath,
   });
 
-  const shouldValidate = input.validate !== false;
+  const validateMode = input.validate ?? 'auto';
+  const shouldValidate = validateMode !== false && (validateMode !== 'auto' || isPastOrToday(input.date));
   let validation: ValidationRunResult | undefined;
   if (shouldValidate) {
     try {
@@ -753,6 +756,11 @@ function finalVerdict(steps: PipelineStepResult[]): PipelineVerdict {
   if (steps.some((step) => step.verdict === 'blocked')) return 'blocked';
   if (steps.some((step) => step.verdict === 'review-required' || step.warnings.length > 0 || !step.ok)) return 'review-required';
   return 'promotable';
+}
+
+function isPastOrToday(date: string): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  return date <= today;
 }
 
 function emptyLowOddsScan(date: string, threshold: number): LowOddsScanView {

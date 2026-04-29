@@ -11,7 +11,7 @@ import { Loader } from './loader.js';
 import { getFiltersStatus } from './filters/status.js';
 import { runHeadless } from './headless.js';
 import { redactSecrets } from './permissions/redaction.js';
-import { appendAutoApproval } from './permissions/audit.js';
+import { appendAuditEvent, appendAutoApproval } from './permissions/audit.js';
 import { deriveNativeWebSearchRequirement, redactProviderSessionId } from './providers/agentic/helpers.js';
 import type { AgentEvent, AgentUsage, NativeWebSearchRequirement } from './providers/agentic/types.js';
 import { getFootballStatus } from './providers/sports/football-status.js';
@@ -25,6 +25,7 @@ import {
   type HarnessEventType,
 } from './runtime/events.js';
 import { getDbStatus } from './storage/db-status.js';
+import { detectMonetaryAction } from './security/no-monetary-actions.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -158,6 +159,7 @@ function recordAutoGrantedProviderOptions(config: ReturnType<typeof loadConfig>,
   const actions: string[] = [];
   if (config.provider === 'codex' && config.codexSandbox === 'danger-full-access') actions.push('codex.danger-full-access');
   if (config.provider === 'gemini' && config.geminiApprovalMode === 'yolo') actions.push('gemini.yolo');
+  if (config.provider === 'cursor' && config.cursorTrust) actions.push('cursor.trust');
   if (config.provider === 'cursor' && config.cursorForce) actions.push('cursor.force');
   for (const action of actions) appendAutoApproval(runtime, action);
 }
@@ -488,6 +490,16 @@ export async function runTui() {
         continue;
       }
 
+      const monetary = detectMonetaryAction(trimmed);
+      if (monetary.blocked) {
+        appendAuditEvent(runtime, {
+          type: 'action.blocked',
+          payload: { action: 'agent.prompt', reason: monetary.reason, matches: monetary.matches },
+        });
+        console.log(`  ${YELLOW}!${RESET} ${DIM}${monetary.reason}${RESET}`);
+        continue;
+      }
+
       messages.push({ role: 'user', content: trimmed });
       saveMessage(sessionPath, { role: 'user', content: trimmed });
 
@@ -506,6 +518,7 @@ export async function runTui() {
         });
         const result = await runAgentWithRetry(config, agentInput, {
           nativeWebSearchRequirement,
+          runtime,
           onEvent: (e) => {
             if (!started) { started = true; loader.stop(); }
             renderer.handle(e);
