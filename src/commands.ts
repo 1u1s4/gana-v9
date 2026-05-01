@@ -41,6 +41,7 @@ import {
 } from './runtime/run-service.js';
 import { getDbStatus } from './storage/db-status.js';
 import type { Fixture } from './domain/fixtures.js';
+import { isMarketKey, MARKET_KEYS, type MarketKey } from './domain/markets.js';
 import type { OddsQuote } from './domain/odds.js';
 import { runFixtureResearch, type FixtureResearchResult } from './evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from './prediction/service.js';
@@ -345,6 +346,59 @@ function parseFlags(args: string[]): Record<string, string | true> {
   return flags;
 }
 
+const LOW_ODDS_SLASH_KEYS = new Set(['date', 'threshold', 'markets', 'leagues', 'teams', 'combine']);
+
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function expandLowOddsSlashTokens(tokens: string[]): string[] {
+  const expanded: string[] = [];
+  let hasDate = false;
+
+  for (const token of tokens) {
+    if (token.startsWith('--')) {
+      if (token === '--date') hasDate = true;
+      expanded.push(token);
+      continue;
+    }
+
+    const colonIndex = token.indexOf(':');
+    if (colonIndex > 0) {
+      const key = token.slice(0, colonIndex);
+      const value = token.slice(colonIndex + 1);
+      if (LOW_ODDS_SLASH_KEYS.has(key) && value) {
+        if (key === 'date') hasDate = true;
+        expanded.push(`--${key}`, value);
+        continue;
+      }
+    }
+
+    if (!hasDate && token === 'today') {
+      expanded.push('--date', formatLocalDate(new Date()));
+      hasDate = true;
+      continue;
+    }
+
+    if (!hasDate && /^\d{4}-\d{2}-\d{2}$/.test(token)) {
+      expanded.push('--date', token);
+      hasDate = true;
+      continue;
+    }
+
+    expanded.push(token);
+  }
+
+  return expanded;
+}
+
+function parseLowOddsSlashFlags(args: string): Record<string, string | true> {
+  return parseFlags(expandLowOddsSlashTokens(args.split(' ').filter(Boolean)));
+}
+
 function requireDateFlag(flags: Record<string, string | true>): string {
   const date = flags.date;
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -386,6 +440,22 @@ function optionalFloatFlag(flags: Record<string, string | true>, key: string): n
   return parsed;
 }
 
+function optionalMarketsFlag(flags: Record<string, string | true>): MarketKey[] | undefined {
+  const value = flags.markets;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new Error(`--markets must be a comma-separated list of: ${MARKET_KEYS.join(', ')}.`);
+  }
+
+  const marketNames = value.split(',').map((market) => market.trim()).filter(Boolean);
+  const invalid = marketNames.filter((market) => !isMarketKey(market));
+  if (!marketNames.length || invalid.length) {
+    throw new Error(`--markets contains unsupported market(s): ${invalid.join(', ') || value}. Use: ${MARKET_KEYS.join(', ')}.`);
+  }
+
+  return [...new Set(marketNames)] as MarketKey[];
+}
+
 function optionalPositiveIntegerFlag(flags: Record<string, string | true>, key: string): number | undefined {
   const value = flags[key];
   if (typeof value !== 'string') return undefined;
@@ -424,8 +494,21 @@ function requiredValidationTarget(flags: Record<string, string | true>): RunVali
   };
 }
 
-function requiredRunInput(flags: Record<string, string | true>): { date: string } {
-  return { date: requireDateFlag(flags) };
+function optionalRunValidationMode(flags: Record<string, string | true>): 'auto' | 'force' | false | undefined {
+  const value = flags.validate;
+  if (value === undefined) return undefined;
+  if (value === true) return 'force';
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'auto' || normalized === 'force') return normalized;
+  if (normalized === 'off' || normalized === 'false' || normalized === 'disabled' || normalized === 'none') return false;
+  throw new Error('--validate must be auto, force, or off.');
+}
+
+function requiredRunInput(flags: Record<string, string | true>): { date: string; validate?: 'auto' | 'force' | false } {
+  return {
+    date: requireDateFlag(flags),
+    validate: optionalRunValidationMode(flags),
+  };
 }
 
 function requiredRunId(flags: Record<string, string | true>): string {
@@ -492,6 +575,29 @@ function optionalCombineModeFlag(flags: Record<string, string | true>): FilterCo
 
 function wantsDefault(flags: Record<string, string | true>, key: string): boolean {
   return flags[key] === true || flags[key] === 'default';
+}
+
+function configWithMarketOverride(config: AgentConfig, markets: MarketKey[] | undefined): AgentConfig {
+  if (!markets) return config;
+  return {
+    ...config,
+    apiFootball: {
+      ...config.apiFootball,
+      defaultMarkets: markets,
+    },
+  };
+}
+
+async function runLowOddsScan(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<LowOddsScanView> {
+  const input = {
+    date: requireDateFlag(flags),
+    threshold: optionalFloatFlag(flags, 'threshold'),
+    leaguesDefault: wantsDefault(flags, 'leagues'),
+    teamsDefault: wantsDefault(flags, 'teams'),
+    combineMode: optionalCombineModeFlag(flags),
+  };
+  const markets = optionalMarketsFlag(flags);
+  return scanLowOdds(configWithMarketOverride(ctx.config, markets), input, ctx.runtime);
 }
 
 async function printPresetCounts(config: AgentConfig): Promise<void> {
@@ -1281,14 +1387,8 @@ commands.push({
   name: '/low-odds',
   description: 'Scan fixtures for low odds',
   execute: async (args, ctx) => {
-    const flags = parseFlags(args.split(' ').filter(Boolean));
-    const scan = await scanLowOdds(ctx.config, {
-      date: requireDateFlag(flags),
-      threshold: optionalFloatFlag(flags, 'threshold'),
-      leaguesDefault: wantsDefault(flags, 'leagues'),
-      teamsDefault: wantsDefault(flags, 'teams'),
-      combineMode: optionalCombineModeFlag(flags),
-    }, ctx.runtime);
+    const flags = parseLowOddsSlashFlags(args);
+    const scan = await runLowOddsScan(ctx, flags);
     printLowOddsScan(scan);
   },
 });
@@ -1495,13 +1595,7 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
 
     if (area === 'scan' && action === 'low-odds') {
       const flags = parseFlags(argv.slice(2));
-      const scan = await scanLowOdds(ctx.config, {
-        date: requireDateFlag(flags),
-        threshold: optionalFloatFlag(flags, 'threshold'),
-        leaguesDefault: wantsDefault(flags, 'leagues'),
-        teamsDefault: wantsDefault(flags, 'teams'),
-        combineMode: optionalCombineModeFlag(flags),
-      }, ctx.runtime);
+      const scan = await runLowOddsScan(ctx, flags);
       printLowOddsScan(scan);
       return { ok: true, exitCode: 0 };
     }
@@ -1529,11 +1623,11 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
-  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --validate auto|force|off${RESET}`);
   console.log(`  ${CYAN}pnpm gana export --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana artifacts --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
-  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);
+  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20 --markets h2h,double_chance,btts${RESET}`);
   console.log(`  ${CYAN}pnpm gana filters show${RESET}`);
 }

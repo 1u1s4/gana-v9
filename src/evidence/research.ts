@@ -4,6 +4,7 @@ import type { Fixture } from '../domain/fixtures.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { runAgentWithRetry } from '../agent.js';
+import { redactSecrets } from '../permissions/redaction.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import { getPrismaClient } from '../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
@@ -92,12 +93,8 @@ export async function runFixtureResearch(
     });
     rawOutput = result.text;
   } catch (err: any) {
-    return writeBlockedArtifact(config, runId, 'research-agent-error.json', {
-      fixtureId: fixture.id,
-      providerFixtureId: fixture.providerFixtureId,
-      promptVersion: RESEARCH_FIXTURE_PROMPT_VERSION,
-      error: err?.message ?? String(err),
-    });
+    const error = redactErrorMessage(err?.message ?? String(err));
+    return buildAndPersistAgentFailureFallback(config, input, runtime, deps, runId, fixture, createdAt, error);
   }
 
   const parsed = parseResearchJson(rawOutput);
@@ -140,10 +137,133 @@ export async function runFixtureResearch(
     });
   }
 
-  const webWarnings = input.web !== 'off' && !validation.value.sources.some((source) => source.type === 'web-search')
-    ? [`web ${input.web} requested but no web-search source was included`]
+  return writeAndPersistResearchBundle(config, runtime, deps, runId, input.web, validation.value);
+}
+
+export function parseResearchJson(rawOutput: string): { ok: true; value: any } | { ok: false; error: string } {
+  const trimmed = rawOutput.trim();
+  try {
+    return { ok: true, value: JSON.parse(trimmed) };
+  } catch (err: any) {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try {
+        return { ok: true, value: JSON.parse(trimmed.slice(start, end + 1)) };
+      } catch {
+        // Fall through to the original strict JSON error for actionable debugging.
+      }
+    }
+    return { ok: false, error: `Research output must be strict JSON: ${err?.message ?? err}` };
+  }
+}
+
+async function buildAndPersistAgentFailureFallback(
+  config: AgentConfig,
+  input: RunFixtureResearchInput,
+  runtime: RuntimeContext,
+  deps: FixtureResearchDependencies,
+  runId: string,
+  fixture: Fixture,
+  createdAt: string,
+  error: string,
+): Promise<FixtureResearchResult> {
+  const bundleInput = buildAgentFailureFallbackBundle(config, input, runId, fixture, createdAt, error);
+  const validation = validateResearchBundle(bundleInput);
+  if (!validation.ok || !validation.value) {
+    return writeBlockedArtifact(config, runId, 'research-fallback-validation-error.json', {
+      fixtureId: fixture.id,
+      providerFixtureId: fixture.providerFixtureId,
+      promptVersion: RESEARCH_FIXTURE_PROMPT_VERSION,
+      issues: validation.issues,
+      error,
+    });
+  }
+
+  return writeAndPersistResearchBundle(config, runtime, deps, runId, input.web, validation.value);
+}
+
+function buildAgentFailureFallbackBundle(
+  config: AgentConfig,
+  input: RunFixtureResearchInput,
+  runId: string,
+  fixture: Fixture,
+  createdAt: string,
+  error: string,
+): ResearchBundle {
+  const source = apiFootballSource(fixture, createdAt);
+  const evidenceId = 'evidence_api_football_fixture_metadata';
+  const claimId = 'claim_api_football_fixture_metadata';
+  const warnings = [
+    `agentic research failed before structured JSON was returned: ${error}`,
+    'fallback research uses API-Football fixture metadata only',
+    'fallback research is not promotable',
+  ];
+
+  return {
+    id: randomUUID(),
+    runId,
+    fixtureId: fixture.id,
+    providerFixtureId: fixture.providerFixtureId,
+    sources: [source],
+    evidenceItems: [{
+      id: evidenceId,
+      sourceId: source.id,
+      claimIds: [claimId],
+      summary: fixtureMetadataSummary(fixture),
+      confidence: 0.55,
+      metadata: {
+        fallback: true,
+        fields: ['providerFixtureId', 'homeTeamId', 'awayTeamId', 'scheduledAt', 'status'],
+      },
+    }],
+    claims: [{
+      id: claimId,
+      statement: fixtureMetadataClaim(fixture),
+      subject: { type: 'fixture', id: fixture.id },
+      supportLevel: 'supported',
+      evidenceIds: [evidenceId],
+      conflictStatus: 'none',
+      metadata: {
+        fallback: true,
+        sourceId: source.id,
+      },
+    }],
+    gateResult: {
+      verdict: 'review-required',
+      reasons: [
+        'agentic research failed before structured JSON was returned',
+        'fallback contains API-Football fixture metadata only',
+        'independent evidence is insufficient for promotion',
+      ],
+      warnings,
+    },
+    providerAgentic: config.provider,
+    model: config.model,
+    promptVersion: RESEARCH_FIXTURE_PROMPT_VERSION,
+    createdAt,
+    warnings,
+    metadata: {
+      fallback: true,
+      fallbackReason: 'agent-runner-error',
+      webMode: input.web,
+      agentError: error,
+    },
+  };
+}
+
+async function writeAndPersistResearchBundle(
+  config: AgentConfig,
+  runtime: RuntimeContext,
+  deps: FixtureResearchDependencies,
+  runId: string,
+  web: ResearchWebMode,
+  validatedBundle: ResearchBundle,
+): Promise<FixtureResearchResult> {
+  const webWarnings = web !== 'off' && !validatedBundle.sources.some((source) => source.type === 'web-search')
+    ? [`web ${web} requested but no web-search source was included`]
     : [];
-  const bundle = mergeGateWarnings(validation.value, webWarnings);
+  const bundle = mergeGateWarnings(validatedBundle, webWarnings);
   const artifactPath = writeArtifact(config, runId, 'research-bundle.json', bundle);
 
   try {
@@ -174,24 +294,6 @@ export async function runFixtureResearch(
   };
 }
 
-export function parseResearchJson(rawOutput: string): { ok: true; value: any } | { ok: false; error: string } {
-  const trimmed = rawOutput.trim();
-  try {
-    return { ok: true, value: JSON.parse(trimmed) };
-  } catch (err: any) {
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start !== -1 && end > start) {
-      try {
-        return { ok: true, value: JSON.parse(trimmed.slice(start, end + 1)) };
-      } catch {
-        // Fall through to the original strict JSON error for actionable debugging.
-      }
-    }
-    return { ok: false, error: `Research output must be strict JSON: ${err?.message ?? err}` };
-  }
-}
-
 async function createDefaultSportsProvider(
   config: AgentConfig,
   runtime: RuntimeContext,
@@ -213,6 +315,28 @@ function apiFootballSource(fixture: Fixture, capturedAt: string): SourceRecord {
       providerFixtureId: fixture.providerFixtureId,
     },
   };
+}
+
+function fixtureMetadataSummary(fixture: Fixture): string {
+  const score = Number.isFinite(fixture.scoreHome) && Number.isFinite(fixture.scoreAway)
+    ? `, score ${fixture.scoreHome}-${fixture.scoreAway}`
+    : '';
+  return [
+    `API-Football fixture ${fixture.providerFixtureId}`,
+    `home team ${fixture.homeTeamId}`,
+    `away team ${fixture.awayTeamId}`,
+    `status ${fixture.status}`,
+    `scheduledAt ${fixture.scheduledAt}${score}`,
+  ].join(', ');
+}
+
+function fixtureMetadataClaim(fixture: Fixture): string {
+  return `API-Football lists fixture ${fixture.providerFixtureId} as ${fixture.status} with scheduled kickoff ${fixture.scheduledAt}.`;
+}
+
+function redactErrorMessage(error: string): string {
+  const redacted = redactSecrets(error);
+  return typeof redacted === 'string' ? redacted : 'Agentic research failed before structured JSON was returned.';
 }
 
 function prependMissingSource(sources: SourceRecord[] | undefined, source: SourceRecord): SourceRecord[] {

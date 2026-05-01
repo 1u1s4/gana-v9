@@ -170,7 +170,18 @@ describe('headless run command', () => {
   it('prints run usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
-    assert.match(output, /pnpm gana run --date YYYY-MM-DD/);
+    assert.match(output, /pnpm gana run --date YYYY-MM-DD --validate auto\|force\|off/);
+  });
+
+  it('validates run validation mode before executing the pipeline', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['run', '--date', '2026-04-25', '--validate', 'invalid'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /--validate must be auto, force, or off/);
   });
 
   it('blocks monetary automation in headless arguments', async () => {
@@ -229,6 +240,70 @@ describe('artifacts command surface', () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
     assert.match(output, /pnpm gana artifacts --run-id RUN_ID/);
+  });
+});
+
+describe('low-odds command surface', () => {
+  it('wires headless scan low-odds with threshold and markets flags', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless([
+        'scan',
+        'low-odds',
+        '--date',
+        '2026-04-25',
+        '--threshold',
+        '1.20',
+        '--markets',
+        'h2h,double_chance,btts',
+      ], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /DATABASE_URL is required/);
+  });
+
+  it('rejects unsupported headless scan markets before running the scan', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless([
+        'scan',
+        'low-odds',
+        '--date',
+        '2026-04-25',
+        '--markets',
+        'h2h,unsupported',
+      ], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /unsupported market\(s\): unsupported/);
+  });
+
+  it('accepts slash-style low-odds tokens', async () => {
+    const ctx = commandContext();
+
+    await assert.rejects(
+      captureConsole(() => dispatch('/low-odds today threshold:1.20 leagues:default teams:default markets:h2h,double_chance,btts', ctx)),
+      /DATABASE_URL is required/,
+    );
+  });
+
+  it('rejects unsupported slash-style low-odds markets before running the scan', async () => {
+    const ctx = commandContext();
+
+    await assert.rejects(
+      captureConsole(() => dispatch('/low-odds 2026-04-25 markets:unsupported', ctx)),
+      /unsupported market\(s\): unsupported/,
+    );
+  });
+
+  it('prints low-odds market flag usage', async () => {
+    const output = await captureConsole(() => printHeadlessUsage());
+
+    assert.match(output, /pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1\.20 --markets h2h,double_chance,btts/);
   });
 });
 

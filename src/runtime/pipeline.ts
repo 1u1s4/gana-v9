@@ -28,12 +28,13 @@ import type { RuntimeContext } from './context.js';
 
 export type PipelineVerdict = 'promotable' | 'review-required' | 'blocked';
 export type PipelineStatus = 'succeeded' | 'failed';
+export type PipelineValidationMode = 'auto' | 'force' | false;
 
 export interface RunPipelineInput {
   date: string;
   runId?: string;
   web?: ResearchWebMode;
-  validate?: 'auto' | false;
+  validate?: PipelineValidationMode;
 }
 
 export interface OddsSnapshotView {
@@ -355,7 +356,8 @@ export async function executeRunPipeline(
   });
 
   const validateMode = input.validate ?? 'auto';
-  const shouldValidate = validateMode !== false && (validateMode !== 'auto' || isPastOrToday(input.date));
+  const validationSkipReason = getValidationSkipReason(validateMode, input.date, startedAt);
+  const shouldValidate = !validationSkipReason;
   let validation: ValidationRunResult | undefined;
   if (shouldValidate) {
     try {
@@ -379,6 +381,7 @@ export async function executeRunPipeline(
       artifactPath: validation.artifactPath,
     });
   }
+  const validationEvaluation = buildValidationEvaluation(input.date, validateMode, validation, validationSkipReason);
 
   const verdict = finalVerdict(steps);
   const status: PipelineStatus = verdict === 'blocked' ? 'failed' : 'succeeded';
@@ -400,6 +403,7 @@ export async function executeRunPipeline(
       parlayLegs: parlay.build.parlay.legs.length,
       validations: validation?.validations.length ?? 0,
     },
+    validation: validationEvaluation,
     lowOddsScanId: lowOddsScan.scanId ?? null,
   };
   writeJsonArtifact(config, runId, 'evaluation.json', evaluation);
@@ -782,8 +786,40 @@ function finalVerdict(steps: PipelineStepResult[]): PipelineVerdict {
   return 'promotable';
 }
 
-function isPastOrToday(date: string): boolean {
-  const today = new Date().toISOString().slice(0, 10);
+function getValidationSkipReason(mode: PipelineValidationMode, date: string, referenceDate: Date): string | undefined {
+  if (mode === false) return 'disabled';
+  if (mode === 'auto' && !isPastOrToday(date, referenceDate)) return 'future-date';
+  return undefined;
+}
+
+function buildValidationEvaluation(
+  date: string,
+  mode: PipelineValidationMode,
+  validation: ValidationRunResult | undefined,
+  skipReason: string | undefined,
+): Record<string, unknown> {
+  if (!validation) {
+    return {
+      mode,
+      status: 'skipped',
+      target: { date },
+      validations: 0,
+      reason: skipReason ?? 'not-run',
+    };
+  }
+  return {
+    mode,
+    status: validation.ok ? 'completed' : 'blocked',
+    target: validation.target,
+    verdict: validation.gateResult.verdict,
+    validations: validation.validations.length,
+    artifactPath: validation.artifactPath ?? null,
+    error: validation.error ?? null,
+  };
+}
+
+function isPastOrToday(date: string, referenceDate: Date): boolean {
+  const today = referenceDate.toISOString().slice(0, 10);
   return date <= today;
 }
 
@@ -838,13 +874,32 @@ function buildHandoffMarkdown(
   manifest: Record<string, any>,
 ): string {
   const evaluation = manifest.evaluation ?? {};
-  const counts = evaluation.counts ?? {};
+  const run = manifest.run && typeof manifest.run === 'object' ? manifest.run : {};
+  const artifacts = Array.isArray(manifest.artifacts) ? manifest.artifacts : [];
+  const validationArtifactCount = artifacts.filter((artifact: any) => artifact?.kind === 'validations').length;
+  const counts = evaluation.counts ?? {
+    validations: validationArtifactCount || undefined,
+  };
   const steps = Array.isArray(evaluation.steps) ? evaluation.steps : [];
+  const validation = evaluation.validation && typeof evaluation.validation === 'object' ? evaluation.validation : {};
+  const runVerdict = typeof run.verdict === 'string' ? run.verdict : undefined;
+  const runStatus = typeof run.status === 'string' ? run.status : undefined;
+  const validationStatus = typeof validation.status === 'string'
+    ? validation.status
+    : validationArtifactCount > 0
+      ? runVerdict ?? 'completed'
+      : 'unknown';
+  const validationMode = typeof validation.mode === 'string' || validation.mode === false ? String(validation.mode) : 'unknown';
+  const validationReason = typeof validation.reason === 'string' ? ` (${validation.reason})` : '';
   const risks = steps.flatMap((step: any) => Array.isArray(step.warnings) ? step.warnings : []);
-  const nextAction = evaluation.verdict === 'promotable'
+  const verdict = evaluation.verdict ?? runVerdict ?? 'unknown';
+  const status = evaluation.status ?? runStatus ?? 'unknown';
+  const nextAction = verdict === 'promotable'
     ? 'Review the analytical parlay candidate and evidence pack before any human decision.'
-    : evaluation.verdict === 'review-required'
+    : verdict === 'review-required'
       ? 'Review warnings, pending validation, and incomplete outputs before promotion.'
+      : verdict === 'pending'
+        ? 'Wait for fixture completion, then rerun validation for final settlement.'
       : 'Resolve blocked pipeline steps and rerun the pipeline.';
   return [
     `# Gana Run Handoff: ${runId}`,
@@ -855,8 +910,8 @@ function buildHandoffMarkdown(
     `- providerSports: ${runtime.providerSports}`,
     `- providerAgentic: ${config.provider}`,
     `- model: ${config.model}`,
-    `- verdict: ${evaluation.verdict ?? 'unknown'}`,
-    `- status: ${evaluation.status ?? 'unknown'}`,
+    `- verdict: ${verdict}`,
+    `- status: ${status}`,
     '',
     '## Outputs',
     '',
@@ -865,6 +920,8 @@ function buildHandoffMarkdown(
     `- predictions: ${counts.predictions ?? 'unknown'}`,
     `- parlayLegs: ${counts.parlayLegs ?? 'unknown'}`,
     `- validations: ${counts.validations ?? 'unknown'}`,
+    `- validationStatus: ${validationStatus}${validationReason}`,
+    `- validationMode: ${validationMode}`,
     '',
     '## Gates',
     '',

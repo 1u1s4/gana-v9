@@ -37,9 +37,7 @@ export interface OddsQuery {
   fixtureId: string;
 }
 
-export interface OddsScanQuery {
-  date: string;
-}
+export interface OddsScanQuery extends FixtureQuery {}
 
 export interface ResultQuery {
   providerFixtureId: string;

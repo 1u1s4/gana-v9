@@ -7,7 +7,7 @@ import { loadConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { OddsQuote } from '../domain/odds.js';
 import { createRuntimeContext } from './context.js';
-import { executeRunPipeline, exportRunArtifacts } from './pipeline.js';
+import { executeRunPipeline, exportRunArtifacts, type RunPipelineDependencies } from './pipeline.js';
 
 function testConfig() {
   return loadConfig({
@@ -53,6 +53,108 @@ function lowOddsQuote(target: Fixture): OddsQuote {
     bookmaker: 'test-book',
     capturedAt: '2026-04-29T12:00:00.000Z',
     sourceSnapshotId: 'provider-snapshot-1',
+  };
+}
+
+function successfulPipelineDeps(input: {
+  target: Fixture;
+  calls: string[];
+  runId: string;
+  date: string;
+  now?: string;
+  validateRun?: RunPipelineDependencies['validateRun'];
+}): RunPipelineDependencies {
+  const evaluatedAt = input.now ?? '2026-04-29T12:00:00.000Z';
+  return {
+    createRunId: () => input.runId,
+    now: () => new Date(evaluatedAt),
+    discoverFixtures: async () => {
+      input.calls.push('fixtures');
+      return {
+        fixtures: [input.target],
+        evaluations: [{
+          fixtureId: input.target.id,
+          providerFixtureId: input.target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        }],
+      };
+    },
+    fetchOddsSnapshot: async () => {
+      input.calls.push('odds');
+      return {
+        fixtureId: input.target.id,
+        providerFixtureId: input.target.providerFixtureId,
+        oddsSnapshotId: 'odds-snapshot-1',
+        providerSnapshotId: 'provider-snapshot-1',
+        quoteRecordIds: { 'test-book|h2h|home|': 'odds-quote-1' },
+        capturedAt: evaluatedAt,
+        bookmakerCount: 1,
+        payloadHash: 'hash',
+        quotes: [lowOddsQuote(input.target)],
+      };
+    },
+    researchFixture: async () => {
+      input.calls.push('research');
+      return {
+        ok: true,
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+      };
+    },
+    scoreFixture: async () => {
+      input.calls.push('score');
+      return {
+        ok: true,
+        runId: input.runId,
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+        predictions: [],
+      };
+    },
+    buildParlay: async () => {
+      input.calls.push('parlay');
+      return {
+        ok: true,
+        runId: input.runId,
+        date: input.date,
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+        build: {
+          parlay: {
+            id: 'parlay-1',
+            sourceRunId: input.runId,
+            legs: [],
+            aggregateConfidence: 0,
+            aggregateQuality: 0,
+            rationale: 'test',
+            warnings: [],
+            status: 'review-required',
+            generatedAt: evaluatedAt,
+          },
+          evaluations: [],
+          config: {
+            minLegs: 2,
+            maxLegs: 4,
+            allowMultipleLegsPerFixture: false,
+            minPredictionConfidence: 0,
+          },
+        },
+      };
+    },
+    validateRun: input.validateRun ?? (async () => {
+      input.calls.push('validate');
+      return {
+        ok: true,
+        runId: input.runId,
+        target: { date: input.date },
+        gateResult: { verdict: 'pending', reasons: [], warnings: [] },
+        validations: [{
+          predictionId: 'prediction-1',
+          status: 'pending',
+          outcome: { status: 'pending' },
+          evaluatedAt,
+        }],
+      };
+    }),
   };
 }
 
@@ -190,11 +292,112 @@ describe('executeRunPipeline', () => {
     assert.equal(lowOddsScan.scanId, 'scan-1');
     assert.equal(lowOddsScan.hits[0].oddsQuoteId, 'odds-quote-1');
     assert.equal(evaluation.lowOddsScanId, 'scan-1');
+    assert.equal(evaluation.counts.validations, 1);
+    assert.equal(evaluation.validation.mode, 'auto');
+    assert.equal(evaluation.validation.status, 'completed');
+    assert.equal(evaluation.validation.validations, 1);
 
     const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
     assert.equal(manifest.runId, 'run-test-1');
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'input.json'));
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'handoff.md'));
+  });
+
+  it('forces validation for future dates when requested', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const calls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2099-01-01',
+      validate: 'force',
+    }, runtime, successfulPipelineDeps({
+      target: fixture(),
+      calls,
+      runId: 'run-force-validation',
+      date: '2099-01-01',
+      now: '2026-04-29T12:00:00.000Z',
+    }));
+
+    assert.equal(result.validation?.validations.length, 1);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay', 'validate']);
+
+    const input = JSON.parse(readFileSync(join(result.artifactDir, 'input.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(input.validate, 'force');
+    assert.equal(evaluation.validation.mode, 'force');
+    assert.equal(evaluation.validation.status, 'completed');
+    assert.equal(evaluation.validation.validations, 1);
+  });
+
+  it('records skipped auto validation separately from zero validations', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const calls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2099-01-01',
+    }, runtime, successfulPipelineDeps({
+      target: fixture(),
+      calls,
+      runId: 'run-skip-validation',
+      date: '2099-01-01',
+      now: '2026-04-29T12:00:00.000Z',
+      validateRun: async () => {
+        throw new Error('validation should have been skipped');
+      },
+    }));
+
+    assert.equal(result.validation, undefined);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
+
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(evaluation.counts.validations, 0);
+    assert.equal(evaluation.validation.mode, 'auto');
+    assert.equal(evaluation.validation.status, 'skipped');
+    assert.equal(evaluation.validation.reason, 'future-date');
+    assert.equal(evaluation.validation.validations, 0);
+
+    const handoff = readFileSync(result.handoffPath, 'utf-8');
+    assert.match(handoff, /validationStatus: skipped \(future-date\)/);
+    assert.match(handoff, /validationMode: auto/);
+  });
+
+  it('records executed validation with zero targets separately from skipped validation', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const calls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+    }, runtime, successfulPipelineDeps({
+      target: fixture(),
+      calls,
+      runId: 'run-zero-validation-targets',
+      date: '2026-04-29',
+      now: '2026-04-29T12:00:00.000Z',
+      validateRun: async () => {
+        calls.push('validate');
+        return {
+          ok: true,
+          runId: 'run-zero-validation-targets',
+          target: { date: '2026-04-29' },
+          gateResult: { verdict: 'blocked', reasons: ['no validation targets found'], warnings: [] },
+          validations: [],
+          artifactPath: '/tmp/validations-blocked.json',
+        };
+      },
+    }));
+
+    assert.equal(result.validation?.validations.length, 0);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay', 'validate']);
+
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(evaluation.counts.validations, 0);
+    assert.equal(evaluation.validation.status, 'completed');
+    assert.equal(evaluation.validation.verdict, 'blocked');
+    assert.equal(evaluation.validation.validations, 0);
+    assert.equal(evaluation.validation.artifactPath, '/tmp/validations-blocked.json');
   });
 
   it('blocks when fixture discovery fails and still exports handoff artifacts', async () => {
@@ -227,5 +430,44 @@ describe('exportRunArtifacts', () => {
 
     assert.equal(result.ok, false);
     assert.match(result.error ?? '', /not found/);
+  });
+
+  it('summarizes storage-only validation exports without unknown verdicts', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+
+    const result = await exportRunArtifacts(config, { runId: 'validation-run-1' }, runtime, {
+      now: () => new Date('2026-05-01T12:00:00.000Z'),
+      repositories: {
+        harnessRuns: {
+          findById: async () => ({
+            id: 'validation-run-1',
+            status: 'succeeded',
+            verdict: 'pending',
+            artifactDir: null,
+            metadata: { settlementRuleVersion: 'settlement-v1' },
+          }),
+        },
+        artifacts: {
+          listByRun: async () => [{
+            name: 'validations.json',
+            kind: 'validations',
+            path: '/tmp/validations.json',
+            sha256: 'hash',
+          }],
+          create: async () => ({}),
+        },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.ok(result.handoffPath);
+
+    const handoff = readFileSync(result.handoffPath, 'utf-8');
+    assert.match(handoff, /verdict: pending/);
+    assert.match(handoff, /status: succeeded/);
+    assert.match(handoff, /validations: 1/);
+    assert.match(handoff, /validationStatus: pending/);
+    assert.match(handoff, /Wait for fixture completion/);
   });
 });

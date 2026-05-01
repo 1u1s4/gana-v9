@@ -255,12 +255,31 @@ describe('runValidation parlay and date targets', () => {
   it('validates predictions and parlays by UTC fixture date', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persistedArtifacts: any[] = [];
+    const persistedValidations: any[] = [];
 
     const result = await runValidation(cfg, { date: '2026-04-25' }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/validations.json',
       fetcher: fetcher(),
       repositories: repositories({
+        artifacts: {
+          create: async (input: any) => {
+            persistedArtifacts.push(input);
+            return { id: 'artifact-validation-1' };
+          },
+        },
+        validationArtifacts: {
+          create: async (input: any) => {
+            persistedValidations.push(input);
+            return {
+              id: `validation-${persistedValidations.length}`,
+              ...input,
+              createdAt: now,
+              updatedAt: now,
+            };
+          },
+        },
         parlays: {
           ...repositories().parlays,
           listForFixtureDate: async () => [await repositories().parlays.findById('parlay-1')],
@@ -271,5 +290,12 @@ describe('runValidation parlay and date targets', () => {
     assert.equal(result.ok, true);
     assert.equal(result.validations.length, 2);
     assert.equal(result.target.date, '2026-04-25');
+    assert.equal(persistedArtifacts.length, 1);
+    assert.equal(persistedArtifacts[0].kind, 'validations');
+    assert.equal(persistedArtifacts[0].name, 'validations.json');
+    assert.equal(persistedValidations.length, 2);
+    assert.deepEqual(persistedValidations.map((item) => item.artifactId), ['artifact-validation-1', 'artifact-validation-1']);
+    assert.deepEqual(persistedValidations.map((item) => item.status), ['won', 'lost']);
+    assert.deepEqual(result.validations.map((item) => item.id), ['validation-1', 'validation-2']);
   });
 });

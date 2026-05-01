@@ -14,7 +14,7 @@ import { redactSecrets } from './permissions/redaction.js';
 import { appendAuditEvent, appendAutoApproval } from './permissions/audit.js';
 import { deriveNativeWebSearchRequirement, redactProviderSessionId } from './providers/agentic/helpers.js';
 import type { AgentEvent, AgentUsage, NativeWebSearchRequirement } from './providers/agentic/types.js';
-import { getFootballStatus } from './providers/sports/football-status.js';
+import { checkApiFootballStatus } from './providers/sports/api-football.js';
 import { createRuntimeContext } from './runtime/context.js';
 import { appendAgentEventJsonl, appendEventJsonl, ensureArtifactRoot } from './runtime/artifacts.js';
 import {
@@ -166,7 +166,7 @@ function recordAutoGrantedProviderOptions(config: ReturnType<typeof loadConfig>,
 
 async function printStartupStatus(config: ReturnType<typeof loadConfig>) {
   const db = await getDbStatus(config);
-  const football = getFootballStatus(config);
+  const football = await checkApiFootballStatus(config);
   const filters = getFiltersStatus(config);
 
   console.log(`  ${DIM}runtime   ${RESET}${CYAN}${config.runtime}${RESET}`);

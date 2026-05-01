@@ -125,8 +125,19 @@ export class ApiFootballProvider implements SportsDataProvider {
     return snapshot.quotes;
   }
 
-  async scanOdds(_input: OddsScanQuery): Promise<OddsScanResult[]> {
-    return [];
+  async scanOdds(input: OddsScanQuery): Promise<OddsScanResult[]> {
+    const fixtures = await this.listFixtures(input);
+    const results: OddsScanResult[] = [];
+
+    for (const fixture of fixtures) {
+      const snapshot = await this.getCanonicalOddsSnapshot({ fixtureId: fixture.providerFixtureId });
+      results.push({
+        fixtureId: snapshot.fixtureId,
+        quotes: snapshot.quotes,
+      });
+    }
+
+    return results;
   }
 
   async getFinalResult(input: { providerFixtureId: string }): Promise<FinalResult> {

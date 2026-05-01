@@ -7,6 +7,7 @@ import { loadConfig } from '../config.js';
 import { createRuntimeContext } from '../runtime/context.js';
 import type { Fixture } from '../domain/fixtures.js';
 import { runFixtureResearch } from './research.js';
+import type { ResearchBundle } from './types.js';
 
 const createdAt = new Date('2026-04-25T12:00:00.000Z');
 
@@ -107,6 +108,11 @@ describe('runFixtureResearch', () => {
         summary: 'Provider fixture context supports the claim.',
         confidence: 0.6,
       }],
+      gateResult: {
+        verdict: 'promotable',
+        reasons: ['agent marked research promotable'],
+        warnings: [],
+      },
     });
 
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
@@ -117,6 +123,7 @@ describe('runFixtureResearch', () => {
     });
 
     assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.equal(result.bundle?.sources.some((source) => source.type === 'web-search'), false);
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
   });
 
@@ -134,6 +141,43 @@ describe('runFixtureResearch', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.claims.length, 1);
+  });
+
+  it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: ResearchBundle[] = [];
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => {
+        throw new Error('Codex provider exited before JSON API_KEY=super-secret-token');
+      },
+      persistBundle: async (bundle) => {
+        persisted.push(bundle);
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(result.bundle?.sources.length, 1);
+    assert.equal(result.bundle?.sources[0]?.type, 'api-football');
+    assert.equal(result.bundle?.sources.some((source) => source.type === 'web-search'), false);
+    assert.equal(result.bundle?.claims.length, 1);
+    assert.equal(result.bundle?.claims[0]?.evidenceIds[0], result.bundle?.evidenceItems[0]?.id);
+    assert.match(result.bundle?.gateResult.reasons.join('\n') ?? '', /insufficient for promotion/);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /agentic research failed/);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
+    assert.doesNotMatch(JSON.stringify(result.bundle), /super-secret-token/);
+    assert.match(JSON.stringify(result.bundle), /\[REDACTED\]/);
+    assert.equal(persisted.length, 1);
+    assert.equal(persisted[0]?.id, result.bundle?.id);
+    assert.match(result.artifactPath ?? '', /research-bundle\.json$/);
+
+    const artifact = JSON.parse(readFileSync(result.artifactPath as string, 'utf-8')) as ResearchBundle;
+    assert.equal(artifact.metadata?.fallback, true);
+    assert.equal(artifact.gateResult.verdict, 'review-required');
   });
 
   it('returns blocked and writes redacted raw output when agent output is not JSON', async () => {
@@ -154,8 +198,10 @@ describe('runFixtureResearch', () => {
     });
 
     assert.equal(result.ok, false);
+    assert.equal(result.bundle, undefined);
     assert.equal(result.gateResult.verdict, 'blocked');
     assert.ok(result.artifactPath);
+    assert.match(result.artifactPath, /research-raw-output\.json$/);
     const artifact = readFileSync(result.artifactPath as string, 'utf-8');
     assert.doesNotMatch(artifact, /super-secret-token/);
     assert.match(artifact, /\[REDACTED\]/);
