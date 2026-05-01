@@ -4,7 +4,7 @@ import type {
   ValidationArtifactRecord,
   ValidationArtifactStatus,
 } from '../types.js';
-import { compactData, takeArg } from './helpers.js';
+import { compactData, redactJson, redactText, takeArg } from './helpers.js';
 
 export interface ValidationArtifactQuery {
   runId?: string;
@@ -21,7 +21,7 @@ export function createValidationArtifactRepository(db: Pick<StoragePrismaClient,
       return db.validationArtifact.create({
         data: compactData({
           evaluatedAt: input.evaluatedAt ?? new Date(),
-          ...input,
+          ...redactValidationInput(input),
         }),
       });
     },
@@ -43,6 +43,17 @@ export function createValidationArtifactRepository(db: Pick<StoragePrismaClient,
         ...takeArg(query.take),
       });
     },
+  };
+}
+
+function redactValidationInput(input: ValidationArtifactInput): ValidationArtifactInput {
+  return {
+    ...input,
+    reason: redactText(input.reason),
+    resultInput: redactJson(input.resultInput),
+    outcome: redactJson(input.outcome),
+    evidenceIds: redactJson(input.evidenceIds),
+    metadata: redactJson(input.metadata),
   };
 }
 

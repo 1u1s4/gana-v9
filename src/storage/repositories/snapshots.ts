@@ -8,7 +8,7 @@ import type {
   ProviderSnapshotRecord,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, takeArg } from './helpers.js';
+import { compactData, takeArg, withTransaction } from './helpers.js';
 
 export interface LatestProviderSnapshotQuery {
   providerId: string;
@@ -23,6 +23,12 @@ export interface LatestOddsQuoteQuery {
   selectionKey?: string;
   line?: number | null;
   take?: number;
+}
+
+export interface OddsSnapshotWithQuotesInput {
+  snapshot: OddsSnapshotInput;
+  quotes: Array<Omit<OddsQuoteInput, 'snapshotId'>>;
+  skipDuplicates?: boolean;
 }
 
 export function createProviderSnapshotRepository(db: Pick<StoragePrismaClient, 'providerSnapshot'>) {
@@ -53,7 +59,7 @@ export function createProviderSnapshotRepository(db: Pick<StoragePrismaClient, '
   };
 }
 
-export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'oddsSnapshot'>) {
+export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'oddsSnapshot' | 'oddsQuote' | '$transaction'>) {
   return {
     create(input: OddsSnapshotInput): Promise<OddsSnapshotRecord> {
       return db.oddsSnapshot.create({
@@ -66,6 +72,32 @@ export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'odds
 
     findById(id: string): Promise<OddsSnapshotRecord | null> {
       return db.oddsSnapshot.findUnique({ where: { id } });
+    },
+
+    createWithQuotes(input: OddsSnapshotWithQuotesInput): Promise<OddsSnapshotRecord> {
+      return withTransaction(db, async (tx) => {
+        const snapshot = await tx.oddsSnapshot.create({
+          data: compactData({
+            ...input.snapshot,
+            capturedAt: input.snapshot.capturedAt ?? new Date(),
+          }),
+        });
+
+        if (input.quotes.length > 0) {
+          await tx.oddsQuote.createMany({
+            data: input.quotes.map((quote) =>
+              compactData({
+                ...quote,
+                snapshotId: snapshot.id,
+                capturedAt: quote.capturedAt ?? new Date(),
+              }),
+            ),
+            skipDuplicates: input.skipDuplicates ?? true,
+          });
+        }
+
+        return snapshot;
+      });
     },
 
     listLatestByFixture(fixtureId: string, take?: number): Promise<OddsSnapshotRecord[]> {
@@ -118,7 +150,7 @@ export function createOddsQuoteRepository(db: Pick<StoragePrismaClient, 'oddsQuo
 }
 
 export function createSnapshotRepositories(
-  db: Pick<StoragePrismaClient, 'providerSnapshot' | 'oddsSnapshot' | 'oddsQuote'>,
+  db: Pick<StoragePrismaClient, 'providerSnapshot' | 'oddsSnapshot' | 'oddsQuote' | '$transaction'>,
 ) {
   return {
     providerSnapshots: createProviderSnapshotRepository(db),

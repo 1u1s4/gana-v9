@@ -79,6 +79,7 @@ export async function getDbStatus(config: DbStatusConfig = {}): Promise<DbStatus
     const migration = await readMigrationStatus(db);
     const activeRunCount = await countActiveRuns(db);
     const lastWrite = await readLastWrite(db);
+    const lastWriteMetadata = await readLastWriteMetadata(db);
 
     return {
       service: 'storage.db',
@@ -97,6 +98,7 @@ export async function getDbStatus(config: DbStatusConfig = {}): Promise<DbStatus
         latestMigration: migration.latestMigration ?? 'none',
         lastRead: checkedAt.toISOString(),
         lastWrite: lastWrite ?? 'none',
+        lastWriteTables: lastWriteMetadata ?? 'none',
         activeRunCount: activeRunCount ?? 'unknown',
       },
     };
@@ -192,11 +194,56 @@ async function readLastWrite(db: PrismaClient): Promise<string | null> {
         UNION ALL SELECT MAX(created_at) FROM odds_quotes
         UNION ALL SELECT MAX(created_at) FROM artifacts
         UNION ALL SELECT MAX(created_at) FROM audit_logs
+        UNION ALL SELECT MAX(created_at) FROM provider_quota_samples
         UNION ALL SELECT MAX(created_at) FROM low_odds_scans
         UNION ALL SELECT MAX(created_at) FROM low_odds_hits
+        UNION ALL SELECT MAX(created_at) FROM research_bundles
+        UNION ALL SELECT MAX(created_at) FROM source_records
+        UNION ALL SELECT MAX(created_at) FROM evidence_items
+        UNION ALL SELECT MAX(created_at) FROM claims
+        UNION ALL SELECT MAX(created_at) FROM predictions
+        UNION ALL SELECT MAX(created_at) FROM parlays
+        UNION ALL SELECT MAX(created_at) FROM parlay_legs
+        UNION ALL SELECT MAX(created_at) FROM validation_artifacts
       ) writes
     `;
     return rows[0]?.last_write?.toISOString() ?? null;
+  } catch (err: any) {
+    if (isMissingTableError(err)) return null;
+    throw err;
+  }
+}
+
+async function readLastWriteMetadata(db: PrismaClient): Promise<string | null> {
+  try {
+    const rows = await db.$queryRaw<Array<{ table_name: string; last_write: Date | null }>>`
+      SELECT table_name, last_write
+      FROM (
+        SELECT 'harness_runs' AS table_name, MAX(created_at) AS last_write FROM harness_runs
+        UNION ALL SELECT 'fixtures', MAX(created_at) FROM fixtures
+        UNION ALL SELECT 'provider_snapshots', MAX(created_at) FROM provider_snapshots
+        UNION ALL SELECT 'odds_quotes', MAX(created_at) FROM odds_quotes
+        UNION ALL SELECT 'artifacts', MAX(created_at) FROM artifacts
+        UNION ALL SELECT 'audit_logs', MAX(created_at) FROM audit_logs
+        UNION ALL SELECT 'provider_quota_samples', MAX(created_at) FROM provider_quota_samples
+        UNION ALL SELECT 'low_odds_scans', MAX(created_at) FROM low_odds_scans
+        UNION ALL SELECT 'low_odds_hits', MAX(created_at) FROM low_odds_hits
+        UNION ALL SELECT 'research_bundles', MAX(created_at) FROM research_bundles
+        UNION ALL SELECT 'source_records', MAX(created_at) FROM source_records
+        UNION ALL SELECT 'evidence_items', MAX(created_at) FROM evidence_items
+        UNION ALL SELECT 'claims', MAX(created_at) FROM claims
+        UNION ALL SELECT 'predictions', MAX(created_at) FROM predictions
+        UNION ALL SELECT 'parlays', MAX(created_at) FROM parlays
+        UNION ALL SELECT 'parlay_legs', MAX(created_at) FROM parlay_legs
+        UNION ALL SELECT 'validation_artifacts', MAX(created_at) FROM validation_artifacts
+      ) writes
+      WHERE last_write IS NOT NULL
+      ORDER BY last_write DESC
+    `;
+    if (!rows.length) return null;
+    return rows
+      .map((row) => `${row.table_name}:${row.last_write?.toISOString() ?? 'none'}`)
+      .join(',');
   } catch (err: any) {
     if (isMissingTableError(err)) return null;
     throw err;

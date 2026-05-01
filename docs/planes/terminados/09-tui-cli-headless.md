@@ -221,7 +221,7 @@ Los checks externos lentos deben mostrar loader y no congelar input.
 - Unit tests de parser headless.
 - Unit tests de dispatch slash.
 - Tests de renderer con eventos sinteticos.
-- Smoke manual:
+- Acceptance manual:
   - `pnpm gana db status`
   - `pnpm gana football status`
   - `pnpm gana filters show`

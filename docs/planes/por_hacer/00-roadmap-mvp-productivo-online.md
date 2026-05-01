@@ -45,7 +45,7 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
    - Este plan es dueno de `src/domain/*` y `src/validation/settlement-rules.ts`.
 
 4. `03-db-digitalocean-postgres.md`
-   - Crear el baseline de DigitalOcean PostgreSQL + Prisma.
+   - Crear el baseline de DigitalOcean MySQL + Prisma para el RC actual; PostgreSQL queda como migracion futura.
    - Partir la implementacion en baseline de discovery + runs/audit/tasks minimos y expansion de prediccion para no bloquear fixtures/odds por research/parlays.
 
 5. `04-api-football-provider-y-normalizacion.md`
@@ -105,7 +105,7 @@ Corte 1 no es un solo PR. Abarca:
 
 1. PR-01: runtime/config/redaction/profile + bootstrap `MarketKey`/filter refs + skeleton TUI/CLI + status commands.
 2. PR-02: dominio minimo completo: `Fixture`, `OddsQuote`, selections y `settlement-v1`.
-3. PR-03: DB baseline DigitalOcean PostgreSQL + Prisma.
+3. PR-03: DB baseline DigitalOcean MySQL + Prisma.
 4. PR-04: API-Football provider + status/quota + fixtures.
 5. PR-05: odds normalization + snapshots + odds quotes.
 6. PR-06: filtros, presets, fixtures y low-odds.
@@ -151,7 +151,7 @@ Incluido:
 
 - TUI local y CLI headless.
 - API-Football como unico proveedor deportivo inicial.
-- DigitalOcean PostgreSQL durable.
+- DigitalOcean MySQL durable para el RC actual; PostgreSQL queda como migracion futura explicita.
 - Codex CLI, Gemini CLI y Cursor Agent.
 - Runs, events, snapshots, evidence packs y handoff.
 - Filtros por ligas, equipos, mercados, fecha, ventana y odds `<= 1.20`.

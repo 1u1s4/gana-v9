@@ -1,4 +1,5 @@
 import type {
+  JsonValue,
   ParlayInput,
   ParlayLegInput,
   ParlayLegRecord,
@@ -8,7 +9,7 @@ import type {
   PrismaBatchPayload,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, takeArg } from './helpers.js';
+import { compactData, redactJson, redactText, takeArg, withTransaction } from './helpers.js';
 
 export interface ParlayQuery {
   runId?: string;
@@ -41,37 +42,39 @@ export function createParlayRepository(db: Pick<StoragePrismaClient, 'parlay' | 
         data: compactData({
           status: 'draft',
           generatedAt: input.generatedAt ?? new Date(),
-          ...input,
+          ...redactParlayInput(input),
         }),
       });
     },
 
     async createWithLegs(input: ParlayWithLegsInput): Promise<ParlayRecord> {
-      const parlay = await db.parlay.create({
-        data: compactData({
-          status: 'draft',
-          generatedAt: input.parlay.generatedAt ?? new Date(),
-          ...input.parlay,
-        }),
-      });
+      return withTransaction(db, async (tx) => {
+        const parlay = await tx.parlay.create({
+          data: compactData({
+            status: 'draft',
+            generatedAt: input.parlay.generatedAt ?? new Date(),
+            ...redactParlayInput(input.parlay),
+          }),
+        });
 
-      if (input.legs.length > 0) {
-        await db.parlayLeg.createMany({
-          data: input.legs.map((leg, index) => {
-            const { legIndex, ...data } = leg;
+        if (input.legs.length > 0) {
+          await tx.parlayLeg.createMany({
+            data: input.legs.map((leg, index) => {
+              const { legIndex, ...data } = leg;
 
-            return compactData({
-              status: 'pending',
-              legIndex: legIndex ?? index,
-              ...data,
+              return compactData({
+                status: 'pending',
+                legIndex: legIndex ?? index,
+              ...redactParlayLegInput(data),
               parlayId: parlay.id,
             });
-          }),
-          skipDuplicates: true,
-        });
-      }
+            }),
+            skipDuplicates: true,
+          });
+        }
 
-      return parlay;
+        return parlay;
+      });
     },
 
     findById(id: string): Promise<ParlayRecord | null> {
@@ -110,6 +113,23 @@ export function createParlayRepository(db: Pick<StoragePrismaClient, 'parlay' | 
         ...takeArg(query.take),
       });
     },
+  };
+}
+
+function redactParlayInput(input: ParlayInput): ParlayInput {
+  return {
+    ...input,
+    rationaleRedacted: redactText(input.rationaleRedacted) ?? '',
+    warnings: redactJson(input.warnings as JsonValue | null | undefined),
+    metadata: redactJson(input.metadata as JsonValue | null | undefined),
+  };
+}
+
+function redactParlayLegInput(input: Omit<ParlayLegInput, 'parlayId' | 'legIndex'>): Omit<ParlayLegInput, 'parlayId' | 'legIndex'> {
+  return {
+    ...input,
+    inclusionReason: redactText(input.inclusionReason),
+    metadata: redactJson(input.metadata as JsonValue | null | undefined),
   };
 }
 

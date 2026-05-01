@@ -296,7 +296,7 @@ Abrir la TUI no debe requerir auth agentic, `API_FOOTBALL_KEY` ni `DATABASE_URL`
 - Unit tests de `redactSecrets` con objetos anidados, headers, URLs y `.env`-like strings.
 - Unit tests de defaults de `loadConfig`.
 - Unit tests de `ensureArtifactRoot` y `createRunArtifactDir` usando directorio temporal.
-- Smoke manual: arrancar TUI con `npm start`, ejecutar `/session`, `/profile`, `/approval` despues de implementarlos.
+- Acceptance manual: arrancar TUI con `npm start`, ejecutar `/session`, `/profile`, `/approval` despues de implementarlos.
 
 ## Riesgos
 

@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Definir la matriz de aceptacion del MVP productivo online, con pruebas unitarias, integracion, smoke tests y checks manuales que demuestren que Gana v9 cumple el SRS sin secretos expuestos ni rutas simuladas como producto.
+Definir la matriz de aceptacion del MVP productivo online, con pruebas unitarias, integracion y acceptance live manual que demuestren que Gana v9 cumple el SRS sin secretos expuestos ni rutas simuladas como producto.
 
 ## SRS cubierto
 
@@ -45,15 +45,29 @@ Usar fixtures JSON redacted para:
 
 Las pruebas pueden usar fixtures y mocks controlados para aislamiento tecnico, pero el producto MVP no ofrece un modo operativo offline ni simulado.
 
-### Nivel 3: smoke productivo controlado
+### Nivel 3: acceptance live productivo
 
-Detras de env vars reales:
+Ejecucion manual con env vars reales. No corre por defecto en CI ni local:
 
 - `API_FOOTBALL_KEY`
 - `DATABASE_URL`
-- auth local de Codex/Gemini/Cursor segun provider.
+- auth local de Codex/Gemini/Cursor segun `AGENT_PROVIDER`; para `openrouter`, `OPENROUTER_API_KEY`.
 
-Comandos smoke:
+La fecha debe ser absoluta para evitar flakiness y proteger la cuota de API-Football. El primer run productivo debe limitar fixtures explicitamente:
+
+```bash
+pnpm gana db status
+pnpm gana football status
+pnpm gana filters show
+GANA_MAX_FIXTURES_PER_RUN=5 pnpm gana run --date YYYY-MM-DD
+pnpm gana artifacts --run-id RUN_ID
+pnpm gana export --run-id RUN_ID
+pnpm gana validate --date YYYY-MM-DD
+```
+
+El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay y verdict. Al final se revisan stdout/stderr, artifacts y audit logs para confirmar que no aparezcan `DATABASE_URL`, password de DB, `API_FOOTBALL_KEY`, `OPENROUTER_API_KEY` ni secretos de auth local.
+
+Comandos de operacion productiva:
 
 ```bash
 pnpm gana db status
@@ -67,7 +81,10 @@ pnpm gana parlay --date YYYY-MM-DD
 pnpm gana validate --date YYYY-MM-DD
 pnpm gana run --date YYYY-MM-DD
 pnpm gana export --run-id RUN_ID
+pnpm gana artifacts --run-id RUN_ID
 ```
+
+Un verdict `blocked` impide promover el run. Un verdict `review-required` se permite solo cuando el comando produjo artifacts o persistencia suficiente para inspeccion manual.
 
 ## Matriz de aceptacion del SRS
 
@@ -97,8 +114,8 @@ pnpm gana export --run-id RUN_ID
 
 ## Criterios de aceptacion
 
-- La matriz de 23 puntos queda trazada a pruebas unitarias, integration mocked o smoke productivo.
-- Los smoke tests productivos son opt-in y no corren sin `API_FOOTBALL_KEY` y `DATABASE_URL`.
+- La matriz de 23 puntos queda trazada a pruebas unitarias, integration mocked o acceptance live productivo.
+- La acceptance live productiva es manual y no corre sin `API_FOOTBALL_KEY`, `DATABASE_URL`, fecha absoluta y auth del provider agentic configurado.
 - Toda prueba con red usa fechas absolutas y limites de fixtures para proteger cuota.
 - Los artifacts generados en pruebas quedan fuera de git o en directorios ignorados.
 - La revision final confirma que no hay secretos en logs, sessions, artifacts ni errores.
@@ -132,12 +149,12 @@ pnpm gana export --run-id RUN_ID
 
 - Parlay y validation.
 - Evidence pack/handoff.
-- Smoke `pnpm gana run`.
+- Acceptance `pnpm gana run`.
 - Auditoria completa.
 
 ## Reglas de CI/local
 
-- No correr smoke productivo si faltan env vars.
+- No correr acceptance live productiva si faltan env vars.
 - Los tests con red deben estar opt-in.
 - Ningun test debe imprimir `DATABASE_URL`, API keys ni auth files.
 - Las fixtures de prueba deben estar redacted.
@@ -149,10 +166,10 @@ pnpm gana export --run-id RUN_ID
 - [ ] Prisma validate/migrations pasan.
 - [ ] Unit tests pasan.
 - [ ] Integration mocked pasa.
-- [ ] Smoke DB pasa.
-- [ ] Smoke API-Football pasa.
-- [ ] Smoke low-odds pasa.
-- [ ] Smoke run/export pasa.
+- [ ] Acceptance DB pasa.
+- [ ] Acceptance API-Football pasa.
+- [ ] Acceptance low-odds pasa.
+- [ ] Acceptance run/export pasa.
 - [ ] Revisar artifacts para secretos.
 - [ ] Revisar audit logs para auto-approvals.
 - [ ] Confirmar que no existe automatizacion monetaria.

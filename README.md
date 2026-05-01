@@ -26,6 +26,22 @@ Interfaz de terminal personalizada para agentes. Por defecto usa tu autenticacio
    npm start
    ```
 
+## Acceptance live productivo
+
+La aceptacion productiva es manual y usa la CLI real con DB, API-Football y auth local del provider configurado. Usa siempre una fecha absoluta:
+
+```bash
+pnpm gana db status
+pnpm gana football status
+pnpm gana filters show
+GANA_MAX_FIXTURES_PER_RUN=5 pnpm gana run --date YYYY-MM-DD
+pnpm gana artifacts --run-id RUN_ID
+pnpm gana export --run-id RUN_ID
+pnpm gana validate --date YYYY-MM-DD
+```
+
+Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini`, `cursor` u `openrouter`). El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
+
 ## Configuracion
 
 Puedes ajustar el provider, modelo, estilo visual, presupuesto y carpeta de sesiones en `agent.config.json`.

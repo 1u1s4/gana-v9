@@ -5,10 +5,58 @@ import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js'
 import type { RuntimeContext } from '../runtime/context.js';
 import { getPrismaClient } from '../storage/db.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
-import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
+import type { JsonValue, LowOddsScanRecord, StoragePrismaClient } from '../storage/types.js';
 import { requireDatabaseUrl, resolveFilterConfig } from './config.js';
 import { discoverFixtures } from './engine.js';
 import type { FilterCombineMode, FilterReason, LowOddsHitView, LowOddsScanView } from './types.js';
+
+export interface LowOddsPersistenceRepositories {
+  lowOddsScans: {
+    create(input: {
+      threshold: number;
+      status?: string;
+      runId?: string | null;
+      startedAt?: Date | null;
+      querySnapshot?: JsonValue | null;
+    }): Promise<Pick<LowOddsScanRecord, 'id'>>;
+    updateStatus(id: string, update: {
+      status: string;
+      completedAt?: Date | null;
+      fixtureCount?: number;
+      hitCount?: number;
+      errorRedacted?: string | null;
+      querySnapshot?: JsonValue | null;
+    }): Promise<unknown>;
+  };
+  lowOddsHits: {
+    createMany(inputs: Array<{
+      scanId: string;
+      fixtureId: string;
+      oddsQuoteId?: string | null;
+      marketKey: string;
+      selectionKey: string;
+      line?: number | null;
+      odds: number;
+      impliedProbability?: number | null;
+      bookmaker?: string | null;
+      includedReasons?: string[] | JsonValue | null;
+      excludedReasons?: string[] | JsonValue | null;
+      eligible?: boolean;
+      metadata?: JsonValue | null;
+    }>): Promise<unknown>;
+  };
+}
+
+export interface PersistLowOddsScanInput {
+  runId?: string | null;
+  date: string;
+  threshold: number;
+  markets: string[];
+  bookmakerAllowlist?: string[];
+  fixtureCount: number;
+  hits: LowOddsHitView[];
+  fixtureEvaluations: LowOddsScanView['fixtureEvaluations'];
+}
 
 export async function scanLowOdds(
   config: AgentConfig,
@@ -155,6 +203,71 @@ export async function scanLowOdds(
     hits,
     fixtureEvaluations,
   };
+}
+
+export async function persistLowOddsScanResult(
+  repositories: LowOddsPersistenceRepositories,
+  input: PersistLowOddsScanInput,
+): Promise<string> {
+  const scan = await repositories.lowOddsScans.create({
+    threshold: input.threshold,
+    status: 'running',
+    runId: input.runId ?? null,
+    startedAt: new Date(),
+    querySnapshot: toJsonValue({
+      date: input.date,
+      threshold: input.threshold,
+      markets: input.markets,
+      bookmakerAllowlist: input.bookmakerAllowlist ?? [],
+    }),
+  });
+
+  try {
+    if (input.hits.length > 0) {
+      await repositories.lowOddsHits.createMany(input.hits.map((hit) => ({
+        scanId: scan.id,
+        fixtureId: hit.fixtureId,
+        oddsQuoteId: hit.oddsQuoteId,
+        marketKey: hit.market,
+        selectionKey: hit.selection,
+        line: hit.line ?? null,
+        odds: hit.odds,
+        impliedProbability: hit.impliedProbability,
+        bookmaker: hit.bookmaker,
+        includedReasons: hit.includedReasons,
+        excludedReasons: hit.excludedReasons,
+        eligible: true,
+        metadata: {
+          providerFixtureId: hit.providerFixtureId,
+        },
+      })));
+    }
+
+    await repositories.lowOddsScans.updateStatus(scan.id, {
+      status: 'succeeded',
+      completedAt: new Date(),
+      fixtureCount: input.fixtureCount,
+      hitCount: input.hits.length,
+      querySnapshot: toJsonValue({
+        date: input.date,
+        threshold: input.threshold,
+        markets: input.markets,
+        bookmakerAllowlist: input.bookmakerAllowlist ?? [],
+        fixtureEvaluations: input.fixtureEvaluations,
+      }),
+    });
+  } catch (err) {
+    await repositories.lowOddsScans.updateStatus(scan.id, {
+      status: 'failed',
+      completedAt: new Date(),
+      fixtureCount: input.fixtureCount,
+      hitCount: input.hits.length,
+      errorRedacted: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+
+  return scan.id;
 }
 
 function addEvaluationReason(

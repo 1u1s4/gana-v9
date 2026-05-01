@@ -166,7 +166,7 @@ No guardar parlay legs como JSON de IDs; usar tabla normalizada.
   - odds combinadas.
 - Unit tests de settlement por market.
 - Integration test con resultados API-Football mocked.
-- Smoke manual:
+- Acceptance manual:
   - generar predictions;
   - `pnpm gana parlay --date YYYY-MM-DD`;
   - `pnpm gana validate --parlay-id ID`.

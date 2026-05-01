@@ -162,7 +162,7 @@ La TUI debe mostrar:
 - Unit tests de reasons de inclusion/exclusion.
 - Unit tests de implied probability.
 - Integration tests con API-Football mocked.
-- Smoke manual:
+- Acceptance manual:
   - `pnpm gana leagues add --id 39 --name "Premier League" --country England`
   - `pnpm gana fixtures --date YYYY-MM-DD --leagues default`
   - `pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20`

@@ -474,24 +474,22 @@ export async function createApiFootballPersistence(
         return record ? fixtureFromStoredRecord(record) : null;
       },
       persistOddsSnapshot: async (snapshot) => {
-        const oddsSnapshot = await repositories.oddsSnapshots.create({
-          fixtureId: snapshot.fixtureId,
-          providerFixtureId: snapshot.providerFixtureId,
-          providerSnapshotId: snapshot.providerSnapshotId.startsWith('provider-snapshot:')
-            ? null
-            : snapshot.providerSnapshotId,
-          bookmakerCount: snapshot.bookmakerCount,
-          capturedAt: new Date(snapshot.capturedAt),
-          payloadHash: snapshot.payloadHash === 'unknown' ? null : snapshot.payloadHash,
-          metadata: {
-            provider: API_FOOTBALL_PROVIDER,
-            quoteCount: snapshot.quotes.length,
+        const oddsSnapshot = await repositories.oddsSnapshots.createWithQuotes({
+          snapshot: {
+            fixtureId: snapshot.fixtureId,
+            providerFixtureId: snapshot.providerFixtureId,
+            providerSnapshotId: snapshot.providerSnapshotId.startsWith('provider-snapshot:')
+              ? null
+              : snapshot.providerSnapshotId,
+            bookmakerCount: snapshot.bookmakerCount,
+            capturedAt: new Date(snapshot.capturedAt),
+            payloadHash: snapshot.payloadHash === 'unknown' ? null : snapshot.payloadHash,
+            metadata: {
+              provider: API_FOOTBALL_PROVIDER,
+              quoteCount: snapshot.quotes.length,
+            },
           },
-        });
-        const quoteRecordIds: Record<string, string> = {};
-        if (snapshot.quotes.length) {
-          await repositories.oddsQuotes.createMany(snapshot.quotes.map((quote) => ({
-            snapshotId: oddsSnapshot.id,
+          quotes: snapshot.quotes.map((quote) => ({
             fixtureId: snapshot.fixtureId,
             bookmaker: quote.bookmaker ?? 'unknown',
             bookmakerKey: quote.bookmaker,
@@ -504,8 +502,9 @@ export async function createApiFootballPersistence(
             metadata: {
               sourceSnapshotId: quote.sourceSnapshotId,
             },
-          })));
-        }
+          })),
+        });
+        const quoteRecordIds: Record<string, string> = {};
         const records = await repositories.oddsQuotes.listLatest({
           fixtureId: snapshot.fixtureId,
           take: Math.max(snapshot.quotes.length, 20),
@@ -587,8 +586,8 @@ export async function createApiFootballPersistence(
         }));
       },
     };
-  } catch {
-    return {};
+  } catch (err) {
+    throw new Error(`API-Football persistence initialization failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

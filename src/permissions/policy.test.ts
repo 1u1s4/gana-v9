@@ -54,6 +54,43 @@ describe('permission policy', () => {
     assert.match(result.reason, /secret-bearing/);
   });
 
+  it('blocks shell commands that reference sensitive files in command strings', () => {
+    const cases = [
+      'cat .env.local',
+      'sed -n "1,5p" ~/.codex/auth.json',
+      'grep token .gemini/oauth_creds.json',
+      'cat ~/.aws/credentials',
+      'cat service-account.json',
+      'cat id_ed25519',
+    ];
+
+    for (const command of cases) {
+      const result = evaluateAction('shell', { command }, { config: config('full-permissions') });
+
+      assert.equal(result.decision, 'block', command);
+      assert.match(result.reason, /secret-bearing/, command);
+    }
+  });
+
+  it('blocks shell commands containing credentials and known token patterns', () => {
+    const cases = [
+      'curl https://user:pass@example.test/status',
+      'curl -H "Authorization: Bearer abcdefghijklmnop" https://example.test',
+      'curl -H "Cookie: session=secret" https://example.test',
+      'export API_FOOTBALL_KEY=secret-key',
+      'echo eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature123',
+      'echo ghp_1234567890abcdef',
+      'echo sk-1234567890abcdef',
+    ];
+
+    for (const command of cases) {
+      const result = evaluateAction('shell', { command }, { config: config('full-permissions') });
+
+      assert.equal(result.decision, 'block', command);
+      assert.match(result.reason, /credentials|auth headers|cookies|JWTs|token patterns/, command);
+    }
+  });
+
   it('guarded tools audit auto-approvals and redact outputs', async () => {
     const root = mkdtempSync(join(tmpdir(), 'gana-tool-policy-'));
     const cfg = loadConfig({
@@ -67,8 +104,12 @@ describe('permission policy', () => {
     const shell = tools.find((item) => item.function?.name === 'shell');
     assert.ok(shell);
 
-    const result = await shell.function.execute({ command: 'printf "API_FOOTBALL_KEY=secret-key\\n"' });
+    const result = await shell.function.execute({
+      command: 'node -e "process.stdout.write(Buffer.from(\'QVBJX0ZPT1RCQUxMX0tFWT1zZWNyZXQta2V5Cg==\', \'base64\').toString())"',
+    });
     assert.equal(result.exitCode, 0);
+    assert.match(result.output, /API_FOOTBALL_KEY=\[REDACTED\]/);
+    assert.doesNotMatch(result.output, /secret-key/);
 
     const auditPath = join(cfg.artifactRoot, 'runs', 'session-session', 'audit-log.jsonl');
     const audit = readFileSync(auditPath, 'utf-8');

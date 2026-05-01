@@ -18,6 +18,7 @@ const SENSITIVE_KEY_PARTS = [
 ];
 
 const AUTH_SCHEME_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
+const PROVIDER_SECRET_HEADER_PATTERN = /\b(x-apisports-key|x-api-key|api[-_]?key)\s*[:= ]\s*([^\n\s]+)/gi;
 const ENV_ASSIGNMENT_PATTERN = /(^|\n)(\s*[\w.-]*(?:key|token|secret|password|authorization|database_url)[\w.-]*\s*=\s*)([^\n]*)/gi;
 const INLINE_SECRET_ASSIGNMENT_PATTERN = /(\b[\w.-]*(?:key|token|secret|password|authorization|database_url)[\w.-]*\s*=\s*)([^&\s"'`\\]+)/gi;
 const QUERY_SECRET_PATTERN = /([?&][^=\s&]*(?:key|token|secret|password|authorization)[^=\s&]*=)([^&\s]+)/gi;
@@ -92,6 +93,7 @@ function redactText(value: string): string {
 
 function redactNonUrlText(value: string): string {
   let redacted = value.replace(AUTH_SCHEME_PATTERN, (_match, scheme: string) => `${scheme} ${REDACTED}`);
+  redacted = redacted.replace(PROVIDER_SECRET_HEADER_PATTERN, (_match, key: string) => `${key} ${REDACTED}`);
   redacted = redacted.replace(ENV_ASSIGNMENT_PATTERN, (_match, prefix: string, assignment: string) => {
     return `${prefix}${assignment}${REDACTED}`;
   });
@@ -117,6 +119,7 @@ function redactUrlText(value: string): string {
     return `${protocol}${REDACTED}:${REDACTED}@`;
   });
   redacted = redacted.replace(AUTH_SCHEME_PATTERN, (_match, scheme: string) => `${scheme} ${REDACTED}`);
+  redacted = redacted.replace(PROVIDER_SECRET_HEADER_PATTERN, (_match, key: string) => `${key} ${REDACTED}`);
   redacted = redacted.replace(ENV_ASSIGNMENT_PATTERN, (_match, prefix: string, assignment: string) => {
     return `${prefix}${assignment}${REDACTED}`;
   });

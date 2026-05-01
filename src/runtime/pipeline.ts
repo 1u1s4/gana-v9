@@ -5,11 +5,13 @@ import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { OddsQuote } from '../domain/odds.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
+import { persistLowOddsScanResult, type LowOddsPersistenceRepositories } from '../filters/low-odds.js';
 import type { LowOddsHitView, LowOddsScanView } from '../filters/types.js';
 import { runFixtureResearch, type FixtureResearchResult } from '../evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from '../prediction/service.js';
 import type { ResearchWebMode } from '../prediction/prompts.js';
 import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
+import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import { runParlayBuild, type ParlayBuildRunResult } from '../parlay/service.js';
 import { runValidation, type ValidationRunResult } from '../validation/service.js';
 import { getPrismaClient } from '../storage/db.js';
@@ -39,6 +41,7 @@ export interface OddsSnapshotView {
   providerFixtureId: string;
   oddsSnapshotId?: string;
   providerSnapshotId?: string;
+  quoteRecordIds?: Record<string, string>;
   quotes: OddsQuote[];
   error?: string;
 }
@@ -116,6 +119,8 @@ export interface PipelineRepositories {
     }): Promise<unknown>;
     listByRun?(runId: string, take?: number): Promise<Array<{ name: string; kind: string; path: string; sha256?: string | null }>>;
   };
+  lowOddsScans?: LowOddsPersistenceRepositories['lowOddsScans'];
+  lowOddsHits?: LowOddsPersistenceRepositories['lowOddsHits'];
 }
 
 export interface RunPipelineDependencies {
@@ -248,6 +253,7 @@ export async function executeRunPipeline(
         providerFixtureId: fixture.providerFixtureId,
         oddsSnapshotId: snapshot.oddsSnapshotId,
         providerSnapshotId: snapshot.providerSnapshotId,
+        quoteRecordIds: snapshot.quoteRecordIds,
         quotes: snapshot.quotes,
       });
     } catch (err: any) {
@@ -270,6 +276,22 @@ export async function executeRunPipeline(
   });
 
   const lowOddsScan = buildLowOddsScan(input.date, config, fixtureDiscovery, oddsSnapshots);
+  if (repositories.lowOddsScans && repositories.lowOddsHits) {
+    try {
+      lowOddsScan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
+        runId,
+        date: input.date,
+        threshold: config.apiFootball.lowOddsThreshold,
+        markets: config.apiFootball.defaultMarkets,
+        bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
+        fixtureCount: fixtureDiscovery.fixtures.length,
+        hits: lowOddsScan.hits,
+        fixtureEvaluations: lowOddsScan.fixtureEvaluations,
+      });
+    } catch (err) {
+      if (config.databaseUrl) throw err;
+    }
+  }
   writeJsonArtifact(config, runId, 'low-odds-scan.json', lowOddsScan);
   steps.push({
     name: 'scan low odds',
@@ -378,6 +400,7 @@ export async function executeRunPipeline(
       parlayLegs: parlay.build.parlay.legs.length,
       validations: validation?.validations.length ?? 0,
     },
+    lowOddsScanId: lowOddsScan.scanId ?? null,
   };
   writeJsonArtifact(config, runId, 'evaluation.json', evaluation);
   writeRun(config, runId, {
@@ -599,6 +622,7 @@ function buildLowOddsScan(
         odds: quote.price,
         impliedProbability: quote.impliedProbability,
         bookmaker: quote.bookmaker,
+        oddsQuoteId: snapshot.quoteRecordIds?.[oddsQuoteDedupeKey(quote)],
         includedReasons: ['included-by-low-odds-threshold'],
         excludedReasons: [],
       });

@@ -203,7 +203,7 @@ Headless:
 - Unit tests de hash estable por request/response.
 - Unit tests de errores por payload invalido, fixture faltante y market faltante.
 - Integration test opcional detras de env `RUN_API_FOOTBALL_INTEGRATION=true`.
-- Smoke manual:
+- Acceptance manual:
   - `pnpm gana football status`
   - `pnpm gana fixtures --date YYYY-MM-DD`
   - `pnpm gana odds --fixture-id ID`

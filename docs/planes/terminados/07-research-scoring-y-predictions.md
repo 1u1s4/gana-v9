@@ -179,7 +179,7 @@ Verdicts:
 - Unit tests de gates.
 - Unit tests de edge/implied probability.
 - Integration con provider agentic mocked.
-- Smoke manual:
+- Acceptance manual:
   - `pnpm gana research --fixture-id ID --web live`
   - `pnpm gana score --fixture-id ID`
   - verificar DB records y artifacts.
@@ -189,4 +189,3 @@ Verdicts:
 - No permitir que rationale textual sustituya datos estructurados.
 - No guardar secretos en prompts/artifacts.
 - No presentar predicciones como garantia de resultado.
-

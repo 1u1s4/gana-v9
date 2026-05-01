@@ -5,7 +5,7 @@ import type {
   PrismaBatchPayload,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, takeArg } from './helpers.js';
+import { compactData, redactJson, redactText, takeArg } from './helpers.js';
 
 export interface PredictionQuery {
   runId?: string;
@@ -27,7 +27,7 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
           status: 'draft',
           quality: 'low',
           generatedAt: input.generatedAt ?? new Date(),
-          ...input,
+          ...redactPredictionInput(input),
         }),
       });
     },
@@ -38,7 +38,7 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
           status: 'draft',
           quality: 'low',
           generatedAt: input.generatedAt ?? new Date(),
-          ...input,
+          ...redactPredictionInput(input),
         })),
         skipDuplicates,
       });
@@ -77,6 +77,17 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
         ...takeArg(query.take),
       });
     },
+  };
+}
+
+function redactPredictionInput(input: PredictionInput): PredictionInput {
+  return {
+    ...input,
+    rationaleRedacted: redactText(input.rationaleRedacted) ?? '',
+    warnings: redactJson(input.warnings),
+    evidenceIds: redactJson(input.evidenceIds),
+    includedByFilters: redactJson(input.includedByFilters),
+    metadata: redactJson(input.metadata),
   };
 }
 

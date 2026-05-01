@@ -160,7 +160,7 @@ Los comandos `/parlay`, `/score`, `/run` deben incluir en metadata que producen 
 - Unit tests de redaccion.
 - Unit tests de no-monetary-actions con comandos/textos sospechosos.
 - Integration test de audit log para DB write/artifact write.
-- Smoke manual:
+- Acceptance manual:
   - `/profile`
   - `/profile full-permissions`
   - `/approval`

@@ -1,12 +1,12 @@
-# DB DigitalOcean PostgreSQL
+# DB DigitalOcean MySQL RC / PostgreSQL futuro
 
 ## Estado de implementacion
 
-Completado en PR-03 Fase A con override operativo confirmado por el usuario: DigitalOcean MySQL existente en lugar de PostgreSQL. El baseline conserva el alcance de Fase A, usa Prisma, migraciones versionadas y tablas durables para discovery, fixtures, odds, snapshots, runs, artifacts, audit, presets y low-odds. La Fase B de research, predictions, parlays y validation queda fuera de este corte.
+Completado en PR-03 Fase A con override operativo confirmado por el usuario: el RC canonico usa la base DigitalOcean MySQL existente. PostgreSQL queda documentado como migracion futura, no como requisito del RC-1. El baseline conserva el alcance de Fase A, usa Prisma, migraciones versionadas y tablas durables para discovery, fixtures, odds, snapshots, runs, artifacts, audit, presets y low-odds. La Fase B de research, predictions, parlays y validation queda fuera de este corte.
 
 ## Objetivo
 
-Definir e implementar la base de datos durable de Gana v9 sobre DigitalOcean Managed PostgreSQL + Prisma, con migraciones versionadas, snapshots auditables, indices adecuados y repositorios para el runtime TUI-first.
+Definir e implementar la base de datos durable de Gana v9 sobre DigitalOcean Managed MySQL + Prisma para RC-1, con migraciones versionadas, snapshots auditables, indices adecuados y repositorios para el runtime TUI-first. La variante DigitalOcean Managed PostgreSQL se conserva como direccion de migracion posterior cuando el RC ya este estabilizado.
 
 ## SRS cubierto
 
@@ -16,13 +16,17 @@ Definir e implementar la base de datos durable de Gana v9 sobre DigitalOcean Man
 
 ## Decision
 
-- Motor: DigitalOcean Managed PostgreSQL.
+- Motor RC-1: DigitalOcean Managed MySQL existente.
+- Motor futuro: DigitalOcean Managed PostgreSQL.
 - ORM: Prisma.
-- Migraciones: Prisma migrations mas SQL manual complementario para Postgres cuando Prisma no cubra bien partial indexes, constraints, triggers o extensions.
+- Migraciones RC-1: Prisma migrations compatibles con MySQL.
+- Migraciones futuras PostgreSQL: Prisma migrations mas SQL manual complementario cuando Prisma no cubra bien partial indexes, constraints, triggers o extensions.
 - Naming DB: `snake_case`.
 - IDs internos: `uuid`.
-- Timestamps: `timestamptz`.
-- JSON estructurado: `jsonb`.
+- Timestamps RC-1: `datetime`/Prisma `DateTime` en UTC.
+- Timestamps futuros PostgreSQL: `timestamptz`.
+- JSON estructurado RC-1: Prisma `Json` sobre MySQL JSON.
+- JSON estructurado futuro PostgreSQL: `jsonb`.
 - Odds/probabilidades: `numeric(12,6)`.
 - No se porta literalmente ningun schema MySQL de v6/v7/v8.
 
@@ -245,7 +249,7 @@ Actualizar:
 Salida minima:
 
 - connected/disconnected;
-- engine `postgresql`;
+- engine `mysql` para RC-1; `postgresql` solo tras migracion futura;
 - migration status;
 - last read;
 - last write;
@@ -257,7 +261,8 @@ Salida minima:
 
 - `npm run typecheck` pasa.
 - `npm run db:validate` pasa.
-- `prisma/schema.prisma` usa `postgresql`.
+- `prisma/schema.prisma` usa el provider canonico de RC-1 (`mysql`).
+- Cualquier plan PostgreSQL posterior debe incluir migracion explicita de schema, indices y tipos JSON/tiempo.
 - No hay tablas con nombres MySQL heredados tipo `fac_*` salvo decision explicita documentada.
 - Fase A: la DB puede persistir un run, fixture, provider snapshot, odds quote, low-odds scan/hit, artifact y audit log.
 - Fase A: `/football status` puede persistir `provider_quota_samples` para observar cuota, rate limits y errores del proveedor desde el inicio.
@@ -273,7 +278,7 @@ Salida minima:
 - Test de `getDbStatus` con `DATABASE_URL` faltante.
 - Test de redaccion de `DATABASE_URL`.
 - Migration validation en CI local.
-- Smoke manual contra DB de desarrollo DigitalOcean:
+- Acceptance manual contra DB de desarrollo DigitalOcean:
   - `pnpm gana db status`
   - crear run de prueba;
   - insertar provider snapshot;
@@ -281,6 +286,7 @@ Salida minima:
 
 ## Riesgos
 
-- Prisma no soporta todas las capacidades Postgres necesarias via schema; usar migraciones SQL complementarias y documentarlas.
-- Evitar RLS/Supabase-specific si DigitalOcean PostgreSQL no lo requiere; si se adopta Supabase despues, agregar plan separado. Para v9 actual, seguridad se controla server-side/TUI y secretos locales.
+- Prisma/MySQL puede requerir ajustes explicitos para indices, longitudes y tipos JSON; documentar cualquier SQL complementario.
+- En la migracion futura a PostgreSQL, Prisma no soportara todas las capacidades Postgres necesarias via schema; usar migraciones SQL complementarias y documentarlas.
+- Evitar RLS/Supabase-specific en RC-1; si se adopta Supabase o PostgreSQL despues, agregar plan separado. Para v9 actual, seguridad se controla server-side/TUI y secretos locales.
 - No persistir raw prompts sin redaccion y politica de retencion.

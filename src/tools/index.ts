@@ -97,16 +97,17 @@ function guardTool(toolDef: ClientTool, context: ToolPolicyContext): ClientTool 
 
         try {
           const result = await execute(args, toolContext);
+          const redactedResult = redactSecrets(result);
           auditActionResult(context.runtime, {
             actionId: evaluation.actionId,
             action: name,
             args,
-            result: summarizeResult(result),
+            result: summarizeResult(redactedResult),
             decision: evaluation.decision,
             approvalKind: evaluation.approvalKind,
             reason: evaluation.reason,
           });
-          return result;
+          return redactedResult;
         } catch (err) {
           auditActionResult(context.runtime, {
             actionId: evaluation.actionId,

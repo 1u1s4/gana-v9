@@ -5,13 +5,22 @@ import { getToolMetadata } from './tool-metadata.js';
 import type { PermissionContext, PermissionEvaluation, ToolMetadata } from './types.js';
 
 const SENSITIVE_PATH_PATTERNS = [
-  /(^|[/\\])\.env($|[./\\])/i,
-  /(^|[/\\])auth\.json$/i,
-  /(^|[/\\])oauth_creds\.json$/i,
-  /(^|[/\\])cli-config\.json$/i,
-  /(^|[/\\])\.codex([/\\]|$)/i,
-  /(^|[/\\])\.gemini([/\\]|$)/i,
-  /(^|[/\\])\.cursor([/\\]|$)/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.env($|[./\\\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.envrc($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])auth\.json($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])oauth_creds\.json($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])cli-config\.json($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.codex([/\\\s"'`;:|&()<>]|$)/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.gemini([/\\\s"'`;:|&()<>]|$)/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.cursor([/\\\s"'`;:|&()<>]|$)/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.aws[/\\]credentials($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.docker[/\\]config\.json($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.kube[/\\]config($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])\.(npmrc|pypirc|netrc)($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])id_(rsa|dsa|ecdsa|ed25519)($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])known_hosts($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])(?:credentials?|secrets?|tokens?|api[-_]?keys?|private[-_]?key|service[-_]?account)\.(?:json|ya?ml|toml|ini|env|txt|pem|key)($|[\s"'`;:|&()<>])/i,
+  /(^|[/\\\s"'`=;:|&()<>])credentials($|[\s"'`;:|&()<>])/i,
 ];
 
 const DESTRUCTIVE_SHELL_PATTERNS = [
@@ -22,6 +31,16 @@ const DESTRUCTIVE_SHELL_PATTERNS = [
   /\bchmod\s+777\b/i,
   /\bdd\s+if=/i,
   /(^|\s)>\s*\/dev\/(disk|rdisk)/i,
+];
+
+const SENSITIVE_COMMAND_PATTERNS = [
+  /[a-z][a-z0-9+.-]*:\/\/[^:@\s/]+(?::[^@\s/]*)?@/i,
+  /\b[\w.-]*(?:api[-_]?key|apikey|key|token|secret|password|authorization|database_url|database-url)[\w.-]*\s*=\s*[^"'`\s;&|)]+/i,
+  /\b(?:Authorization|Cookie)\s*[:=]\s*\S+/i,
+  /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/i,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+  /\bsk-[A-Za-z0-9_-]{12,}\b/,
+  /\bgh[pousr]_[A-Za-z0-9_]{12,}\b/,
 ];
 
 export function evaluateAction(
@@ -127,6 +146,17 @@ function sensitivePathReason(args: unknown, cwd: string): string | undefined {
       return 'Access to secret-bearing local config or auth files is blocked by PR-13 policy.';
     }
   }
+
+  const shellCommand = extractShellCommand(args);
+  if (shellCommand) {
+    if (SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(shellCommand))) {
+      return 'Shell commands that read secret-bearing local config or auth files are blocked by PR-13 policy.';
+    }
+    if (SENSITIVE_COMMAND_PATTERNS.some((pattern) => pattern.test(shellCommand))) {
+      return 'Shell commands containing credentials, auth headers, cookies, JWTs, or token patterns are blocked by PR-13 policy.';
+    }
+  }
+
   return undefined;
 }
 
@@ -136,4 +166,11 @@ function collectPathLikeValues(value: unknown): string[] {
   return Object.entries(source)
     .filter(([key, item]) => /path|file|dir/i.test(key) && typeof item === 'string')
     .map(([, item]) => String(item));
+}
+
+function extractShellCommand(args: unknown): string | undefined {
+  if (typeof args === 'object' && args !== null && 'command' in args) {
+    return String((args as { command?: unknown }).command ?? '');
+  }
+  return undefined;
 }

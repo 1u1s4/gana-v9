@@ -12,7 +12,7 @@ import type {
   SourceRecordRecord,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, takeArg } from './helpers.js';
+import { compactData, redactJson, redactText, takeArg, withTransaction } from './helpers.js';
 
 export interface ResearchBundleQuery {
   runId?: string;
@@ -123,8 +123,9 @@ export function createResearchBundleRepository(
     },
 
     async createWithItems(input: ResearchBundleGraphInput): Promise<ResearchBundleRecord> {
-      const artifact = input.artifactPath
-        ? await db.artifact.create({
+      return withTransaction(db, async (tx) => {
+        const artifact = input.artifactPath
+          ? await tx.artifact.create({
             data: compactData({
               name: basename(input.artifactPath),
               kind: 'research-bundle',
@@ -137,94 +138,95 @@ export function createResearchBundleRepository(
               }) as JsonValue,
             }),
           })
-        : null;
-      const createdAt = coerceDate(input.bundle.createdAt);
-      const bundle = await db.researchBundle.create({
-        data: compactData({
-          id: input.bundle.id,
-          runId: input.bundle.runId,
-          fixtureId: input.bundle.fixtureId,
-          providerFixtureId: input.bundle.providerFixtureId,
-          artifactId: artifact?.id,
-          status: researchStatusFromGate(input.bundle.gateResult),
-          gateResult: input.bundle.gateResult,
-          providerAgentic: input.bundle.providerAgentic,
-          model: input.bundle.model,
-          promptVersion: input.bundle.promptVersion,
-          warnings: input.bundle.warnings,
-          metadata: input.bundle.metadata,
-          createdAt,
-        }),
-      });
-
-      const evidenceSourceIds = new Map<string, string>();
-      const sourceIds = new Map<string, string>();
-      for (const source of input.bundle.sources ?? []) {
-        const localSourceId = String(source.id);
-        const sourceId = scopedResearchId(bundle.id, localSourceId);
-        sourceIds.set(localSourceId, sourceId);
-        await db.sourceRecord.create({
+          : null;
+        const createdAt = coerceDate(input.bundle.createdAt);
+        const bundle = await tx.researchBundle.create({
           data: compactData({
-            id: sourceId,
-            bundleId: bundle.id,
             runId: input.bundle.runId,
+            id: input.bundle.id,
             fixtureId: input.bundle.fixtureId,
-            sourceType: source.sourceType ?? source.type,
-            url: source.url,
-            title: source.title,
-            externalId: source.externalId ?? source.snapshotId,
-            hash: source.hash,
-            capturedAt: coerceDate(source.capturedAt) ?? new Date(),
-            metadata: compactData({
-              ...(source.metadata ?? {}),
-              artifactPath: source.artifactPath,
-              snapshotId: source.snapshotId,
-            }) as JsonValue,
+            providerFixtureId: input.bundle.providerFixtureId,
+            artifactId: artifact?.id,
+            status: researchStatusFromGate(input.bundle.gateResult),
+            gateResult: redactJson(input.bundle.gateResult as JsonValue | null | undefined),
+            providerAgentic: input.bundle.providerAgentic,
+            model: input.bundle.model,
+            promptVersion: input.bundle.promptVersion,
+            warnings: redactJson(input.bundle.warnings as JsonValue | null | undefined),
+            metadata: redactJson(input.bundle.metadata as JsonValue | null | undefined),
+            createdAt,
           }),
         });
-      }
 
-      for (const evidence of input.bundle.evidenceItems ?? []) {
-        const localEvidenceId = String(evidence.id);
-        const evidenceId = scopedResearchId(bundle.id, localEvidenceId);
-        const record = await db.evidenceItem.create({
-          data: compactData({
-            id: evidenceId,
-            bundleId: bundle.id,
-            sourceId: sourceIds.get(String(evidence.sourceId)) ?? evidence.sourceId,
-            fixtureId: input.bundle.fixtureId,
-            snippetRedacted: evidence.snippet,
-            summaryRedacted: evidence.summary,
-            confidence: evidence.confidence,
-            claimIds: evidence.claimIds?.map((id) => scopedResearchId(bundle.id, String(id))),
-            metadata: evidence.metadata,
-          }),
-        });
-        evidenceSourceIds.set(localEvidenceId, record.sourceId);
-        evidenceSourceIds.set(record.id, record.sourceId);
-      }
+        const evidenceSourceIds = new Map<string, string>();
+        const sourceIds = new Map<string, string>();
+        for (const source of input.bundle.sources ?? []) {
+          const localSourceId = String(source.id);
+          const sourceId = scopedResearchId(bundle.id, localSourceId);
+          sourceIds.set(localSourceId, sourceId);
+          await tx.sourceRecord.create({
+            data: compactData({
+              id: sourceId,
+              bundleId: bundle.id,
+              runId: input.bundle.runId,
+              fixtureId: input.bundle.fixtureId,
+              sourceType: source.sourceType ?? source.type,
+              url: redactText(source.url),
+              title: redactText(source.title),
+              externalId: redactText(source.externalId ?? source.snapshotId),
+              hash: source.hash,
+              capturedAt: coerceDate(source.capturedAt) ?? new Date(),
+              metadata: redactJson(compactData({
+                ...(source.metadata ?? {}),
+                artifactPath: source.artifactPath,
+                snapshotId: source.snapshotId,
+              }) as JsonValue),
+            }),
+          });
+        }
 
-      for (const claim of input.bundle.claims ?? []) {
-        await db.claim.create({
-          data: compactData({
-            id: scopedResearchId(bundle.id, String(claim.id)),
-            bundleId: bundle.id,
-            fixtureId: input.bundle.fixtureId,
-            sourceId: firstEvidenceSourceId(claim.evidenceIds, evidenceSourceIds),
-            statement: claim.statement,
-            subjectType: claim.subject?.type,
-            subjectKey: claim.subject?.id ?? claim.subject?.market,
-            marketKey: claim.subject?.market,
-            supportLevel: claim.supportLevel ?? 'unknown',
-            evidenceIds: claim.evidenceIds?.map((id) => scopedResearchId(bundle.id, String(id))),
-            conflictStatus: claim.conflictStatus ?? 'unknown',
-            critical: false,
-            metadata: claim.metadata,
-          }),
-        });
-      }
+        for (const evidence of input.bundle.evidenceItems ?? []) {
+          const localEvidenceId = String(evidence.id);
+          const evidenceId = scopedResearchId(bundle.id, localEvidenceId);
+          const record = await tx.evidenceItem.create({
+            data: compactData({
+              id: evidenceId,
+              bundleId: bundle.id,
+              sourceId: sourceIds.get(String(evidence.sourceId)) ?? evidence.sourceId,
+              fixtureId: input.bundle.fixtureId,
+              snippetRedacted: redactText(evidence.snippet),
+              summaryRedacted: redactText(evidence.summary),
+              confidence: evidence.confidence,
+              claimIds: evidence.claimIds?.map((id) => scopedResearchId(bundle.id, String(id))),
+              metadata: redactJson(evidence.metadata as JsonValue | null | undefined),
+            }),
+          });
+          evidenceSourceIds.set(localEvidenceId, record.sourceId);
+          evidenceSourceIds.set(record.id, record.sourceId);
+        }
 
-      return bundle;
+        for (const claim of input.bundle.claims ?? []) {
+          await tx.claim.create({
+            data: compactData({
+              id: scopedResearchId(bundle.id, String(claim.id)),
+              bundleId: bundle.id,
+              fixtureId: input.bundle.fixtureId,
+              sourceId: firstEvidenceSourceId(claim.evidenceIds, evidenceSourceIds),
+              statement: redactText(claim.statement),
+              subjectType: claim.subject?.type,
+              subjectKey: claim.subject?.id ?? claim.subject?.market,
+              marketKey: claim.subject?.market,
+              supportLevel: claim.supportLevel ?? 'unknown',
+              evidenceIds: claim.evidenceIds?.map((id) => scopedResearchId(bundle.id, String(id))),
+              conflictStatus: claim.conflictStatus ?? 'unknown',
+              critical: false,
+              metadata: redactJson(claim.metadata as JsonValue | null | undefined),
+            }),
+          });
+        }
+
+        return bundle;
+      });
     },
 
     list(query: ResearchBundleQuery = {}): Promise<ResearchBundleRecord[]> {

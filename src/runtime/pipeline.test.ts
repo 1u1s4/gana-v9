@@ -62,6 +62,7 @@ describe('executeRunPipeline', () => {
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const target = fixture();
     const calls: string[] = [];
+    const persistedHits: unknown[] = [];
 
     const result = await executeRunPipeline(config, {
       date: '2026-04-29',
@@ -88,6 +89,7 @@ describe('executeRunPipeline', () => {
           providerFixtureId: target.providerFixtureId,
           oddsSnapshotId: 'odds-snapshot-1',
           providerSnapshotId: 'provider-snapshot-1',
+          quoteRecordIds: { 'test-book|h2h|home|': 'odds-quote-1' },
           capturedAt: '2026-04-29T12:00:00.000Z',
           bookmakerCount: 1,
           payloadHash: 'hash',
@@ -154,6 +156,18 @@ describe('executeRunPipeline', () => {
           }],
         };
       },
+      repositories: {
+        lowOddsScans: {
+          create: async () => ({ id: 'scan-1' }),
+          updateStatus: async () => ({}),
+        },
+        lowOddsHits: {
+          createMany: async (inputs) => {
+            persistedHits.push(...inputs);
+            return { count: inputs.length };
+          },
+        },
+      },
     });
 
     assert.equal(runtime.runId, 'run-test-1');
@@ -168,6 +182,14 @@ describe('executeRunPipeline', () => {
     assert.ok(existsSync(join(result.artifactDir, 'handoff.md')));
     assert.ok(result.evidencePackPath.endsWith('/evidence-packs/run-test-1/manifest.json'));
     assert.ok(result.handoffPath.endsWith('/handoffs/run-test-1.md'));
+    assert.equal(result.lowOddsScan.scanId, 'scan-1');
+    assert.equal(persistedHits.length, 1);
+
+    const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(lowOddsScan.scanId, 'scan-1');
+    assert.equal(lowOddsScan.hits[0].oddsQuoteId, 'odds-quote-1');
+    assert.equal(evaluation.lowOddsScanId, 'scan-1');
 
     const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
     assert.equal(manifest.runId, 'run-test-1');

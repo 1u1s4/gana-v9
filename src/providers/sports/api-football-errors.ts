@@ -1,4 +1,5 @@
 import type { ApiFootballEndpointName } from './types.js';
+import { redactSecrets } from '../../permissions/redaction.js';
 
 export type ApiFootballErrorCode =
   | 'provider_unavailable'
@@ -76,13 +77,13 @@ export class ApiFootballProviderError extends Error {
   readonly statusCode?: number;
 
   constructor(input: ApiFootballErrorInput) {
-    super(input.message ?? buildApiFootballErrorMessage(input), { cause: input.cause });
+    super(String(redactSecrets(input.message ?? buildApiFootballErrorMessage(input))), { cause: input.cause });
     this.name = 'ApiFootballProviderError';
     this.code = input.code;
     this.operation = input.operation ?? 'provider request';
     this.endpointName = input.endpointName;
     this.expected = input.expected ?? 'valid API-Football provider response';
-    this.received = input.received;
+    this.received = redactSecrets(input.received);
     this.fixtureId = input.fixtureId;
     this.market = input.market;
     this.providerRequestId = input.providerRequestId;
@@ -216,16 +217,16 @@ export function createQuotaExceededError(input: Omit<ApiFootballErrorInput, 'cod
 }
 
 function formatReceivedCondition(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (value === undefined) return 'undefined';
+  const redacted = redactSecrets(value);
+  if (typeof redacted === 'string') return redacted;
+  if (redacted === undefined) return 'undefined';
   try {
-    return JSON.stringify(value);
+    return JSON.stringify(redacted);
   } catch {
-    return String(value);
+    return String(redacted);
   }
 }
 
 function redactUnknown(value: unknown): unknown {
-  if (typeof value !== 'string') return value;
-  return value.replace(/(x-apisports-key\s*[:=]\s*)\S+/gi, '$1[REDACTED]');
+  return redactSecrets(value);
 }

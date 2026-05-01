@@ -173,7 +173,7 @@ No debe bloquear los planes deportivos. Los nuevos comandos productivos deben pr
 
 - Unit tests de `providerReady`, `defaultModelForProvider` y loaders de modelos con fixtures JSON.
 - Unit tests de enforcement de web search por provider.
-- Smoke manual por provider autenticado:
+- Acceptance manual por provider autenticado:
   - `/provider codex`
   - `/model`
   - `/think high`
