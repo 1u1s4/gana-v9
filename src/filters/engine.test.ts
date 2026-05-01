@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import type { AgentConfig } from '../config.js';
 import { DEFAULT_MARKETS } from '../domain/markets.js';
 import type { Fixture } from '../domain/fixtures.js';
-import { evaluateExclusions } from './engine.js';
+import { buildFixtureDiscoveryRequests, evaluateExclusions } from './engine.js';
 
 function fixture(overrides: Partial<Fixture> = {}): Fixture {
   return {
@@ -37,6 +37,18 @@ const config: Pick<AgentConfig, 'apiFootball'> = {
 };
 
 describe('filter engine', () => {
+  it('uses league preset seasons when building default league requests', () => {
+    const requests = buildFixtureDiscoveryRequests([
+      { providerCompetitionId: '135', season: 2025 },
+      { providerCompetitionId: '253', season: 2026 },
+    ], []);
+
+    assert.deepEqual(requests, [
+      { league: 135, season: 2025, reason: 'included-by-default-league' },
+      { league: 253, season: 2026, reason: 'included-by-default-league' },
+    ]);
+  });
+
   it('keeps scheduled fixtures inside the kickoff window', () => {
     assert.deepEqual(evaluateExclusions(fixture(), config), []);
   });

@@ -28,7 +28,7 @@ function testConfig() {
   }, { skipApiKey: true });
 }
 
-function fixture(): Fixture {
+function fixture(overrides: Partial<Fixture> = {}): Fixture {
   return {
     id: 'fixture-1',
     provider: 'api-football',
@@ -40,6 +40,7 @@ function fixture(): Fixture {
     includedByFilters: ['included-by-manual-query'],
     createdAt: '2026-04-29T00:00:00.000Z',
     updatedAt: '2026-04-29T00:00:00.000Z',
+    ...overrides,
   };
 }
 
@@ -56,12 +57,42 @@ function lowOddsQuote(target: Fixture): OddsQuote {
   };
 }
 
+function predictionRecord(input: {
+  runId: string;
+  fixtureId?: string;
+  providerFixtureId?: string;
+  oddsQuoteId?: string;
+}): any {
+  const oddsQuoteId = input.oddsQuoteId ?? 'odds-quote-1';
+  return {
+    id: `prediction-${oddsQuoteId}`,
+    runId: input.runId,
+    fixtureId: input.fixtureId ?? 'fixture-1',
+    providerFixtureId: input.providerFixtureId ?? '1001',
+    market: 'h2h',
+    selection: 'home',
+    odds: 1.18,
+    impliedProbability: 1 / 1.18,
+    oddsSnapshotId: 'odds-snapshot-1',
+    oddsQuoteId,
+    evidenceIds: ['evidence-1'],
+    claimIds: ['claim-1'],
+    status: 'review-required',
+    confidence: 0.5,
+    quality: 'low',
+    promptVersion: 'score-prediction-v1',
+    scoringRuleVersion: 'scoring-v1',
+    generatedAt: '2026-04-29T12:00:00.000Z',
+  };
+}
+
 function successfulPipelineDeps(input: {
   target: Fixture;
   calls: string[];
   runId: string;
   date: string;
   now?: string;
+  scoreFixture?: RunPipelineDependencies['scoreFixture'];
   validateRun?: RunPipelineDependencies['validateRun'];
 }): RunPipelineDependencies {
   const evaluatedAt = input.now ?? '2026-04-29T12:00:00.000Z';
@@ -79,6 +110,8 @@ function successfulPipelineDeps(input: {
           excludedReasons: [],
           eligible: true,
         }],
+        requestedLeagues: [],
+        requestedTeams: [],
       };
     },
     fetchOddsSnapshot: async () => {
@@ -102,15 +135,19 @@ function successfulPipelineDeps(input: {
         gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
       };
     },
-    scoreFixture: async () => {
+    scoreFixture: input.scoreFixture ?? (async () => {
       input.calls.push('score');
       return {
         ok: true,
         runId: input.runId,
         gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
-        predictions: [],
+        predictions: [predictionRecord({
+          runId: input.runId,
+          fixtureId: input.target.id,
+          providerFixtureId: input.target.providerFixtureId,
+        })],
       };
-    },
+    }),
     buildParlay: async () => {
       input.calls.push('parlay');
       return {
@@ -182,6 +219,8 @@ describe('executeRunPipeline', () => {
             excludedReasons: [],
             eligible: true,
           }],
+          requestedLeagues: [],
+          requestedTeams: [],
         };
       },
       fetchOddsSnapshot: async () => {
@@ -211,7 +250,11 @@ describe('executeRunPipeline', () => {
           ok: true,
           runId: 'run-test-1',
           gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
-          predictions: [],
+          predictions: [predictionRecord({
+            runId: 'run-test-1',
+            fixtureId: target.id,
+            providerFixtureId: target.providerFixtureId,
+          })],
         };
       },
       buildParlay: async () => {
@@ -293,6 +336,10 @@ describe('executeRunPipeline', () => {
     assert.equal(lowOddsScan.hits[0].oddsQuoteId, 'odds-quote-1');
     assert.equal(evaluation.lowOddsScanId, 'scan-1');
     assert.equal(evaluation.counts.validations, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.hits, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 0);
+    assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
     assert.equal(evaluation.validation.mode, 'auto');
     assert.equal(evaluation.validation.status, 'completed');
     assert.equal(evaluation.validation.validations, 1);
@@ -301,6 +348,151 @@ describe('executeRunPipeline', () => {
     assert.equal(manifest.runId, 'run-test-1');
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'input.json'));
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'handoff.md'));
+  });
+
+  it('flags incomplete low-odds prediction coverage in the run evaluation', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const calls: string[] = [];
+    const target = fixture();
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+    }, runtime, successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-missing-low-odds-prediction',
+      date: '2026-04-29',
+      scoreFixture: async () => {
+        calls.push('score');
+        return {
+          ok: true,
+          runId: 'run-missing-low-odds-prediction',
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          predictions: [],
+        };
+      },
+    }));
+
+    assert.equal(result.verdict, 'review-required');
+
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(evaluation.lowOddsPredictionCoverage.hits, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 0);
+    assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.complete, false);
+    assert.match(
+      evaluation.steps.find((step: { name: string }) => step.name === 'score').warnings.join('\n'),
+      /missing predictions for 1 low-odds hits/,
+    );
+
+    const handoff = readFileSync(result.handoffPath, 'utf-8');
+    assert.match(handoff, /lowOddsPredicted: 0\/1/);
+  });
+
+  it('tracks low-odds prediction coverage across all requested league presets', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const fixtures = [
+      fixture({ id: 'fixture-serie-a', providerFixtureId: '135001' }),
+      fixture({ id: 'fixture-mls', providerFixtureId: '253001' }),
+    ];
+    const scoreCalls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, {
+      createRunId: () => 'run-all-leagues-low-odds',
+      now: () => new Date('2026-04-29T12:00:00.000Z'),
+      discoverFixtures: async () => ({
+        fixtures,
+        evaluations: fixtures.map((target) => ({
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-default-league'],
+          excludedReasons: [],
+          eligible: true,
+        })),
+        requestedLeagues: [
+          { providerCompetitionId: '135', name: 'Serie A', country: 'Italy', season: 2025 },
+          { providerCompetitionId: '253', name: 'Major League Soccer', country: 'USA', season: 2026 },
+        ],
+        requestedTeams: [],
+      }),
+      fetchOddsSnapshot: async (_cfg, providerFixtureId) => {
+        const target = fixtures.find((item) => item.providerFixtureId === providerFixtureId)!;
+        const oddsQuoteId = `odds-quote-${providerFixtureId}`;
+        return {
+          fixtureId: target.id,
+          providerFixtureId,
+          oddsSnapshotId: `snapshot-${providerFixtureId}`,
+          providerSnapshotId: `provider-snapshot-${providerFixtureId}`,
+          quoteRecordIds: { 'test-book|h2h|home|': oddsQuoteId },
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: `hash-${providerFixtureId}`,
+          quotes: [lowOddsQuote(target)],
+        };
+      },
+      researchFixture: async () => ({
+        ok: true,
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+      }),
+      scoreFixture: async (_cfg, input) => {
+        scoreCalls.push(input.fixtureId);
+        const target = fixtures.find((item) => item.providerFixtureId === input.fixtureId)!;
+        return {
+          ok: true,
+          runId: 'run-all-leagues-low-odds',
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+          predictions: [predictionRecord({
+            runId: 'run-all-leagues-low-odds',
+            fixtureId: target.id,
+            providerFixtureId: target.providerFixtureId,
+            oddsQuoteId: `odds-quote-${target.providerFixtureId}`,
+          })],
+        };
+      },
+      buildParlay: async () => ({
+        ok: true,
+        runId: 'run-all-leagues-low-odds',
+        date: '2026-04-29',
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+        build: {
+          parlay: {
+            id: 'parlay-1',
+            sourceRunId: 'run-all-leagues-low-odds',
+            legs: [],
+            aggregateConfidence: 0,
+            aggregateQuality: 0,
+            rationale: 'test',
+            warnings: [],
+            status: 'review-required',
+            generatedAt: '2026-04-29T12:00:00.000Z',
+          },
+          evaluations: [],
+          config: {
+            minLegs: 2,
+            maxLegs: 4,
+            allowMultipleLegsPerFixture: false,
+            minPredictionConfidence: 0,
+          },
+        },
+      }),
+    });
+
+    assert.deepEqual(scoreCalls.sort(), ['135001', '253001']);
+
+    const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(lowOddsScan.requestedLeagues.length, 2);
+    assert.deepEqual(lowOddsScan.requestedLeagues.map((league: { season: number }) => league.season), [2025, 2026]);
+    assert.equal(evaluation.counts.lowOddsHits, 2);
+    assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 2);
+    assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
   });
 
   it('forces validation for future dates when requested', async () => {

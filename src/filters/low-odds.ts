@@ -8,7 +8,14 @@ import { createStorageRepositories } from '../storage/repositories/index.js';
 import type { JsonValue, LowOddsScanRecord, StoragePrismaClient } from '../storage/types.js';
 import { requireDatabaseUrl, resolveFilterConfig } from './config.js';
 import { discoverFixtures } from './engine.js';
-import type { FilterCombineMode, FilterReason, LowOddsHitView, LowOddsScanView } from './types.js';
+import type {
+  FilterCombineMode,
+  FilterReason,
+  LowOddsHitView,
+  LowOddsScanView,
+  RequestedLeaguePresetView,
+  RequestedTeamPresetView,
+} from './types.js';
 
 export interface LowOddsPersistenceRepositories {
   lowOddsScans: {
@@ -56,6 +63,8 @@ export interface PersistLowOddsScanInput {
   fixtureCount: number;
   hits: LowOddsHitView[];
   fixtureEvaluations: LowOddsScanView['fixtureEvaluations'];
+  requestedLeagues?: RequestedLeaguePresetView[];
+  requestedTeams?: RequestedTeamPresetView[];
 }
 
 export async function scanLowOdds(
@@ -91,16 +100,24 @@ export async function scanLowOdds(
     }),
   });
 
-  const fixtureDiscovery = await discoverFixtures(config, {
-    date: filters.date,
-    leaguesDefault: input.leaguesDefault,
-    teamsDefault: input.teamsDefault,
-    combineMode: filters.combineMode,
-  }, runtime);
   const hits: LowOddsHitView[] = [];
-  const fixtureEvaluations = [...fixtureDiscovery.evaluations];
+  let fixtureDiscovery: Awaited<ReturnType<typeof discoverFixtures>> = {
+    fixtures: [],
+    evaluations: [],
+    requestedLeagues: [],
+    requestedTeams: [],
+  };
+  let fixtureEvaluations: LowOddsScanView['fixtureEvaluations'] = [];
 
   try {
+    fixtureDiscovery = await discoverFixtures(config, {
+      date: filters.date,
+      leaguesDefault: input.leaguesDefault,
+      teamsDefault: input.teamsDefault,
+      combineMode: filters.combineMode,
+    }, runtime);
+    fixtureEvaluations = [...fixtureDiscovery.evaluations];
+
     for (const fixture of fixtureDiscovery.fixtures.slice(0, filters.maxFixturesPerRun)) {
       try {
         const snapshot = await getApiFootballOddsSnapshot(config, fixture.providerFixtureId, runtime);
@@ -180,6 +197,8 @@ export async function scanLowOdds(
         threshold: filters.threshold,
         markets: filters.markets,
         bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
+        requestedLeagues: fixtureDiscovery.requestedLeagues,
+        requestedTeams: fixtureDiscovery.requestedTeams,
         fixtureEvaluations,
       }),
     });
@@ -202,6 +221,8 @@ export async function scanLowOdds(
     hitCount: hits.length,
     hits,
     fixtureEvaluations,
+    requestedLeagues: fixtureDiscovery.requestedLeagues,
+    requestedTeams: fixtureDiscovery.requestedTeams,
   };
 }
 
@@ -253,6 +274,8 @@ export async function persistLowOddsScanResult(
         threshold: input.threshold,
         markets: input.markets,
         bookmakerAllowlist: input.bookmakerAllowlist ?? [],
+        requestedLeagues: input.requestedLeagues ?? [],
+        requestedTeams: input.requestedTeams ?? [],
         fixtureEvaluations: input.fixtureEvaluations,
       }),
     });

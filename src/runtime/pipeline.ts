@@ -139,6 +139,18 @@ export interface RunPipelineDependencies {
   exportArtifacts?: (config: AgentConfig, input: ExportRunInput, runtime: RuntimeContext, deps?: RunPipelineDependencies) => Promise<ExportRunResult>;
 }
 
+interface LowOddsPredictionCoverage {
+  threshold: number;
+  hits: number;
+  hitsWithOddsQuoteId: number;
+  uniqueHitOddsQuoteIds: number;
+  predictedHitOddsQuoteIds: number;
+  missingPredictionHits: number;
+  unlinkedHits: number;
+  complete: boolean;
+  missingOddsQuoteIds: string[];
+}
+
 const EMPTY_LOW_ODDS_SCAN: Omit<LowOddsScanView, 'date' | 'threshold'> = {
   fixtureCount: 0,
   hitCount: 0,
@@ -288,6 +300,8 @@ export async function executeRunPipeline(
         fixtureCount: fixtureDiscovery.fixtures.length,
         hits: lowOddsScan.hits,
         fixtureEvaluations: lowOddsScan.fixtureEvaluations,
+        requestedLeagues: fixtureDiscovery.requestedLeagues,
+        requestedTeams: fixtureDiscovery.requestedTeams,
       });
     } catch (err) {
       if (config.databaseUrl) throw err;
@@ -332,12 +346,20 @@ export async function executeRunPipeline(
       scoring.push(blockedScoringResult(config, runId, fixture, err));
     }
   }
-  steps.push(summarizeResultStep('score', scoring.map((result) => ({
+  const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring);
+  const scoreStep = summarizeResultStep('score', scoring.map((result) => ({
     ok: result.ok,
     verdict: result.gateResult.verdict,
     warnings: [...result.gateResult.warnings, ...(result.error ? [result.error] : [])],
     artifactPath: result.artifactPath,
-  })), selectedFixtures.length));
+  })), selectedFixtures.length);
+  if (!lowOddsPredictionCoverage.complete) {
+    scoreStep.verdict = scoreStep.verdict === 'blocked' ? 'blocked' : 'review-required';
+    scoreStep.warnings.push(
+      `missing predictions for ${lowOddsPredictionCoverage.missingPredictionHits} low-odds hits and ${lowOddsPredictionCoverage.unlinkedHits} unlinked low-odds hits`,
+    );
+  }
+  steps.push(scoreStep);
 
   let parlay: ParlayBuildRunResult;
   try {
@@ -403,6 +425,7 @@ export async function executeRunPipeline(
       parlayLegs: parlay.build.parlay.legs.length,
       validations: validation?.validations.length ?? 0,
     },
+    lowOddsPredictionCoverage,
     validation: validationEvaluation,
     lowOddsScanId: lowOddsScan.scanId ?? null,
   };
@@ -640,6 +663,8 @@ function buildLowOddsScan(
     hitCount: hits.length,
     hits,
     fixtureEvaluations: discovery.evaluations,
+    requestedLeagues: discovery.requestedLeagues,
+    requestedTeams: discovery.requestedTeams,
   };
 }
 
@@ -823,6 +848,32 @@ function isPastOrToday(date: string, referenceDate: Date): boolean {
   return date <= today;
 }
 
+function buildLowOddsPredictionCoverage(
+  scan: LowOddsScanView,
+  scoring: FixtureScoringResult[],
+): LowOddsPredictionCoverage {
+  const hitQuoteIds = scan.hits
+    .map((hit) => hit.oddsQuoteId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+  const uniqueHitQuoteIds = [...new Set(hitQuoteIds)];
+  const predictedQuoteIds = new Set(
+    scoring.flatMap((result) => result.predictions.map((prediction) => prediction.oddsQuoteId)),
+  );
+  const missingOddsQuoteIds = uniqueHitQuoteIds.filter((id) => !predictedQuoteIds.has(id));
+  const unlinkedHits = scan.hits.length - hitQuoteIds.length;
+  return {
+    threshold: scan.threshold,
+    hits: scan.hitCount,
+    hitsWithOddsQuoteId: hitQuoteIds.length,
+    uniqueHitOddsQuoteIds: uniqueHitQuoteIds.length,
+    predictedHitOddsQuoteIds: uniqueHitQuoteIds.length - missingOddsQuoteIds.length,
+    missingPredictionHits: missingOddsQuoteIds.length,
+    unlinkedHits,
+    complete: missingOddsQuoteIds.length === 0 && unlinkedHits === 0,
+    missingOddsQuoteIds,
+  };
+}
+
 function emptyLowOddsScan(date: string, threshold: number): LowOddsScanView {
   return {
     ...EMPTY_LOW_ODDS_SCAN,
@@ -891,6 +942,12 @@ function buildHandoffMarkdown(
       : 'unknown';
   const validationMode = typeof validation.mode === 'string' || validation.mode === false ? String(validation.mode) : 'unknown';
   const validationReason = typeof validation.reason === 'string' ? ` (${validation.reason})` : '';
+  const lowOddsCoverage = evaluation.lowOddsPredictionCoverage && typeof evaluation.lowOddsPredictionCoverage === 'object'
+    ? evaluation.lowOddsPredictionCoverage
+    : {};
+  const lowOddsPredicted = typeof lowOddsCoverage.predictedHitOddsQuoteIds === 'number' && typeof lowOddsCoverage.uniqueHitOddsQuoteIds === 'number'
+    ? `${lowOddsCoverage.predictedHitOddsQuoteIds}/${lowOddsCoverage.uniqueHitOddsQuoteIds}`
+    : 'unknown';
   const risks = steps.flatMap((step: any) => Array.isArray(step.warnings) ? step.warnings : []);
   const verdict = evaluation.verdict ?? runVerdict ?? 'unknown';
   const status = evaluation.status ?? runStatus ?? 'unknown';
@@ -920,6 +977,7 @@ function buildHandoffMarkdown(
     `- predictions: ${counts.predictions ?? 'unknown'}`,
     `- parlayLegs: ${counts.parlayLegs ?? 'unknown'}`,
     `- validations: ${counts.validations ?? 'unknown'}`,
+    `- lowOddsPredicted: ${lowOddsPredicted}`,
     `- validationStatus: ${validationStatus}${validationReason}`,
     `- validationMode: ${validationMode}`,
     '',

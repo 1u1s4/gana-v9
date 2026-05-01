@@ -40,6 +40,20 @@ export interface FixtureFilterEvaluation {
   eligible: boolean;
 }
 
+export interface RequestedLeaguePresetView {
+  providerCompetitionId: string;
+  name?: string;
+  country?: string | null;
+  season?: number | null;
+}
+
+export interface RequestedTeamPresetView {
+  providerTeamId: string;
+  name?: string;
+  country?: string | null;
+  providerLeagueId?: string | null;
+}
+
 export interface LowOddsHitView {
   fixtureId: string;
   providerFixtureId: string;
@@ -62,4 +76,6 @@ export interface LowOddsScanView {
   hitCount: number;
   hits: LowOddsHitView[];
   fixtureEvaluations: FixtureFilterEvaluation[];
+  requestedLeagues?: RequestedLeaguePresetView[];
+  requestedTeams?: RequestedTeamPresetView[];
 }

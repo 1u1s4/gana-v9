@@ -116,6 +116,18 @@ describe('headless parlay command', () => {
     assert.match(result?.message ?? '', /--date YYYY-MM-DD/);
   });
 
+  it('uses default parlay rules when optional override flags are omitted', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['parlay', '--date', '2026-05-02'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /DATABASE_URL is required/);
+    assert.doesNotMatch(result?.message ?? '', /minLegs/);
+  });
+
   it('prints parlay usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 

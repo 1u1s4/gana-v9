@@ -4,6 +4,7 @@ import { afterEach, describe, it } from 'node:test';
 import type { Fixture } from '../../domain/fixtures.js';
 import type { ApiFootballPersistence, ApiFootballProviderConfig, CanonicalOddsSnapshot, NormalizedFixture } from './types.js';
 import { createApiFootballProvider } from './api-football.js';
+import { isApiFootballProviderError } from './api-football-errors.js';
 
 const originalFetch = globalThis.fetch;
 
@@ -12,6 +13,27 @@ afterEach(() => {
 });
 
 describe('api-football provider', () => {
+  it('applies a timeout signal and maps aborted requests to provider errors', async () => {
+    let sawSignal = false;
+    globalThis.fetch = (async (_input, init) => {
+      sawSignal = init?.signal instanceof AbortSignal;
+      const err = new Error('The operation was aborted.');
+      err.name = 'AbortError';
+      throw err;
+    }) as typeof fetch;
+
+    const provider = createApiFootballProvider(testConfig());
+    await assert.rejects(
+      () => provider.listFixtures({ date: '2026-05-01', league: 39, season: 2026 }),
+      (err) => {
+        assert.equal(sawSignal, true);
+        assert.equal(isApiFootballProviderError(err), true);
+        assert.match((err as Error).message, /timed out/);
+        return true;
+      },
+    );
+  });
+
   it('scans fixtures for a date and returns persisted canonical odds snapshots', async () => {
     const requests: URL[] = [];
     const fixturesByProviderId = new Map<string, Fixture>();

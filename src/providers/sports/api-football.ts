@@ -50,6 +50,8 @@ interface ApiFootballResponse<T = unknown> {
   payloadHash?: string | null;
 }
 
+const API_FOOTBALL_REQUEST_TIMEOUT_MS = 15_000;
+
 export function createApiFootballProvider(
   config: ApiFootballProviderConfig,
   persistence: ApiFootballPersistence = {},
@@ -244,12 +246,19 @@ export class ApiFootballProvider implements SportsDataProvider {
     const started = Date.now();
     let response: Response;
     try {
-      response = await fetch(url, { method: 'GET', headers });
+      response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: apiFootballRequestSignal(),
+      });
     } catch (err) {
+      const aborted = err instanceof Error && err.name === 'AbortError';
       throw new ApiFootballProviderError({
         code: 'provider_unavailable',
         endpointName,
-        message: 'Could not reach API-Football.',
+        message: aborted
+          ? `API-Football request timed out after ${API_FOOTBALL_REQUEST_TIMEOUT_MS}ms.`
+          : 'Could not reach API-Football.',
         expected: 'Network access to API-Football base URL.',
         received: err instanceof Error ? err.message : err,
         nextAction: 'Check network connectivity and API_FOOTBALL_BASE_URL.',
@@ -344,6 +353,12 @@ export class ApiFootballProvider implements SportsDataProvider {
       // Quota persistence must never make provider commands fail.
     }
   }
+}
+
+function apiFootballRequestSignal(): AbortSignal | undefined {
+  if (typeof AbortSignal === 'undefined') return undefined;
+  const timeout = (AbortSignal as any).timeout;
+  return typeof timeout === 'function' ? timeout(API_FOOTBALL_REQUEST_TIMEOUT_MS) : undefined;
 }
 
 export async function checkApiFootballStatus(

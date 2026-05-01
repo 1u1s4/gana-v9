@@ -59,6 +59,8 @@ describe('run-service facade', () => {
           excludedReasons: [],
           eligible: true,
         }],
+        requestedLeagues: [],
+        requestedTeams: [],
       }),
       fetchOddsSnapshot: async () => ({
         fixtureId: target.id,

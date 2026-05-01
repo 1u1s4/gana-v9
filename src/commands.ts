@@ -472,13 +472,17 @@ function optionalProbabilityFlag(flags: Record<string, string | true>, key: stri
 }
 
 function optionalParlayConfig(flags: Record<string, string | true>): ParlayConfig {
-  return {
-    minLegs: optionalPositiveIntegerFlag(flags, 'min-legs'),
-    maxLegs: optionalPositiveIntegerFlag(flags, 'max-legs'),
-    allowMultipleLegsPerFixture: flags['allow-multiple-legs-per-fixture'] === true,
-    minPredictionConfidence: optionalProbabilityFlag(flags, 'min-confidence'),
-    maxCombinedOdds: optionalFloatFlag(flags, 'max-combined-odds'),
-  };
+  const config: ParlayConfig = {};
+  const minLegs = optionalPositiveIntegerFlag(flags, 'min-legs');
+  const maxLegs = optionalPositiveIntegerFlag(flags, 'max-legs');
+  const minPredictionConfidence = optionalProbabilityFlag(flags, 'min-confidence');
+  const maxCombinedOdds = optionalFloatFlag(flags, 'max-combined-odds');
+  if (minLegs !== undefined) config.minLegs = minLegs;
+  if (maxLegs !== undefined) config.maxLegs = maxLegs;
+  if (flags['allow-multiple-legs-per-fixture'] === true) config.allowMultipleLegsPerFixture = true;
+  if (minPredictionConfidence !== undefined) config.minPredictionConfidence = minPredictionConfidence;
+  if (maxCombinedOdds !== undefined) config.maxCombinedOdds = maxCombinedOdds;
+  return config;
 }
 
 function requiredValidationTarget(flags: Record<string, string | true>): RunValidationInput {
