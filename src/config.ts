@@ -23,6 +23,7 @@ export interface DisplayConfig {
 export interface ApiFootballFilterConfig {
   defaultSeason: number;
   defaultSeasonInferred: boolean;
+  timezone: string;
   defaultLeagues: ApiFootballLeagueRef[];
   defaultTeams: ApiFootballTeamRef[];
   defaultMarkets: MarketKey[];
@@ -155,6 +156,7 @@ const DEFAULTS: AgentConfig = {
   apiFootball: {
     defaultSeason: DEFAULT_SEASON,
     defaultSeasonInferred: defaultSeasonFromEnv === undefined,
+    timezone: 'America/Guatemala',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,
@@ -285,6 +287,7 @@ export function loadConfig(
   const envThreshold = parseNumber(process.env.GANA_LOW_ODDS_THRESHOLD);
   const envMaxFixtures = parseNumber(process.env.GANA_MAX_FIXTURES_PER_RUN);
   const envWindow = parseNumber(process.env.GANA_KICKOFF_WINDOW_HOURS);
+  const envTimezone = process.env.GANA_FIXTURE_TIMEZONE || process.env.GANA_TIMEZONE;
   const envMarkets = parseMarkets(process.env.GANA_DEFAULT_MARKETS);
   const envIncludeLive = parseBoolean(process.env.GANA_INCLUDE_LIVE_FIXTURES);
   const envIncludeCompleted = parseBoolean(process.env.GANA_INCLUDE_COMPLETED_FIXTURES);
@@ -295,6 +298,7 @@ export function loadConfig(
     ...(envThreshold !== undefined && { lowOddsThreshold: envThreshold }),
     ...(envMaxFixtures !== undefined && { maxFixturesPerRun: envMaxFixtures }),
     ...(envWindow !== undefined && { kickoffWindowHours: envWindow }),
+    ...(envTimezone && { timezone: envTimezone }),
     ...(envMarkets && { defaultMarkets: envMarkets }),
     ...(envIncludeLive !== undefined && { includeLiveFixtures: envIncludeLive }),
     ...(envIncludeCompleted !== undefined && { includeCompletedFixtures: envIncludeCompleted }),

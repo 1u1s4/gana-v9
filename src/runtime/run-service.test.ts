@@ -15,6 +15,7 @@ function testConfig() {
     apiFootball: {
       defaultSeason: 2026,
       defaultSeasonInferred: false,
+      timezone: 'America/Guatemala',
       defaultLeagues: [],
       defaultTeams: [],
       defaultMarkets: ['h2h'],

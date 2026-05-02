@@ -534,8 +534,23 @@ async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags:
 }
 
 async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
+  const portfolio = optionalStringFlag(flags, 'portfolio');
+  if (portfolio !== undefined && portfolio !== 'llm') throw new Error('--portfolio must be llm when provided.');
+  if (portfolio === 'llm') {
+    const input = {
+      date: typeof flags.date === 'string' ? requireDateFlag(flags) : formatLocalDate(new Date()),
+      sourceRunId: requireStringFlag(flags, 'run-id'),
+      portfolio: 'llm' as const,
+      configOverrides: optionalParlayConfig(flags),
+    };
+    const service = await loadOptionalRunService();
+    const runner = service.runParlayBuild ?? runParlayBuild;
+    return runner(ctx.config, input, ctx.runtime);
+  }
+
   const input = {
     date: requireDateFlag(flags),
+    sourceRunId: optionalStringFlag(flags, 'run-id'),
     configOverrides: optionalParlayConfig(flags),
   };
   const service = await loadOptionalRunService();
@@ -705,9 +720,26 @@ function printScoringResult(result: FixtureScoringResult): void {
 
 function printParlayResult(result: ParlayBuildRunResult): void {
   const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
-  console.log(`  ${marker} ${CYAN}parlay${RESET} ${DIM}${result.gateResult.verdict}${RESET}`);
+  console.log(`  ${marker} ${CYAN}${result.portfolio ? 'parlay portfolio' : 'parlay'}${RESET} ${DIM}${result.gateResult.verdict}${RESET}`);
   printKeyValue('runId', result.runId);
   printKeyValue('date', result.date);
+  if (result.portfolio) {
+    printKeyValue('portfolioId', result.portfolio.id);
+    printKeyValue('sourceRunId', result.portfolio.sourceRunId);
+    printKeyValue('parlays', result.portfolio.parlays.length);
+    if (result.persistedParlayIds?.length) printKeyValue('persistedParlayIds', result.persistedParlayIds.join(', '));
+    for (const profile of result.portfolio.profiles) {
+      printKeyValue(`profile.${profile.profile}`, `${profile.included}/${profile.requested} included, ${profile.rejected} rejected`);
+    }
+    if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+    for (const reason of result.gateResult.reasons) {
+      console.log(`  ${DIM}reason:${RESET} ${CYAN}${reason}${RESET}`);
+    }
+    for (const warning of result.gateResult.warnings) {
+      console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+    }
+    return;
+  }
   printKeyValue('parlayId', result.build.parlay.id);
   if (result.persistedParlayId) printKeyValue('persistedParlayId', result.persistedParlayId);
   printKeyValue('legs', result.build.parlay.legs.length);
@@ -1631,6 +1663,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live${RESET}`);
   console.log(`  ${CYAN}pnpm gana score --fixture-id ID --web live${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);

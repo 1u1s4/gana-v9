@@ -23,6 +23,7 @@ export interface ApiFootballProviderConfig {
 
 export interface FixtureQuery {
   date: string;
+  timezone?: string;
   league?: number;
   team?: number;
   season?: number;

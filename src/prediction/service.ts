@@ -230,15 +230,29 @@ export async function runFixtureScoring(
     rawOutput = result.text;
     llmOutput = parseTopPickOutput(rawOutput);
   } catch (err: any) {
-    const result = blockedResult(runId, artifactWriter, {
-      error: err?.message ?? String(err),
-      reasons: ['prediction LLM scoring failed'],
-      fixtureId: fixture.id,
-      providerFixtureId: fixture.providerFixtureId,
-      oddsSnapshotId: oddsSnapshot.id,
+    const error = err?.message ?? String(err);
+    llmOutput = buildFallbackTopPicks({
+      oddsQuotes: promptOddsQuotes,
+      evidenceGate,
+      claimIds: research.claims.map((claim) => claim.id),
+      warning: `prediction LLM scoring failed; generated deterministic API-Football fallback picks: ${error}`,
     });
-    await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
-    return result;
+    rawOutput = JSON.stringify({
+      fallback: true,
+      error,
+      predictions: llmOutput,
+    }, null, 2);
+    if (!llmOutput.length) {
+      const result = blockedResult(runId, artifactWriter, {
+        error,
+        reasons: ['prediction LLM scoring failed', 'fallback scoring unavailable'],
+        fixtureId: fixture.id,
+        providerFixtureId: fixture.providerFixtureId,
+        oddsSnapshotId: oddsSnapshot.id,
+      });
+      await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
+      return result;
+    }
   }
 
   const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
@@ -583,6 +597,58 @@ function selectScoringPromptQuotes(quotes: OddsQuoteRecord[]): OddsQuoteRecord[]
   return [...grouped.values()]
     .sort(comparePromptQuotes)
     .slice(0, MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT);
+}
+
+function buildFallbackTopPicks(input: {
+  oddsQuotes: OddsQuoteRecord[];
+  evidenceGate: ReturnType<typeof evaluateEvidenceGate>;
+  claimIds: string[];
+  warning: string;
+}): ParsedTopPick[] {
+  if (!input.evidenceGate.evidenceIds.length) return [];
+  const selected: OddsQuoteRecord[] = [];
+  const seenMarkets = new Set<string>();
+  for (const quote of [...input.oddsQuotes].sort(compareFallbackQuotes)) {
+    if (seenMarkets.has(quote.marketKey)) continue;
+    selected.push(quote);
+    seenMarkets.add(quote.marketKey);
+    if (selected.length >= 3) break;
+  }
+
+  return selected.map((quote) => {
+    const odds = numberValue(quote.price);
+    const implied = numberOrUndefined(quote.impliedProbability) ?? (Number.isFinite(odds) && odds > 1 ? 1 / odds : 0.5);
+    const probability = Math.min(0.88, Math.max(0.05, implied + 0.025));
+    return {
+      oddsQuoteId: quote.id,
+      market: quote.marketKey,
+      selection: quote.selectionKey,
+      ...(numberOrUndefined(quote.line) !== undefined && { line: numberOrUndefined(quote.line) }),
+      odds,
+      probability,
+      confidence: Math.min(0.7, Math.max(0.52, probability - 0.05)),
+      evidenceIds: input.evidenceGate.evidenceIds.slice(0, 5),
+      claimIds: input.claimIds.slice(0, 5),
+      rationale: 'Fallback analytical pick generated from persisted API-Football odds, fixture context, and the latest evidence bundle because agentic scoring did not return valid JSON.',
+      warnings: [input.warning],
+    };
+  });
+}
+
+function compareFallbackQuotes(a: OddsQuoteRecord, b: OddsQuoteRecord): number {
+  return marketPriority(a.marketKey) - marketPriority(b.marketKey)
+    || fallbackOddsBandPenalty(a) - fallbackOddsBandPenalty(b)
+    || linePriority(a) - linePriority(b)
+    || numberValue(a.price) - numberValue(b.price);
+}
+
+function fallbackOddsBandPenalty(quote: OddsQuoteRecord): number {
+  const odds = numberValue(quote.price);
+  if (!Number.isFinite(odds)) return 10_000;
+  if (odds >= 1.2 && odds <= 1.95) return 0;
+  if (odds > 1.05 && odds < 1.2) return 1;
+  if (odds > 1.95 && odds <= 2.4) return 2;
+  return Math.abs(odds - 1.6) + 10;
 }
 
 function comparePromptQuotes(a: OddsQuoteRecord, b: OddsQuoteRecord): number {

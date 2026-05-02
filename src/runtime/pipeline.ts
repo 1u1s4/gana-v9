@@ -213,6 +213,7 @@ export async function executeRunPipeline(
   const filtersPayload = {
     date: input.date,
     season: config.apiFootball.defaultSeason,
+    timezone: config.apiFootball.timezone,
     markets: config.apiFootball.defaultMarkets,
     defaultLeagues: config.apiFootball.defaultLeagues,
     defaultTeams: config.apiFootball.defaultTeams,
@@ -323,10 +324,7 @@ export async function executeRunPipeline(
       : ['no low-odds hits found; falling back to full eligible fixture slate for review-required scoring'],
   });
 
-  const selectedFixtureIds = new Set(lowOddsScan.hits.map((hit) => hit.fixtureId));
-  const selectedFixtures = selectedFixtureIds.size
-    ? fixtureDiscovery.fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id))
-    : fixtureDiscovery.fixtures;
+  const selectedFixtures = fixtureDiscovery.fixtures;
 
   const research = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
     try {
@@ -372,7 +370,10 @@ export async function executeRunPipeline(
 
   let parlay: ParlayBuildRunResult;
   try {
-    parlay = await retryStorageConnection(() => (deps.buildParlay ?? runParlayBuild)(config, { date: input.date }, runtime));
+    parlay = await retryStorageConnection(() => (deps.buildParlay ?? runParlayBuild)(config, {
+      date: input.date,
+      sourceRunId: runId,
+    }, runtime));
   } catch (err: any) {
     parlay = blockedParlayResult(config, runId, input.date, err);
   }

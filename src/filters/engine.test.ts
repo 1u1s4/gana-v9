@@ -25,6 +25,7 @@ const config: Pick<AgentConfig, 'apiFootball'> = {
   apiFootball: {
     defaultSeason: 2026,
     defaultSeasonInferred: false,
+    timezone: 'America/Guatemala',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,
@@ -57,6 +58,26 @@ describe('filter engine', () => {
     const scheduledAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
 
     assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config), ['excluded-outside-window']);
+  });
+
+  it('keeps UTC next-day fixtures when they belong to the configured local date', () => {
+    const scheduledAt = '2026-05-03T00:00:00.000Z';
+
+    assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config, {
+      date: '2026-05-02',
+      timezone: 'America/Guatemala',
+      now: new Date('2026-05-02T05:00:00.000Z'),
+    }), []);
+  });
+
+  it('excludes fixtures outside the configured local date', () => {
+    const scheduledAt = '2026-05-03T07:00:00.000Z';
+
+    assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config, {
+      date: '2026-05-02',
+      timezone: 'America/Guatemala',
+      now: new Date('2026-05-02T05:00:00.000Z'),
+    }), ['excluded-outside-window']);
   });
 
   it('excludes live and completed fixtures unless config allows them', () => {

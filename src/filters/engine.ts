@@ -27,6 +27,24 @@ interface FixtureDiscoveryRequest {
 }
 
 const FIXTURE_DISCOVERY_CONCURRENCY = 6;
+const DEFAULT_LEAGUE_PRIORITY = new Map<string, number>([
+  ['39', 10], // England Premier League
+  ['140', 20], // Spain La Liga
+  ['78', 30], // Germany Bundesliga
+  ['61', 40], // France Ligue 1
+  ['135', 50], // Italy Serie A
+  ['88', 60], // Netherlands Eredivisie
+  ['188', 70], // Australia A-League
+  ['98', 80], // Japan J1 League
+  ['71', 90], // Brazil Serie A
+  ['253', 100], // MLS
+  ['339', 110], // Guatemala Liga Nacional
+  ['262', 120], // Liga MX
+  ['242', 130], // Ecuador Liga Pro
+  ['292', 140], // K League 1
+  ['103', 150], // Norway Eliteserien
+  ['113', 160], // Sweden Allsvenskan
+]);
 
 export async function discoverFixtures(
   config: AgentConfig,
@@ -34,7 +52,7 @@ export async function discoverFixtures(
   runtime?: RuntimeContext,
 ): Promise<FixtureDiscoveryResult> {
   const filters = resolveFilterConfig(config, query);
-  const leaguePresets = filters.useDefaultLeagues ? await listLeaguePresets(config) : [];
+  const leaguePresets = filters.useDefaultLeagues ? sortLeaguePresetsForDiscovery(await listLeaguePresets(config)) : [];
   const teamPresets = filters.useDefaultTeams ? await listTeamPresets(config) : [];
   const requests = buildFixtureDiscoveryRequests(leaguePresets, teamPresets);
   const validRequests = requests.filter((request) => {
@@ -52,6 +70,7 @@ export async function discoverFixtures(
       request,
       fixtures: await listApiFootballFixtures(config, {
         date: filters.date,
+        timezone: filters.timezone,
         season: request.season ?? config.apiFootball.defaultSeason,
         league: request.league,
         team: request.team,
@@ -69,7 +88,7 @@ export async function discoverFixtures(
 
   const evaluations: FixtureFilterEvaluation[] = [];
   const fixtures: Fixture[] = [];
-  for (const { fixture, reasons } of byProviderFixtureId.values()) {
+  for (const { fixture, reasons } of sortFixtureEntriesForSelection([...byProviderFixtureId.values()])) {
     const includedReasons = [...reasons];
     if (
       filters.combineMode === 'AND'
@@ -80,7 +99,10 @@ export async function discoverFixtures(
       continue;
     }
 
-    const excludedReasons = evaluateExclusions(fixture, config);
+    const excludedReasons = evaluateExclusions(fixture, config, {
+      date: filters.date,
+      timezone: filters.timezone,
+    });
     const maxReached = excludedReasons.length === 0 && fixtures.length >= filters.maxFixturesPerRun;
     const eligible = excludedReasons.length === 0 && !maxReached;
     const finalExcludedReasons = maxReached
@@ -114,6 +136,27 @@ export async function discoverFixtures(
   };
 }
 
+function sortLeaguePresetsForDiscovery<T extends { providerCompetitionId: string; name?: string | null }>(presets: T[]): T[] {
+  return [...presets].sort((a, b) => {
+    const priority = leaguePriority(Number(a.providerCompetitionId)) - leaguePriority(Number(b.providerCompetitionId));
+    if (priority !== 0) return priority;
+    return (a.name ?? '').localeCompare(b.name ?? '');
+  });
+}
+
+function sortFixtureEntriesForSelection<T extends { fixture: Fixture }>(entries: T[]): T[] {
+  return [...entries].sort((a, b) => {
+    const priority = leaguePriority(a.fixture.leagueId) - leaguePriority(b.fixture.leagueId);
+    if (priority !== 0) return priority;
+    return Date.parse(a.fixture.scheduledAt) - Date.parse(b.fixture.scheduledAt);
+  });
+}
+
+function leaguePriority(leagueId: number | undefined): number {
+  if (leagueId === undefined || !Number.isFinite(leagueId)) return Number.MAX_SAFE_INTEGER;
+  return DEFAULT_LEAGUE_PRIORITY.get(String(leagueId)) ?? 10_000;
+}
+
 function chunks<T>(items: T[], size: number): T[][] {
   const output: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -143,7 +186,11 @@ export function buildFixtureDiscoveryRequests(
   return requests;
 }
 
-export function evaluateExclusions(fixture: Fixture, config: Pick<AgentConfig, 'apiFootball'>): FilterReason[] {
+export function evaluateExclusions(
+  fixture: Fixture,
+  config: Pick<AgentConfig, 'apiFootball'>,
+  options: { date?: string; timezone?: string; now?: Date } = {},
+): FilterReason[] {
   const reasons: FilterReason[] = [];
   if (fixture.status === 'completed' && !config.apiFootball.includeCompletedFixtures) {
     reasons.push('excluded-outside-window');
@@ -151,15 +198,33 @@ export function evaluateExclusions(fixture: Fixture, config: Pick<AgentConfig, '
   if (fixture.status === 'live' && !config.apiFootball.includeLiveFixtures) {
     reasons.push('excluded-outside-window');
   }
-  if (fixture.status === 'scheduled' && !withinKickoffWindow(fixture.scheduledAt, config.apiFootball.kickoffWindowHours)) {
-    reasons.push('excluded-outside-window');
+  if (fixture.status === 'scheduled') {
+    const timezone = options.timezone ?? config.apiFootball.timezone;
+    if (options.date && localDateKey(fixture.scheduledAt, timezone) !== options.date) {
+      reasons.push('excluded-outside-window');
+    } else if (!withinKickoffWindow(fixture.scheduledAt, config.apiFootball.kickoffWindowHours, options.now)) {
+      reasons.push('excluded-outside-window');
+    }
   }
   return reasons;
 }
 
-function withinKickoffWindow(scheduledAt: string, hours: number): boolean {
+function withinKickoffWindow(scheduledAt: string, hours: number, nowDate = new Date()): boolean {
   const kickoff = new Date(scheduledAt).getTime();
   if (!Number.isFinite(kickoff)) return false;
-  const now = Date.now();
+  const now = nowDate.getTime();
   return kickoff >= now && kickoff <= now + hours * 60 * 60 * 1000;
+}
+
+function localDateKey(scheduledAt: string, timezone: string): string {
+  const date = new Date(scheduledAt);
+  if (!Number.isFinite(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const byType = new Map(parts.map((part) => [part.type, part.value]));
+  return `${byType.get('year')}-${byType.get('month')}-${byType.get('day')}`;
 }

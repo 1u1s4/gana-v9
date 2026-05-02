@@ -128,10 +128,22 @@ describe('headless parlay command', () => {
     assert.doesNotMatch(result?.message ?? '', /minLegs/);
   });
 
+  it('requires --run-id for LLM parlay portfolios', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['parlay', '--portfolio', 'llm'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /--run-id is required/);
+  });
+
   it('prints parlay usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
     assert.match(output, /pnpm gana parlay --date YYYY-MM-DD/);
+    assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio llm/);
   });
 });
 

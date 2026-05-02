@@ -66,6 +66,9 @@ describe('runParlayBuild', () => {
       },
       repositories: {
         predictions: {
+          list: async () => {
+            throw new Error('date-only parlay builds should not use run-scoped list when runtime has no runId');
+          },
           listForFixtureDate: async (date, query) => {
             assert.equal(date, '2026-04-25');
             assert.deepEqual(query.status, ['candidate', 'review-required', 'promotable']);
@@ -98,6 +101,159 @@ describe('runParlayBuild', () => {
     assert.equal(persisted.legs.length, 2);
   });
 
+  it('uses only current-run predictions when runtime has a run id', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let listQuery: any;
+
+    const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunId: 'current-run-1' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/parlays.json',
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            listQuery = query;
+            return [
+              prediction({ id: 'prediction-1', runId: 'current-run-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8 }),
+              prediction({ id: 'prediction-2', runId: 'current-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.7 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => {
+            throw new Error('run-scoped parlay builds must not read every prediction for the fixture date');
+          },
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-parlays-1' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(listQuery, {
+      runId: 'current-run-1',
+      status: ['candidate', 'review-required', 'promotable'],
+      take: 500,
+    });
+    assert.equal(result.build.parlay.legs.length, 2);
+  });
+
+  it('builds and persists an LLM parlay portfolio from source-run predictions', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    const artifactNames: string[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        const prompt = String(input);
+        if (prompt.includes('(conservative)')) {
+          return { text: JSON.stringify({ parlays: [
+            { title: 'Conservative A', predictionIds: ['prediction-1', 'prediction-2'], rationale: 'Two high confidence legs.' },
+            { title: 'Conservative B', predictionIds: ['prediction-3', 'prediction-4'], rationale: 'Two independent legs.' },
+          ] }) } as any;
+        }
+        if (prompt.includes('(balanced)')) {
+          return { text: JSON.stringify({ parlays: [
+            { title: 'Balanced A', predictionIds: ['prediction-1', 'prediction-2', 'prediction-3'], rationale: 'Three compatible legs.' },
+            { title: 'Balanced B', predictionIds: ['prediction-2', 'prediction-3', 'prediction-4'], rationale: 'Three independent fixtures.' },
+            { title: 'Balanced C', predictionIds: ['prediction-1', 'prediction-3', 'prediction-4'], rationale: 'Higher quality blend.' },
+          ] }) } as any;
+        }
+        return { text: JSON.stringify({ parlays: [
+          { title: 'Aggressive A', predictionIds: ['prediction-1', 'prediction-2', 'prediction-3', 'prediction-4'], rationale: 'Four-leg upside profile.' },
+        ] }) } as any;
+      },
+      writeArtifact: (_runId, name) => {
+        artifactNames.push(name);
+        return `/tmp/${name}`;
+      },
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-1');
+            assert.deepEqual(query.status, ['candidate', 'review-required', 'promotable']);
+            return [
+              prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.25, confidence: 0.8 }),
+              prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.6, confidence: 0.82 }),
+              prediction({ id: 'prediction-3', runId: 'source-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.84 }),
+              prediction({ id: 'prediction-4', runId: 'source-run-1', fixtureId: 'fixture-4', odds: 2, confidence: 0.86 }),
+              prediction({ id: 'prediction-low', runId: 'source-run-1', fixtureId: 'fixture-5', odds: 2, confidence: 0.59 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => {
+            throw new Error('portfolio builds must be source-run scoped');
+          },
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-1' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.sourceRunId, 'source-run-1');
+    assert.equal(result.portfolio?.parlays.length, 6);
+    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3', 'parlay-4', 'parlay-5', 'parlay-6']);
+    assert.equal(persisted.length, 6);
+    assert.equal(persisted[0].parlay.metadata.portfolioId, result.portfolio?.id);
+    assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'conservative');
+    assert.equal(persisted[0].legs.length, 2);
+    assert.deepEqual(artifactNames, ['parlay-portfolio.json', 'parlays.json']);
+  });
+
+  it('rejects LLM portfolio parlays that duplicate a fixture without justification', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        const prompt = String(input);
+        if (!prompt.includes('(conservative)')) return { text: JSON.stringify({ parlays: [] }) } as any;
+        return { text: JSON.stringify({ parlays: [
+          { title: 'Bad duplicate', predictionIds: ['prediction-1', 'prediction-2'], rationale: 'Same fixture.' },
+        ] }) } as any;
+      },
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8 }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8 }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-1' }) as any },
+        parlays: {
+          createWithLegs: async () => {
+            throw new Error('invalid portfolio parlays should not be persisted');
+          },
+        },
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.match(result.gateResult.warnings.join('\n'), /duplicate fixture without justification/);
+    assert.equal(result.portfolio?.parlays.length, 0);
+    assert.equal(result.portfolio?.rejected.length, 1);
+  });
+
   it('writes a blocked artifact when database access is unavailable', async () => {
     const cfg = config({ databaseUrl: '' });
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -115,6 +271,23 @@ describe('runParlayBuild', () => {
 });
 
 describe('prediction repository fixture date query', () => {
+  it('supports array status filters for run-scoped prediction queries', async () => {
+    let where: any;
+    const repo = createPredictionRepository({
+      prediction: {
+        findMany: async (args: any) => {
+          where = args.where;
+          return [];
+        },
+      } as any,
+    });
+
+    await repo.list({ runId: 'run-1', status: ['candidate', 'review-required'] });
+
+    assert.equal(where.runId, 'run-1');
+    assert.deepEqual(where.status, { in: ['candidate', 'review-required'] });
+  });
+
   it('filters predictions with a UTC day window on fixture scheduledAt', async () => {
     let where: any;
     const repo = createPredictionRepository({

@@ -10,7 +10,7 @@ import { compactData, redactJson, redactText, takeArg } from './helpers.js';
 export interface PredictionQuery {
   runId?: string;
   fixtureId?: string;
-  status?: PredictionStatus | string;
+  status?: PredictionStatus | string | Array<PredictionStatus | string>;
   take?: number;
 }
 
@@ -53,7 +53,7 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
         where: compactData({
           runId: query.runId,
           fixtureId: query.fixtureId,
-          status: query.status,
+          status: Array.isArray(query.status) ? { in: query.status } : query.status,
         }),
         orderBy: { generatedAt: 'desc' },
         ...takeArg(query.take),

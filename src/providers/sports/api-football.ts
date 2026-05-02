@@ -89,6 +89,8 @@ export class ApiFootballProvider implements SportsDataProvider {
   async listFixtures(input: FixtureQuery): Promise<Fixture[]> {
     const maxFixtures = input.maxFixtures ?? this.config.apiFootball.maxFixturesPerRun;
     const query: Record<string, string | number> = { date: input.date };
+    const timezone = input.timezone ?? this.config.apiFootball.timezone;
+    if (timezone) query.timezone = timezone;
     if (input.league !== undefined) query.league = input.league;
     if (input.team !== undefined) query.team = input.team;
     if (input.season !== undefined) query.season = input.season;

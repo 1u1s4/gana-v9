@@ -118,6 +118,7 @@ describe('api-football provider', () => {
     const fixtureRequest = requests.find((request) => request.pathname === '/fixtures');
     assert.ok(fixtureRequest);
     assert.equal(fixtureRequest.searchParams.get('date'), '2026-05-01');
+    assert.equal(fixtureRequest.searchParams.get('timezone'), 'America/Guatemala');
     assert.equal(fixtureRequest.searchParams.get('league'), '39');
     assert.equal(fixtureRequest.searchParams.get('season'), '2026');
     assert.equal(fixtureRequest.searchParams.has('maxFixtures'), false);
@@ -137,6 +138,7 @@ function testConfig(): ApiFootballProviderConfig {
     apiFootball: {
       defaultSeason: 2026,
       defaultSeasonInferred: false,
+      timezone: 'America/Guatemala',
       defaultLeagues: [],
       defaultTeams: [],
       defaultMarkets: ['h2h'],

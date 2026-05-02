@@ -7,6 +7,7 @@ const config = {
   apiFootball: {
     defaultSeason: 2026,
     defaultSeasonInferred: false,
+    timezone: 'America/Guatemala',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,
