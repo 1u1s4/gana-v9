@@ -26,6 +26,8 @@ interface FixtureDiscoveryRequest {
   reason: FilterReason;
 }
 
+const FIXTURE_DISCOVERY_CONCURRENCY = 6;
+
 export async function discoverFixtures(
   config: AgentConfig,
   query: FixtureFilterQuery,
@@ -45,18 +47,23 @@ export async function discoverFixtures(
   }
 
   const byProviderFixtureId = new Map<string, { fixture: Fixture; reasons: Set<FilterReason> }>();
-  for (const request of validRequests) {
-    const fixtures = await listApiFootballFixtures(config, {
-      date: filters.date,
-      season: request.season ?? config.apiFootball.defaultSeason,
-      league: request.league,
-      team: request.team,
-      maxFixtures: filters.maxFixturesPerRun,
-    }, runtime);
-    for (const fixture of fixtures) {
-      const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
-      entry.reasons.add(request.reason);
-      byProviderFixtureId.set(fixture.providerFixtureId, entry);
+  for (const batch of chunks(validRequests, FIXTURE_DISCOVERY_CONCURRENCY)) {
+    const results = await Promise.all(batch.map(async (request) => ({
+      request,
+      fixtures: await listApiFootballFixtures(config, {
+        date: filters.date,
+        season: request.season ?? config.apiFootball.defaultSeason,
+        league: request.league,
+        team: request.team,
+        maxFixtures: filters.maxFixturesPerRun,
+      }, runtime),
+    })));
+    for (const result of results) {
+      for (const fixture of result.fixtures) {
+        const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
+        entry.reasons.add(result.request.reason);
+        byProviderFixtureId.set(fixture.providerFixtureId, entry);
+      }
     }
   }
 
@@ -105,6 +112,14 @@ export async function discoverFixtures(
       providerLeagueId: team.providerLeagueId,
     })),
   };
+}
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const output: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    output.push(items.slice(i, i + size));
+  }
+  return output;
 }
 
 export function buildFixtureDiscoveryRequests(

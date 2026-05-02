@@ -18,7 +18,7 @@ const fixture: Fixture = {
 
 describe('research prompts', () => {
   it('exports the research fixture prompt version', () => {
-    assert.equal(RESEARCH_FIXTURE_PROMPT_VERSION, 'research-fixture-v1');
+    assert.equal(RESEARCH_FIXTURE_PROMPT_VERSION, 'research-fixture-v2');
   });
 
   it('requires JSON-only structured research with evidence references', () => {
@@ -36,7 +36,9 @@ describe('research prompts', () => {
     assert.match(prompt, /Every EvidenceItem\.sourceId/);
     assert.match(prompt, /Every Claim\.evidenceIds/);
     assert.match(prompt, /web-search/);
-    assert.match(prompt, /research-fixture-v1/);
+    assert.match(prompt, /research-fixture-v2/);
+    assert.match(prompt, /fixtureStatistics/);
+    assert.match(prompt, /Use API-Football fixture, statistics, and odds context/);
     assert.match(prompt, /Monetary safety/);
     assert.match(prompt, /analytical artifacts only/);
   });

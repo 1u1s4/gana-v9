@@ -182,7 +182,7 @@ describe('headless run command', () => {
   it('prints run usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
-    assert.match(output, /pnpm gana run --date YYYY-MM-DD --validate auto\|force\|off/);
+    assert.match(output, /pnpm gana run --date YYYY-MM-DD --web live --validate auto\|force\|off/);
   });
 
   it('validates run validation mode before executing the pipeline', async () => {
@@ -315,7 +315,7 @@ describe('low-odds command surface', () => {
   it('prints low-odds market flag usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
-    assert.match(output, /pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1\.20 --markets h2h,double_chance,btts/);
+    assert.match(output, /pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1\.20/);
   });
 });
 

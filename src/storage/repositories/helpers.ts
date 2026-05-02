@@ -14,7 +14,7 @@ export function withTransaction<T, TClient extends Partial<StoragePrismaClient>>
   fn: (tx: TClient) => Promise<T>,
 ): Promise<T> {
   return typeof db.$transaction === 'function'
-    ? db.$transaction((tx) => fn(tx as TClient))
+    ? db.$transaction((tx) => fn(tx as TClient), { maxWait: 10_000, timeout: 60_000 })
     : fn(db);
 }
 

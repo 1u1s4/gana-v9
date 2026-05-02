@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import { loadConfig } from '../config.js';
 import { createRuntimeContext } from '../runtime/context.js';
 import type { Fixture } from '../domain/fixtures.js';
+import type { CanonicalOddsSnapshot, FixtureStatistics } from '../providers/sports/types.js';
 import { runFixtureResearch } from './research.js';
 import type { ResearchBundle } from './types.js';
 
@@ -22,6 +23,36 @@ const fixture: Fixture = {
   includedByFilters: ['manual-include'],
   createdAt: '2026-04-25T12:00:00.000Z',
   updatedAt: '2026-04-25T12:00:00.000Z',
+};
+
+const fixtureStatistics: FixtureStatistics = {
+  providerFixtureId: '1001',
+  cornersHome: 4,
+  cornersAway: 6,
+  totalCorners: 10,
+  capturedAt: createdAt.toISOString(),
+  providerSnapshotId: 'provider-statistics-snapshot-1',
+};
+
+const oddsSnapshot: CanonicalOddsSnapshot = {
+  fixtureId: 'fixture-1',
+  providerFixtureId: '1001',
+  providerSnapshotId: 'provider-odds-snapshot-1',
+  oddsSnapshotId: 'odds-snapshot-1',
+  capturedAt: createdAt.toISOString(),
+  bookmakerCount: 1,
+  payloadHash: 'odds-payload-hash',
+  quotes: [{
+    fixtureId: 'fixture-1',
+    market: 'goals_over_under',
+    selection: 'over',
+    line: 2.5,
+    price: 1.72,
+    impliedProbability: 0.5813953488372093,
+    bookmaker: 'Example Book',
+    capturedAt: createdAt.toISOString(),
+    sourceSnapshotId: 'provider-odds-snapshot-1',
+  }],
 };
 
 function config() {
@@ -89,11 +120,49 @@ describe('runFixtureResearch', () => {
 
     assert.equal(result.ok, true);
     assert.equal(requiredWeb, true);
-    assert.equal(result.bundle?.promptVersion, 'research-fixture-v1');
+    assert.equal(result.bundle?.promptVersion, 'research-fixture-v2');
     assert.equal(result.bundle?.sources.some((source) => source.type === 'api-football'), true);
     assert.equal(result.bundle?.sources.some((source) => source.type === 'web-search'), true);
     assert.equal(persisted.length, 1);
     assert.ok(result.artifactPath);
+  });
+
+  it('passes API-Football statistics and odds context into the research prompt', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let prompt = '';
+    let statisticsRequested = false;
+    let oddsRequested = false;
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: {
+        getFixture: async () => fixture,
+        getFixtureStatistics: async () => {
+          statisticsRequested = true;
+          return fixtureStatistics;
+        },
+        getCanonicalOddsSnapshot: async () => {
+          oddsRequested = true;
+          return oddsSnapshot;
+        },
+      },
+      agentRunner: async (_config, input) => {
+        prompt = typeof input === 'string' ? input : JSON.stringify(input);
+        return { text: agentOutput(), usage: {}, output: agentOutput() };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(statisticsRequested, true);
+    assert.equal(oddsRequested, true);
+    assert.match(prompt, /"fixtureStatistics"/);
+    assert.match(prompt, /"totalCorners": 10/);
+    assert.match(prompt, /"oddsSnapshot"/);
+    assert.match(prompt, /"market": "goals_over_under"/);
+    assert.equal(result.bundle?.sources.some((source) => source.id === 'source_api_football_fixture_statistics'), true);
+    assert.equal(result.bundle?.sources.some((source) => source.id === 'source_api_football_odds_snapshot'), true);
   });
 
   it('downgrades live web research without a web-search source to review-required', async () => {
@@ -141,6 +210,37 @@ describe('runFixtureResearch', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.claims.length, 1);
+  });
+
+  it('repairs source ids accidentally included in claim evidence references', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let sawAbortSignal = false;
+    const output = agentOutput({
+      claims: [{
+        id: 'claim-1',
+        statement: 'Home team has current availability concerns.',
+        subject: { type: 'fixture', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1', 'source-web-1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        sawAbortSignal = options?.signal instanceof AbortSignal;
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(sawAbortSignal, true);
+    assert.deepEqual(result.bundle?.claims[0]?.evidenceIds, ['evidence-1']);
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped source reference "source-web-1"/);
   });
 
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {

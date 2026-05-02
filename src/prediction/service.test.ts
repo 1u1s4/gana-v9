@@ -121,6 +121,25 @@ describe('runFixtureScoring', () => {
       now: () => now,
       repositories: repositories(),
       writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
       persistPredictions: async (records: any[]) => {
         persisted = records;
         return records;
@@ -141,7 +160,102 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].promptVersion, 'score-prediction-v1');
     assert.equal(persisted[0].scoringRuleVersion, 'scoring-v1');
     assert.equal(persisted[0].impliedProbability, 1 / 2.1);
-    assert.equal(persisted[0].edge, null);
+    assert.equal(persisted[0].estimatedProbability, 0.56);
+    assert.equal(persisted[0].edge, 0.56 - (1 / 2.1));
+  });
+
+  it('keeps scoring prompts compact by trimming representative allowed quotes', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const manyQuotes = [
+      oddsQuote,
+      ...Array.from({ length: 120 }, (_, index) => ({
+        ...oddsQuote,
+        id: `corner-quote-${index}`,
+        marketKey: 'corners_over_under',
+        selectionKey: index % 2 === 0 ? 'over' : 'under',
+        line: 5 + (index / 4),
+        price: 1.5 + (index % 10) / 10,
+      })),
+    ];
+    let prompt = '';
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => manyQuotes },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async (_config, input) => {
+        prompt = String(input);
+        return {
+          text: JSON.stringify({
+            predictions: [{
+              oddsQuoteId: 'odds-quote-1',
+              market: 'h2h',
+              selection: 'home',
+              line: null,
+              odds: 2.1,
+              probability: 0.56,
+              confidence: 0.75,
+              evidenceIds: ['evidence-1', 'evidence-2'],
+              claimIds: ['claim-1'],
+              rationale: 'Home selection is supported by the supplied evidence.',
+              warnings: [],
+            }],
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistPredictions: async (records: any[]) => records,
+    });
+
+    const payload = JSON.parse(prompt.slice(prompt.indexOf('Input:') + 'Input:'.length));
+    assert.equal(result.ok, true);
+    assert.equal(payload.allowedQuotes.length, 80);
+    assert.equal(payload.allowedQuotes.some((quote: any) => quote.oddsQuoteId === 'odds-quote-1'), true);
+    assert.match(payload.providerContextWarnings.join('\n'), /allowedQuotes trimmed/);
+  });
+
+  it('blocks invalid LLM picks that reference quotes outside the persisted odds snapshot', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted = false;
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions-blocked.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'missing-quote',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1'],
+            claimIds: ['claim-1'],
+            rationale: 'Invalid quote reference.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async () => {
+        persisted = true;
+        return [];
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.match(result.error ?? '', /unknown oddsQuoteId/);
+    assert.equal(persisted, false);
   });
 
   it('blocks without a persisted odds snapshot and does not persist predictions', async () => {

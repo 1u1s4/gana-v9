@@ -107,7 +107,7 @@ type OptionalRunService = {
   runFixtureScoring?: typeof runFixtureScoring;
   runParlayBuild?: typeof runParlayBuild;
   runValidation?: typeof runValidation;
-  runPipeline?: (config: AgentConfig, input: { date: string }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
+  runPipeline?: (config: AgentConfig, input: { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
   exportRunArtifacts?: (config: AgentConfig, input: { runId: string }, runtime: RuntimeContext) => Promise<RunExportResult>;
 };
 
@@ -427,7 +427,13 @@ function optionalStringFlag(flags: Record<string, string | true>, key: string): 
 }
 
 function optionalResearchWebMode(flags: Record<string, string | true>): ResearchWebMode {
-  const value = optionalStringFlag(flags, 'web') ?? 'off';
+  const value = optionalResearchWebModeFlag(flags) ?? 'off';
+  return value;
+}
+
+function optionalResearchWebModeFlag(flags: Record<string, string | true>): ResearchWebMode | undefined {
+  const value = optionalStringFlag(flags, 'web');
+  if (value === undefined) return undefined;
   if (value === 'off' || value === 'cached' || value === 'live') return value;
   throw new Error('--web must be off, cached, or live.');
 }
@@ -508,10 +514,11 @@ function optionalRunValidationMode(flags: Record<string, string | true>): 'auto'
   throw new Error('--validate must be auto, force, or off.');
 }
 
-function requiredRunInput(flags: Record<string, string | true>): { date: string; validate?: 'auto' | 'force' | false } {
+function requiredRunInput(flags: Record<string, string | true>): { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode } {
   return {
     date: requireDateFlag(flags),
     validate: optionalRunValidationMode(flags),
+    web: optionalResearchWebModeFlag(flags),
   };
 }
 
@@ -523,7 +530,7 @@ async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags:
   const fixtureId = requireStringFlag(flags, 'fixture-id');
   const service = await loadOptionalRunService();
   const runner = service.runFixtureScoring ?? runFixtureScoring;
-  return runner(ctx.config, { fixtureId }, ctx.runtime);
+  return runner(ctx.config, { fixtureId, web: optionalResearchWebMode(flags) }, ctx.runtime);
 }
 
 async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
@@ -1622,16 +1629,16 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana fixtures --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana odds --fixture-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live${RESET}`);
-  console.log(`  ${CYAN}pnpm gana score --fixture-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana score --fixture-id ID --web live${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
-  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --validate auto|force|off${RESET}`);
+  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --validate auto|force|off${RESET}`);
   console.log(`  ${CYAN}pnpm gana export --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana artifacts --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
-  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20 --markets h2h,double_chance,btts${RESET}`);
+  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);
   console.log(`  ${CYAN}pnpm gana filters show${RESET}`);
 }

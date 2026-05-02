@@ -14,7 +14,7 @@ import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js'
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import { runParlayBuild, type ParlayBuildRunResult } from '../parlay/service.js';
 import { runValidation, type ValidationRunResult } from '../validation/service.js';
-import { getPrismaClient } from '../storage/db.js';
+import { disconnectDb, getPrismaClient } from '../storage/db.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import type { HarnessRunRecord, JsonValue, StoragePrismaClient } from '../storage/types.js';
 import {
@@ -157,6 +157,8 @@ const EMPTY_LOW_ODDS_SCAN: Omit<LowOddsScanView, 'date' | 'threshold'> = {
   hits: [],
   fixtureEvaluations: [],
 };
+const STORAGE_RETRY_ATTEMPTS = 3;
+const STORAGE_RETRY_DELAY_MS = 2_000;
 
 export async function executeRunPipeline(
   config: AgentConfig,
@@ -260,7 +262,9 @@ export async function executeRunPipeline(
   const oddsSnapshots: OddsSnapshotView[] = [];
   for (const fixture of fixtureDiscovery.fixtures) {
     try {
-      const snapshot = await (deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot)(config, fixture.providerFixtureId, runtime);
+      const snapshot = await retryStorageConnection(() => (
+        deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
+      )(config, fixture.providerFixtureId, runtime));
       oddsSnapshots.push({
         fixtureId: fixture.id,
         providerFixtureId: fixture.providerFixtureId,
@@ -312,21 +316,23 @@ export async function executeRunPipeline(
     name: 'scan low odds',
     ok: lowOddsScan.hitCount > 0,
     verdict: lowOddsScan.hitCount > 0 ? 'promotable' : 'review-required',
-    warnings: lowOddsScan.hitCount > 0 ? [] : ['no low-odds hits found'],
+    warnings: lowOddsScan.hitCount > 0
+      ? []
+      : ['no low-odds hits found; falling back to full eligible fixture slate for review-required scoring'],
   });
 
   const selectedFixtureIds = new Set(lowOddsScan.hits.map((hit) => hit.fixtureId));
   const selectedFixtures = selectedFixtureIds.size
     ? fixtureDiscovery.fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id))
-    : [];
+    : fixtureDiscovery.fixtures;
 
   const research: FixtureResearchResult[] = [];
   for (const fixture of selectedFixtures) {
     try {
-      research.push(await (deps.researchFixture ?? runFixtureResearch)(config, {
+      research.push(await retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(config, {
         fixtureId: fixture.providerFixtureId,
         web: input.web ?? defaultWebMode(config),
-      }, runtime));
+      }, runtime)));
     } catch (err: any) {
       research.push(blockedResearchResult(config, runId, fixture, err));
     }
@@ -341,7 +347,10 @@ export async function executeRunPipeline(
   const scoring: FixtureScoringResult[] = [];
   for (const fixture of selectedFixtures) {
     try {
-      scoring.push(await (deps.scoreFixture ?? runFixtureScoring)(config, { fixtureId: fixture.providerFixtureId }, runtime));
+      scoring.push(await retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(config, {
+        fixtureId: fixture.providerFixtureId,
+        web: input.web ?? defaultWebMode(config),
+      }, runtime)));
     } catch (err: any) {
       scoring.push(blockedScoringResult(config, runId, fixture, err));
     }
@@ -363,7 +372,7 @@ export async function executeRunPipeline(
 
   let parlay: ParlayBuildRunResult;
   try {
-    parlay = await (deps.buildParlay ?? runParlayBuild)(config, { date: input.date }, runtime);
+    parlay = await retryStorageConnection(() => (deps.buildParlay ?? runParlayBuild)(config, { date: input.date }, runtime));
   } catch (err: any) {
     parlay = blockedParlayResult(config, runId, input.date, err);
   }
@@ -637,7 +646,7 @@ function buildLowOddsScan(
     const fixture = fixturesByProviderId.get(snapshot.providerFixtureId);
     if (!fixture) continue;
     for (const quote of snapshot.quotes) {
-      if (!config.apiFootball.defaultMarkets.includes(quote.market)) continue;
+      if (!isLowOddsFixtureSelectorQuote(quote)) continue;
       if (quote.price > config.apiFootball.lowOddsThreshold) continue;
       if (config.apiFootball.bookmakerAllowlist?.length && quote.bookmaker && !config.apiFootball.bookmakerAllowlist.includes(quote.bookmaker)) continue;
       hits.push({
@@ -668,13 +677,17 @@ function buildLowOddsScan(
   };
 }
 
+function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }): boolean {
+  return quote.market === 'h2h' && (quote.selection === 'home' || quote.selection === 'away');
+}
+
 function summarizeResultStep(
   name: string,
   results: Array<{ ok: boolean; verdict?: string; warnings: string[]; artifactPath?: string }>,
   expected: number,
 ): PipelineStepResult {
   if (!expected) {
-    return { name, ok: false, verdict: 'review-required', warnings: [`${name} skipped because no low-odds fixtures were selected`] };
+    return { name, ok: false, verdict: 'review-required', warnings: [`${name} skipped because no eligible fixtures were selected`] };
   }
   const warnings = results.flatMap((result) => result.warnings);
   const blocked = results.filter((result) => result.verdict === 'blocked' || !result.ok).length;
@@ -804,11 +817,42 @@ function blockedValidationResult(config: AgentConfig, runId: string, date: strin
 }
 
 function finalVerdict(steps: PipelineStepResult[]): PipelineVerdict {
-  const critical = steps.filter((step) => ['fetch fixtures', 'fetch odds', 'research', 'score', 'build parlay'].includes(step.name));
-  if (critical.length && critical.every((step) => step.verdict === 'blocked' || !step.ok)) return 'blocked';
-  if (steps.some((step) => step.verdict === 'blocked')) return 'blocked';
+  const fatalSteps = new Set(['fetch fixtures', 'fetch odds', 'score', 'build parlay']);
+  if (steps.some((step) => fatalSteps.has(step.name) && (step.verdict === 'blocked' || !step.ok))) return 'blocked';
   if (steps.some((step) => step.verdict === 'review-required' || step.warnings.length > 0 || !step.ok)) return 'review-required';
   return 'promotable';
+}
+
+async function retryStorageConnection<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= STORAGE_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (!isStorageConnectionError(err) || attempt === STORAGE_RETRY_ATTEMPTS) throw err;
+      await disconnectDb().catch(() => undefined);
+      await sleep(STORAGE_RETRY_DELAY_MS * attempt);
+    }
+  }
+  throw lastError;
+}
+
+function isStorageConnectionError(err: unknown): boolean {
+  const error = err as { code?: unknown; message?: unknown };
+  const code = typeof error?.code === 'string' ? error.code : '';
+  const message = String(error?.message ?? err);
+  return code === 'P1001'
+    || code === 'P1017'
+    || code === 'P2024'
+    || message.includes('Server has closed the connection')
+    || message.includes("Can't reach database server")
+    || message.includes('Connection terminated')
+    || message.includes('Timed out fetching a new connection');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getValidationSkipReason(mode: PipelineValidationMode, date: string, referenceDate: Date): string | undefined {

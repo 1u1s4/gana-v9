@@ -95,7 +95,8 @@ export async function scanLowOdds(
     querySnapshot: toJsonValue({
       date: filters.date,
       threshold: filters.threshold,
-      markets: filters.markets,
+      markets: ['h2h'],
+      marketScope: 'h2h-home-away',
       bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
     }),
   });
@@ -121,7 +122,7 @@ export async function scanLowOdds(
     for (const fixture of fixtureDiscovery.fixtures.slice(0, filters.maxFixturesPerRun)) {
       try {
         const snapshot = await getApiFootballOddsSnapshot(config, fixture.providerFixtureId, runtime);
-        const marketQuotes = snapshot.quotes.filter((quote) => filters.markets.includes(quote.market));
+        const marketQuotes = snapshot.quotes.filter(isLowOddsFixtureSelectorQuote);
         const bookmakerQuotes = filters.bookmakerAllowlist?.length
           ? marketQuotes.filter((quote) => quote.bookmaker && filters.bookmakerAllowlist?.includes(quote.bookmaker))
           : marketQuotes;
@@ -195,7 +196,8 @@ export async function scanLowOdds(
       querySnapshot: toJsonValue({
         date: filters.date,
         threshold: filters.threshold,
-        markets: filters.markets,
+        markets: ['h2h'],
+        marketScope: 'h2h-home-away',
         bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
         requestedLeagues: fixtureDiscovery.requestedLeagues,
         requestedTeams: fixtureDiscovery.requestedTeams,
@@ -226,6 +228,10 @@ export async function scanLowOdds(
   };
 }
 
+function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }): boolean {
+  return quote.market === 'h2h' && (quote.selection === 'home' || quote.selection === 'away');
+}
+
 export async function persistLowOddsScanResult(
   repositories: LowOddsPersistenceRepositories,
   input: PersistLowOddsScanInput,
@@ -238,7 +244,8 @@ export async function persistLowOddsScanResult(
     querySnapshot: toJsonValue({
       date: input.date,
       threshold: input.threshold,
-      markets: input.markets,
+      markets: ['h2h'],
+      marketScope: 'h2h-home-away',
       bookmakerAllowlist: input.bookmakerAllowlist ?? [],
     }),
   });
@@ -272,7 +279,8 @@ export async function persistLowOddsScanResult(
       querySnapshot: toJsonValue({
         date: input.date,
         threshold: input.threshold,
-        markets: input.markets,
+        markets: ['h2h'],
+        marketScope: 'h2h-home-away',
         bookmakerAllowlist: input.bookmakerAllowlist ?? [],
         requestedLeagues: input.requestedLeagues ?? [],
         requestedTeams: input.requestedTeams ?? [],

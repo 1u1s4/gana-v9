@@ -13,7 +13,12 @@ import {
   createApiFootballPersistence,
   createApiFootballProvider,
 } from '../providers/sports/api-football.js';
-import type { SportsDataProvider } from '../providers/sports/types.js';
+import type {
+  CanonicalOddsSnapshot,
+  FixtureStatistics,
+  OddsQuery,
+  SportsDataProvider,
+} from '../providers/sports/types.js';
 import {
   RESEARCH_FIXTURE_PROMPT_VERSION,
   type ResearchWebMode,
@@ -29,6 +34,7 @@ import { mergeGateWarnings, validateResearchBundle } from './claims.js';
 export interface RunFixtureResearchInput {
   fixtureId: string;
   web: ResearchWebMode;
+  oddsSnapshot?: CanonicalOddsSnapshot;
 }
 
 export interface FixtureResearchResult {
@@ -41,10 +47,21 @@ export interface FixtureResearchResult {
 
 export interface FixtureResearchDependencies {
   agentRunner?: typeof runAgentWithRetry;
-  provider?: Pick<SportsDataProvider, 'getFixture'>;
+  provider?: ResearchSportsProvider;
   now?: () => Date;
   persistBundle?: (bundle: ResearchBundle, artifactPath: string) => Promise<void>;
   createRun?: (input: { runId: string; artifactDir?: string }) => Promise<string>;
+}
+
+type ResearchSportsProvider = Pick<SportsDataProvider, 'getFixture'> &
+  Partial<Pick<SportsDataProvider, 'getFixtureStatistics'>> & {
+    getCanonicalOddsSnapshot?(input: OddsQuery): Promise<CanonicalOddsSnapshot>;
+  };
+
+interface ResearchProviderContext {
+  fixtureStatistics?: FixtureStatistics;
+  oddsSnapshot?: CanonicalOddsSnapshot;
+  warnings: string[];
 }
 
 const BLOCKED_GATE: ResearchGateResult = {
@@ -52,6 +69,7 @@ const BLOCKED_GATE: ResearchGateResult = {
   reasons: ['research failed'],
   warnings: [],
 };
+const RESEARCH_AGENT_TIMEOUT_MS = 120_000;
 
 export async function runFixtureResearch(
   config: AgentConfig,
@@ -75,9 +93,13 @@ export async function runFixtureResearch(
     });
   }
 
+  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot);
   const prompt = buildResearchFixturePrompt({
     fixture,
     web: input.web,
+    oddsSnapshot: providerContext.oddsSnapshot,
+    fixtureStatistics: providerContext.fixtureStatistics,
+    providerContextWarnings: providerContext.warnings,
     runId,
     createdAt,
   });
@@ -88,13 +110,13 @@ export async function runFixtureResearch(
       required: input.web === 'live',
       reason: 'research fixture',
     });
-    const result = await (deps.agentRunner ?? runAgentWithRetry)(config, prompt, {
+    const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, {
       nativeWebSearchRequirement,
     });
     rawOutput = result.text;
   } catch (err: any) {
     const error = redactErrorMessage(err?.message ?? String(err));
-    return buildAndPersistAgentFailureFallback(config, input, runtime, deps, runId, fixture, createdAt, error);
+    return buildAndPersistAgentFailureFallback(config, input, runtime, deps, runId, fixture, createdAt, error, providerContext);
   }
 
   const parsed = parseResearchJson(rawOutput);
@@ -108,22 +130,27 @@ export async function runFixtureResearch(
     });
   }
 
-  const baseSource = apiFootballSource(fixture, createdAt);
+  const repaired = repairResearchReferences(parsed.value);
+  const baseSources = apiFootballSources(fixture, createdAt, providerContext);
   const bundleInput = {
     id: randomUUID(),
     runId,
     fixtureId: fixture.id,
     providerFixtureId: fixture.providerFixtureId,
-    sources: normalizeSourceRecords(prependMissingSource(parsed.value.sources, baseSource)),
-    evidenceItems: parsed.value.evidenceItems,
-    claims: parsed.value.claims,
-    gateResult: parsed.value.gateResult,
+    sources: normalizeSourceRecords(prependMissingSources(repaired.value.sources, baseSources)),
+    evidenceItems: repaired.value.evidenceItems,
+    claims: repaired.value.claims,
+    gateResult: repaired.value.gateResult,
     providerAgentic: config.provider,
     model: config.model,
     promptVersion: RESEARCH_FIXTURE_PROMPT_VERSION,
     createdAt,
-    warnings: parsed.value.warnings ?? [],
-    metadata: parsed.value.metadata ?? {},
+    warnings: uniqueStrings([...(repaired.value.warnings ?? []), ...repaired.warnings, ...providerContext.warnings]),
+    metadata: {
+      ...(repaired.value.metadata ?? {}),
+      providerContextWarnings: providerContext.warnings,
+      ...(repaired.warnings.length ? { referenceRepairs: repaired.warnings } : {}),
+    },
   };
 
   const validation = validateResearchBundle(bundleInput);
@@ -158,6 +185,84 @@ export function parseResearchJson(rawOutput: string): { ok: true; value: any } |
   }
 }
 
+async function runResearchAgent(
+  runner: typeof runAgentWithRetry,
+  config: AgentConfig,
+  prompt: string,
+  options: Parameters<typeof runAgentWithRetry>[2],
+): Promise<Awaited<ReturnType<typeof runAgentWithRetry>>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RESEARCH_AGENT_TIMEOUT_MS);
+  try {
+    return await runner(config, prompt, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (controller.signal.aborted) {
+      throw new Error(`research agent timed out after ${Math.round(RESEARCH_AGENT_TIMEOUT_MS / 1000)}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function repairResearchReferences(value: any): { value: any; warnings: string[] } {
+  const warnings: string[] = [];
+  const claims = Array.isArray(value?.claims) ? value.claims : [];
+  const evidenceItems = Array.isArray(value?.evidenceItems) ? value.evidenceItems : [];
+  const claimIds = new Set(claims.map((claim: any) => claim?.id).filter((id: unknown): id is string => typeof id === 'string'));
+  const evidenceIds = new Set(evidenceItems.map((evidence: any) => evidence?.id).filter((id: unknown): id is string => typeof id === 'string'));
+  const evidenceIdsBySourceId = new Map<string, string[]>();
+
+  for (const evidence of evidenceItems) {
+    if (typeof evidence?.sourceId !== 'string' || typeof evidence?.id !== 'string') continue;
+    const existing = evidenceIdsBySourceId.get(evidence.sourceId) ?? [];
+    existing.push(evidence.id);
+    evidenceIdsBySourceId.set(evidence.sourceId, existing);
+  }
+
+  const repairedEvidenceItems = evidenceItems.map((evidence: any) => {
+    if (!Array.isArray(evidence?.claimIds)) return evidence;
+    const claimIdsBefore = evidence.claimIds;
+    const filteredClaimIds = uniqueStrings(claimIdsBefore.filter((claimId: unknown) => typeof claimId === 'string' && claimIds.has(claimId)));
+    if (filteredClaimIds.length !== claimIdsBefore.length) {
+      warnings.push(`removed unknown claim references from evidence item "${evidence.id ?? 'unknown'}"`);
+    }
+    return { ...evidence, claimIds: filteredClaimIds };
+  });
+
+  const repairedClaims = claims.map((claim: any) => {
+    if (!Array.isArray(claim?.evidenceIds)) return claim;
+    const repairedEvidenceIds: string[] = [];
+    for (const evidenceId of claim.evidenceIds) {
+      if (typeof evidenceId !== 'string') continue;
+      if (evidenceIds.has(evidenceId)) {
+        repairedEvidenceIds.push(evidenceId);
+        continue;
+      }
+      const sourceEvidenceIds = evidenceIdsBySourceId.get(evidenceId);
+      if (sourceEvidenceIds?.length) {
+        repairedEvidenceIds.push(...sourceEvidenceIds);
+        warnings.push(`mapped source reference "${evidenceId}" to evidence on claim "${claim.id ?? 'unknown'}"`);
+        continue;
+      }
+      warnings.push(`removed unknown evidence reference "${evidenceId}" from claim "${claim.id ?? 'unknown'}"`);
+    }
+    return { ...claim, evidenceIds: uniqueStrings(repairedEvidenceIds) };
+  });
+
+  return {
+    value: {
+      ...value,
+      evidenceItems: repairedEvidenceItems,
+      claims: repairedClaims,
+    },
+    warnings: uniqueStrings(warnings),
+  };
+}
+
 async function buildAndPersistAgentFailureFallback(
   config: AgentConfig,
   input: RunFixtureResearchInput,
@@ -167,8 +272,9 @@ async function buildAndPersistAgentFailureFallback(
   fixture: Fixture,
   createdAt: string,
   error: string,
+  providerContext: ResearchProviderContext,
 ): Promise<FixtureResearchResult> {
-  const bundleInput = buildAgentFailureFallbackBundle(config, input, runId, fixture, createdAt, error);
+  const bundleInput = buildAgentFailureFallbackBundle(config, input, runId, fixture, createdAt, error, providerContext);
   const validation = validateResearchBundle(bundleInput);
   if (!validation.ok || !validation.value) {
     return writeBlockedArtifact(config, runId, 'research-fallback-validation-error.json', {
@@ -190,50 +296,88 @@ function buildAgentFailureFallbackBundle(
   fixture: Fixture,
   createdAt: string,
   error: string,
+  providerContext: ResearchProviderContext = { warnings: [] },
 ): ResearchBundle {
   const source = apiFootballSource(fixture, createdAt);
+  const statisticsSource = providerContext.fixtureStatistics
+    ? apiFootballStatisticsSource(providerContext.fixtureStatistics, createdAt)
+    : undefined;
+  const oddsSource = providerContext.oddsSnapshot
+    ? apiFootballOddsSnapshotSource(providerContext.oddsSnapshot, createdAt)
+    : undefined;
   const evidenceId = 'evidence_api_football_fixture_metadata';
   const claimId = 'claim_api_football_fixture_metadata';
   const warnings = [
     `agentic research failed before structured JSON was returned: ${error}`,
-    'fallback research uses API-Football fixture metadata only',
+    'fallback research uses API-Football provider context only',
     'fallback research is not promotable',
+    ...providerContext.warnings,
   ];
+  const evidenceItems = [{
+    id: evidenceId,
+    sourceId: source.id,
+    claimIds: [claimId],
+    summary: fixtureMetadataSummary(fixture),
+    confidence: 0.55,
+    metadata: {
+      fallback: true,
+      fields: ['providerFixtureId', 'homeTeamId', 'awayTeamId', 'scheduledAt', 'status'],
+    },
+  }];
+  const claims = [{
+    id: claimId,
+    statement: fixtureMetadataClaim(fixture),
+    subject: { type: 'fixture' as const, id: fixture.id },
+    supportLevel: 'supported' as const,
+    evidenceIds: [evidenceId],
+    conflictStatus: 'none' as const,
+    metadata: {
+      fallback: true,
+      sourceId: source.id,
+    },
+  }];
+
+  if (providerContext.fixtureStatistics && statisticsSource) {
+    const statisticsEvidenceId = 'evidence_api_football_fixture_statistics';
+    const statisticsClaimId = 'claim_api_football_fixture_statistics';
+    evidenceItems.push({
+      id: statisticsEvidenceId,
+      sourceId: statisticsSource.id,
+      claimIds: [statisticsClaimId],
+      summary: fixtureStatisticsSummary(providerContext.fixtureStatistics),
+      confidence: 0.55,
+      metadata: {
+        fallback: true,
+        fields: ['cornersHome', 'cornersAway', 'totalCorners'],
+      },
+    });
+    claims.push({
+      id: statisticsClaimId,
+      statement: fixtureStatisticsClaim(providerContext.fixtureStatistics),
+      subject: { type: 'fixture', id: fixture.id },
+      supportLevel: 'supported',
+      evidenceIds: [statisticsEvidenceId],
+      conflictStatus: 'none',
+      metadata: {
+        fallback: true,
+        sourceId: statisticsSource.id,
+      },
+    });
+  }
 
   return {
     id: randomUUID(),
     runId,
     fixtureId: fixture.id,
     providerFixtureId: fixture.providerFixtureId,
-    sources: [source],
-    evidenceItems: [{
-      id: evidenceId,
-      sourceId: source.id,
-      claimIds: [claimId],
-      summary: fixtureMetadataSummary(fixture),
-      confidence: 0.55,
-      metadata: {
-        fallback: true,
-        fields: ['providerFixtureId', 'homeTeamId', 'awayTeamId', 'scheduledAt', 'status'],
-      },
-    }],
-    claims: [{
-      id: claimId,
-      statement: fixtureMetadataClaim(fixture),
-      subject: { type: 'fixture', id: fixture.id },
-      supportLevel: 'supported',
-      evidenceIds: [evidenceId],
-      conflictStatus: 'none',
-      metadata: {
-        fallback: true,
-        sourceId: source.id,
-      },
-    }],
+    sources: [source, statisticsSource, oddsSource].filter((item): item is SourceRecord => Boolean(item)),
+    evidenceItems,
+    claims,
     gateResult: {
       verdict: 'review-required',
       reasons: [
         'agentic research failed before structured JSON was returned',
-        'fallback contains API-Football fixture metadata only',
+        'fallback contains API-Football provider context only',
         'independent evidence is insufficient for promotion',
       ],
       warnings,
@@ -248,6 +392,7 @@ function buildAgentFailureFallbackBundle(
       fallbackReason: 'agent-runner-error',
       webMode: input.web,
       agentError: error,
+      providerContextWarnings: providerContext.warnings,
     },
   };
 }
@@ -297,9 +442,54 @@ async function writeAndPersistResearchBundle(
 async function createDefaultSportsProvider(
   config: AgentConfig,
   runtime: RuntimeContext,
-): Promise<Pick<SportsDataProvider, 'getFixture'>> {
+): Promise<ResearchSportsProvider> {
   const persistence = await createApiFootballPersistence(config, runtime);
   return createApiFootballProvider(config, persistence);
+}
+
+async function buildResearchProviderContext(
+  provider: ResearchSportsProvider,
+  fixture: Fixture,
+  inputOddsSnapshot?: CanonicalOddsSnapshot,
+): Promise<ResearchProviderContext> {
+  const warnings: string[] = [];
+  const fixtureStatistics = await fetchFixtureStatistics(provider, fixture.providerFixtureId, warnings);
+  const oddsSnapshot = inputOddsSnapshot
+    ?? await fetchCanonicalOddsSnapshot(provider, fixture.providerFixtureId, warnings);
+
+  return {
+    ...(fixtureStatistics && { fixtureStatistics }),
+    ...(oddsSnapshot && { oddsSnapshot }),
+    warnings: uniqueStrings(warnings),
+  };
+}
+
+async function fetchFixtureStatistics(
+  provider: ResearchSportsProvider,
+  providerFixtureId: string,
+  warnings: string[],
+): Promise<FixtureStatistics | undefined> {
+  if (!provider.getFixtureStatistics) return undefined;
+  try {
+    return await provider.getFixtureStatistics({ providerFixtureId });
+  } catch (err: any) {
+    warnings.push(`API-Football fixture statistics unavailable: ${err?.message ?? String(err)}`);
+    return undefined;
+  }
+}
+
+async function fetchCanonicalOddsSnapshot(
+  provider: ResearchSportsProvider,
+  providerFixtureId: string,
+  warnings: string[],
+): Promise<CanonicalOddsSnapshot | undefined> {
+  if (!provider.getCanonicalOddsSnapshot) return undefined;
+  try {
+    return await provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId });
+  } catch (err: any) {
+    warnings.push(`API-Football odds snapshot unavailable: ${err?.message ?? String(err)}`);
+    return undefined;
+  }
 }
 
 function apiFootballSource(fixture: Fixture, capturedAt: string): SourceRecord {
@@ -317,6 +507,57 @@ function apiFootballSource(fixture: Fixture, capturedAt: string): SourceRecord {
   };
 }
 
+function apiFootballStatisticsSource(statistics: FixtureStatistics, capturedAt: string): SourceRecord {
+  return {
+    id: 'source_api_football_fixture_statistics',
+    type: 'api-football',
+    externalId: statistics.providerFixtureId,
+    snapshotId: statistics.providerSnapshotId,
+    title: 'API-Football fixture statistics',
+    capturedAt: statistics.capturedAt ?? capturedAt,
+    hash: hashPayload(statistics),
+    metadata: {
+      providerFixtureId: statistics.providerFixtureId,
+      fields: ['cornersHome', 'cornersAway', 'totalCorners'],
+    },
+  };
+}
+
+function apiFootballOddsSnapshotSource(snapshot: CanonicalOddsSnapshot, capturedAt: string): SourceRecord {
+  return {
+    id: 'source_api_football_odds_snapshot',
+    type: 'provider-snapshot',
+    externalId: snapshot.providerFixtureId,
+    snapshotId: snapshot.providerSnapshotId,
+    title: 'API-Football odds snapshot',
+    capturedAt: snapshot.capturedAt ?? capturedAt,
+    hash: snapshot.payloadHash,
+    metadata: {
+      fixtureId: snapshot.fixtureId,
+      providerFixtureId: snapshot.providerFixtureId,
+      oddsSnapshotId: snapshot.oddsSnapshotId ?? null,
+      quoteCount: snapshot.quotes.length,
+      bookmakerCount: snapshot.bookmakerCount,
+    },
+  };
+}
+
+function apiFootballSources(
+  fixture: Fixture,
+  capturedAt: string,
+  providerContext: ResearchProviderContext,
+): SourceRecord[] {
+  return [
+    apiFootballSource(fixture, capturedAt),
+    providerContext.fixtureStatistics
+      ? apiFootballStatisticsSource(providerContext.fixtureStatistics, capturedAt)
+      : undefined,
+    providerContext.oddsSnapshot
+      ? apiFootballOddsSnapshotSource(providerContext.oddsSnapshot, capturedAt)
+      : undefined,
+  ].filter((source): source is SourceRecord => Boolean(source));
+}
+
 function fixtureMetadataSummary(fixture: Fixture): string {
   const score = Number.isFinite(fixture.scoreHome) && Number.isFinite(fixture.scoreAway)
     ? `, score ${fixture.scoreHome}-${fixture.scoreAway}`
@@ -330,6 +571,27 @@ function fixtureMetadataSummary(fixture: Fixture): string {
   ].join(', ');
 }
 
+function fixtureStatisticsSummary(statistics: FixtureStatistics): string {
+  const cornerParts = [
+    Number.isFinite(statistics.cornersHome) ? `home corners ${statistics.cornersHome}` : undefined,
+    Number.isFinite(statistics.cornersAway) ? `away corners ${statistics.cornersAway}` : undefined,
+    Number.isFinite(statistics.totalCorners) ? `total corners ${statistics.totalCorners}` : undefined,
+  ].filter(Boolean);
+  const corners = cornerParts.length ? cornerParts.join(', ') : 'no mapped corner statistics returned';
+  return [
+    `API-Football fixture statistics ${statistics.providerFixtureId}`,
+    corners,
+    `capturedAt ${statistics.capturedAt}`,
+  ].join(', ');
+}
+
+function fixtureStatisticsClaim(statistics: FixtureStatistics): string {
+  if (Number.isFinite(statistics.totalCorners)) {
+    return `API-Football statistics list ${statistics.totalCorners} total corners for fixture ${statistics.providerFixtureId}.`;
+  }
+  return `API-Football statistics were captured for fixture ${statistics.providerFixtureId}.`;
+}
+
 function fixtureMetadataClaim(fixture: Fixture): string {
   return `API-Football lists fixture ${fixture.providerFixtureId} as ${fixture.status} with scheduled kickoff ${fixture.scheduledAt}.`;
 }
@@ -339,9 +601,14 @@ function redactErrorMessage(error: string): string {
   return typeof redacted === 'string' ? redacted : 'Agentic research failed before structured JSON was returned.';
 }
 
-function prependMissingSource(sources: SourceRecord[] | undefined, source: SourceRecord): SourceRecord[] {
+function prependMissingSources(sources: SourceRecord[] | undefined, requiredSources: SourceRecord[]): SourceRecord[] {
   const existing = Array.isArray(sources) ? sources : [];
-  return existing.some((item) => item.id === source.id) ? existing : [source, ...existing];
+  const missing = requiredSources.filter((source) => !existing.some((item) => item.id === source.id));
+  return [...missing, ...existing];
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
 }
 
 function normalizeSourceRecords(sources: SourceRecord[]): SourceRecord[] {

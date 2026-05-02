@@ -34,7 +34,10 @@ export interface PrismaModelDelegate<Record> {
 }
 
 export interface StoragePrismaClient {
-  $transaction?<T>(fn: (tx: StoragePrismaClient) => Promise<T>): Promise<T>;
+  $transaction?<T>(
+    fn: (tx: StoragePrismaClient) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number },
+  ): Promise<T>;
   sportsProvider: PrismaModelDelegate<SportsProviderRecord>;
   competition: PrismaModelDelegate<CompetitionRecord>;
   team: PrismaModelDelegate<TeamRecord>;

@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import type { AgentConfig } from '../config.js';
-import { API_FOOTBALL_PROVIDER } from '../providers/sports/types.js';
+import { runAgentWithRetry } from '../agent.js';
+import { createApiFootballPersistence, createApiFootballProvider } from '../providers/sports/api-football.js';
+import { API_FOOTBALL_PROVIDER, type FixtureStatistics } from '../providers/sports/types.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { getPrismaClient } from '../storage/db.js';
@@ -16,15 +18,20 @@ import type {
   PredictionInput,
   PredictionRecord,
   ResearchBundleRecord,
+  SourceRecordRecord,
   StoragePrismaClient,
 } from '../storage/types.js';
 import { aggregatePredictionGate, evaluateEvidenceGate, evaluatePredictionGates } from './gates.js';
 import { buildAtomicPrediction, scorePredictionCandidate } from './scoring.js';
-import { SCORE_PREDICTION_PROMPT_VERSION } from './prompts.js';
+import { SCORE_PREDICTION_PROMPT_VERSION, buildScorePredictionPrompt, type ResearchWebMode } from './prompts.js';
 import { SCORING_RULE_VERSION, type PredictionRecordView } from './types.js';
+
+const SCORING_AGENT_TIMEOUT_MS = 120_000;
+const MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT = 80;
 
 export interface RunFixtureScoringInput {
   fixtureId: string;
+  web?: ResearchWebMode;
 }
 
 export interface FixtureScoringResult {
@@ -49,6 +56,8 @@ export interface FixtureScoringDependencies {
     fixtureId?: string;
   }) => Promise<Pick<ArtifactRecord, 'id'> | null>;
   persistPredictions?: (predictions: PredictionInput[]) => Promise<PredictionRecord[]>;
+  agentRunner?: typeof runAgentWithRetry;
+  fetchFixtureStatistics?: (providerFixtureId: string) => Promise<FixtureStatistics | undefined>;
 }
 
 export interface PredictionServiceRepositories {
@@ -67,6 +76,9 @@ export interface PredictionServiceRepositories {
   };
   researchBundles: {
     list(query: { fixtureId?: string; status?: string; take?: number }): Promise<ResearchBundleRecord[]>;
+  };
+  sourceRecords?: {
+    list(query: { bundleId?: string; fixtureId?: string; sourceType?: string; take?: number }): Promise<SourceRecordRecord[]>;
   };
   evidenceItems: {
     list(query: { bundleId?: string; fixtureId?: string; take?: number }): Promise<EvidenceItemRecord[]>;
@@ -102,6 +114,20 @@ export interface PredictionServiceRepositories {
   predictions?: {
     create(input: PredictionInput): Promise<PredictionRecord>;
   };
+}
+
+interface ParsedTopPick {
+  oddsQuoteId: string;
+  market: string;
+  selection: string;
+  line?: number;
+  odds: number;
+  probability?: number;
+  confidence: number;
+  evidenceIds: string[];
+  claimIds: string[];
+  rationale: string;
+  warnings: string[];
 }
 
 export async function runFixtureScoring(
@@ -165,49 +191,108 @@ export async function runFixtureScoring(
     return result;
   }
 
+  const web = input.web ?? 'off';
   const research = await latestResearchGraph(repositories, fixture.id);
   const evidenceGate = evaluateEvidenceGate(research);
   const includedByFilters = stringArray(fixture.includedByFilters);
-  const predictions = oddsQuotes.map((quote) => {
-    const candidateScore = scorePredictionCandidate({
+  const providerContextWarnings: string[] = [];
+  const fixtureStatistics = await fetchScoringFixtureStatistics(config, runtime, deps, fixture.providerFixtureId, providerContextWarnings);
+  const promptOddsQuotes = selectScoringPromptQuotes(oddsQuotes);
+  const allowedQuotes = promptOddsQuotes.map(toAllowedQuote);
+  const quoteTrimWarnings = promptOddsQuotes.length < oddsQuotes.length
+    ? [`scoring prompt allowedQuotes trimmed from ${oddsQuotes.length} to ${promptOddsQuotes.length} representative quotes`]
+    : [];
+  const prompt = buildScorePredictionPrompt({
+    runId,
+    createdAt: generatedAt,
+    web,
+    fixture: fixturePromptView(fixture),
+    fixtureStatistics: fixtureStatistics ?? null,
+    oddsSnapshot: oddsSnapshotPromptView(oddsSnapshot),
+    researchBundle: researchBundlePromptView(research.researchBundle),
+    sources: research.sources.map(sourcePromptView),
+    evidenceItems: research.evidenceItems.map(evidencePromptView),
+    claims: research.claims.map(claimPromptView),
+    allowedQuotes,
+    providerContextWarnings: [
+      ...providerContextWarnings,
+      ...quoteTrimWarnings,
+      ...(web !== 'off' && !hasWebResearchSource(research.sources)
+        ? [`web ${web} requested but no persisted web-search source is linked to the latest research bundle`]
+        : []),
+    ],
+  });
+
+  let llmOutput: ParsedTopPick[];
+  let rawOutput = '';
+  try {
+    const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, { runtime });
+    rawOutput = result.text;
+    llmOutput = parseTopPickOutput(rawOutput);
+  } catch (err: any) {
+    const result = blockedResult(runId, artifactWriter, {
+      error: err?.message ?? String(err),
+      reasons: ['prediction LLM scoring failed'],
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
-      market: quote.marketKey as any,
-      selection: quote.selectionKey,
-      line: numberOrUndefined(quote.line),
-      odds: numberValue(quote.price),
       oddsSnapshotId: oddsSnapshot.id,
-      oddsQuoteId: quote.id,
-      evidenceIds: evidenceGate.evidenceIds,
-      claimIds: evidenceGate.claimIds,
+    });
+    await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
+    return result;
+  }
+
+  const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
+  const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims);
+  if (topPickIssues.length) {
+    const result = blockedResult(runId, artifactWriter, {
+      error: `Prediction LLM output failed validation: ${topPickIssues.join('; ')}`,
+      reasons: ['invalid prediction LLM output'],
+      fixtureId: fixture.id,
+      providerFixtureId: fixture.providerFixtureId,
+      oddsSnapshotId: oddsSnapshot.id,
+    });
+    await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
+    return result;
+  }
+  const predictions = llmOutput.map((pick) => {
+    const quote = quoteById.get(pick.oddsQuoteId);
+    const candidateScore = validateTopPick({
+      pick,
+      quote,
+      evidenceGate,
+      claims: research.claims,
     });
     const gate = evaluatePredictionGates({
       fixture,
       hasOddsSnapshot: true,
-      hasOddsQuote: true,
+      hasOddsQuote: Boolean(quote),
       marketValid: candidateScore.valid,
       researchBundle: research.researchBundle,
       evidenceItems: research.evidenceItems,
       claims: research.claims,
+      webResearchRequired: web !== 'off',
+      hasWebResearch: hasWebResearchSource(research.sources),
     });
+    const selectedEvidenceIds = pick.evidenceIds.length ? pick.evidenceIds : evidenceGate.evidenceIds;
+    const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
 
     return buildAtomicPrediction({
       runId,
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
       oddsSnapshotId: oddsSnapshot.id,
-      oddsQuoteId: quote.id,
-      market: quote.marketKey,
-      selection: quote.selectionKey,
-      line: numberOrUndefined(quote.line),
-      odds: numberValue(quote.price),
-      estimatedProbability: null,
-      evidenceIds: evidenceGate.evidenceIds,
-      claimIds: evidenceGate.claimIds,
+      oddsQuoteId: pick.oddsQuoteId,
+      market: pick.market,
+      selection: pick.selection,
+      line: pick.line,
+      odds: pick.odds,
+      estimatedProbability: pick.probability,
+      evidenceIds: selectedEvidenceIds,
+      claimIds: selectedClaimIds,
       status: gate.verdict,
-      confidence: evidenceGate.confidence,
-      rationale: 'Rule-based scoring v1 from persisted odds snapshot and linked research evidence.',
-      warnings: [...gate.warnings, ...candidateScore.reasons],
+      confidence: pick.confidence,
+      rationale: pick.rationale,
+      warnings: [...gate.warnings, ...candidateScore.reasons, ...pick.warnings],
       providerAgentic: config.provider,
       model: config.model,
       researchBundleId: research.researchBundle?.id,
@@ -231,6 +316,8 @@ export async function runFixtureScoring(
     promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
     scoringRuleVersion: SCORING_RULE_VERSION,
     gateResult: aggregate,
+    prompt,
+    rawOutput,
     predictions,
   };
   const artifactPath = artifactWriter(runId, 'predictions.json', artifactPayload);
@@ -290,20 +377,354 @@ async function resolveFixture(repositories: PredictionServiceRepositories, fixtu
   return repositories.fixtures.findByProviderKey(provider.id, fixtureId);
 }
 
+async function fetchScoringFixtureStatistics(
+  config: AgentConfig,
+  runtime: RuntimeContext,
+  deps: FixtureScoringDependencies,
+  providerFixtureId: string,
+  warnings: string[],
+): Promise<FixtureStatistics | undefined> {
+  if (deps.fetchFixtureStatistics) return deps.fetchFixtureStatistics(providerFixtureId);
+  if (deps.repositories) return undefined;
+  if (!config.apiFootballKey) return undefined;
+  try {
+    const persistence = await createApiFootballPersistence(config, runtime);
+    const provider = createApiFootballProvider(config, persistence);
+    return await provider.getFixtureStatistics({ providerFixtureId });
+  } catch (err: any) {
+    warnings.push(`API-Football fixture statistics unavailable for scoring: ${err?.message ?? String(err)}`);
+    return undefined;
+  }
+}
+
 async function latestResearchGraph(repositories: PredictionServiceRepositories, fixtureId: string) {
   const researchBundle = (await repositories.researchBundles.list({ fixtureId, take: 1 }))[0] ?? null;
   if (!researchBundle) {
     return {
       researchBundle: null,
+      sources: [] as SourceRecordRecord[],
       evidenceItems: [] as EvidenceItemRecord[],
       claims: [] as ClaimRecord[],
     };
   }
-  const [evidenceItems, claims] = await Promise.all([
+  const [sources, evidenceItems, claims] = await Promise.all([
+    repositories.sourceRecords?.list({ bundleId: researchBundle.id, take: 500 }) ?? Promise.resolve([]),
     repositories.evidenceItems.list({ bundleId: researchBundle.id, take: 500 }),
     repositories.claims.list({ bundleId: researchBundle.id, take: 500 }),
   ]);
-  return { researchBundle, evidenceItems, claims };
+  return { researchBundle, sources, evidenceItems, claims };
+}
+
+async function runScoringAgent(
+  runner: typeof runAgentWithRetry,
+  config: AgentConfig,
+  prompt: string,
+  options: Parameters<typeof runAgentWithRetry>[2],
+): Promise<Awaited<ReturnType<typeof runAgentWithRetry>>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SCORING_AGENT_TIMEOUT_MS);
+  try {
+    return await runner(config, prompt, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    if (controller.signal.aborted) {
+      throw new Error(`prediction scoring agent timed out after ${Math.round(SCORING_AGENT_TIMEOUT_MS / 1000)}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseTopPickOutput(rawOutput: string): ParsedTopPick[] {
+  const parsed = parseJsonObject(rawOutput);
+  const predictions: unknown[] | undefined = Array.isArray(parsed.predictions) ? parsed.predictions : undefined;
+  if (!predictions) throw new Error('Prediction output must include predictions array.');
+  return predictions.map((item, index) => parseTopPick(item, index));
+}
+
+function parseJsonObject(rawOutput: string): any {
+  const trimmed = rawOutput.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (err: any) {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1));
+      } catch {
+        // Use the strict parse error below.
+      }
+    }
+    throw new Error(`Prediction output must be strict JSON: ${err?.message ?? err}`);
+  }
+}
+
+function parseTopPick(value: unknown, index: number): ParsedTopPick {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`predictions[${index}] must be an object.`);
+  }
+  const item = value as Record<string, unknown>;
+  const oddsQuoteId = stringField(item, 'oddsQuoteId', index);
+  const market = stringField(item, 'market', index);
+  const selection = stringField(item, 'selection', index);
+  const line = nullableNumberField(item, 'line', index);
+  const odds = numberField(item, 'odds', index);
+  const probability = optionalNumberField(item, 'probability', index);
+  const confidence = numberField(item, 'confidence', index);
+  const evidenceIds = stringArrayField(item, 'evidenceIds', index);
+  const claimIds = stringArrayField(item, 'claimIds', index, true);
+  const rationale = stringField(item, 'rationale', index);
+  const warnings = stringArrayField(item, 'warnings', index, true);
+
+  return {
+    oddsQuoteId,
+    market,
+    selection,
+    ...(line !== undefined && { line }),
+    odds,
+    ...(probability !== undefined && { probability }),
+    confidence,
+    evidenceIds,
+    claimIds,
+    rationale,
+    warnings,
+  };
+}
+
+function validateTopPicks(
+  picks: ParsedTopPick[],
+  quoteById: Map<string, OddsQuoteRecord>,
+  evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
+  claims: ClaimRecord[],
+): string[] {
+  const issues: string[] = [];
+  const evidenceIds = new Set(evidenceGate.evidenceIds);
+  const claimIds = new Set(claims.map((claim) => claim.id));
+  const seenQuoteIds = new Set<string>();
+
+  for (const [index, pick] of picks.entries()) {
+    const quote = quoteById.get(pick.oddsQuoteId);
+    if (seenQuoteIds.has(pick.oddsQuoteId)) issues.push(`predictions[${index}] duplicates oddsQuoteId "${pick.oddsQuoteId}"`);
+    seenQuoteIds.add(pick.oddsQuoteId);
+    if (!quote) {
+      issues.push(`predictions[${index}] references unknown oddsQuoteId "${pick.oddsQuoteId}"`);
+      continue;
+    }
+    if (pick.market !== quote.marketKey) issues.push(`predictions[${index}] market does not match odds quote`);
+    if (pick.selection !== quote.selectionKey) issues.push(`predictions[${index}] selection does not match odds quote`);
+    if (!sameOptionalNumber(pick.line, numberOrUndefined(quote.line))) issues.push(`predictions[${index}] line does not match odds quote`);
+    if (!sameNumber(pick.odds, numberValue(quote.price))) issues.push(`predictions[${index}] odds does not match odds quote`);
+    if (pick.probability !== undefined && (pick.probability < 0 || pick.probability > 1)) issues.push(`predictions[${index}] probability must be between 0 and 1`);
+    if (pick.confidence < 0 || pick.confidence > 1) issues.push(`predictions[${index}] confidence must be between 0 and 1`);
+    if (!pick.evidenceIds.length) issues.push(`predictions[${index}] requires at least one evidenceId`);
+    for (const evidenceId of pick.evidenceIds) {
+      if (!evidenceIds.has(evidenceId)) issues.push(`predictions[${index}] references unknown or insufficient evidenceId "${evidenceId}"`);
+    }
+    for (const claimId of pick.claimIds) {
+      if (!claimIds.has(claimId)) issues.push(`predictions[${index}] references unknown claimId "${claimId}"`);
+    }
+  }
+
+  return issues;
+}
+
+function validateTopPick(input: {
+  pick: ParsedTopPick;
+  quote?: OddsQuoteRecord;
+  evidenceGate: ReturnType<typeof evaluateEvidenceGate>;
+  claims: ClaimRecord[];
+}) {
+  return scorePredictionCandidate({
+    fixtureId: input.quote?.fixtureId ?? 'unknown-fixture',
+    market: input.pick.market,
+    selection: input.pick.selection,
+    line: input.pick.line,
+    probability: input.pick.probability,
+    odds: input.pick.odds,
+    oddsQuoteId: input.pick.oddsQuoteId,
+    evidenceIds: input.pick.evidenceIds,
+    claimIds: input.pick.claimIds,
+    rationale: input.pick.rationale,
+    warnings: input.pick.warnings,
+  });
+}
+
+function toAllowedQuote(quote: OddsQuoteRecord) {
+  return {
+    oddsQuoteId: quote.id,
+    market: quote.marketKey,
+    selection: quote.selectionKey,
+    line: numberOrNull(quote.line),
+    odds: numberValue(quote.price),
+    impliedProbability: numberOrNull(quote.impliedProbability),
+    bookmaker: quote.bookmaker,
+    capturedAt: quote.capturedAt instanceof Date ? quote.capturedAt.toISOString() : String(quote.capturedAt),
+  };
+}
+
+function selectScoringPromptQuotes(quotes: OddsQuoteRecord[]): OddsQuoteRecord[] {
+  const grouped = new Map<string, OddsQuoteRecord>();
+  for (const quote of quotes) {
+    const key = [
+      quote.marketKey,
+      quote.selectionKey,
+      numberOrNull(quote.line) ?? 'null',
+    ].join(':');
+    const current = grouped.get(key);
+    if (!current || numberValue(quote.price) > numberValue(current.price)) {
+      grouped.set(key, quote);
+    }
+  }
+
+  return [...grouped.values()]
+    .sort(comparePromptQuotes)
+    .slice(0, MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT);
+}
+
+function comparePromptQuotes(a: OddsQuoteRecord, b: OddsQuoteRecord): number {
+  return marketPriority(a.marketKey) - marketPriority(b.marketKey)
+    || linePriority(a) - linePriority(b)
+    || String(a.selectionKey).localeCompare(String(b.selectionKey))
+    || numberValue(b.price) - numberValue(a.price)
+    || String(a.bookmaker ?? '').localeCompare(String(b.bookmaker ?? ''));
+}
+
+function marketPriority(market: string | null | undefined): number {
+  switch (market) {
+    case 'h2h': return 0;
+    case 'double_chance': return 1;
+    case 'goals_over_under': return 2;
+    case 'btts': return 3;
+    case 'corners_over_under': return 4;
+    default: return 10;
+  }
+}
+
+function linePriority(quote: OddsQuoteRecord): number {
+  const line = numberOrNull(quote.line);
+  if (line === null) return 0;
+  const preferred = quote.marketKey === 'corners_over_under'
+    ? [8.5, 9.5, 10.5, 7.5, 11.5, 8, 9, 10, 11]
+    : [1.5, 2.5, 3.5, 0.5, 4.5, 5.5, 2.25, 2.75, 3.25, 3.75];
+  const exact = preferred.indexOf(line);
+  if (exact >= 0) return exact;
+  const nearest = Math.min(...preferred.map((candidate) => Math.abs(candidate - line)));
+  return preferred.length + nearest;
+}
+
+function fixturePromptView(fixture: FixtureRecord) {
+  const metadata = fixture.metadata && typeof fixture.metadata === 'object' && !Array.isArray(fixture.metadata)
+    ? fixture.metadata as Record<string, any>
+    : {};
+  const raw = metadata.raw && typeof metadata.raw === 'object' ? metadata.raw as Record<string, any> : {};
+  return {
+    id: fixture.id,
+    providerFixtureId: fixture.providerFixtureId,
+    competitionId: fixture.competitionId,
+    season: fixture.season,
+    homeTeamId: fixture.homeTeamId,
+    awayTeamId: fixture.awayTeamId,
+    scheduledAt: fixture.scheduledAt instanceof Date ? fixture.scheduledAt.toISOString() : fixture.scheduledAt,
+    status: fixture.status,
+    scoreHome: fixture.scoreHome,
+    scoreAway: fixture.scoreAway,
+    includedByFilters: fixture.includedByFilters,
+    metadata: compactJson({
+      league: raw.league
+        ? {
+          id: raw.league.id,
+          name: raw.league.name,
+          country: raw.league.country,
+          season: raw.league.season,
+          round: raw.league.round,
+        }
+        : undefined,
+      teams: raw.teams
+        ? {
+          home: raw.teams.home ? { id: raw.teams.home.id, name: raw.teams.home.name } : undefined,
+          away: raw.teams.away ? { id: raw.teams.away.id, name: raw.teams.away.name } : undefined,
+        }
+        : undefined,
+      venue: metadata.venue,
+      round: metadata.round,
+      timezone: metadata.timezone,
+      apiFootballStatusShort: metadata.apiFootballStatusShort,
+      apiFootballStatusLong: metadata.apiFootballStatusLong,
+    }),
+  };
+}
+
+function oddsSnapshotPromptView(snapshot: OddsSnapshotRecord) {
+  return {
+    id: snapshot.id,
+    fixtureId: snapshot.fixtureId,
+    providerFixtureId: snapshot.providerFixtureId,
+    providerSnapshotId: snapshot.providerSnapshotId,
+    bookmakerCount: snapshot.bookmakerCount,
+    capturedAt: snapshot.capturedAt instanceof Date ? snapshot.capturedAt.toISOString() : String(snapshot.capturedAt),
+    payloadHash: snapshot.payloadHash,
+  };
+}
+
+function researchBundlePromptView(bundle: ResearchBundleRecord | null) {
+  if (!bundle) return null;
+  return {
+    id: bundle.id,
+    runId: bundle.runId,
+    status: bundle.status,
+    gateResult: bundle.gateResult,
+    providerAgentic: bundle.providerAgentic,
+    model: bundle.model,
+    promptVersion: bundle.promptVersion,
+    warnings: bundle.warnings,
+    metadata: bundle.metadata,
+  };
+}
+
+function sourcePromptView(source: SourceRecordRecord) {
+  return {
+    id: source.id,
+    type: source.sourceType,
+    url: source.url,
+    title: source.title,
+    externalId: source.externalId,
+    providerSnapshotId: source.providerSnapshotId,
+    capturedAt: source.capturedAt instanceof Date ? source.capturedAt.toISOString() : String(source.capturedAt),
+    metadata: source.metadata,
+  };
+}
+
+function evidencePromptView(evidence: EvidenceItemRecord) {
+  return {
+    id: evidence.id,
+    sourceId: evidence.sourceId,
+    summary: evidence.summaryRedacted,
+    confidence: numberOrNull(evidence.confidence),
+    claimIds: evidence.claimIds,
+    metadata: evidence.metadata,
+  };
+}
+
+function claimPromptView(claim: ClaimRecord) {
+  return {
+    id: claim.id,
+    statement: claim.statement,
+    marketKey: claim.marketKey,
+    selectionKey: claim.selectionKey,
+    line: numberOrNull(claim.line),
+    supportLevel: claim.supportLevel,
+    confidence: numberOrNull(claim.confidence),
+    evidenceIds: claim.evidenceIds,
+    conflictStatus: claim.conflictStatus,
+  };
+}
+
+function hasWebResearchSource(sources: SourceRecordRecord[]): boolean {
+  return sources.some((source) => source.sourceType === 'web-search');
 }
 
 function defaultPersistArtifact(repositories: PredictionServiceRepositories) {
@@ -443,10 +864,61 @@ function numberValue(value: unknown): number {
   return NaN;
 }
 
+function numberOrNull(value: unknown): number | null {
+  const parsed = numberOrUndefined(value);
+  return parsed ?? null;
+}
+
 function numberOrUndefined(value: unknown): number | undefined {
   if (value === null || value === undefined) return undefined;
   const parsed = numberValue(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function stringField(item: Record<string, unknown>, key: string, index: number): string {
+  const value = item[key];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`predictions[${index}].${key} must be a non-empty string.`);
+  }
+  return value.trim();
+}
+
+function numberField(item: Record<string, unknown>, key: string, index: number): number {
+  const value = numberValue(item[key]);
+  if (!Number.isFinite(value)) throw new Error(`predictions[${index}].${key} must be a number.`);
+  return value;
+}
+
+function optionalNumberField(item: Record<string, unknown>, key: string, index: number): number | undefined {
+  if (item[key] === undefined || item[key] === null) return undefined;
+  return numberField(item, key, index);
+}
+
+function nullableNumberField(item: Record<string, unknown>, key: string, index: number): number | undefined {
+  if (item[key] === undefined || item[key] === null) return undefined;
+  return numberField(item, key, index);
+}
+
+function stringArrayField(item: Record<string, unknown>, key: string, index: number, optional = false): string[] {
+  const value = item[key];
+  if (value === undefined && optional) return [];
+  if (!Array.isArray(value)) throw new Error(`predictions[${index}].${key} must be an array of strings.`);
+  return value.map((entry, entryIndex) => {
+    if (typeof entry !== 'string' || !entry.trim()) {
+      throw new Error(`predictions[${index}].${key}[${entryIndex}] must be a non-empty string.`);
+    }
+    return entry.trim();
+  });
+}
+
+function sameOptionalNumber(left: number | undefined, right: number | undefined): boolean {
+  if (left === undefined && right === undefined) return true;
+  if (left === undefined || right === undefined) return false;
+  return sameNumber(left, right);
+}
+
+function sameNumber(left: number, right: number): boolean {
+  return Math.abs(left - right) < 0.000001;
 }
 
 function stringArray(value: unknown): string[] {
