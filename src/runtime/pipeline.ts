@@ -159,6 +159,8 @@ const EMPTY_LOW_ODDS_SCAN: Omit<LowOddsScanView, 'date' | 'threshold'> = {
 };
 const STORAGE_RETRY_ATTEMPTS = 3;
 const STORAGE_RETRY_DELAY_MS = 2_000;
+const RESEARCH_CONCURRENCY = 4;
+const SCORING_CONCURRENCY = 4;
 
 export async function executeRunPipeline(
   config: AgentConfig,
@@ -326,17 +328,16 @@ export async function executeRunPipeline(
     ? fixtureDiscovery.fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id))
     : fixtureDiscovery.fixtures;
 
-  const research: FixtureResearchResult[] = [];
-  for (const fixture of selectedFixtures) {
+  const research = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
     try {
-      research.push(await retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(config, {
+      return await retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(isolatedAgentConfig(config), {
         fixtureId: fixture.providerFixtureId,
         web: input.web ?? defaultWebMode(config),
-      }, runtime)));
+      }, runtime));
     } catch (err: any) {
-      research.push(blockedResearchResult(config, runId, fixture, err));
+      return blockedResearchResult(config, runId, fixture, err);
     }
-  }
+  });
   steps.push(summarizeResultStep('research', research.map((result) => ({
     ok: result.ok,
     verdict: result.gateResult.verdict,
@@ -344,17 +345,16 @@ export async function executeRunPipeline(
     artifactPath: result.artifactPath,
   })), selectedFixtures.length));
 
-  const scoring: FixtureScoringResult[] = [];
-  for (const fixture of selectedFixtures) {
+  const scoring = await mapWithConcurrency(selectedFixtures, SCORING_CONCURRENCY, async (fixture) => {
     try {
-      scoring.push(await retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(config, {
+      return await retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(isolatedAgentConfig(config), {
         fixtureId: fixture.providerFixtureId,
         web: input.web ?? defaultWebMode(config),
-      }, runtime)));
+      }, runtime));
     } catch (err: any) {
-      scoring.push(blockedScoringResult(config, runId, fixture, err));
+      return blockedScoringResult(config, runId, fixture, err);
     }
-  }
+  });
   const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring);
   const scoreStep = summarizeResultStep('score', scoring.map((result) => ({
     ok: result.ok,
@@ -821,6 +821,33 @@ function finalVerdict(steps: PipelineStepResult[]): PipelineVerdict {
   if (steps.some((step) => fatalSteps.has(step.name) && (step.verdict === 'blocked' || !step.ok))) return 'blocked';
   if (steps.some((step) => step.verdict === 'review-required' || step.warnings.length > 0 || !step.ok)) return 'review-required';
   return 'promotable';
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index] as T, index);
+    }
+  }));
+  return results;
+}
+
+function isolatedAgentConfig(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    codexThreadId: undefined,
+    geminiSessionId: undefined,
+    cursorSessionId: undefined,
+  };
 }
 
 async function retryStorageConnection<T>(operation: () => Promise<T>): Promise<T> {

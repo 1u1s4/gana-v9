@@ -122,6 +122,19 @@ export async function runFixtureResearch(
 
   const parsed = parseResearchJson(rawOutput);
   if (!parsed.ok) {
+    if (input.web === 'live' || input.web === 'cached') {
+      return buildAndPersistAgentFailureFallback(
+        config,
+        input,
+        runtime,
+        deps,
+        runId,
+        fixture,
+        createdAt,
+        parsed.error,
+        providerContext,
+      );
+    }
     return writeBlockedArtifact(config, runId, 'research-raw-output.json', {
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
