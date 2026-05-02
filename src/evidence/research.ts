@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
+import { isMarketKey } from '../domain/markets.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { runAgentWithRetry } from '../agent.js';
@@ -234,7 +235,8 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
   });
 
   const repairedClaims = claims.map((claim: any) => {
-    if (!Array.isArray(claim?.evidenceIds)) return claim;
+    const subject = repairClaimSubject(claim?.subject, claim?.id, warnings);
+    if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject };
     const repairedEvidenceIds: string[] = [];
     for (const evidenceId of claim.evidenceIds) {
       if (typeof evidenceId !== 'string') continue;
@@ -250,7 +252,7 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
       }
       warnings.push(`removed unknown evidence reference "${evidenceId}" from claim "${claim.id ?? 'unknown'}"`);
     }
-    return { ...claim, evidenceIds: uniqueStrings(repairedEvidenceIds) };
+    return { ...claim, subject, evidenceIds: uniqueStrings(repairedEvidenceIds) };
   });
 
   return {
@@ -261,6 +263,16 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
     },
     warnings: uniqueStrings(warnings),
   };
+}
+
+function repairClaimSubject(subject: any, claimId: unknown, warnings: string[]): any {
+  if (subject?.type !== 'market') return subject;
+  if (isMarketKey(subject.market)) return subject;
+  if (isMarketKey(subject.id)) {
+    warnings.push(`mapped market subject id "${subject.id}" to subject.market on claim "${String(claimId ?? 'unknown')}"`);
+    return { ...subject, market: subject.id };
+  }
+  return subject;
 }
 
 async function buildAndPersistAgentFailureFallback(

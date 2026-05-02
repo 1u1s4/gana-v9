@@ -243,6 +243,32 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped source reference "source-web-1"/);
   });
 
+  it('repairs market claim subjects that use id instead of market', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      claims: [{
+        id: 'claim-1',
+        statement: 'The goals market leans over.',
+        subject: { type: 'market', id: 'goals_over_under' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.claims[0]?.subject.market, 'goals_over_under');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped market subject id "goals_over_under"/);
+  });
+
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
