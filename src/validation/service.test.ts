@@ -252,17 +252,26 @@ describe('runValidation parlay and date targets', () => {
     assert.deepEqual(statuses, ['won', 'lost']);
   });
 
-  it('validates predictions and parlays by UTC fixture date', async () => {
+  it('validates predictions and parlays by configured fixture date', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const persistedArtifacts: any[] = [];
     const persistedValidations: any[] = [];
+    const predictionQueries: any[] = [];
+    const parlayQueries: any[] = [];
 
     const result = await runValidation(cfg, { date: '2026-04-25' }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/validations.json',
       fetcher: fetcher(),
       repositories: repositories({
+        predictions: {
+          ...repositories().predictions,
+          listForFixtureDate: async (_date: Date | string, query: any) => {
+            predictionQueries.push(query);
+            return [prediction({ id: 'prediction-date-1' })];
+          },
+        },
         artifacts: {
           create: async (input: any) => {
             persistedArtifacts.push(input);
@@ -282,7 +291,10 @@ describe('runValidation parlay and date targets', () => {
         },
         parlays: {
           ...repositories().parlays,
-          listForFixtureDate: async () => [await repositories().parlays.findById('parlay-1')],
+          listForFixtureDate: async (_date: Date | string, query: any) => {
+            parlayQueries.push(query);
+            return [await repositories().parlays.findById('parlay-1')];
+          },
         },
       }),
     });
@@ -297,5 +309,94 @@ describe('runValidation parlay and date targets', () => {
     assert.deepEqual(persistedValidations.map((item) => item.artifactId), ['artifact-validation-1', 'artifact-validation-1']);
     assert.deepEqual(persistedValidations.map((item) => item.status), ['won', 'lost']);
     assert.deepEqual(result.validations.map((item) => item.id), ['validation-1', 'validation-2']);
+    assert.deepEqual(predictionQueries.map((query) => query.skip), [0]);
+    assert.deepEqual(parlayQueries.map((query) => query.skip), [0]);
+    assert.equal(predictionQueries[0].timezone, 'America/Guatemala');
+    assert.equal(parlayQueries[0].timezone, 'America/Guatemala');
+  });
+
+  it('validates all prediction pages and reuses fetched fixture results', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const predictions = Array.from({ length: 501 }, (_, index) => prediction({
+      id: `prediction-date-${index + 1}`,
+      marketKey: index % 2 === 0 ? 'h2h' : 'btts',
+      selectionKey: index % 2 === 0 ? 'home' : 'yes',
+    }));
+    const predictionQueries: any[] = [];
+    let fixtureReads = 0;
+    const fetchInputs: any[] = [];
+
+    const result = await runValidation(cfg, { date: '2026-04-25' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: {
+        fetch: async (input: any) => {
+          fetchInputs.push(input);
+          return fetcher().fetch(input);
+        },
+      },
+      repositories: repositories({
+        predictions: {
+          ...repositories().predictions,
+          listForFixtureDate: async (_date: Date | string, query: any) => {
+            predictionQueries.push(query);
+            return predictions.slice(query.skip, query.skip + query.take);
+          },
+        },
+        fixtures: {
+          findById: async () => {
+            fixtureReads += 1;
+            return fixtureRecord;
+          },
+        },
+        validationArtifacts: {
+          create: async (input: any) => ({
+            id: `validation-${input.predictionId}`,
+            ...input,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations.length, 501);
+    assert.deepEqual(predictionQueries.map((query) => query.skip), [0, 500]);
+    assert.equal(fixtureReads, 1);
+    assert.equal(fetchInputs.length, 1);
+    assert.equal(fetchInputs[0].market, 'h2h');
+  });
+
+  it('fetches corner statistics separately from fixture results', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const fetchInputs: any[] = [];
+
+    const result = await runValidation(cfg, { date: '2026-04-25' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: {
+        fetch: async (input: any) => {
+          fetchInputs.push(input);
+          return fetcher({ cornersHome: 6, cornersAway: 4 }).fetch(input);
+        },
+      },
+      repositories: repositories({
+        predictions: {
+          ...repositories().predictions,
+          listForFixtureDate: async () => [
+            prediction({ id: 'prediction-h2h', marketKey: 'h2h', selectionKey: 'home' }),
+            prediction({ id: 'prediction-btts', marketKey: 'btts', selectionKey: 'yes' }),
+            prediction({ id: 'prediction-corners', marketKey: 'corners_over_under', selectionKey: 'over', line: 9.5 }),
+          ],
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations.length, 3);
+    assert.deepEqual(fetchInputs.map((input) => input.market), ['h2h', 'corners_over_under']);
   });
 });

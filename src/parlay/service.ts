@@ -478,6 +478,7 @@ function buildPortfolioProfilePrompt(input: {
     `Each parlay must contain ${input.profile.minLegs}-${input.profile.maxLegs} legs.`,
     `Target combined decimal odds: ${input.profile.minOdds}-${input.profile.maxOdds}. If an otherwise strong parlay is outside that range, explain the risk note.`,
     'Prefer diversity across fixtures, leagues and market types when quality is similar.',
+    'Use predictionIds only. Do not use fixtureId, team id, odds quote id, or any other id in predictionIds.',
     'A fixture may appear more than once in the same parlay only when duplicateFixtureJustification is specific and non-empty.',
     'The artifact is analytical only and has no monetary action capability.',
     '',
@@ -613,14 +614,17 @@ function validateParsedPortfolioParlay(
       : 'included-eligible-prediction',
   }));
   const combinedOdds = calculateCombinedOdds(legs);
-  const warnings = [
+  const constraintWarnings = [
     ...((combinedOdds !== undefined && (combinedOdds < profile.minOdds || combinedOdds > profile.maxOdds))
       ? [`combined odds ${round(combinedOdds)} outside ${profile.label} target ${profile.minOdds}-${profile.maxOdds}`]
       : []),
     ...(duplicateFixtures.length ? [`duplicate fixture override: ${duplicateJustification}`] : []),
+  ].filter(Boolean);
+  const warnings = [
+    ...constraintWarnings,
     ...(parsed.riskNotes ?? []),
   ].filter(Boolean);
-  const status: PredictionStatus = warnings.length || selected.some((prediction) => prediction.status === 'review-required')
+  const status: PredictionStatus = constraintWarnings.length || selected.some((prediction) => prediction.status === 'review-required')
     ? 'review-required'
     : selected.some((prediction) => prediction.status === 'candidate')
       ? 'candidate'

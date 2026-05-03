@@ -196,6 +196,54 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
   });
 
+  it('adds a synthetic web-search source when native web search was used but omitted from JSON', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      sources: [],
+      evidenceItems: [{
+        id: 'evidence-1',
+        sourceId: 'source_api_football_fixture',
+        claimIds: ['claim-1'],
+        summary: 'Provider fixture context supports the claim.',
+        confidence: 0.7,
+      }],
+      gateResult: {
+        verdict: 'promotable',
+        reasons: ['agent marked research promotable with native web search'],
+        warnings: [],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        options?.onEvent?.({
+          type: 'tool_call',
+          name: 'web_search',
+          callId: 'web-1',
+          args: { query: 'fixture 1001 team news injuries' },
+        });
+        options?.onEvent?.({
+          type: 'tool_result',
+          name: 'web_search',
+          callId: 'web-1',
+          output: 'Search completed: fixture 1001 team news injuries',
+        });
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    const synthetic = result.bundle?.sources.find((source) => source.id === 'source_native_web_search');
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(synthetic?.type, 'web-search');
+    assert.equal(synthetic?.metadata?.synthesized, true);
+    assert.deepEqual(synthetic?.metadata?.queries, ['fixture 1001 team news injuries']);
+    assert.doesNotMatch(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
+  });
+
   it('accepts provider output with explanatory text around the JSON object', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

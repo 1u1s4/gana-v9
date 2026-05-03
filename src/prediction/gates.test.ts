@@ -44,6 +44,19 @@ describe('prediction gates', () => {
     });
   });
 
+  it('allows live-web predictions when promotable research includes web evidence', () => {
+    const result = evaluatePredictionGates({
+      fixture,
+      oddsQuotes,
+      researchBundle,
+      webResearchRequired: true,
+      hasWebResearch: true,
+    });
+
+    assert.equal(result.verdict, 'promotable');
+    assert.deepEqual(result.warnings, []);
+  });
+
   it('blocks when fixture context is missing', () => {
     const result = evaluatePredictionGates({ fixture: undefined, oddsQuotes, researchBundle });
 

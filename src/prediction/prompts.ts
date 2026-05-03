@@ -70,15 +70,18 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
 
   return [
     'Produce structured football research for the fixture below.',
-    'Return only valid JSON. Do not wrap it in markdown. Do not include prose outside JSON.',
+    'Return only valid JSON starting with "{" as the first character. Do not wrap it in markdown. Do not include prose outside JSON.',
     NO_MONETARY_ACTIONS_PROMPT,
     '',
     'Allowed source types: api-football, provider-snapshot, web-search, db, artifact.',
     'Use API-Football fixture, statistics, and odds context as provider evidence when present.',
-    'If webMode is live or cached, use native web search and include at least one source with type "web-search".',
+    'If webMode is live or cached, use native web search and include at least one source with type "web-search" in the returned JSON.',
     'Every EvidenceItem.sourceId must reference a SourceRecord.id.',
     'Every Claim.evidenceIds entry must reference an EvidenceItem.id.',
     'Claims with subject.type "market" must use one canonical market key: h2h, double_chance, goals_over_under, corners_over_under, btts.',
+    'Set gateResult.verdict to "promotable" only when the research is supported by sufficient evidence, no material conflicts are present, and web-search evidence is included when webMode is live or cached.',
+    'Set gateResult.verdict to "review-required" when evidence is partial, required web-search evidence is missing, or factual uncertainty remains.',
+    'Set gateResult.verdict to "blocked" only when the research cannot be structured from the available data.',
     '',
     'Required JSON shape:',
     JSON.stringify({
@@ -110,8 +113,8 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
         metadata: {},
       }],
       gateResult: {
-        verdict: 'review-required',
-        reasons: ['structured research generated'],
+        verdict: 'promotable',
+        reasons: ['structured research generated with sufficient evidence'],
         warnings: [],
       },
       warnings: [],

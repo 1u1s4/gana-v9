@@ -9,7 +9,7 @@ import type {
   PrismaBatchPayload,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, redactJson, redactText, takeArg, withTransaction } from './helpers.js';
+import { compactData, fixtureDateRange, paginationArgs, redactJson, redactText, takeArg, withTransaction } from './helpers.js';
 
 export interface ParlayQuery {
   runId?: string;
@@ -20,6 +20,8 @@ export interface ParlayQuery {
 export interface ParlayFixtureDateQuery {
   status?: ParlayStatus | string | Array<ParlayStatus | string>;
   take?: number;
+  skip?: number;
+  timezone?: string;
 }
 
 export interface ParlayLegQuery {
@@ -93,7 +95,7 @@ export function createParlayRepository(db: Pick<StoragePrismaClient, 'parlay' | 
     },
 
     listForFixtureDate(date: Date | string, query: ParlayFixtureDateQuery = {}): Promise<ParlayRecord[]> {
-      const fixtureDate = dateRange(date);
+      const fixtureDate = fixtureDateRange(date, query.timezone);
 
       return db.parlay.findMany({
         where: compactData({
@@ -109,8 +111,8 @@ export function createParlayRepository(db: Pick<StoragePrismaClient, 'parlay' | 
             },
           },
         }),
-        orderBy: { generatedAt: 'desc' },
-        ...takeArg(query.take),
+        orderBy: [{ generatedAt: 'desc' }, { id: 'asc' }],
+        ...paginationArgs(query),
       });
     },
   };
@@ -180,19 +182,6 @@ export function createParlayLegRepository(db: Pick<StoragePrismaClient, 'parlayL
       });
     },
   };
-}
-
-function dateRange(date: Date | string): { start: Date; end: Date } {
-  const value = coerceDate(date);
-  const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 1);
-  return { start, end };
-}
-
-function coerceDate(date: Date | string): Date {
-  if (date instanceof Date) return date;
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00.000Z`) : new Date(date);
 }
 
 export function createParlayRepositories(db: Pick<StoragePrismaClient, 'parlay' | 'parlayLeg'>) {

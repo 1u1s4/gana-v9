@@ -29,16 +29,20 @@ describe('research prompts', () => {
       createdAt: '2026-04-25T12:00:00.000Z',
     });
 
-    assert.match(prompt, /Return only valid JSON/);
+    assert.match(prompt, /Return only valid JSON starting with "\{"/);
     assert.match(prompt, /sources/);
     assert.match(prompt, /evidenceItems/);
     assert.match(prompt, /claims/);
     assert.match(prompt, /Every EvidenceItem\.sourceId/);
     assert.match(prompt, /Every Claim\.evidenceIds/);
-    assert.match(prompt, /web-search/);
+    assert.match(prompt, /include at least one source with type "web-search" in the returned JSON/);
     assert.match(prompt, /research-fixture-v2/);
     assert.match(prompt, /fixtureStatistics/);
     assert.match(prompt, /Use API-Football fixture, statistics, and odds context/);
+    assert.match(prompt, /gateResult\.verdict to "promotable"/);
+    assert.match(prompt, /gateResult\.verdict to "review-required"/);
+    assert.match(prompt, /gateResult\.verdict to "blocked"/);
+    assert.match(prompt, /structured research generated with sufficient evidence/);
     assert.match(prompt, /Monetary safety/);
     assert.match(prompt, /analytical artifacts only/);
   });

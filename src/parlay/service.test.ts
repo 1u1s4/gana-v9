@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { loadConfig } from '../config.js';
 import { createRuntimeContext } from '../runtime/context.js';
+import { createParlayRepository } from '../storage/repositories/parlays.js';
 import { createPredictionRepository } from '../storage/repositories/predictions.js';
 import { runParlayBuild } from './service.js';
 
@@ -211,6 +212,55 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames, ['parlay-portfolio.json', 'parlays.json']);
   });
 
+  it('keeps LLM portfolio risk notes informational when legs are promotable', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let conservativePrompt = '';
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        const prompt = String(input);
+        if (prompt.includes('(conservative)')) {
+          conservativePrompt = prompt;
+          return { text: JSON.stringify({ parlays: [
+            {
+              title: 'Promotable with notes',
+              predictionIds: ['prediction-1', 'prediction-2'],
+              rationale: 'Two promotable legs inside the profile range.',
+              riskNotes: ['Normal match-state variance.'],
+            },
+          ] }) } as any;
+        }
+        return { text: JSON.stringify({ parlays: [] }) } as any;
+      },
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8, status: 'promotable' }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, status: 'promotable' }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-1' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.match(conservativePrompt, /Use predictionIds only/);
+    assert.match(conservativePrompt, /Do not use fixtureId/);
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'promotable');
+    assert.equal(result.portfolio?.parlays[0]?.build.parlay.status, 'promotable');
+    assert.deepEqual(result.portfolio?.parlays[0]?.build.parlay.warnings, ['Normal match-state variance.']);
+  });
+
   it('rejects LLM portfolio parlays that duplicate a fixture without justification', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -289,6 +339,26 @@ describe('prediction repository fixture date query', () => {
   });
 
   it('filters predictions with a UTC day window on fixture scheduledAt', async () => {
+    let args: any;
+    const repo = createPredictionRepository({
+      prediction: {
+        findMany: async (input: any) => {
+          args = input;
+          return [];
+        },
+      } as any,
+    });
+
+    await repo.listForFixtureDate('2026-04-25', { status: ['candidate', 'promotable'], take: 50, skip: 100 });
+
+    assert.deepEqual(args.where.status, { in: ['candidate', 'promotable'] });
+    assert.equal(args.where.fixture.scheduledAt.gte.toISOString(), '2026-04-25T00:00:00.000Z');
+    assert.equal(args.where.fixture.scheduledAt.lt.toISOString(), '2026-04-26T00:00:00.000Z');
+    assert.equal(args.take, 50);
+    assert.equal(args.skip, 100);
+  });
+
+  it('filters predictions with a configured local day window', async () => {
     let where: any;
     const repo = createPredictionRepository({
       prediction: {
@@ -299,10 +369,38 @@ describe('prediction repository fixture date query', () => {
       } as any,
     });
 
-    await repo.listForFixtureDate('2026-04-25', { status: ['candidate', 'promotable'] });
+    await repo.listForFixtureDate('2026-05-02', { timezone: 'America/Guatemala' });
 
-    assert.deepEqual(where.status, { in: ['candidate', 'promotable'] });
-    assert.equal(where.fixture.scheduledAt.gte.toISOString(), '2026-04-25T00:00:00.000Z');
-    assert.equal(where.fixture.scheduledAt.lt.toISOString(), '2026-04-26T00:00:00.000Z');
+    assert.equal(where.fixture.scheduledAt.gte.toISOString(), '2026-05-02T06:00:00.000Z');
+    assert.equal(where.fixture.scheduledAt.lt.toISOString(), '2026-05-03T06:00:00.000Z');
+  });
+});
+
+describe('parlay repository fixture date query', () => {
+  it('filters parlays through leg fixtures with a configured local day window', async () => {
+    let args: any;
+    const repo = createParlayRepository({
+      parlay: {
+        findMany: async (input: any) => {
+          args = input;
+          return [];
+        },
+      } as any,
+      parlayLeg: {} as any,
+    });
+
+    await repo.listForFixtureDate('2026-05-02', {
+      status: ['candidate', 'review-required'],
+      take: 25,
+      skip: 50,
+      timezone: 'America/Guatemala',
+    });
+
+    const scheduledAt = args.where.legs.some.fixture.scheduledAt;
+    assert.deepEqual(args.where.status, { in: ['candidate', 'review-required'] });
+    assert.equal(scheduledAt.gte.toISOString(), '2026-05-02T06:00:00.000Z');
+    assert.equal(scheduledAt.lt.toISOString(), '2026-05-03T06:00:00.000Z');
+    assert.equal(args.take, 25);
+    assert.equal(args.skip, 50);
   });
 });

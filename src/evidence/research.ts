@@ -10,6 +10,7 @@ import { createStorageRepositories } from '../storage/repositories/index.js';
 import { getPrismaClient } from '../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
 import { deriveNativeWebSearchRequirement } from '../providers/agentic/helpers.js';
+import type { AgentEvent } from '../providers/agentic/types.js';
 import {
   createApiFootballPersistence,
   createApiFootballProvider,
@@ -65,6 +66,16 @@ interface ResearchProviderContext {
   warnings: string[];
 }
 
+interface NativeWebSearchTrace {
+  used: boolean;
+  calls: Array<{
+    callId: string;
+    name: string;
+    query?: string;
+    output?: string;
+  }>;
+}
+
 const BLOCKED_GATE: ResearchGateResult = {
   verdict: 'blocked',
   reasons: ['research failed'],
@@ -106,6 +117,7 @@ export async function runFixtureResearch(
   });
 
   let rawOutput = '';
+  const nativeWebSearchTrace = createNativeWebSearchTrace();
   try {
     const nativeWebSearchRequirement = deriveNativeWebSearchRequirement(config, {
       required: input.web === 'live',
@@ -113,6 +125,7 @@ export async function runFixtureResearch(
     });
     const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, {
       nativeWebSearchRequirement,
+      onEvent: (event) => recordNativeWebSearchEvent(nativeWebSearchTrace, event),
     });
     rawOutput = result.text;
   } catch (err: any) {
@@ -151,7 +164,14 @@ export async function runFixtureResearch(
     runId,
     fixtureId: fixture.id,
     providerFixtureId: fixture.providerFixtureId,
-    sources: normalizeSourceRecords(prependMissingSources(repaired.value.sources, baseSources)),
+    sources: normalizeSourceRecords(ensureNativeWebSearchSource(
+      prependMissingSources(repaired.value.sources, baseSources),
+      input.web,
+      createdAt,
+      nativeWebSearchTrace,
+      config.provider,
+      runId,
+    )),
     evidenceItems: repaired.value.evidenceItems,
     claims: repaired.value.claims,
     gateResult: repaired.value.gateResult,
@@ -197,6 +217,53 @@ export function parseResearchJson(rawOutput: string): { ok: true; value: any } |
     }
     return { ok: false, error: `Research output must be strict JSON: ${err?.message ?? err}` };
   }
+}
+
+function createNativeWebSearchTrace(): NativeWebSearchTrace {
+  return { used: false, calls: [] };
+}
+
+function recordNativeWebSearchEvent(trace: NativeWebSearchTrace, event: AgentEvent): void {
+  if ((event.type !== 'tool_call' && event.type !== 'tool_result') || !isWebSearchToolName(event.name)) return;
+  trace.used = true;
+  const existing = trace.calls.find((call) => call.callId === event.callId);
+  const call = existing ?? {
+    callId: event.callId,
+    name: event.name,
+  };
+  if (event.type === 'tool_call') {
+    const query = webSearchQueryFromArgs(event.args);
+    if (query) call.query = query;
+  } else {
+    call.output = event.output;
+    if (!call.query) {
+      const query = webSearchQueryFromOutput(event.output);
+      if (query) call.query = query;
+    }
+  }
+  if (!existing) trace.calls.push(call);
+}
+
+function isWebSearchToolName(name: string): boolean {
+  return name === 'web_search' || name === 'google_web_search' || name.toLowerCase().includes('web_search');
+}
+
+function webSearchQueryFromArgs(args: Record<string, unknown>): string | undefined {
+  const query = args.query;
+  if (typeof query === 'string' && query.trim()) return query.trim();
+  const queries = args.queries;
+  if (Array.isArray(queries)) {
+    const joined = queries.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).join(', ');
+    if (joined) return joined;
+  }
+  return undefined;
+}
+
+function webSearchQueryFromOutput(output: string): string | undefined {
+  const prefix = 'Search completed:';
+  if (!output.startsWith(prefix)) return undefined;
+  const query = output.slice(prefix.length).trim();
+  return query || undefined;
 }
 
 async function runResearchAgent(
@@ -630,6 +697,45 @@ function prependMissingSources(sources: SourceRecord[] | undefined, requiredSour
   const existing = Array.isArray(sources) ? sources : [];
   const missing = requiredSources.filter((source) => !existing.some((item) => item.id === source.id));
   return [...missing, ...existing];
+}
+
+function ensureNativeWebSearchSource(
+  sources: SourceRecord[],
+  web: ResearchWebMode,
+  capturedAt: string,
+  trace: NativeWebSearchTrace,
+  provider: AgentConfig['provider'],
+  runId: string,
+): SourceRecord[] {
+  if (web === 'off' || !trace.used || sources.some((source) => source.type === 'web-search')) return sources;
+  const queries = uniqueStrings(trace.calls.map((call) => call.query ?? '').filter(Boolean));
+  return [
+    ...sources,
+    {
+      id: 'source_native_web_search',
+      type: 'web-search',
+      externalId: `native-web-search:${provider}:${runId}`,
+      title: queries.length ? `Native web search: ${queries[0]}` : 'Native web search',
+      capturedAt,
+      hash: hashPayload({
+        provider,
+        runId,
+        calls: trace.calls,
+      }),
+      metadata: {
+        provider,
+        mode: web,
+        synthesized: true,
+        reason: 'Native web search tool was used, but the agent response did not include a web-search source.',
+        queries,
+        calls: trace.calls.map((call) => ({
+          callId: call.callId,
+          name: call.name,
+          query: call.query,
+        })),
+      },
+    },
+  ];
 }
 
 function uniqueStrings(values: string[]): string[] {

@@ -4,3 +4,4 @@ dist/
 .sessions/
 .artifacts/
 npm-debug.log*
+tmp/

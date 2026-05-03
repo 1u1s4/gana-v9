@@ -5,7 +5,7 @@ import type {
   PrismaBatchPayload,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, redactJson, redactText, takeArg } from './helpers.js';
+import { compactData, fixtureDateRange, paginationArgs, redactJson, redactText, takeArg } from './helpers.js';
 
 export interface PredictionQuery {
   runId?: string;
@@ -17,6 +17,8 @@ export interface PredictionQuery {
 export interface PredictionFixtureDateQuery {
   status?: PredictionStatus | string | Array<PredictionStatus | string>;
   take?: number;
+  skip?: number;
+  timezone?: string;
 }
 
 export function createPredictionRepository(db: Pick<StoragePrismaClient, 'prediction'>) {
@@ -61,7 +63,7 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
     },
 
     listForFixtureDate(date: Date | string, query: PredictionFixtureDateQuery = {}): Promise<PredictionRecord[]> {
-      const fixtureDate = dateRange(date);
+      const fixtureDate = fixtureDateRange(date, query.timezone);
 
       return db.prediction.findMany({
         where: compactData({
@@ -73,8 +75,8 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
             },
           },
         }),
-        orderBy: { generatedAt: 'desc' },
-        ...takeArg(query.take),
+        orderBy: [{ generatedAt: 'desc' }, { id: 'asc' }],
+        ...paginationArgs(query),
       });
     },
   };
@@ -95,17 +97,4 @@ export function createPredictionRepositories(db: Pick<StoragePrismaClient, 'pred
   return {
     predictions: createPredictionRepository(db),
   };
-}
-
-function dateRange(date: Date | string): { start: Date; end: Date } {
-  const value = coerceDate(date);
-  const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 1);
-  return { start, end };
-}
-
-function coerceDate(date: Date | string): Date {
-  if (date instanceof Date) return date;
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00.000Z`) : new Date(date);
 }

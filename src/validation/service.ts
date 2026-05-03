@@ -28,6 +28,9 @@ import {
 } from './result-fetcher.js';
 
 const VALIDATABLE_STATUSES = ['candidate', 'review-required', 'promotable'];
+const DATE_PREDICTION_PAGE_SIZE = 500;
+const DATE_PARLAY_PAGE_SIZE = 100;
+const DATE_VALIDATION_CONCURRENCY = 5;
 
 export interface RunValidationInput {
   date?: string;
@@ -75,14 +78,14 @@ export interface ValidationDependencies {
 export interface ValidationRepositories {
   predictions: {
     findById(id: string): Promise<PredictionRecord | null>;
-    listForFixtureDate(date: Date | string, query: { status?: string | string[]; take?: number }): Promise<PredictionRecord[]>;
+    listForFixtureDate(date: Date | string, query: { status?: string | string[]; take?: number; skip?: number; timezone?: string }): Promise<PredictionRecord[]>;
   };
   fixtures: {
     findById(id: string): Promise<FixtureRecord | null>;
   };
   parlays: {
     findById(id: string): Promise<ParlayRecord | null>;
-    listForFixtureDate(date: Date | string, query?: { status?: string | string[]; take?: number }): Promise<ParlayRecord[]>;
+    listForFixtureDate(date: Date | string, query?: { status?: string | string[]; take?: number; skip?: number; timezone?: string }): Promise<ParlayRecord[]>;
   };
   parlayLegs: {
     list(query: { parlayId?: string; predictionId?: string; fixtureId?: string; status?: string; take?: number }): Promise<ParlayLegRecord[]>;
@@ -123,6 +126,13 @@ interface PendingValidation {
   input: ValidationArtifactInput;
 }
 
+interface ValidationExecutionContext {
+  repositories: ValidationRepositories;
+  fetcher: ValidationResultFetcher;
+  fixtures: Map<string, Promise<FixtureRecord | null>>;
+  results: Map<string, Promise<ValidationResultFetchResult>>;
+}
+
 export async function runValidation(
   config: AgentConfig,
   input: RunValidationInput,
@@ -147,13 +157,14 @@ export async function runValidation(
 
   const repositories = deps.repositories ?? defaultRepositories();
   const fetcher = deps.fetcher ?? await createApiFootballValidationResultFetcher(config, runtime);
+  const validationContext = createValidationExecutionContext(repositories, fetcher);
 
   try {
     const pending = input.predictionId
-      ? [await validatePredictionTarget(repositories, fetcher, input.predictionId, evaluatedAt, runId)]
+      ? [await validatePredictionTarget(validationContext, input.predictionId, evaluatedAt, runId)]
       : input.parlayId
-        ? [await validateParlayTarget(repositories, fetcher, input.parlayId, evaluatedAt, runId)]
-        : await validateDateTarget(repositories, fetcher, input.date as string, evaluatedAt, runId);
+        ? [await validateParlayTarget(validationContext, input.parlayId, evaluatedAt, runId)]
+        : await validateDateTarget(validationContext, input.date as string, evaluatedAt, runId, config.apiFootball.timezone);
 
     const gateResult = gateFromValidations(pending.map((item) => item.view));
     const artifactPayload = buildArtifactPayload(runId, input, evaluatedAt, gateResult, pending.map((item) => item.view));
@@ -196,49 +207,59 @@ export async function runValidation(
 }
 
 async function validateDateTarget(
-  repositories: ValidationRepositories,
-  fetcher: ValidationResultFetcher,
+  context: ValidationExecutionContext,
   date: string,
   evaluatedAt: string,
   runId: string,
+  timezone?: string,
 ): Promise<PendingValidation[]> {
   const [predictions, parlays] = await Promise.all([
-    repositories.predictions.listForFixtureDate(date, { status: VALIDATABLE_STATUSES, take: 1000 }),
-    repositories.parlays.listForFixtureDate(date, { status: VALIDATABLE_STATUSES, take: 100 }),
+    listAllFixtureDateRecords((query) => context.repositories.predictions.listForFixtureDate(date, query), {
+      status: VALIDATABLE_STATUSES,
+      take: DATE_PREDICTION_PAGE_SIZE,
+      timezone,
+    }),
+    listAllFixtureDateRecords((query) => context.repositories.parlays.listForFixtureDate(date, query), {
+      status: VALIDATABLE_STATUSES,
+      take: DATE_PARLAY_PAGE_SIZE,
+      timezone,
+    }),
   ]);
-  const validations: PendingValidation[] = [];
-  for (const prediction of predictions) {
-    validations.push(await validatePredictionRecord(repositories, fetcher, prediction, evaluatedAt, runId));
-  }
-  for (const parlay of parlays) {
-    validations.push(await validateParlayRecord(repositories, fetcher, parlay, evaluatedAt, runId));
-  }
-  return validations;
+  const predictionValidations = await mapLimit(
+    predictions,
+    DATE_VALIDATION_CONCURRENCY,
+    (prediction) => validatePredictionRecord(context, prediction, evaluatedAt, runId),
+  );
+  const parlayValidations = await mapLimit(
+    parlays,
+    DATE_VALIDATION_CONCURRENCY,
+    (parlay) => validateParlayRecord(context, parlay, evaluatedAt, runId),
+  );
+  return [...predictionValidations, ...parlayValidations];
 }
 
 async function validatePredictionTarget(
-  repositories: ValidationRepositories,
-  fetcher: ValidationResultFetcher,
+  context: ValidationExecutionContext,
   predictionId: string,
   evaluatedAt: string,
   runId: string,
 ): Promise<PendingValidation> {
+  const { repositories } = context;
   const prediction = await repositories.predictions.findById(predictionId);
   if (!prediction) throw new Error(`Prediction "${predictionId}" was not found.`);
-  return validatePredictionRecord(repositories, fetcher, prediction, evaluatedAt, runId);
+  return validatePredictionRecord(context, prediction, evaluatedAt, runId);
 }
 
 async function validatePredictionRecord(
-  repositories: ValidationRepositories,
-  fetcher: ValidationResultFetcher,
+  context: ValidationExecutionContext,
   prediction: PredictionRecord,
   evaluatedAt: string,
   runId: string,
 ): Promise<PendingValidation> {
-  const fixture = await repositories.fixtures.findById(prediction.fixtureId);
+  const fixture = await findFixture(context, prediction.fixtureId);
   if (!fixture) throw new Error(`Fixture "${prediction.fixtureId}" was not found for prediction "${prediction.id}".`);
   const market = marketKey(prediction.marketKey);
-  const fetched = await fetcher.fetch({ providerFixtureId: fixture.providerFixtureId, fixtureId: fixture.id, market });
+  const fetched = await fetchValidationResult(context, fixture, market);
   const selection = selectionFromPrediction(prediction);
   const outcome = settleMarket({
     selection,
@@ -273,34 +294,34 @@ async function validatePredictionRecord(
 }
 
 async function validateParlayTarget(
-  repositories: ValidationRepositories,
-  fetcher: ValidationResultFetcher,
+  context: ValidationExecutionContext,
   parlayId: string,
   evaluatedAt: string,
   runId: string,
 ): Promise<PendingValidation> {
+  const { repositories } = context;
   const parlay = await repositories.parlays.findById(parlayId);
   if (!parlay) throw new Error(`Parlay "${parlayId}" was not found.`);
-  return validateParlayRecord(repositories, fetcher, parlay, evaluatedAt, runId);
+  return validateParlayRecord(context, parlay, evaluatedAt, runId);
 }
 
 async function validateParlayRecord(
-  repositories: ValidationRepositories,
-  fetcher: ValidationResultFetcher,
+  context: ValidationExecutionContext,
   parlay: ParlayRecord,
   evaluatedAt: string,
   runId: string,
 ): Promise<PendingValidation> {
+  const { repositories } = context;
   const legs = await repositories.parlayLegs.list({ parlayId: parlay.id, take: 100 });
   const legValidations: ValidationArtifactView[] = [];
   const resultInputs: JsonValue[] = [];
   const providerSnapshotIds = new Set<string>();
 
   for (const leg of legs) {
-    const fixture = await repositories.fixtures.findById(leg.fixtureId);
+    const fixture = await findFixture(context, leg.fixtureId);
     if (!fixture) throw new Error(`Fixture "${leg.fixtureId}" was not found for parlay leg "${leg.id}".`);
     const market = marketKey(leg.marketKey);
-    const fetched = await fetcher.fetch({ providerFixtureId: fixture.providerFixtureId, fixtureId: fixture.id, market });
+    const fetched = await fetchValidationResult(context, fixture, market);
     const selection = selectionFromParlayLeg(leg);
     const outcome = settleMarket({
       selection,
@@ -340,6 +361,77 @@ async function validateParlayRecord(
       legCount: legs.length,
     },
   });
+}
+
+function createValidationExecutionContext(
+  repositories: ValidationRepositories,
+  fetcher: ValidationResultFetcher,
+): ValidationExecutionContext {
+  return {
+    repositories,
+    fetcher,
+    fixtures: new Map(),
+    results: new Map(),
+  };
+}
+
+async function listAllFixtureDateRecords<T>(
+  listPage: (query: { status?: string | string[]; take: number; skip: number; timezone?: string }) => Promise<T[]>,
+  query: { status?: string | string[]; take: number; timezone?: string },
+): Promise<T[]> {
+  const all: T[] = [];
+  const take = query.take;
+  let skip = 0;
+
+  while (take > 0) {
+    const page = await listPage({ ...query, skip });
+    all.push(...page);
+    if (page.length < take) break;
+    skip += page.length;
+  }
+
+  return all;
+}
+
+async function mapLimit<T, U>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<U>,
+): Promise<U[]> {
+  const results = new Array<U>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+async function findFixture(context: ValidationExecutionContext, fixtureId: string): Promise<FixtureRecord | null> {
+  let fixture = context.fixtures.get(fixtureId);
+  if (!fixture) {
+    fixture = context.repositories.fixtures.findById(fixtureId);
+    context.fixtures.set(fixtureId, fixture);
+  }
+  return fixture;
+}
+
+async function fetchValidationResult(
+  context: ValidationExecutionContext,
+  fixture: FixtureRecord,
+  market: MarketKey,
+): Promise<ValidationResultFetchResult> {
+  const resultKey = `${fixture.id}:${market === 'corners_over_under' ? 'corners' : 'result'}`;
+  let result = context.results.get(resultKey);
+  if (!result) {
+    result = context.fetcher.fetch({ providerFixtureId: fixture.providerFixtureId, fixtureId: fixture.id, market });
+    context.results.set(resultKey, result);
+  }
+  return result;
 }
 
 function validationFor(input: {
