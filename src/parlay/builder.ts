@@ -136,6 +136,8 @@ function evaluatePrediction(
   if (prediction.confidence < config.minPredictionConfidence) {
     reasons.push('excluded-below-min-confidence');
   }
+  if (prediction.blockers?.length) reasons.push('excluded-prediction-blockers');
+  if (prediction.edge !== undefined && prediction.edge <= 0) reasons.push('excluded-no-edge');
   if (
     !config.allowMultipleLegsPerFixture
     && selected.some((selection) => selection.prediction.fixtureId === prediction.fixtureId)
@@ -154,7 +156,10 @@ function evaluatePrediction(
 
 function deriveParlayStatus(predictions: readonly ParlaySourcePrediction[], minLegs: number): ParlayStatus {
   if (predictions.length < minLegs) return 'blocked';
+  if (predictions.some((prediction) => (prediction.blockers?.length ?? 0) > 0)) return 'blocked';
+  if (predictions.some((prediction) => prediction.edge !== undefined && prediction.edge <= 0)) return 'blocked';
   if (predictions.some((prediction) => prediction.status === 'review-required')) return 'review-required';
+  if (predictions.some((prediction) => (prediction.warnings?.length ?? 0) > 0 || (prediction.riskTags?.length ?? 0) > 0)) return 'review-required';
   if (predictions.every((prediction) => prediction.status === 'promotable')) return 'promotable';
   return 'candidate';
 }
@@ -189,6 +194,12 @@ function buildWarnings(
     && evaluations.some((evaluation) => evaluation.includedReasons.includes('included-with-duplicate-fixture-override'))
   ) {
     warnings.push('Duplicate fixture override included more than one leg from a fixture.');
+  }
+  if (selected.some((prediction) => (prediction.warnings?.length ?? 0) > 0)) {
+    warnings.push('One or more selected legs carry prediction or research warnings.');
+  }
+  if (selected.some((prediction) => (prediction.riskTags?.length ?? 0) > 0)) {
+    warnings.push('One or more selected legs carry portfolio risk tags.');
   }
   if (evaluations.some((evaluation) => evaluation.excludedReasons.includes('excluded-combined-odds-limit'))) {
     warnings.push('Combined odds limit excluded one or more predictions.');

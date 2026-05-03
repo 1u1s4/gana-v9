@@ -1,8 +1,11 @@
 import type { AgentConfig } from '../../config.js';
+import { evaluateEgress } from '../../permissions/egress-policy.js';
 import type { Fixture } from '../../domain/fixtures.js';
 import type { FixtureStatus } from '../../domain/fixtures.js';
 import type { SportsProvider } from '../../domain/ids.js';
 import type { OddsQuote } from '../../domain/odds.js';
+import { consensusFairPrices } from '../../markets/fair-price.js';
+import { isLowLiquidity, marketEfficiencyScore } from '../../markets/efficiency.js';
 import { redactSecrets } from '../../permissions/redaction.js';
 import type { RuntimeContext } from '../../runtime/context.js';
 import { createStorageRepositories } from '../../storage/repositories/index.js';
@@ -244,6 +247,17 @@ export class ApiFootballProvider implements SportsDataProvider {
     }
 
     const url = buildApiFootballUrl(this.config.apiFootballBaseUrl, path, query);
+    const egress = evaluateEgress({ url, config: this.config });
+    if (!egress.allowed) {
+      throw new ApiFootballProviderError({
+        code: 'provider_unavailable',
+        endpointName,
+        message: egress.reason ?? 'API-Football egress blocked by policy.',
+        expected: 'Network access to an allowlisted API-Football host.',
+        received: egress.host,
+        nextAction: 'Set API_FOOTBALL_BASE_URL to an allowlisted provider URL.',
+      });
+    }
     const headers = { 'x-apisports-key': apiKey };
     const started = Date.now();
     let response: Response;
@@ -502,6 +516,7 @@ export async function createApiFootballPersistence(
         return record ? fixtureFromStoredRecord(record) : null;
       },
       persistOddsSnapshot: async (snapshot) => {
+        const marketAnalytics = buildOddsMarketAnalytics(snapshot.quotes);
         const oddsSnapshot = await repositories.oddsSnapshots.createWithQuotes({
           snapshot: {
             fixtureId: snapshot.fixtureId,
@@ -517,20 +532,29 @@ export async function createApiFootballPersistence(
               quoteCount: snapshot.quotes.length,
             },
           },
-          quotes: snapshot.quotes.map((quote) => ({
-            fixtureId: snapshot.fixtureId,
-            bookmaker: quote.bookmaker ?? 'unknown',
-            bookmakerKey: quote.bookmaker,
-            marketKey: quote.market,
-            selectionKey: quote.selection,
-            line: quote.line ?? null,
-            price: quote.price,
-            impliedProbability: quote.impliedProbability,
-            capturedAt: new Date(quote.capturedAt),
-            metadata: {
-              sourceSnapshotId: quote.sourceSnapshotId,
-            },
-          })),
+          quotes: snapshot.quotes.map((quote) => {
+            const analytics = marketAnalytics.get(marketAnalyticsKey(quote));
+            return {
+              fixtureId: snapshot.fixtureId,
+              bookmaker: quote.bookmaker ?? 'unknown',
+              bookmakerKey: quote.bookmaker,
+              marketKey: quote.market,
+              selectionKey: quote.selection,
+              line: quote.line ?? null,
+              price: quote.price,
+              impliedProbability: quote.impliedProbability,
+              marketImpliedProbability: analytics?.marketImpliedProbability ?? null,
+              marketFairProbability: analytics?.marketFairProbability ?? null,
+              consensusFairOdds: analytics?.consensusFairOdds ?? null,
+              overround: analytics?.overround ?? null,
+              marketEfficiencyScore: analytics?.marketEfficiencyScore ?? null,
+              capturedAt: new Date(quote.capturedAt),
+              metadata: {
+                sourceSnapshotId: quote.sourceSnapshotId,
+                lowLiquidity: analytics?.lowLiquidity ?? false,
+              },
+            };
+          }),
         });
         const quoteRecordIds: Record<string, string> = {};
         const records = await repositories.oddsQuotes.listLatest({
@@ -637,6 +661,85 @@ function countBookmakers(payloads: unknown[]): number {
     }
   }
   return bookmakers.size;
+}
+
+interface OddsMarketAnalytics {
+  marketImpliedProbability: number;
+  marketFairProbability: number;
+  consensusFairOdds: number;
+  overround: number;
+  marketEfficiencyScore: number;
+  lowLiquidity: boolean;
+}
+
+function buildOddsMarketAnalytics(quotes: OddsQuote[]): Map<string, OddsMarketAnalytics> {
+  const groups = new Map<string, OddsQuote[]>();
+  for (const quote of quotes) {
+    const key = [quote.market, quote.line ?? 'null'].join(':');
+    groups.set(key, [...(groups.get(key) ?? []), quote]);
+  }
+
+  const result = new Map<string, OddsMarketAnalytics>();
+  for (const group of groups.values()) {
+    const fairPrices = consensusFairPrices(group.map((quote) => ({
+      selection: quote.selection,
+      odds: quote.price,
+      bookmaker: quote.bookmaker,
+    })));
+    const dispersion = averageSelectionDispersion(group);
+    for (const fair of fairPrices) {
+      const efficiency = marketEfficiencyScore({
+        bookmakerCount: fair.bookmakerCount,
+        overround: fair.overround,
+        dispersion,
+        freshnessMinutes: 0,
+      });
+      const lowLiquidity = isLowLiquidity({
+        bookmakerCount: fair.bookmakerCount,
+        overround: fair.overround,
+        dispersion,
+        freshnessMinutes: 0,
+      });
+      for (const quote of group.filter((item) => item.selection === fair.selection)) {
+        result.set(marketAnalyticsKey(quote), {
+          marketImpliedProbability: round6(fair.marketImpliedProbability),
+          marketFairProbability: round6(fair.marketFairProbability),
+          consensusFairOdds: Number.isFinite(fair.consensusFairOdds) ? round6(fair.consensusFairOdds) : 0,
+          overround: round6(fair.overround),
+          marketEfficiencyScore: efficiency,
+          lowLiquidity,
+        });
+      }
+    }
+  }
+  return result;
+}
+
+function marketAnalyticsKey(quote: OddsQuote): string {
+  return [
+    quote.bookmaker ?? 'unknown',
+    quote.market,
+    quote.selection,
+    quote.line ?? 'null',
+  ].join('|');
+}
+
+function averageSelectionDispersion(quotes: OddsQuote[]): number {
+  const bySelection = new Map<string, number[]>();
+  for (const quote of quotes) {
+    bySelection.set(quote.selection, [...(bySelection.get(quote.selection) ?? []), quote.impliedProbability]);
+  }
+  const dispersions = [...bySelection.values()].map((values) => {
+    if (values.length < 2) return 0;
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length;
+    return Math.sqrt(variance);
+  });
+  return dispersions.length ? dispersions.reduce((sum, value) => sum + value, 0) / dispersions.length : 0;
+}
+
+function round6(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 function dedupeQuotes(quotes: OddsQuote[]): OddsQuote[] {

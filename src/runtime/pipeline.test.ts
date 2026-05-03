@@ -355,8 +355,44 @@ describe('executeRunPipeline', () => {
 
     const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
     assert.equal(manifest.runId, 'run-test-1');
+    assert.equal(manifest.handoff.parlay, 'no-parlay-today');
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'input.json'));
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'handoff.md'));
+    assert.match(readFileSync(result.handoffPath, 'utf-8'), /handoff\.parlay: no-parlay-today/);
+  });
+
+  it('resumes a run from completed HarnessTask checkpoints without reexecuting completed steps', async () => {
+    const config = testConfig();
+    const target = fixture();
+    const calls: string[] = [];
+    const deps = successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-resume-checkpoint',
+      date: '2026-04-29',
+    });
+
+    const firstRuntime = createRuntimeContext(config, 'session.jsonl');
+    const first = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, firstRuntime, deps);
+
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
+    const firstTasks = JSON.parse(readFileSync(join(first.artifactDir, 'tasks.json'), 'utf-8'));
+    assert.equal(firstTasks.find((task: { type: string }) => task.type === 'score.fixture').status, 'succeeded');
+
+    const secondRuntime = createRuntimeContext(config, 'session-2.jsonl');
+    const second = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      runId: 'run-resume-checkpoint',
+      validate: false,
+    }, secondRuntime, deps);
+
+    assert.equal(second.runId, first.runId);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
+    assert.equal(second.scoring.length, 1);
+    assert.equal(second.parlay?.runId, 'run-resume-checkpoint');
   });
 
   it('flags incomplete low-odds prediction coverage in the run evaluation', async () => {

@@ -3,6 +3,7 @@ import type { AgentConfig, ApprovalMode, GanaProfile } from '../config.js';
 export interface RuntimeContext {
   runId?: string;
   taskId?: string;
+  traceId?: string;
   sessionPath: string;
   artifactRoot: string;
   profile: GanaProfile;

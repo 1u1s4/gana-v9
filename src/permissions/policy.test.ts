@@ -91,7 +91,7 @@ describe('permission policy', () => {
     }
   });
 
-  it('guarded tools audit auto-approvals and redact outputs', async () => {
+  it('guarded tools audit auto-approvals and redact mutation args', async () => {
     const root = mkdtempSync(join(tmpdir(), 'gana-tool-policy-'));
     const cfg = loadConfig({
       artifactRoot: join(root, 'artifacts'),
@@ -100,22 +100,68 @@ describe('permission policy', () => {
       approvalMode: 'auto-grant',
     }, { skipApiKey: true });
     const runtime = createRuntimeContext(cfg, join(root, 'session.jsonl'));
+    runtime.runId = 'tool-policy-test';
+    runtime.traceId = 'trace-tool-policy-test';
     const tools = createTools({ config: cfg, runtime });
-    const shell = tools.find((item) => item.function?.name === 'shell');
-    assert.ok(shell);
+    const fileWrite = tools.find((item) => item.function?.name === 'file_write');
+    assert.ok(fileWrite);
 
-    const result = await shell.function.execute({
-      command: 'node -e "process.stdout.write(Buffer.from(\'QVBJX0ZPT1RCQUxMX0tFWT1zZWNyZXQta2V5Cg==\', \'base64\').toString())"',
+    const result = await fileWrite.function.execute({
+      path: '.artifacts/redacted-tool-output.txt',
+      content: 'API_FOOTBALL_KEY=secret-key',
+      reason: 'verify guarded tool audit redaction',
+      dryRun: false,
+      idempotencyKey: 'redaction-test',
     });
-    assert.equal(result.exitCode, 0);
-    assert.match(result.output, /API_FOOTBALL_KEY=\[REDACTED\]/);
-    assert.doesNotMatch(result.output, /secret-key/);
+    assert.equal(result.written, true);
 
-    const auditPath = join(cfg.artifactRoot, 'runs', 'session-session', 'audit-log.jsonl');
+    const auditPath = join(cfg.artifactRoot, 'runs', 'tool-policy-test', 'audit-log.jsonl');
     const audit = readFileSync(auditPath, 'utf-8');
     assert.match(audit, /approval\.auto_granted/);
     assert.match(audit, /action\.completed/);
     assert.doesNotMatch(audit, /secret-key/);
+
+    const spans = readFileSync(join(cfg.artifactRoot, 'runs', 'tool-policy-test', 'spans.jsonl'), 'utf-8');
+    assert.match(spans, /policy\.evaluate/);
+    assert.match(spans, /tool\.execute\.file_write/);
+    assert.doesNotMatch(spans, /secret-key/);
+  });
+
+  it('registers analytical promotion tools and gates them behind manual approval', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'gana-promote-policy-'));
+    const cfg = loadConfig({
+      artifactRoot: join(root, 'artifacts'),
+      databaseUrl: '',
+      profile: 'standard',
+      approvalMode: 'manual',
+    }, { skipApiKey: true });
+    const runtime = createRuntimeContext(cfg, join(root, 'session.jsonl'));
+    runtime.runId = 'promotion-policy-test';
+    runtime.traceId = 'trace-promotion-policy-test';
+    const tools = createTools({ config: cfg, runtime });
+    const artifactPromote = tools.find((item) => item.function?.name === 'artifact_promote');
+    const predictionPromote = tools.find((item) => item.function?.name === 'prediction_promote');
+    assert.ok(artifactPromote);
+    assert.ok(predictionPromote);
+
+    assert.equal(evaluateAction('artifact_promote', { artifactId: 'artifact-1', runId: 'run-1' }, { config: cfg }).decision, 'require_approval');
+    assert.equal(evaluateAction('prediction_promote', { predictionId: 'prediction-1', runId: 'run-1' }, { config: cfg }).decision, 'require_approval');
+
+    const result = await artifactPromote.function.execute({
+      artifactId: 'artifact-1',
+      runId: 'run-1',
+      target: 'handoff',
+      reason: 'manual promotion review',
+      dryRun: false,
+      idempotencyKey: 'promote-approval-test',
+    }, { toolCallId: 'tool-call-promote-1' });
+    assert.equal(result.blocked, true);
+    assert.equal(result.decision, 'require_approval');
+    assert.ok(result.approvalId);
+
+    const spans = readFileSync(join(cfg.artifactRoot, 'runs', 'promotion-policy-test', 'spans.jsonl'), 'utf-8');
+    assert.match(spans, /policy\.evaluate/);
+    assert.match(spans, /pending_approval/);
   });
 });
 

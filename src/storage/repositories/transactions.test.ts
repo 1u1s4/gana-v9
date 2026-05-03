@@ -23,9 +23,16 @@ function delegate(record: any = {}) {
 describe('compound storage writes', () => {
   it('creates odds snapshots and quotes inside a transaction', async () => {
     let transactions = 0;
+    let persistedQuotes: any[] = [];
     const db: any = {
       oddsSnapshot: delegate({ id: 'odds-snapshot-1' }),
-      oddsQuote: delegate(),
+      oddsQuote: {
+        ...delegate(),
+        createMany: async (args: any) => {
+          persistedQuotes = args.data;
+          return { count: args.data.length };
+        },
+      },
       $transaction: async (fn: (tx: any) => Promise<unknown>) => {
         transactions += 1;
         return fn(db);
@@ -35,11 +42,23 @@ describe('compound storage writes', () => {
     const repo = createOddsSnapshotRepository(db);
     const snapshot = await repo.createWithQuotes({
       snapshot: { fixtureId: 'fixture-1', providerFixtureId: '1001', bookmakerCount: 1 },
-      quotes: [{ fixtureId: 'fixture-1', bookmaker: 'book', marketKey: 'h2h', selectionKey: 'home', price: 1.18 }],
+      quotes: [{
+        fixtureId: 'fixture-1',
+        bookmaker: 'book',
+        marketKey: 'h2h',
+        selectionKey: 'home',
+        price: 1.18,
+        marketFairProbability: 0.82,
+        overround: 0.04,
+        marketEfficiencyScore: 0.71,
+      }],
     });
 
     assert.equal(snapshot.id, 'odds-snapshot-1');
     assert.equal(transactions, 1);
+    assert.equal(persistedQuotes[0].marketFairProbability, 0.82);
+    assert.equal(persistedQuotes[0].overround, 0.04);
+    assert.equal(persistedQuotes[0].marketEfficiencyScore, 0.71);
   });
 
   it('creates research bundle graphs inside a transaction', async () => {

@@ -37,6 +37,7 @@ export interface RunFixtureResearchInput {
   fixtureId: string;
   web: ResearchWebMode;
   oddsSnapshot?: CanonicalOddsSnapshot;
+  signal?: AbortSignal;
 }
 
 export interface FixtureResearchResult {
@@ -126,6 +127,7 @@ export async function runFixtureResearch(
     const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, {
       nativeWebSearchRequirement,
       onEvent: (event) => recordNativeWebSearchEvent(nativeWebSearchTrace, event),
+      signal: input.signal,
     });
     rawOutput = result.text;
   } catch (err: any) {
@@ -273,6 +275,8 @@ async function runResearchAgent(
   options: Parameters<typeof runAgentWithRetry>[2],
 ): Promise<Awaited<ReturnType<typeof runAgentWithRetry>>> {
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  options?.signal?.addEventListener('abort', abort, { once: true });
   const timeout = setTimeout(() => controller.abort(), RESEARCH_AGENT_TIMEOUT_MS);
   try {
     return await runner(config, prompt, {
@@ -285,6 +289,7 @@ async function runResearchAgent(
     }
     throw err;
   } finally {
+    options?.signal?.removeEventListener('abort', abort);
     clearTimeout(timeout);
   }
 }

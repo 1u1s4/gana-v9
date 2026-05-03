@@ -1,0 +1,1 @@
+{"type":"object","required":["predictions"],"properties":{"predictions":{"type":"array"}}}

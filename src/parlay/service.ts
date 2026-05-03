@@ -808,12 +808,26 @@ function toSourcePrediction(prediction: PredictionRecord): ParlaySourcePredictio
     impliedProbability: numberOrUndefined(prediction.impliedProbability),
     estimatedProbability: numberOrUndefined(prediction.estimatedProbability),
     edge: numberOrUndefined(prediction.edge),
+    blockers: metadataStringArray(prediction.metadata, 'blockers'),
+    marketFairProbability: metadataNumber(prediction.metadata, 'marketFairProbability'),
     confidence: numberValue(prediction.confidence),
     quality: qualityValue(prediction.quality),
     status: prediction.status as PredictionStatus,
     rationale: prediction.rationaleRedacted,
     warnings: jsonStringArray(prediction.warnings),
   };
+}
+
+function metadataStringArray(metadata: unknown, key: string): string[] | undefined {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : undefined;
+}
+
+function metadataNumber(metadata: unknown, key: string): number | undefined {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : undefined;
 }
 
 function decoratePortfolioPrediction(prediction: ParlaySourcePrediction): ParlaySourcePrediction {
@@ -977,7 +991,7 @@ function gateFromBuild(build: BuildParlayResult): ParlayGateResult {
 
   return {
     verdict: build.parlay.status,
-    reasons,
+    reasons: build.parlay.status === 'blocked' ? ['handoff.parlay = no-parlay-today', ...reasons] : reasons,
     warnings: build.parlay.warnings,
   };
 }
@@ -995,6 +1009,10 @@ function artifactPayloadFor(
     generatedAt,
     parlayBuilderRuleVersion: PARLAY_BUILDER_RULE_VERSION,
     analyticalArtifactOnly: true,
+    handoff: {
+      parlay: build.parlay.status === 'blocked' ? 'no-parlay-today' : 'analytical-candidate',
+      disclaimer: 'uso analitico, no constituye recomendacion de apuesta, no garantiza resultado',
+    },
     notice: 'This parlay candidate is an analytical artifact only; it cannot execute wagers or monetary actions.',
     config: build.config,
     gateResult,

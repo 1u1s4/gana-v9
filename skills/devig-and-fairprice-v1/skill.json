@@ -1,0 +1,1 @@
+{"id":"devig-and-fairprice","version":"v1","purpose":"Convert raw multi-bookmaker odds into fair probabilities","inputs":["oddsQuotes"],"trustedContext":["bookmaker odds"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["probabilities-sum-to-one"],"promptSha256":"1c5239d9ab0d9597666a35d54967a70f63737a2449c125b02cb4113c2db7109b"}

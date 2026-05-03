@@ -1,4 +1,5 @@
 import type { StoragePrismaClient } from '../types.js';
+import { createAnalyticsRepositories } from './analytics.js';
 import { createCatalogRepositories } from './catalog.js';
 import { createEvidenceRepositories } from './evidence.js';
 import { createLowOddsRepositories } from './low-odds.js';
@@ -10,6 +11,7 @@ import { createSnapshotRepositories } from './snapshots.js';
 import { createValidationRepositories } from './validation.js';
 
 export * from './catalog.js';
+export * from './analytics.js';
 export * from './evidence.js';
 export * from './low-odds.js';
 export * from './parlays.js';
@@ -30,5 +32,6 @@ export function createStorageRepositories(db: StoragePrismaClient) {
     ...createPredictionRepositories(db),
     ...createParlayRepositories(db),
     ...createValidationRepositories(db),
+    ...createAnalyticsRepositories(db),
   };
 }

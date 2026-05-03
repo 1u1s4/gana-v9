@@ -64,6 +64,15 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     destructive: false,
     requiresApproval: 'standard',
   },
+  dangerous_shell: {
+    name: 'dangerous_shell',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: true,
+    network: true,
+    destructive: true,
+    requiresApproval: 'always',
+  },
   api_football_request: {
     name: 'api_football_request',
     readOnly: true,

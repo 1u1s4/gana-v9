@@ -43,6 +43,7 @@ export interface EvaluatePredictionGatesInput extends EvidenceGateInput {
   dbWritable?: boolean;
   webResearchRequired?: boolean;
   hasWebResearch?: boolean;
+  qualityWarnings?: string[];
 }
 
 export function evaluateEvidenceGate(input: EvidenceGateInput): EvidenceGateResult {
@@ -118,6 +119,7 @@ export function evaluatePredictionGates(input: EvaluatePredictionGatesInput): Pr
   const evidence = evaluateEvidenceGate(input);
   if (!evidence.sufficient) warnings.push(...evidence.reasons);
   warnings.push(...evidence.warnings);
+  warnings.push(...(input.qualityWarnings ?? []));
 
   if (input.webResearchRequired && !input.hasWebResearch) {
     warnings.push('web research required but no web-search source was linked');
@@ -169,7 +171,15 @@ export function aggregatePredictionGate(results: PredictionGateResult[]): Predic
       warnings,
     };
   }
-  return { verdict: 'promotable', reasons: ['prediction gates passed'], warnings };
+  if (warnings.length) {
+    return {
+      verdict: 'review-required',
+      reasons: ['prediction requires review'],
+      warnings,
+    };
+  }
+
+  return { verdict: 'promotable', reasons: ['prediction gates passed'], warnings: [] };
 }
 
 function researchBundleStatus(bundle: EvidenceGateInput['researchBundle']): string | undefined {

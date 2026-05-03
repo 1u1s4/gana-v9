@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { isMarketKey, isValidMarketSelection, marketRequiresLine } from '../domain/markets.js';
 import { calculateImpliedProbability, isValidDecimalOdds } from '../domain/odds.js';
 import { SCORE_PREDICTION_PROMPT_VERSION } from './prompts.js';
+import { evaluateEdgeGate } from '../scoring/edge-gate.js';
 import {
   SCORING_RULE_VERSION,
   type PredictionCandidate,
@@ -24,6 +25,9 @@ export interface ScorePredictionCandidateInput {
   line?: number;
   probability?: number;
   odds: number;
+  marketImpliedProbability?: number | null;
+  marketFairProbability?: number | null;
+  lowLiquidity?: boolean;
   oddsSnapshotId?: string;
   oddsQuoteId: string;
   evidenceIds: string[];
@@ -42,6 +46,12 @@ export interface BuildAtomicPredictionInput {
   market: string;
   selection: string;
   odds: number;
+  marketImpliedProbability?: number | null;
+  marketFairProbability?: number | null;
+  lowLiquidity?: boolean;
+  stalePick?: boolean;
+  lineupPending?: boolean;
+  modelDisagreement?: boolean;
   line?: number;
   estimatedProbability?: number | null;
   evidenceIds: string[];
@@ -75,7 +85,9 @@ export function scorePredictionCandidate(input: ScorePredictionCandidateInput): 
   if (!input.evidenceIds.length) reasons.push('missing evidence');
 
   const impliedProbability = calculateImpliedProbability(input.odds);
-  const edge = input.probability === undefined ? undefined : input.probability - impliedProbability;
+  const marketImpliedProbability = input.marketImpliedProbability ?? impliedProbability;
+  const marketFairProbability = input.marketFairProbability ?? impliedProbability;
+  const edge = input.probability === undefined ? undefined : input.probability - marketFairProbability;
 
   return {
     valid: reasons.length === 0,
@@ -86,7 +98,11 @@ export function scorePredictionCandidate(input: ScorePredictionCandidateInput): 
       claimIds: input.claimIds ?? [],
       warnings: input.warnings ?? [],
       impliedProbability,
+      marketImpliedProbability,
+      marketFairProbability,
       edge,
+      blockers: [],
+      promotable: edge === undefined ? false : edge > 0,
     },
   };
 }
@@ -100,6 +116,9 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
     line: input.line,
     probability: input.estimatedProbability ?? undefined,
     odds: input.odds,
+    marketImpliedProbability: input.marketImpliedProbability,
+    marketFairProbability: input.marketFairProbability,
+    lowLiquidity: input.lowLiquidity,
     oddsSnapshotId: input.oddsSnapshotId,
     oddsQuoteId: input.oddsQuoteId,
     evidenceIds: input.evidenceIds,
@@ -107,6 +126,19 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
     rationale: input.rationale,
     warnings: input.warnings ?? [],
   });
+  const confidenceBand = input.quality ?? qualityFromConfidence(input.confidence);
+  const edgeGate = input.estimatedProbability === undefined || input.estimatedProbability === null
+    ? { blockers: ['missing-model-probability'], promotable: false, edge: 0 }
+    : evaluateEdgeGate({
+      modelProbability: input.estimatedProbability,
+      marketFairProbability: candidate.scored.marketFairProbability ?? candidate.scored.impliedProbability ?? calculateImpliedProbability(input.odds),
+      confidenceBand,
+      evidenceCoverage: input.evidenceIds.length >= 2 ? 1 : 0.5,
+      lowLiquidity: input.lowLiquidity,
+      stalePick: input.stalePick,
+      lineupPending: input.lineupPending,
+      modelDisagreement: input.modelDisagreement,
+    });
 
   return {
     id: input.id ?? randomUUID(),
@@ -117,8 +149,11 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
     selection: input.selection,
     line: input.line,
     probability: input.estimatedProbability ?? undefined,
+    modelProbability: input.estimatedProbability ?? undefined,
     odds: input.odds,
     impliedProbability: candidate.scored.impliedProbability ?? calculateImpliedProbability(input.odds),
+    marketImpliedProbability: candidate.scored.marketImpliedProbability ?? calculateImpliedProbability(input.odds),
+    marketFairProbability: candidate.scored.marketFairProbability ?? calculateImpliedProbability(input.odds),
     edge: candidate.scored.edge,
     oddsSnapshotId: input.oddsSnapshotId,
     oddsQuoteId: input.oddsQuoteId,
@@ -126,14 +161,17 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
     evidenceIds: input.evidenceIds,
     claimIds: input.claimIds,
     rationale: input.rationale ?? 'Rule-based scoring v1 from persisted odds and linked research evidence.',
-    warnings: [...new Set([...(input.warnings ?? []), ...candidate.reasons])],
+    blockers: edgeGate.blockers,
+    promotable: edgeGate.promotable,
+    warnings: [...new Set([...(input.warnings ?? []), ...candidate.reasons, ...edgeGate.blockers])],
     providerAgentic: input.providerAgentic as PredictionRecordView['providerAgentic'],
     model: input.model,
     promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
     scoringRuleVersion: SCORING_RULE_VERSION,
     confidence: clamp01(input.confidence),
-    quality: input.quality ?? qualityFromConfidence(input.confidence),
-    status: candidate.valid ? input.status : 'blocked',
+    quality: confidenceBand,
+    confidenceBand,
+    status: candidate.valid && edgeGate.promotable ? input.status : edgeGate.blockers.length ? 'blocked' : 'blocked',
     generatedAt: input.generatedAt,
   };
 }

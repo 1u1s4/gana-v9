@@ -84,6 +84,26 @@ const claims = [
   },
 ];
 
+const sourceRecords = [
+  {
+    id: 'source-1',
+    bundleId: 'research-bundle-1',
+    runId: 'research-run-1',
+    fixtureId: 'fixture-1',
+    artifactId: null,
+    providerSnapshotId: 'provider-snapshot-1',
+    sourceType: 'provider-snapshot',
+    url: null,
+    title: 'Provider snapshot',
+    externalId: 'provider-snapshot-1',
+    hash: 'hash',
+    capturedAt: now,
+    warnings: null,
+    metadata: null,
+    createdAt: now,
+  },
+];
+
 function config() {
   return loadConfig({
     databaseUrl: 'mysql://user:pass@localhost:3306/gana',
@@ -102,6 +122,7 @@ function repositories(overrides: Record<string, unknown> = {}) {
     oddsSnapshots: { listLatestByFixture: async () => [oddsSnapshot] },
     oddsQuotes: { listLatest: async () => [oddsQuote] },
     researchBundles: { list: async () => [researchBundle] },
+    sourceRecords: { list: async () => sourceRecords },
     evidenceItems: { list: async () => evidenceItems },
     claims: { list: async () => claims },
     harnessRuns: { upsertForRun: async () => ({}) },
@@ -256,6 +277,110 @@ describe('runFixtureScoring', () => {
     assert.equal(result.gateResult.verdict, 'blocked');
     assert.match(result.error ?? '', /unknown oddsQuoteId/);
     assert.equal(persisted, false);
+  });
+
+  it('applies line movement, lineup, and model disagreement blockers from persisted context', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+    const kickoffSoon = new Date(now.getTime() + 60 * 60_000);
+    const bttsQuote = {
+      ...oddsQuote,
+      id: 'odds-quote-btts',
+      marketKey: 'btts',
+      selectionKey: 'yes',
+      price: 2,
+      impliedProbability: 0.5,
+      marketFairProbability: 0.45,
+      metadata: {
+        openingOdds: 2.3,
+        providerPredictions: [
+          { provider: 'codex', selection: 'yes', probability: 0.9 },
+          { provider: 'gemini', selection: 'yes', probability: 0.62 },
+        ],
+      },
+    };
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        fixtures: {
+          findById: async () => ({ ...fixture, scheduledAt: kickoffSoon, metadata: { lineupConfirmed: false } }),
+          findByProviderKey: async () => ({ ...fixture, scheduledAt: kickoffSoon, metadata: { lineupConfirmed: false } }),
+        },
+        oddsQuotes: { listLatest: async () => [bttsQuote] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-btts',
+            market: 'btts',
+            selection: 'yes',
+            line: null,
+            odds: 2,
+            probability: 0.9,
+            confidence: 0.9,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'BTTS is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.deepEqual(result.predictions[0].blockers.sort(), ['lineup-pending', 'model-disagreement', 'stale-pick']);
+    assert.deepEqual(persisted[0].metadata.blockers.sort(), ['lineup-pending', 'model-disagreement', 'stale-pick']);
+  });
+
+  it('downgrades predictions when linked research sources are stale', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const staleSource = {
+      ...sourceRecords[0],
+      capturedAt: new Date('2026-04-25T09:00:00.000Z'),
+    };
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        sourceRecords: { list: async () => [staleSource] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => records,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.match(result.predictions[0].warnings.join('\n'), /stale odds source/);
   });
 
   it('blocks without a persisted odds snapshot and does not persist predictions', async () => {

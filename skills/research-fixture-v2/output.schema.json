@@ -1,0 +1,1 @@
+{"type":"object","required":["sources","claims"],"properties":{"sources":{"type":"array"},"claims":{"type":"array"}}}

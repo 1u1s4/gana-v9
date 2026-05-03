@@ -1,0 +1,1 @@
+{"type":"object","properties":{"correlationPenalty":{"type":"number"},"blockers":{"type":"array"}}}

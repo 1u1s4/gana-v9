@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { resolve } from 'path';
 import { detectMonetaryAction } from '../security/no-monetary-actions.js';
+import { evaluateFilesystemWrite } from './filesystem-policy.js';
 import { getToolMetadata } from './tool-metadata.js';
 import type { PermissionContext, PermissionEvaluation, ToolMetadata } from './types.js';
 
@@ -76,6 +77,18 @@ export function evaluateAction(
     };
   }
 
+  const fsWrite = filesystemWriteReason(name, args, context);
+  if (fsWrite) {
+    return {
+      decision: 'require_approval',
+      approvalKind: 'manual',
+      reason: fsWrite,
+      actionId,
+      metadata,
+      destructive: metadata.destructive,
+    };
+  }
+
   const destructive = metadata.destructive || (name === 'shell' && isDestructiveShellCommand(args));
   if (destructive) {
     return {
@@ -129,6 +142,20 @@ export function evaluateAction(
     metadata,
     destructive,
   };
+}
+
+function filesystemWriteReason(name: string, args: unknown, context: PermissionContext): string | undefined {
+  if (name !== 'file_write' && name !== 'file_edit') return undefined;
+  if (!args || typeof args !== 'object' || !('path' in args)) return undefined;
+  const result = evaluateFilesystemWrite({
+    path: String((args as { path?: unknown }).path ?? ''),
+    cwd: context.cwd ?? process.cwd(),
+    artifactRoot: context.runtime?.artifactRoot,
+    requireArtifactWrite: true,
+    approved: context.config.profile === 'full-permissions' && context.config.approvalMode === 'auto-grant',
+  });
+  if (result.allowed) return undefined;
+  return result.reason;
 }
 
 export function isDestructiveShellCommand(args: unknown): boolean {

@@ -3,6 +3,11 @@ import type { AgentConfig } from '../config.js';
 import { runAgentWithRetry } from '../agent.js';
 import { createApiFootballPersistence, createApiFootballProvider } from '../providers/sports/api-football.js';
 import { API_FOOTBALL_PROVIDER, type FixtureStatistics } from '../providers/sports/types.js';
+import { movedAgainstPick } from '../markets/line-movement.js';
+import { lineupGate } from '../markets/lineup-gate.js';
+import { evaluateFreshness } from '../retrieval/freshness.js';
+import { claimsHaveProvenance } from '../retrieval/provenance.js';
+import { detectDisagreement } from '../scoring/disagreement.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { getPrismaClient } from '../storage/db.js';
@@ -32,6 +37,7 @@ const MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT = 80;
 export interface RunFixtureScoringInput {
   fixtureId: string;
   web?: ResearchWebMode;
+  signal?: AbortSignal;
 }
 
 export interface FixtureScoringResult {
@@ -41,6 +47,7 @@ export interface FixtureScoringResult {
   providerFixtureId?: string;
   gateResult: ReturnType<typeof aggregatePredictionGate>;
   predictions: PredictionRecordView[];
+  retrievalWarnings?: string[];
   artifactPath?: string;
   error?: string;
 }
@@ -202,6 +209,12 @@ export async function runFixtureScoring(
   const quoteTrimWarnings = promptOddsQuotes.length < oddsQuotes.length
     ? [`scoring prompt allowedQuotes trimmed from ${oddsQuotes.length} to ${promptOddsQuotes.length} representative quotes`]
     : [];
+  const retrievalWarnings = evaluateRetrievalQuality({
+    sources: research.sources,
+    claims: research.claims,
+    fixtureStatus: fixture.status,
+    now: now(),
+  });
   const prompt = buildScorePredictionPrompt({
     runId,
     createdAt: generatedAt,
@@ -214,9 +227,10 @@ export async function runFixtureScoring(
     evidenceItems: research.evidenceItems.map(evidencePromptView),
     claims: research.claims.map(claimPromptView),
     allowedQuotes,
-    providerContextWarnings: [
+      providerContextWarnings: [
       ...providerContextWarnings,
       ...quoteTrimWarnings,
+      ...retrievalWarnings,
       ...(web !== 'off' && !hasWebResearchSource(research.sources)
         ? [`web ${web} requested but no persisted web-search source is linked to the latest research bundle`]
         : []),
@@ -226,7 +240,10 @@ export async function runFixtureScoring(
   let llmOutput: ParsedTopPick[];
   let rawOutput = '';
   try {
-    const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, { runtime });
+    const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, {
+      runtime,
+      signal: input.signal,
+    });
     rawOutput = result.text;
     llmOutput = parseTopPickOutput(rawOutput);
   } catch (err: any) {
@@ -286,6 +303,7 @@ export async function runFixtureScoring(
       claims: research.claims,
       webResearchRequired: web !== 'off',
       hasWebResearch: hasWebResearchSource(research.sources),
+      qualityWarnings: retrievalWarnings,
     });
     const selectedEvidenceIds = pick.evidenceIds.length ? pick.evidenceIds : evidenceGate.evidenceIds;
     const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
@@ -300,13 +318,19 @@ export async function runFixtureScoring(
       selection: pick.selection,
       line: pick.line,
       odds: pick.odds,
+      marketImpliedProbability: numberOrNull(quote?.marketImpliedProbability),
+      marketFairProbability: numberOrNull(quote?.marketFairProbability),
+      lowLiquidity: metadataBool(quote?.metadata, 'lowLiquidity'),
+      stalePick: stalePickFromQuote(quote, pick.odds),
+      lineupPending: lineupPendingForFixture(fixture, pick.market, quote, now()),
+      modelDisagreement: modelDisagreementFromMetadata(quote?.metadata),
       estimatedProbability: pick.probability,
       evidenceIds: selectedEvidenceIds,
       claimIds: selectedClaimIds,
       status: gate.verdict,
       confidence: pick.confidence,
       rationale: pick.rationale,
-      warnings: [...gate.warnings, ...candidateScore.reasons, ...pick.warnings],
+      warnings: [...gate.warnings, ...retrievalWarnings, ...candidateScore.reasons, ...pick.warnings],
       providerAgentic: config.provider,
       model: config.model,
       researchBundleId: research.researchBundle?.id,
@@ -330,6 +354,7 @@ export async function runFixtureScoring(
     promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
     scoringRuleVersion: SCORING_RULE_VERSION,
     gateResult: aggregate,
+    retrievalWarnings,
     prompt,
     rawOutput,
     predictions,
@@ -355,6 +380,7 @@ export async function runFixtureScoring(
       providerFixtureId: fixture.providerFixtureId,
       gateResult: aggregate,
       predictions: persisted.length ? predictions : [],
+      retrievalWarnings,
       artifactPath,
     };
   } catch (err: any) {
@@ -436,6 +462,8 @@ async function runScoringAgent(
   options: Parameters<typeof runAgentWithRetry>[2],
 ): Promise<Awaited<ReturnType<typeof runAgentWithRetry>>> {
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  options?.signal?.addEventListener('abort', abort, { once: true });
   const timeout = setTimeout(() => controller.abort(), SCORING_AGENT_TIMEOUT_MS);
   try {
     return await runner(config, prompt, {
@@ -448,6 +476,7 @@ async function runScoringAgent(
     }
     throw err;
   } finally {
+    options?.signal?.removeEventListener('abort', abort);
     clearTimeout(timeout);
   }
 }
@@ -575,6 +604,12 @@ function toAllowedQuote(quote: OddsQuoteRecord) {
     line: numberOrNull(quote.line),
     odds: numberValue(quote.price),
     impliedProbability: numberOrNull(quote.impliedProbability),
+    marketImpliedProbability: numberOrNull(quote.marketImpliedProbability),
+    marketFairProbability: numberOrNull(quote.marketFairProbability),
+    consensusFairOdds: numberOrNull(quote.consensusFairOdds),
+    overround: numberOrNull(quote.overround),
+    marketEfficiencyScore: numberOrNull(quote.marketEfficiencyScore),
+    lowLiquidity: metadataBool(quote.metadata, 'lowLiquidity'),
     bookmaker: quote.bookmaker,
     capturedAt: quote.capturedAt instanceof Date ? quote.capturedAt.toISOString() : String(quote.capturedAt),
   };
@@ -859,6 +894,11 @@ function toPredictionInput(
     metadata: compactJson({
       providerFixtureId: fixture.providerFixtureId,
       claimIds: prediction.claimIds,
+      modelProbability: prediction.modelProbability ?? prediction.probability ?? null,
+      marketFairProbability: prediction.marketFairProbability ?? null,
+      confidenceBand: prediction.confidenceBand ?? prediction.quality,
+      blockers: prediction.blockers,
+      promotable: prediction.promotable ?? prediction.status === 'promotable',
     }),
   };
 }
@@ -939,6 +979,92 @@ function numberOrUndefined(value: unknown): number | undefined {
   if (value === null || value === undefined) return undefined;
   const parsed = numberValue(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function metadataBool(metadata: unknown, key: string): boolean | undefined {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function metadataNumber(metadata: unknown, key: string): number | undefined {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  return numberOrUndefined((metadata as Record<string, unknown>)[key]);
+}
+
+function stalePickFromQuote(quote: OddsQuoteRecord | undefined, selectedOdds: number): boolean {
+  const metadata = quote?.metadata;
+  if (metadataBool(metadata, 'lineMovementAgainstPick')) return true;
+  const openingOdds = metadataNumber(metadata, 'openingOdds') ?? metadataNumber(metadata, 'openingPrice');
+  const currentOdds = numberOrUndefined(quote?.price) ?? selectedOdds;
+  if (openingOdds === undefined || !Number.isFinite(currentOdds)) return false;
+  return movedAgainstPick('back', openingOdds, currentOdds);
+}
+
+function lineupPendingForFixture(
+  fixture: FixtureRecord,
+  market: string,
+  quote: OddsQuoteRecord | undefined,
+  now: Date,
+): boolean {
+  if (metadataBool(quote?.metadata, 'lineupPending')) return true;
+  const lineupConfirmed = metadataBool(quote?.metadata, 'lineupConfirmed')
+    ?? metadataBool(fixture.metadata, 'lineupConfirmed')
+    ?? false;
+  const scheduledAt = fixture.scheduledAt instanceof Date
+    ? fixture.scheduledAt.toISOString()
+    : String(fixture.scheduledAt ?? '');
+  return lineupGate({ market, kickoffAt: scheduledAt, lineupConfirmed, now }).includes('lineup-pending');
+}
+
+function modelDisagreementFromMetadata(metadata: unknown): boolean {
+  if (metadataBool(metadata, 'modelDisagreement')) return true;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
+  const raw = (metadata as Record<string, unknown>).providerPredictions;
+  if (!Array.isArray(raw)) return false;
+  const predictions = raw.flatMap((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const selection = (item as Record<string, unknown>).selection;
+    const probability = numberOrUndefined((item as Record<string, unknown>).probability);
+    return typeof selection === 'string' && probability !== undefined ? [{ selection, probability }] : [];
+  });
+  return detectDisagreement(predictions).includes('model-disagreement');
+}
+
+function evaluateRetrievalQuality(input: {
+  sources: SourceRecordRecord[];
+  claims: ClaimRecord[];
+  fixtureStatus?: string | null;
+  now: Date;
+}): string[] {
+  const warnings: string[] = [];
+  const provenance = claimsHaveProvenance(input.claims.map((claim) => ({
+    id: claim.id,
+    sourceIds: claim.sourceId ? [claim.sourceId] : [],
+    evidenceIds: jsonStringArray(claim.evidenceIds),
+  })));
+  if (!provenance.ok) warnings.push(`claims missing provenance: ${provenance.missing.join(', ')}`);
+
+  for (const source of input.sources) {
+    const freshness = evaluateFreshness({
+      sourceType: freshnessSourceType(source.sourceType),
+      availableAt: source.capturedAt instanceof Date ? source.capturedAt.toISOString() : String(source.capturedAt ?? ''),
+      fixtureStatus: input.fixtureStatus ?? undefined,
+      now: input.now,
+    });
+    if (!freshness.fresh) warnings.push(freshness.reason ?? `stale source ${source.id}`);
+  }
+  return [...new Set(warnings)];
+}
+
+function freshnessSourceType(sourceType: string): string {
+  if (sourceType === 'provider-snapshot' || sourceType === 'api-football') return 'odds';
+  if (sourceType === 'web-search') return 'news';
+  return sourceType;
+}
+
+function jsonStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
 function stringField(item: Record<string, unknown>, key: string, index: number): string {

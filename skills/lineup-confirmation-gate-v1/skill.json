@@ -1,0 +1,1 @@
+{"id":"lineup-confirmation-gate","version":"v1","purpose":"Block XI-sensitive markets until lineup is confirmed","inputs":["fixture","market","lineup"],"trustedContext":["provider lineup"],"untrustedContext":["news snippets"],"outputSchema":"output.schema.json","evals":["lineup-pending-blocked"],"promptSha256":"d06fb778ccb6aa7d404431404f97329c87bdafa35cf195f26e0d247a346fd61a"}

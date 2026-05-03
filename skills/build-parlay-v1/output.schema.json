@@ -1,0 +1,1 @@
+{"type":"object","required":["parlays"],"properties":{"parlays":{"type":"array"}}}

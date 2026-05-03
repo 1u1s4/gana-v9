@@ -1,0 +1,1 @@
+{"id":"ensemble-disagreement","version":"v1","purpose":"Combine provider predictions and block material disagreement","inputs":["providerPredictions"],"trustedContext":["provider outputs"],"untrustedContext":["rationales"],"outputSchema":"output.schema.json","evals":["delta-15-blocks"],"promptSha256":"82fb73509adc59ab1df58e478dc182f9cfcc95cc2691e48f670306ac78e92ef7"}

@@ -1,0 +1,22 @@
+CREATE TABLE `leaderboard_entries` (
+  `id` CHAR(36) NOT NULL,
+  `run_id` CHAR(36) NULL,
+  `prompt_version` VARCHAR(120) NOT NULL,
+  `model_id` VARCHAR(160) NOT NULL,
+  `market` VARCHAR(80) NOT NULL,
+  `league` VARCHAR(120) NOT NULL,
+  `brier` DECIMAL(12, 6) NOT NULL,
+  `logloss` DECIMAL(12, 6) NOT NULL,
+  `clv_pct` DECIMAL(12, 6) NULL,
+  `hitrate` DECIMAL(12, 6) NOT NULL,
+  `n` INTEGER NOT NULL,
+  `low_sample` BOOLEAN NOT NULL DEFAULT false,
+  `generated_at` DATETIME(3) NOT NULL,
+  `metadata` JSON NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  INDEX `leaderboard_entries_dimensions_idx` (`prompt_version`, `model_id`, `market`, `league`),
+  INDEX `leaderboard_entries_run_id_idx` (`run_id`),
+  INDEX `leaderboard_entries_generated_at_idx` (`generated_at`),
+  CONSTRAINT `leaderboard_entries_run_id_fkey` FOREIGN KEY (`run_id`) REFERENCES `harness_runs`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

@@ -1,0 +1,1 @@
+{"id":"parlay-ranker","version":"v1","purpose":"Rank parlay candidates by edge adjusted for risk","inputs":["parlayCandidates"],"trustedContext":["candidate metrics"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["risk-adjusted-order"],"promptSha256":"935b89ab7e722319bcad15fc43359c0b100771099dc68e4100a484c416e94a29"}

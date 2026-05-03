@@ -10,6 +10,7 @@ const RUN_FILES = [
   'provider-snapshots.jsonl',
   'agent-events.jsonl',
   'audit-log.jsonl',
+  'spans.jsonl',
 ];
 
 export function ensureArtifactRoot(config: Pick<AgentConfig, 'artifactRoot'>): string {

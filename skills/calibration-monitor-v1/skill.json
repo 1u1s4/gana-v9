@@ -1,0 +1,1 @@
+{"id":"calibration-monitor","version":"v1","purpose":"Report calibration plots and low-sample flags","inputs":["predictions","outcomes"],"trustedContext":["validation analytics"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["low-sample-flag"],"promptSha256":"29df36e22969f1d6537086366e2039e6b68467887afe725bfc6d9243214ed4ac"}

@@ -25,6 +25,20 @@ describe('prediction scoring', () => {
     assert.equal(result.scored.edge, 0.58 - (1 / 2.1));
   });
 
+  it('uses devigged market fair probability for edge when available', () => {
+    const result = scorePredictionCandidate(candidate({
+      odds: 1.8,
+      probability: 0.61,
+      marketFairProbability: 0.56,
+      marketImpliedProbability: 0.58,
+    }));
+
+    assert.equal(result.valid, true);
+    assert.equal(result.scored.marketImpliedProbability, 0.58);
+    assert.equal(result.scored.marketFairProbability, 0.56);
+    assert.ok(Math.abs((result.scored.edge ?? 0) - 0.05) < 1e-9);
+  });
+
   it('supports lined over-under selections', () => {
     const result = scorePredictionCandidate(candidate({
       market: 'goals_over_under',

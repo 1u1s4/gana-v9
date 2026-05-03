@@ -1,0 +1,1 @@
+{"id":"line-movement-tracker","version":"v1","purpose":"Detect stale picks from odds movement","inputs":["lineOpen","lineNow","lineClose"],"trustedContext":["odds snapshots"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["stale-pick-blocked"],"promptSha256":"cb1bfb121a56faa9d425b2ee4d582ab8a8a6976f3f7e06d27272995aa92487c0"}

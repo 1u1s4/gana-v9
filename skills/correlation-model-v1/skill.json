@@ -1,0 +1,1 @@
+{"id":"correlation-model","version":"v1","purpose":"Estimate parlay leg correlation penalties","inputs":["legs"],"trustedContext":["market matrix"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["same-fixture-penalty"],"promptSha256":"495b5fcde5edcf49dd152442a7814a992b5ea95999949c99eb3781b7988f3dec"}

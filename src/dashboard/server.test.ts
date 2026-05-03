@@ -254,8 +254,9 @@ describe('dashboard api queries', () => {
     if ('error' in entity) {
       assert.fail('validation should exist');
     }
-    assert.equal(entity.entity.target.kind, 'parlay');
-    assert.equal(entity.entity.target.summary, 'Parlay de 2 legs');
+    const validationEntity = entity.entity as typeof overview.validations[number];
+    assert.equal(validationEntity.target.kind, 'parlay');
+    assert.equal(validationEntity.target.summary, 'Parlay de 2 legs');
   });
 
   it('preserves target type when validation relation is missing', async () => {

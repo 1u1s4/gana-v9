@@ -169,6 +169,11 @@ model OddsQuote {
   line               Decimal? @db.Decimal(12, 6)
   price              Decimal  @db.Decimal(12, 6)
   impliedProbability Decimal? @map("implied_probability") @db.Decimal(12, 6)
+  marketImpliedProbability Decimal? @map("market_implied_probability") @db.Decimal(12, 6)
+  marketFairProbability    Decimal? @map("market_fair_probability") @db.Decimal(12, 6)
+  consensusFairOdds        Decimal? @map("consensus_fair_odds") @db.Decimal(12, 6)
+  overround                Decimal? @db.Decimal(12, 6)
+  marketEfficiencyScore    Decimal? @map("market_efficiency_score") @db.Decimal(12, 6)
   capturedAt         DateTime @default(now()) @map("captured_at") @db.DateTime(3)
   metadata           Json?
   createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(3)
@@ -212,6 +217,8 @@ model HarnessRun {
   predictions       Prediction[]
   parlays           Parlay[]
   validationArtifacts ValidationArtifact[]
+  approvalRequests  ApprovalRequest[]
+  leaderboardEntries LeaderboardEntry[]
 
   @@index([status, createdAt], map: "harness_runs_status_created_at_idx")
   @@index([filterPresetId], map: "harness_runs_filter_preset_id_idx")
@@ -234,12 +241,41 @@ model HarnessTask {
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
 
   run               HarnessRun?        @relation(fields: [runId], references: [id], onDelete: SetNull)
+  approvalRequests  ApprovalRequest[]
   providerSnapshots ProviderSnapshot[]
 
   @@index([status, scheduledFor, priority, createdAt], map: "harness_tasks_queue_idx")
   @@index([status, leaseExpiresAt], map: "harness_tasks_running_lease_idx")
   @@index([runId], map: "harness_tasks_run_id_idx")
   @@map("harness_tasks")
+}
+
+model ApprovalRequest {
+  id           String    @id @db.VarChar(80)
+  runId        String?   @map("run_id") @db.Char(36)
+  taskId       String?   @map("task_id") @db.Char(36)
+  toolCallId   String    @map("tool_call_id") @db.VarChar(160)
+  toolName     String    @map("tool_name") @db.VarChar(120)
+  argsRedacted Json?     @map("args_redacted")
+  risk         String    @db.VarChar(40)
+  reason       String    @db.Text
+  status       String    @db.VarChar(40)
+  requestedAt  DateTime  @map("requested_at") @db.DateTime(3)
+  expiresAt    DateTime? @map("expires_at") @db.DateTime(3)
+  decidedAt    DateTime? @map("decided_at") @db.DateTime(3)
+  decidedBy    String?   @map("decided_by") @db.VarChar(120)
+  metadata     Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+
+  run  HarnessRun?  @relation(fields: [runId], references: [id], onDelete: SetNull)
+  task HarnessTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([status, requestedAt], map: "approval_requests_status_requested_idx")
+  @@index([runId], map: "approval_requests_run_id_idx")
+  @@index([taskId], map: "approval_requests_task_id_idx")
+  @@index([toolCallId], map: "approval_requests_tool_call_id_idx")
+  @@map("approval_requests")
 }
 
 model Artifact {
@@ -693,4 +729,29 @@ model ValidationArtifact {
   @@index([artifactId], map: "validation_artifacts_artifact_id_idx")
   @@index([status, evaluatedAt], map: "validation_artifacts_status_evaluated_at_idx")
   @@map("validation_artifacts")
+}
+
+model LeaderboardEntry {
+  id            String   @id @default(uuid()) @db.Char(36)
+  runId         String?  @map("run_id") @db.Char(36)
+  promptVersion String  @map("prompt_version") @db.VarChar(120)
+  modelId       String  @map("model_id") @db.VarChar(160)
+  market        String  @db.VarChar(80)
+  league        String  @db.VarChar(120)
+  brier         Decimal @db.Decimal(12, 6)
+  logloss       Decimal @db.Decimal(12, 6)
+  clvPct        Decimal? @map("clv_pct") @db.Decimal(12, 6)
+  hitrate       Decimal @db.Decimal(12, 6)
+  n             Int
+  lowSample     Boolean @default(false) @map("low_sample")
+  generatedAt   DateTime @map("generated_at") @db.DateTime(3)
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  run HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([promptVersion, modelId, market, league], map: "leaderboard_entries_dimensions_idx")
+  @@index([runId], map: "leaderboard_entries_run_id_idx")
+  @@index([generatedAt], map: "leaderboard_entries_generated_at_idx")
+  @@map("leaderboard_entries")
 }

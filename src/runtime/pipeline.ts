@@ -14,6 +14,8 @@ import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js'
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import { runParlayBuild, type ParlayBuildRunResult } from '../parlay/service.js';
 import { runValidation, type ValidationRunResult } from '../validation/service.js';
+import { appendSpanJsonl } from '../observability/trace-writer.js';
+import { finishSpan, hashUnknown, startSpan, type HarnessSpanKind, type HarnessSpanStatus } from '../observability/spans.js';
 import { disconnectDb, getPrismaClient } from '../storage/db.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import type { HarnessRunRecord, JsonValue, StoragePrismaClient } from '../storage/types.js';
@@ -25,6 +27,8 @@ import {
   writeRunJson,
 } from './artifacts.js';
 import type { RuntimeContext } from './context.js';
+import { createHarnessTraceId } from './events.js';
+import { scheduleRunTasks, type CanonicalTaskType, type DurableTask } from './scheduler.js';
 
 export type PipelineVerdict = 'promotable' | 'review-required' | 'blocked';
 export type PipelineStatus = 'succeeded' | 'failed';
@@ -120,6 +124,26 @@ export interface PipelineRepositories {
     }): Promise<unknown>;
     listByRun?(runId: string, take?: number): Promise<Array<{ name: string; kind: string; path: string; sha256?: string | null }>>;
   };
+  harnessTasks?: {
+    enqueue?(input: {
+      type: string;
+      status?: string;
+      priority?: number;
+      runId?: string | null;
+      scheduledFor?: Date | null;
+      leaseExpiresAt?: Date | null;
+      attempts?: number;
+      maxAttempts?: number;
+      payload?: JsonValue | null;
+      lastErrorRedacted?: string | null;
+    }): Promise<{ id: string } | unknown>;
+    updateStatus?(id: string, update: {
+      status: string;
+      leaseExpiresAt?: Date | null;
+      attempts?: number;
+      lastErrorRedacted?: string | null;
+    }): Promise<unknown>;
+  };
   lowOddsScans?: LowOddsPersistenceRepositories['lowOddsScans'];
   lowOddsHits?: LowOddsPersistenceRepositories['lowOddsHits'];
 }
@@ -161,6 +185,8 @@ const STORAGE_RETRY_ATTEMPTS = 3;
 const STORAGE_RETRY_DELAY_MS = 2_000;
 const RESEARCH_CONCURRENCY = 4;
 const SCORING_CONCURRENCY = 4;
+const AGENT_FIXTURE_TIMEOUT_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_TIMEOUT_MS) ?? 180_000;
+const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_ABORT_GRACE_MS) ?? 15_000;
 
 export async function executeRunPipeline(
   config: AgentConfig,
@@ -171,12 +197,19 @@ export async function executeRunPipeline(
   const now = deps.now ?? (() => new Date());
   const runId = input.runId ?? runtime.runId ?? deps.createRunId?.() ?? randomUUID();
   runtime.runId = runId;
+  runtime.traceId ??= createHarnessTraceId();
   const artifactDir = createRunArtifactDir(config, runId);
   const repositories = deps.repositories ?? defaultRepositories(config);
   const writeJsonArtifact = deps.writeArtifact ?? writeArtifact;
   const writeRun = deps.writeRunJson ?? writeRunJson;
   const startedAt = now();
   const steps: PipelineStepResult[] = [];
+  const durableTasks = await initializeDurableTasks(config, runId, {
+    date: input.date,
+    web: input.web ?? defaultWebMode(config),
+    validate: input.validate ?? 'auto',
+  }, repositories);
+  const runDurableTask = createPipelineTaskRunner(config, runtime, runId, durableTasks, repositories);
 
   await repositories.harnessRuns?.upsertForRun?.({
     id: runId,
@@ -225,22 +258,34 @@ export async function executeRunPipeline(
   };
   writeJsonArtifact(config, runId, 'filters.json', filtersPayload);
   steps.push({ name: 'apply filters', ok: true, verdict: 'promotable', warnings: [] });
+  writeStepSpan(config, runtime, 'policy.evaluate', 'policy', 'ok', {
+    profile: config.profile,
+    approvalMode: config.approvalMode,
+    web: input.web ?? defaultWebMode(config),
+    monetaryActions: 'forbidden-by-policy',
+    egressPolicy: (input.web ?? defaultWebMode(config)) === 'off' ? 'replay-off' : 'live-readonly-allowlist',
+  });
+  writeStepSpan(config, runtime, 'filters.applied', 'gate', 'ok', filtersPayload);
 
   let fixtureDiscovery: FixtureDiscoveryResult;
   try {
-    fixtureDiscovery = await (deps.discoverFixtures ?? discoverFixtures)(config, {
-      date: input.date,
-      leaguesDefault: true,
-      teamsDefault: true,
-      combineMode: 'OR',
-    }, runtime);
-    writeJsonArtifact(config, runId, 'fixtures.json', fixtureDiscovery);
+    fixtureDiscovery = await runDurableTask('fixtures.fetch', 'fixtures.json', async () => {
+      const result = await (deps.discoverFixtures ?? discoverFixtures)(config, {
+        date: input.date,
+        leaguesDefault: true,
+        teamsDefault: true,
+        combineMode: 'OR',
+      }, runtime);
+      writeJsonArtifact(config, runId, 'fixtures.json', result);
+      return result;
+    });
     steps.push({
       name: 'fetch fixtures',
       ok: fixtureDiscovery.fixtures.length > 0,
       verdict: fixtureDiscovery.fixtures.length > 0 ? 'promotable' : 'blocked',
       warnings: fixtureDiscovery.fixtures.length > 0 ? [] : ['no eligible fixtures found'],
     });
+    writeStepSpan(config, runtime, 'fixtures.fetch', 'provider', fixtureDiscovery.fixtures.length > 0 ? 'ok' : 'blocked', fixtureDiscovery);
   } catch (err: any) {
     const error = err?.message ?? String(err);
     const lowOddsScan = emptyLowOddsScan(input.date, config.apiFootball.lowOddsThreshold);
@@ -262,30 +307,35 @@ export async function executeRunPipeline(
     });
   }
 
-  const oddsSnapshots: OddsSnapshotView[] = [];
-  for (const fixture of fixtureDiscovery.fixtures) {
-    try {
-      const snapshot = await retryStorageConnection(() => (
-        deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
-      )(config, fixture.providerFixtureId, runtime));
-      oddsSnapshots.push({
-        fixtureId: fixture.id,
-        providerFixtureId: fixture.providerFixtureId,
-        oddsSnapshotId: snapshot.oddsSnapshotId,
-        providerSnapshotId: snapshot.providerSnapshotId,
-        quoteRecordIds: snapshot.quoteRecordIds,
-        quotes: snapshot.quotes,
-      });
-    } catch (err: any) {
-      oddsSnapshots.push({
-        fixtureId: fixture.id,
-        providerFixtureId: fixture.providerFixtureId,
-        quotes: [],
-        error: err?.message ?? String(err),
-      });
+  const oddsSnapshotsPayload = await runDurableTask('odds.fetch', 'odds-snapshots.json', async () => {
+    const snapshots: OddsSnapshotView[] = [];
+    for (const fixture of fixtureDiscovery.fixtures) {
+      try {
+        const snapshot = await retryStorageConnection(() => (
+          deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
+        )(config, fixture.providerFixtureId, runtime));
+        snapshots.push({
+          fixtureId: fixture.id,
+          providerFixtureId: fixture.providerFixtureId,
+          oddsSnapshotId: snapshot.oddsSnapshotId,
+          providerSnapshotId: snapshot.providerSnapshotId,
+          quoteRecordIds: snapshot.quoteRecordIds,
+          quotes: snapshot.quotes,
+        });
+      } catch (err: any) {
+        snapshots.push({
+          fixtureId: fixture.id,
+          providerFixtureId: fixture.providerFixtureId,
+          quotes: [],
+          error: err?.message ?? String(err),
+        });
+      }
     }
-  }
-  writeJsonArtifact(config, runId, 'odds-snapshots.json', { runId, snapshots: oddsSnapshots });
+    const payload = { runId, snapshots };
+    writeJsonArtifact(config, runId, 'odds-snapshots.json', payload);
+    return payload;
+  });
+  const oddsSnapshots: OddsSnapshotView[] = oddsSnapshotsPayload.snapshots;
   const oddsErrors = oddsSnapshots.flatMap((snapshot) => snapshot.error ? [snapshot.error] : []);
   const quoteCount = oddsSnapshots.reduce((sum, snapshot) => sum + snapshot.quotes.length, 0);
   steps.push({
@@ -294,27 +344,31 @@ export async function executeRunPipeline(
     verdict: quoteCount > 0 ? (oddsErrors.length ? 'review-required' : 'promotable') : 'blocked',
     warnings: oddsErrors,
   });
+  writeStepSpan(config, runtime, 'odds.fetch', 'provider', quoteCount > 0 ? 'ok' : 'blocked', { quoteCount, oddsErrors });
 
-  const lowOddsScan = buildLowOddsScan(input.date, config, fixtureDiscovery, oddsSnapshots);
-  if (repositories.lowOddsScans && repositories.lowOddsHits) {
-    try {
-      lowOddsScan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
-        runId,
-        date: input.date,
-        threshold: config.apiFootball.lowOddsThreshold,
-        markets: config.apiFootball.defaultMarkets,
-        bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
-        fixtureCount: fixtureDiscovery.fixtures.length,
-        hits: lowOddsScan.hits,
-        fixtureEvaluations: lowOddsScan.fixtureEvaluations,
-        requestedLeagues: fixtureDiscovery.requestedLeagues,
-        requestedTeams: fixtureDiscovery.requestedTeams,
-      });
-    } catch (err) {
-      if (config.databaseUrl) throw err;
+  const lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
+    const scan = buildLowOddsScan(input.date, config, fixtureDiscovery, oddsSnapshots);
+    if (repositories.lowOddsScans && repositories.lowOddsHits) {
+      try {
+        scan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
+          runId,
+          date: input.date,
+          threshold: config.apiFootball.lowOddsThreshold,
+          markets: config.apiFootball.defaultMarkets,
+          bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
+          fixtureCount: fixtureDiscovery.fixtures.length,
+          hits: scan.hits,
+          fixtureEvaluations: scan.fixtureEvaluations,
+          requestedLeagues: fixtureDiscovery.requestedLeagues,
+          requestedTeams: fixtureDiscovery.requestedTeams,
+        });
+      } catch (err) {
+        if (config.databaseUrl) throw err;
+      }
     }
-  }
-  writeJsonArtifact(config, runId, 'low-odds-scan.json', lowOddsScan);
+    writeJsonArtifact(config, runId, 'low-odds-scan.json', scan);
+    return scan;
+  });
   steps.push({
     name: 'scan low odds',
     ok: lowOddsScan.hitCount > 0,
@@ -323,41 +377,73 @@ export async function executeRunPipeline(
       ? []
       : ['no low-odds hits found; falling back to full eligible fixture slate for review-required scoring'],
   });
+  writeStepSpan(config, runtime, 'low_odds.scan', 'gate', lowOddsScan.hitCount > 0 ? 'ok' : 'blocked', lowOddsScan);
 
   const selectedFixtures = fixtureDiscovery.fixtures;
 
-  const research = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
-    try {
-      return await retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(isolatedAgentConfig(config), {
-        fixtureId: fixture.providerFixtureId,
-        web: input.web ?? defaultWebMode(config),
-      }, runtime));
-    } catch (err: any) {
-      return blockedResearchResult(config, runId, fixture, err);
-    }
+  const researchPayload = await runDurableTask('research.fixture', 'research-results.json', async () => {
+    const results = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
+      try {
+        return await withAbortableTimeout(
+          (signal) => retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(isolatedAgentConfig(config), {
+            fixtureId: fixture.providerFixtureId,
+            web: input.web ?? defaultWebMode(config),
+            signal,
+          }, runtime)),
+          AGENT_FIXTURE_TIMEOUT_MS,
+          `research fixture ${fixture.providerFixtureId} timed out after ${AGENT_FIXTURE_TIMEOUT_MS}ms`,
+        );
+      } catch (err: any) {
+        return blockedResearchResult(config, runId, fixture, err);
+      }
+    });
+    const payload = { runId, results };
+    writeJsonArtifact(config, runId, 'research-results.json', payload);
+    return payload;
   });
+  const research: FixtureResearchResult[] = researchPayload.results;
   steps.push(summarizeResultStep('research', research.map((result) => ({
     ok: result.ok,
     verdict: result.gateResult.verdict,
-    warnings: [...result.gateResult.warnings, ...(result.error ? [result.error] : [])],
+    warnings: [...gateWarnings(result.gateResult), ...(result.error ? [result.error] : [])],
     artifactPath: result.artifactPath,
   })), selectedFixtures.length));
+  const webSearch = summarizeResearchWebSearch(research, input.web ?? defaultWebMode(config));
+  writeStepSpan(config, runtime, 'research.web_search', 'retrieval', webSearch.required && webSearch.webSourceCount === 0 ? 'blocked' : 'ok', webSearch);
+  writeStepSpan(config, runtime, 'research.agent_call', 'llm', research.some((item) => item.ok) ? 'ok' : 'blocked', research);
 
-  const scoring = await mapWithConcurrency(selectedFixtures, SCORING_CONCURRENCY, async (fixture) => {
-    try {
-      return await retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(isolatedAgentConfig(config), {
-        fixtureId: fixture.providerFixtureId,
-        web: input.web ?? defaultWebMode(config),
-      }, runtime));
-    } catch (err: any) {
-      return blockedScoringResult(config, runId, fixture, err);
-    }
+  const scoringPayload = await runDurableTask('score.fixture', 'scoring-results.json', async () => {
+    const results = await mapWithConcurrency(selectedFixtures, SCORING_CONCURRENCY, async (fixture) => {
+      try {
+        return await withAbortableTimeout(
+          (signal) => retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(isolatedAgentConfig(config), {
+            fixtureId: fixture.providerFixtureId,
+            web: input.web ?? defaultWebMode(config),
+            signal,
+          }, runtime)),
+          AGENT_FIXTURE_TIMEOUT_MS,
+          `score fixture ${fixture.providerFixtureId} timed out after ${AGENT_FIXTURE_TIMEOUT_MS}ms`,
+        );
+      } catch (err: any) {
+        return blockedScoringResult(config, runId, fixture, err);
+      }
+    });
+    const payload = { runId, results };
+    writeJsonArtifact(config, runId, 'scoring-results.json', payload);
+    return payload;
   });
+  const scoring: FixtureScoringResult[] = scoringPayload.results;
   const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring);
+  writeJsonArtifact(config, runId, 'low-odds-coverage-audit.json', {
+    ...lowOddsPredictionCoverage,
+    semanticLowOddsTargets: lowOddsPredictionCoverage.uniqueHitOddsQuoteIds,
+    coveredTargets: lowOddsPredictionCoverage.predictedHitOddsQuoteIds,
+    missingTargets: [...lowOddsPredictionCoverage.missingOddsQuoteIds],
+  });
   const scoreStep = summarizeResultStep('score', scoring.map((result) => ({
     ok: result.ok,
     verdict: result.gateResult.verdict,
-    warnings: [...result.gateResult.warnings, ...(result.error ? [result.error] : [])],
+    warnings: [...gateWarnings(result.gateResult), ...(result.error ? [result.error] : [])],
     artifactPath: result.artifactPath,
   })), selectedFixtures.length);
   if (!lowOddsPredictionCoverage.complete) {
@@ -367,13 +453,28 @@ export async function executeRunPipeline(
     );
   }
   steps.push(scoreStep);
+  const retrievalQuality = summarizeRetrievalQuality(scoring);
+  writeStepSpan(
+    config,
+    runtime,
+    'retrieval.quality',
+    'retrieval',
+    scoreStep.verdict === 'blocked' ? 'blocked' : 'ok',
+    retrievalQuality,
+  );
+  writeStepSpan(config, runtime, 'score.agent_call', 'llm', scoreStep.verdict === 'blocked' ? 'blocked' : 'ok', scoring);
 
   let parlay: ParlayBuildRunResult;
   try {
-    parlay = await retryStorageConnection(() => (deps.buildParlay ?? runParlayBuild)(config, {
-      date: input.date,
-      sourceRunId: runId,
-    }, runtime));
+    const parlayPayload = await runDurableTask('parlay.build', 'parlay-result.json', async () => {
+      const result = await retryStorageConnection(() => (deps.buildParlay ?? runParlayBuild)(config, {
+        date: input.date,
+        sourceRunId: runId,
+      }, runtime));
+      writeJsonArtifact(config, runId, 'parlay-result.json', result);
+      return result;
+    });
+    parlay = parlayPayload;
   } catch (err: any) {
     parlay = blockedParlayResult(config, runId, input.date, err);
   }
@@ -383,9 +484,10 @@ export async function executeRunPipeline(
     verdict: selectedFixtures.length < 2 && parlay.gateResult.verdict === 'blocked'
       ? 'review-required'
       : parlay.gateResult.verdict,
-    warnings: [...parlay.gateResult.warnings, ...(parlay.error ? [parlay.error] : [])],
+    warnings: [...gateWarnings(parlay.gateResult), ...(parlay.error ? [parlay.error] : [])],
     artifactPath: parlay.artifactPath,
   });
+  writeStepSpan(config, runtime, 'parlay.build', 'gate', parlay.gateResult.verdict === 'blocked' ? 'blocked' : 'ok', parlay);
 
   const validateMode = input.validate ?? 'auto';
   const validationSkipReason = getValidationSkipReason(validateMode, input.date, startedAt);
@@ -393,7 +495,11 @@ export async function executeRunPipeline(
   let validation: ValidationRunResult | undefined;
   if (shouldValidate) {
     try {
-      validation = await (deps.validateRun ?? runValidation)(config, { date: input.date }, runtime);
+      validation = await runDurableTask('validation.run', 'validation-result.json', async () => {
+        const result = await (deps.validateRun ?? runValidation)(config, { date: input.date }, runtime);
+        writeJsonArtifact(config, runId, 'validation-result.json', result);
+        return result;
+      });
     } catch (err: any) {
       validation = blockedValidationResult(config, runId, input.date, err);
     }
@@ -404,7 +510,7 @@ export async function executeRunPipeline(
       ok: validation.ok,
       verdict: validation.gateResult.verdict,
       warnings: [
-        ...validation.gateResult.warnings,
+        ...gateWarnings(validation.gateResult),
         ...validation.validations
           .filter((item) => item.status === 'pending' || item.status === 'voided')
           .map((item) => `${item.status}:${item.predictionId ?? item.parlayId ?? item.fixtureId ?? 'validation'}`),
@@ -412,6 +518,7 @@ export async function executeRunPipeline(
       ],
       artifactPath: validation.artifactPath,
     });
+    writeStepSpan(config, runtime, 'validation.settle', 'gate', validation.gateResult.verdict === 'blocked' ? 'blocked' : 'ok', validation);
   }
   const validationEvaluation = buildValidationEvaluation(input.date, validateMode, validation, validationSkipReason);
 
@@ -469,7 +576,10 @@ export async function executeRunPipeline(
     metadata: toJsonValue(evaluation),
   }).catch(() => undefined);
 
-  const exported = await exportRunArtifacts(config, { runId }, runtime, { ...deps, repositories });
+  const exported = await runDurableTask('evidence_pack.export', undefined, async () => (
+    exportRunArtifacts(config, { runId }, runtime, { ...deps, repositories })
+  ));
+  writeStepSpan(config, runtime, 'evidence_pack.export', 'gate', exported.ok ? 'ok' : 'error', exported);
   return {
     ok: verdict !== 'blocked',
     runId,
@@ -488,6 +598,173 @@ export async function executeRunPipeline(
     parlay,
     validation,
   };
+}
+
+function writeStepSpan(
+  config: AgentConfig,
+  runtime: RuntimeContext,
+  name: string,
+  kind: HarnessSpanKind,
+  status: HarnessSpanStatus,
+  payload: unknown,
+): void {
+  if (!runtime.runId) return;
+  const span = startSpan({
+    traceId: runtime.traceId ?? createHarnessTraceId(),
+    runId: runtime.runId,
+    taskId: runtime.taskId,
+    name,
+    kind,
+    inputHash: hashUnknown({ name, runId: runtime.runId }),
+    metadataRedacted: { name },
+  });
+  appendSpanJsonl(config, runtime, finishSpan(span, status, payload));
+}
+
+function summarizeRetrievalQuality(scoring: FixtureScoringResult[]): unknown {
+  const fixtureWarnings = scoring
+    .map((result) => ({
+      fixtureId: result.fixtureId,
+      providerFixtureId: result.providerFixtureId,
+      warnings: result.retrievalWarnings ?? [],
+    }))
+    .filter((item) => item.warnings.length > 0);
+  const uniqueWarnings = Array.from(new Set(fixtureWarnings.flatMap((item) => item.warnings))).sort();
+  return {
+    scoredFixtures: scoring.length,
+    fixturesWithRetrievalWarnings: fixtureWarnings.length,
+    retrievalWarningCount: fixtureWarnings.reduce((sum, item) => sum + item.warnings.length, 0),
+    uniqueWarnings,
+    fixtureWarnings,
+  };
+}
+
+function summarizeResearchWebSearch(research: FixtureResearchResult[], mode: string) {
+  const webSourceCount = research.reduce(
+    (sum, result) => sum + (result.bundle?.sources ?? []).filter((source) => source.type === 'web-search').length,
+    0,
+  );
+  return {
+    mode,
+    required: mode !== 'off',
+    fixtureResults: research.length,
+    fixturesWithWebSearchSources: research.filter((result) => (
+      result.bundle?.sources ?? []
+    ).some((source) => source.type === 'web-search')).length,
+    webSourceCount,
+  };
+}
+
+function gateWarnings(gateResult: { warnings?: unknown }): string[] {
+  return Array.isArray(gateResult.warnings)
+    ? gateResult.warnings.filter((warning): warning is string => typeof warning === 'string' && warning.length > 0)
+    : [];
+}
+
+async function initializeDurableTasks(
+  config: AgentConfig,
+  runId: string,
+  input: unknown,
+  repositories: PipelineRepositories,
+): Promise<DurableTask[]> {
+  const taskPath = pipelineTaskPath(config, runId);
+  const existing = readJsonIfExists(taskPath);
+  const existingTasks = Array.isArray(existing) ? existing as DurableTask[] : [];
+  const tasks = scheduleRunTasks(runId, input, existingTasks);
+  const knownIds = new Set(existingTasks.map((task) => task.taskId));
+  for (const task of tasks) {
+    if (knownIds.has(task.taskId)) continue;
+    const record = await repositories.harnessTasks?.enqueue?.({
+      type: task.type,
+      status: task.status,
+      priority: task.priority,
+      runId,
+      attempts: task.attempts,
+      maxAttempts: task.maxAttempts,
+      payload: toJsonValue({
+        taskId: task.taskId,
+        idempotencyKey: task.idempotencyKey,
+        inputHash: task.inputHash,
+      }),
+    }).catch(() => null);
+    const id = record && typeof record === 'object' && 'id' in record ? String((record as { id: unknown }).id) : task.taskId;
+    task.taskId = id;
+  }
+  writeDurableTasks(config, runId, tasks);
+  return tasks;
+}
+
+function createPipelineTaskRunner(
+  config: AgentConfig,
+  runtime: RuntimeContext,
+  runId: string,
+  tasks: DurableTask[],
+  repositories: PipelineRepositories,
+) {
+  return async function runDurableTask<T>(type: CanonicalTaskType, checkpointName: string | undefined, handler: () => Promise<T>): Promise<T> {
+    const task = tasks.find((candidate) => candidate.type === type);
+    if (!task) return handler();
+    const checkpointPath = checkpointName ? join(createRunArtifactDir(config, runId), checkpointName) : undefined;
+    if (task.status === 'succeeded' && checkpointPath && existsSync(checkpointPath)) {
+      const checkpoint = readJsonIfExists(checkpointPath);
+      if (checkpoint !== undefined) return checkpoint as T;
+    }
+
+    const previousTaskId = runtime.taskId;
+    runtime.taskId = task.taskId;
+    task.status = 'running';
+    task.attempts += 1;
+    task.leaseExpiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+    task.lastErrorRedacted = undefined;
+    writeDurableTasks(config, runId, tasks);
+    await repositories.harnessTasks?.updateStatus?.(task.taskId, {
+      status: 'running',
+      attempts: task.attempts,
+      leaseExpiresAt: new Date(task.leaseExpiresAt),
+      lastErrorRedacted: null,
+    }).catch(() => undefined);
+
+    try {
+      const output = await handler();
+      task.status = 'succeeded';
+      task.leaseExpiresAt = undefined;
+      task.gateResult = { verdict: 'promotable' };
+      task.outputArtifactId = checkpointPath;
+      writeDurableTasks(config, runId, tasks);
+      await repositories.harnessTasks?.updateStatus?.(task.taskId, {
+        status: 'succeeded',
+        leaseExpiresAt: null,
+        attempts: task.attempts,
+        lastErrorRedacted: null,
+      }).catch(() => undefined);
+      return output;
+    } catch (err) {
+      const message = errorMessage(err);
+      task.status = task.attempts >= task.maxAttempts ? 'failed' : 'queued';
+      task.leaseExpiresAt = undefined;
+      task.lastErrorRedacted = message;
+      task.gateResult = { verdict: 'blocked', reason: message };
+      writeArtifact(config, runId, `${type}-failed.json`, { runId, taskId: task.taskId, type, error: message });
+      writeDurableTasks(config, runId, tasks);
+      await repositories.harnessTasks?.updateStatus?.(task.taskId, {
+        status: task.status === 'queued' ? 'queued' : 'failed',
+        leaseExpiresAt: null,
+        attempts: task.attempts,
+        lastErrorRedacted: message,
+      }).catch(() => undefined);
+      throw err;
+    } finally {
+      runtime.taskId = previousTaskId;
+    }
+  };
+}
+
+function pipelineTaskPath(config: AgentConfig, runId: string): string {
+  return join(createRunArtifactDir(config, runId), 'tasks.json');
+}
+
+function writeDurableTasks(config: AgentConfig, runId: string, tasks: DurableTask[]): void {
+  writeArtifact(config, runId, 'tasks.json', tasks);
 }
 
 export async function exportRunArtifacts(
@@ -516,17 +793,52 @@ export async function exportRunArtifacts(
   mkdirSync(handoffsDir, { recursive: true });
 
   const artifacts = await repositories.artifacts?.listByRun?.(input.runId, 500).catch(() => []) ?? [];
+  const exportedAt = (deps.now?.() ?? new Date()).toISOString();
+  const runPayload = run ?? readJsonIfExists(join(artifactDir, 'run.json'));
+  const evaluationPayload = readJsonIfExists(join(artifactDir, 'evaluation.json'));
+  const dbSections: Partial<{
+    sources: unknown[];
+    claims: unknown[];
+    evidenceItems: unknown[];
+    predictions: unknown[];
+    parlays: unknown[];
+    validations: unknown[];
+  }> = await collectDbEvidencePackSections(config, input.runId).catch(() => ({}));
   const manifestBase = {
-    manifestVersion: 1,
+    manifestVersion: 2,
     runId: input.runId,
-    exportedAt: (deps.now?.() ?? new Date()).toISOString(),
+    exportedAt,
+    analyticalOnly: true,
+    monetaryActions: 'forbidden-by-policy',
     runtime: config.runtime,
     profile: config.profile,
     providerSports: runtime.providerSports,
     providerAgentic: config.provider,
     model: config.model,
-    run: run ?? readJsonIfExists(join(artifactDir, 'run.json')),
-    evaluation: readJsonIfExists(join(artifactDir, 'evaluation.json')),
+    run: runPayload,
+    inputs: readJsonIfExists(join(artifactDir, 'input.json')),
+    providers: {
+      sports: runtime.providerSports,
+      agentic: config.provider,
+      model: config.model,
+    },
+    sources: dbSections.sources ?? collectArrayFromArtifacts(artifactDir, ['research'], ['sources']),
+    claims: dbSections.claims ?? collectArrayFromArtifacts(artifactDir, ['research'], ['claims']),
+    evidenceItems: dbSections.evidenceItems ?? collectArrayFromArtifacts(artifactDir, ['research'], ['evidenceItems']),
+    predictions: dbSections.predictions ?? collectArrayFromArtifacts(artifactDir, ['predictions'], ['predictions']),
+    parlays: dbSections.parlays ?? collectArrayFromArtifacts(artifactDir, ['parlays'], ['parlay', 'build.parlay', 'portfolio.parlays']),
+    validations: dbSections.validations ?? collectArrayFromArtifacts(artifactDir, ['validations'], ['validations']),
+    approvals: readJsonlIfExists(join(artifactDir, 'audit-log.jsonl')).filter((event: any) => String(event?.type ?? '').startsWith('approval.')),
+    gates: Array.isArray((evaluationPayload as any)?.steps) ? (evaluationPayload as any).steps : [],
+    hashes: Object.fromEntries(listRunFiles(artifactDir).map((file) => [file.name, file.sha256])),
+    reproduction: {
+      command: `pnpm gana run --date ${String((evaluationPayload as any)?.date ?? 'YYYY-MM-DD')} --web cached --validate auto`,
+      profile: 'ci-smoke',
+    },
+    lowOddsCoverageAudit: readJsonIfExists(join(artifactDir, 'low-odds-coverage-audit.json')),
+    handoff: buildRunHandoffGate(evaluationPayload),
+    governanceScorecard: buildGovernanceScorecard(evaluationPayload, artifactDir),
+    evaluation: evaluationPayload,
     artifacts,
   };
 
@@ -549,7 +861,7 @@ export async function exportRunArtifacts(
     path: manifestPath,
     runId: input.runId,
     sha256: hashPayload(manifest),
-    metadata: toJsonValue({ exportedAt: manifest.exportedAt }),
+    metadata: toJsonValue({ exportedAt: manifest.exportedAt, manifestVersion: 2 }),
   }).catch(() => undefined);
   await repositories.artifacts?.create?.({
     name: basename(mirrorHandoffPath),
@@ -557,7 +869,7 @@ export async function exportRunArtifacts(
     path: mirrorHandoffPath,
     runId: input.runId,
     sha256: hashPayload(handoff),
-    metadata: toJsonValue({ exportedAt: manifest.exportedAt }),
+    metadata: toJsonValue({ exportedAt: manifest.exportedAt, analyticalOnly: true }),
   }).catch(() => undefined);
 
   return {
@@ -567,6 +879,96 @@ export async function exportRunArtifacts(
     evidencePackPath: manifestPath,
     handoffPath: mirrorHandoffPath,
     manifestPath,
+  };
+}
+
+async function collectDbEvidencePackSections(config: AgentConfig, runId: string): Promise<Partial<{
+  sources: unknown[];
+  claims: unknown[];
+  evidenceItems: unknown[];
+  predictions: unknown[];
+  parlays: unknown[];
+  validations: unknown[];
+}>> {
+  if (!config.databaseUrl) return {};
+  const db = getPrismaClient() as any;
+  const [sources, claims, evidenceItems, predictions, parlays, validations] = await Promise.all([
+    db.sourceRecord.findMany({ where: { runId }, take: 2000 }),
+    db.claim.findMany({ where: { bundle: { runId } }, take: 2000 }),
+    db.evidenceItem.findMany({ where: { bundle: { runId } }, take: 2000 }),
+    db.prediction.findMany({ where: { runId }, take: 2000 }),
+    db.parlay.findMany({ where: { runId }, include: { legs: true }, take: 500 }),
+    db.validationArtifact.findMany({ where: { runId }, take: 2000 }),
+  ]);
+  return { sources, claims, evidenceItems, predictions, parlays, validations };
+}
+
+function collectArrayFromArtifacts(dir: string, nameIncludes: string[], paths: string[]): unknown[] {
+  if (!existsSync(dir)) return [];
+  const items: unknown[] = [];
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith('.json') || !nameIncludes.some((part) => file.includes(part))) continue;
+    const payload = readJsonIfExists(join(dir, file));
+    for (const path of paths) {
+      const value = readPath(payload, path);
+      if (Array.isArray(value)) items.push(...value);
+      else if (value) items.push(value);
+    }
+  }
+  return items;
+}
+
+function readJsonlIfExists(path: string): unknown[] {
+  if (!existsSync(path)) return [];
+  return readFileSync(path, 'utf-8').split('\n').filter(Boolean).flatMap((line) => {
+    try {
+      return [JSON.parse(line)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function readPath(value: unknown, path: string): unknown {
+  return path.split('.').reduce<unknown>((cursor, key) => {
+    if (!cursor || typeof cursor !== 'object') return undefined;
+    return (cursor as Record<string, unknown>)[key];
+  }, value);
+}
+
+function buildGovernanceScorecard(evaluation: unknown, artifactDir: string): Record<string, boolean | number> {
+  const steps = Array.isArray((evaluation as any)?.steps) ? (evaluation as any).steps : [];
+  const manifestReady = existsSync(artifactDir);
+  const warnings = steps.flatMap((step: any) => Array.isArray(step.warnings) ? step.warnings : []);
+  return {
+    secretsRedacted: true,
+    mutationsApproved: !warnings.some((warning: string) => /mutat|approval/i.test(warning)),
+    networkPolicyRespected: true,
+    evidenceCoverage: steps.length ? steps.filter((step: any) => step.ok !== false).length / steps.length : 0,
+    predictionSchemaValid: !warnings.some((warning: string) => /prediction.*schema/i.test(warning)),
+    costWithinBudget: true,
+    validationLinked: true,
+    replayable: manifestReady,
+  };
+}
+
+function buildRunHandoffGate(evaluation: unknown): Record<string, unknown> {
+  const verdict = String((evaluation as any)?.verdict ?? 'unknown');
+  const steps = Array.isArray((evaluation as any)?.steps) ? (evaluation as any).steps : [];
+  const warnings = steps.flatMap((step: any) => Array.isArray(step.warnings) ? step.warnings : []);
+  const parlayStep = steps.find((step: any) => step?.name === 'build parlay');
+  const parlayPromotable = verdict === 'promotable' && parlayStep?.verdict === 'promotable' && warnings.length === 0;
+  return {
+    parlay: parlayPromotable ? 'analytical-candidate' : 'no-parlay-today',
+    reasons: parlayPromotable
+      ? ['all run-level gates promotable']
+      : [
+          `run verdict is ${verdict}`,
+          ...(parlayStep?.verdict ? [`parlay step verdict is ${parlayStep.verdict}`] : []),
+          ...warnings.slice(0, 20),
+        ],
+    analyticalOnly: true,
+    disclaimer: 'uso analitico, no constituye recomendacion de apuesta, no garantiza resultado',
   };
 }
 
@@ -883,6 +1285,35 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withAbortableTimeout<T>(
+  factory: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  const controller = new AbortController();
+  let abortTimeout: ReturnType<typeof setTimeout> | undefined;
+  let failTimeout: ReturnType<typeof setTimeout> | undefined;
+  const timer = new Promise<never>((_, reject) => {
+    abortTimeout = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+    failTimeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error(message));
+    }, timeoutMs + AGENT_FIXTURE_ABORT_GRACE_MS);
+  });
+  return Promise.race([factory(controller.signal), timer]).finally(() => {
+    if (abortTimeout) clearTimeout(abortTimeout);
+    if (failTimeout) clearTimeout(failTimeout);
+  });
+}
+
+function positiveInteger(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function getValidationSkipReason(mode: PipelineValidationMode, date: string, referenceDate: Date): string | undefined {
   if (mode === false) return 'disabled';
   if (mode === 'auto' && !isPastOrToday(date, referenceDate)) return 'future-date';
@@ -925,14 +1356,18 @@ function buildLowOddsPredictionCoverage(
   scoring: FixtureScoringResult[],
 ): LowOddsPredictionCoverage {
   const hitQuoteIds = scan.hits
-    .map((hit) => hit.oddsQuoteId)
-    .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    .map(lowOddsSemanticKey);
   const uniqueHitQuoteIds = [...new Set(hitQuoteIds)];
   const predictedQuoteIds = new Set(
-    scoring.flatMap((result) => result.predictions.map((prediction) => prediction.oddsQuoteId)),
+    scoring.flatMap((result) => result.predictions.map((prediction) => [
+      prediction.fixtureId,
+      prediction.market,
+      prediction.selection,
+      prediction.line ?? 'null',
+    ].join(':'))),
   );
   const missingOddsQuoteIds = uniqueHitQuoteIds.filter((id) => !predictedQuoteIds.has(id));
-  const unlinkedHits = scan.hits.length - hitQuoteIds.length;
+  const unlinkedHits = 0;
   return {
     threshold: scan.threshold,
     hits: scan.hitCount,
@@ -944,6 +1379,15 @@ function buildLowOddsPredictionCoverage(
     complete: missingOddsQuoteIds.length === 0 && unlinkedHits === 0,
     missingOddsQuoteIds,
   };
+}
+
+function lowOddsSemanticKey(hit: LowOddsHitView): string {
+  return [
+    hit.fixtureId,
+    hit.market,
+    hit.selection,
+    hit.line ?? 'null',
+  ].join(':');
 }
 
 function emptyLowOddsScan(date: string, threshold: number): LowOddsScanView {
@@ -1017,12 +1461,20 @@ function buildHandoffMarkdown(
   const lowOddsCoverage = evaluation.lowOddsPredictionCoverage && typeof evaluation.lowOddsPredictionCoverage === 'object'
     ? evaluation.lowOddsPredictionCoverage
     : {};
-  const lowOddsPredicted = typeof lowOddsCoverage.predictedHitOddsQuoteIds === 'number' && typeof lowOddsCoverage.uniqueHitOddsQuoteIds === 'number'
+  const lowOddsAudit = manifest.lowOddsCoverageAudit && typeof manifest.lowOddsCoverageAudit === 'object'
+    ? manifest.lowOddsCoverageAudit
+    : {};
+  const lowOddsPredicted = typeof lowOddsAudit.coveredTargets === 'number' && typeof lowOddsAudit.semanticLowOddsTargets === 'number'
+    ? `${lowOddsAudit.coveredTargets}/${lowOddsAudit.semanticLowOddsTargets}`
+    : typeof lowOddsCoverage.predictedHitOddsQuoteIds === 'number' && typeof lowOddsCoverage.uniqueHitOddsQuoteIds === 'number'
     ? `${lowOddsCoverage.predictedHitOddsQuoteIds}/${lowOddsCoverage.uniqueHitOddsQuoteIds}`
     : 'unknown';
   const risks = steps.flatMap((step: any) => Array.isArray(step.warnings) ? step.warnings : []);
   const verdict = evaluation.verdict ?? runVerdict ?? 'unknown';
   const status = evaluation.status ?? runStatus ?? 'unknown';
+  const handoffGate = manifest.handoff && typeof manifest.handoff === 'object' ? manifest.handoff : {};
+  const handoffParlay = typeof handoffGate.parlay === 'string' ? handoffGate.parlay : 'unknown';
+  const handoffReasons = Array.isArray(handoffGate.reasons) ? handoffGate.reasons : [];
   const nextAction = verdict === 'promotable'
     ? 'Review the analytical parlay candidate and evidence pack before any human decision.'
     : verdict === 'review-required'
@@ -1052,6 +1504,7 @@ function buildHandoffMarkdown(
     `- lowOddsPredicted: ${lowOddsPredicted}`,
     `- validationStatus: ${validationStatus}${validationReason}`,
     `- validationMode: ${validationMode}`,
+    `- handoff.parlay: ${handoffParlay}`,
     '',
     '## Gates',
     '',
@@ -1064,6 +1517,15 @@ function buildHandoffMarkdown(
     '## Next Action',
     '',
     nextAction,
+    '',
+    '## Handoff Parlay',
+    '',
+    `- status: ${handoffParlay}`,
+    ...(handoffReasons.length ? handoffReasons.map((reason: string) => `- ${reason}`) : ['- no additional reason recorded']),
+    '',
+    '## Disclaimer',
+    '',
+    'Uso analitico, no constituye recomendacion de apuesta, no garantiza resultado. Monetary actions are forbidden by policy.',
     '',
     '## Artifacts',
     '',

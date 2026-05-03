@@ -1,0 +1,1 @@
+{"id":"validate-settlement","version":"v1","purpose":"Validate predictions and parlays against final results","inputs":["predictions","fixtureResults"],"trustedContext":["provider final result"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["settlement-status-present"],"promptSha256":"83b027f5ee8a114e16fc4e5dc25627f9cd16945449a714be1fb51c2f016f4f77"}

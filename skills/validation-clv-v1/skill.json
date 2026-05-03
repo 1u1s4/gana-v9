@@ -1,0 +1,1 @@
+{"id":"validation-clv","version":"v1","purpose":"Calculate validation analytics including CLV","inputs":["validations","closingLines"],"trustedContext":["settlements"],"untrustedContext":[],"outputSchema":"output.schema.json","evals":["tracking-only-not-betting"],"promptSha256":"a50ae3b0751fa6bf256bdd6df915f899a1b8c4d772351aeba7c7a2dffcdf3f49"}

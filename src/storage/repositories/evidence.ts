@@ -174,7 +174,7 @@ export function createResearchBundleRepository(
               url: redactText(source.url),
               title: redactText(source.title),
               externalId: redactText(source.externalId ?? source.snapshotId),
-              hash: source.hash,
+              hash: normalizeSourceHash(source.hash),
               capturedAt: coerceDate(source.capturedAt) ?? new Date(),
               metadata: redactJson(compactData({
                 ...(source.metadata ?? {}),
@@ -401,4 +401,9 @@ function firstEvidenceSourceId(evidenceIds: string[] | undefined, evidenceSource
 function scopedResearchId(bundleId: string, localId: string): string {
   const scoped = `${bundleId}:${localId}`;
   return scoped.length <= 120 ? scoped : scoped.slice(0, 120);
+}
+
+function normalizeSourceHash(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value) return undefined;
+  return value.length <= 64 ? value : value.slice(0, 64);
 }

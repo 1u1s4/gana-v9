@@ -63,6 +63,7 @@ export interface StoragePrismaClient {
   parlay: PrismaModelDelegate<ParlayRecord>;
   parlayLeg: PrismaModelDelegate<ParlayLegRecord>;
   validationArtifact: PrismaModelDelegate<ValidationArtifactRecord>;
+  leaderboardEntry: PrismaModelDelegate<LeaderboardEntryRecord>;
 }
 
 export interface SportsProviderRecord {
@@ -222,6 +223,11 @@ export interface OddsQuoteRecord {
   line: DbDecimal | null;
   price: DbDecimal;
   impliedProbability: DbDecimal | null;
+  marketImpliedProbability: DbDecimal | null;
+  marketFairProbability: DbDecimal | null;
+  consensusFairOdds: DbDecimal | null;
+  overround: DbDecimal | null;
+  marketEfficiencyScore: DbDecimal | null;
   capturedAt: DbDate;
   metadata: JsonValue | null;
   createdAt: DbDate;
@@ -237,6 +243,11 @@ export interface OddsQuoteInput {
   capturedAt?: Date;
   bookmakerKey?: string | null;
   impliedProbability?: number | null;
+  marketImpliedProbability?: number | null;
+  marketFairProbability?: number | null;
+  consensusFairOdds?: number | null;
+  overround?: number | null;
+  marketEfficiencyScore?: number | null;
   line?: number | null;
   metadata?: JsonValue | null;
 }
@@ -835,5 +846,40 @@ export interface ValidationArtifactInput {
   resultInput?: JsonValue | null;
   outcome?: JsonValue | null;
   evidenceIds?: string[] | JsonValue | null;
+  metadata?: JsonValue | null;
+}
+
+export interface LeaderboardEntryRecord {
+  id: string;
+  runId: string | null;
+  promptVersion: string;
+  modelId: string;
+  market: string;
+  league: string;
+  brier: DbDecimal;
+  logloss: DbDecimal;
+  clvPct: DbDecimal | null;
+  hitrate: DbDecimal;
+  n: number;
+  lowSample: boolean;
+  generatedAt: DbDate;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+}
+
+export interface LeaderboardEntryInput {
+  id?: string;
+  runId?: string | null;
+  promptVersion: string;
+  modelId: string;
+  market: string;
+  league: string;
+  brier: number;
+  logloss: number;
+  clvPct?: number | null;
+  hitrate: number;
+  n: number;
+  lowSample: boolean;
+  generatedAt?: Date;
   metadata?: JsonValue | null;
 }

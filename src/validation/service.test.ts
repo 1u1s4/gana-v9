@@ -224,6 +224,43 @@ describe('runValidation prediction targets', () => {
     assert.equal(result.validations[0]?.status, 'blocked');
     assert.equal(result.validations[0]?.reason, 'corners-statistics-unavailable');
   });
+
+  it('emits tracking-only validation analytics and leaderboard entries', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let artifactPayload: any;
+    let leaderboardRows: any[] = [];
+
+    const result = await runValidation(cfg, { predictionId: 'prediction-1' }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, _name, payload) => {
+        artifactPayload = payload;
+        return '/tmp/validations.json';
+      },
+      fetcher: fetcher(),
+      repositories: repositories({
+        predictions: {
+          findById: async () => prediction({ estimatedProbability: 0.7, model: 'gpt-test', competitionId: 'league-1' }),
+          listForFixtureDate: async () => [],
+        },
+        leaderboardEntries: {
+          createMany: async (rows: any[]) => {
+            leaderboardRows = rows;
+            return { count: rows.length };
+          },
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.analytics?.trackingOnly, true);
+    assert.equal(result.analytics?.outcomes.length, 1);
+    assert.equal(result.analytics?.leaderboard[0]?.n, 1);
+    assert.equal(result.analytics?.leaderboard[0]?.lowSample, true);
+    assert.equal(artifactPayload.analytics.disclaimer.includes('tracking-only-not-betting'), true);
+    assert.equal(leaderboardRows.length, 1);
+    assert.equal(leaderboardRows[0].modelId, 'gpt-test');
+  });
 });
 
 describe('runValidation parlay and date targets', () => {

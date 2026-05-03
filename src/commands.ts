@@ -16,6 +16,9 @@ import {
 } from './filters/presets.js';
 import { getFiltersStatus, type FiltersStatus, type ServiceStatusReport } from './filters/status.js';
 import { appendAuditEvent, appendConfigStatusEvent } from './permissions/audit.js';
+import { approveAndExecute, denyApproval } from './permissions/approval-executor.js';
+import { listApprovals } from './permissions/approval-service.js';
+import type { ApprovalRequest } from './permissions/approval-store.js';
 import { redactSecrets } from './permissions/redaction.js';
 import { listToolMetadata } from './permissions/tool-metadata.js';
 import { detectMonetaryAction } from './security/no-monetary-actions.js';
@@ -39,6 +42,7 @@ import {
   runPipeline as runServicePipeline,
   runValidation as runServiceValidation,
 } from './runtime/run-service.js';
+import { getPrismaClient } from './storage/db.js';
 import { getDbStatus } from './storage/db-status.js';
 import { startDashboardServer, type DashboardOptions } from './dashboard/server.js';
 import type { Fixture } from './domain/fixtures.js';
@@ -50,6 +54,7 @@ import { runParlayBuild, type ParlayBuildRunResult } from './parlay/service.js';
 import type { ParlayConfig } from './parlay/types.js';
 import { runValidation, type RunValidationInput, type ValidationRunResult } from './validation/service.js';
 import type { ResearchWebMode } from './prediction/prompts.js';
+import { runCertification } from './evals/runner.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -516,9 +521,10 @@ function optionalRunValidationMode(flags: Record<string, string | true>): 'auto'
   throw new Error('--validate must be auto, force, or off.');
 }
 
-function requiredRunInput(flags: Record<string, string | true>): { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode } {
+function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode } {
   return {
     date: requireDateFlag(flags),
+    runId: optionalStringFlag(flags, 'run-id'),
     validate: optionalRunValidationMode(flags),
     web: optionalResearchWebModeFlag(flags),
   };
@@ -815,6 +821,16 @@ function printExportResult(result: RunExportResult): void {
   if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
 }
 
+function printCertificationResult(result: Awaited<ReturnType<typeof runCertification>>): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}certify${RESET} ${DIM}${result.profile}${RESET}`);
+  printKeyValue('manifest', result.manifestPath);
+  printKeyValue('hash', result.hash);
+  for (const check of result.checks) {
+    console.log(`  ${check.ok ? GREEN + '✓' + RESET : YELLOW + '!' + RESET} ${DIM}${check.name}${RESET}`);
+  }
+}
+
 function printArtifacts(result: ArtifactListResult): void {
   console.log(`  ${CYAN}artifacts${RESET} ${DIM}${result.path}${RESET}`);
   printKeyValue('artifactRoot', result.artifactRoot);
@@ -826,6 +842,86 @@ function printArtifacts(result: ArtifactListResult): void {
   for (const file of result.files) {
     console.log(`  ${GREEN}•${RESET} ${CYAN}${file}${RESET}`);
   }
+}
+
+function computeNoParlayStats(config: AgentConfig): { runs: number; noParlay: number; promoted: number; percentNoParlay: string } {
+  const evidenceRoot = join(resolve(config.artifactRoot), 'evidence-packs');
+  if (!existsSync(evidenceRoot)) return { runs: 0, noParlay: 0, promoted: 0, percentNoParlay: '0.0%' };
+  let runs = 0;
+  let noParlay = 0;
+  let promoted = 0;
+  for (const runId of readdirSync(evidenceRoot)) {
+    const manifestPath = join(evidenceRoot, runId, 'manifest.json');
+    if (!existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      const parlay = String(manifest?.handoff?.parlay ?? '');
+      if (!parlay) continue;
+      runs += 1;
+      if (parlay === 'no-parlay-today') noParlay += 1;
+      else promoted += 1;
+    } catch {
+      // Ignore malformed historical artifacts; stats is read-only and best-effort.
+    }
+  }
+  const percent = runs ? (noParlay / runs) * 100 : 0;
+  return { runs, noParlay, promoted, percentNoParlay: `${percent.toFixed(1)}%` };
+}
+
+async function readLeaderboardRows(config: AgentConfig, since?: string): Promise<any[]> {
+  if (config.databaseUrl) {
+    try {
+      const db = getPrismaClient() as any;
+      if (db.leaderboardEntry?.findMany) {
+        return await db.leaderboardEntry.findMany({
+          where: since ? { generatedAt: { gte: new Date(since) } } : undefined,
+          orderBy: { generatedAt: 'desc' },
+          take: 50,
+        });
+      }
+    } catch {
+      // Fall back to local artifacts below.
+    }
+  }
+  const runsRoot = join(resolve(config.artifactRoot), 'runs');
+  if (!existsSync(runsRoot)) return [];
+  const rows: any[] = [];
+  for (const runId of readdirSync(runsRoot)) {
+    const validationPath = join(runsRoot, runId, 'validations.json');
+    if (!existsSync(validationPath)) continue;
+    try {
+      const payload = JSON.parse(readFileSync(validationPath, 'utf-8'));
+      if (since && typeof payload.evaluatedAt === 'string' && payload.evaluatedAt < since) continue;
+      const leaderboard = Array.isArray(payload?.analytics?.leaderboard) ? payload.analytics.leaderboard : [];
+      rows.push(...leaderboard.map((entry: any) => ({ ...entry, runId, generatedAt: payload.evaluatedAt })));
+    } catch {
+      // Ignore malformed historical artifacts.
+    }
+  }
+  return rows;
+}
+
+function printLeaderboardRows(rows: any[], by: string): void {
+  printKeyValue('rows', rows.length);
+  printKeyValue('by', by);
+  if (!rows.length) {
+    printKeyValue('status', 'no leaderboard rows found');
+    return;
+  }
+  for (const row of rows.slice(0, 20)) {
+    const label = [
+      row.promptVersion ?? 'unknown-prompt',
+      row.modelId ?? 'unknown-model',
+      row.market ?? 'unknown-market',
+      row.league ?? 'unknown-league',
+    ].join(' | ');
+    console.log(`  ${GREEN}•${RESET} ${CYAN}${label}${RESET} ${DIM}n=${row.n} brier=${formatMetric(row.brier)} logloss=${formatMetric(row.logloss)} hitrate=${formatMetric(row.hitrate)} lowSample=${Boolean(row.lowSample)}${RESET}`);
+  }
+}
+
+function formatMetric(value: unknown): string {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(4) : 'n/a';
 }
 
 function printSessionStatus(ctx: CommandContext): void {
@@ -871,6 +967,51 @@ function printApprovalStatus(ctx: Pick<CommandContext, 'config' | 'runtime'>): v
   printKeyValue('manualRequired', ctx.config.profile === 'standard' ? standardManual.join(', ') : manual.join(', ') || 'none');
   printKeyValue('audit', `${ctx.runtime.artifactRoot}/runs/<session-run>/audit-log.jsonl`);
   printKeyValue('lastAuditEvent', latestAuditEvent(ctx.runtime));
+}
+
+function printApprovalRequests(items: ApprovalRequest[]): void {
+  if (!items.length) {
+    console.log(`  ${DIM}No approvals found.${RESET}`);
+    return;
+  }
+  for (const item of items) {
+    console.log(`  ${CYAN}${item.approvalId}${RESET} ${item.status} ${DIM}${item.toolName} call=${item.toolCallId} risk=${item.risk}${RESET}`);
+    console.log(`  ${DIM}${item.reason}${RESET}`);
+  }
+}
+
+async function handleApprovalCommand(ctx: Pick<CommandContext, 'config' | 'runtime'>, args: string): Promise<void> {
+  const tokens = args.split(' ').filter(Boolean);
+  const action = tokens[0];
+  const id = tokens[1];
+  if (!action) {
+    printApprovalStatus(ctx);
+    return;
+  }
+  if (action === 'pending') {
+    printApprovalRequests(listApprovals(ctx.runtime, 'pending'));
+    return;
+  }
+  if (action === 'show') {
+    if (!id) throw new Error('approval show requires APPROVAL_ID.');
+    printApprovalRequests(listApprovals(ctx.runtime).filter((item) => item.approvalId === id));
+    return;
+  }
+  if (action === 'approve') {
+    if (!id) throw new Error('approval approve requires APPROVAL_ID.');
+    const result = await approveAndExecute(ctx.config, ctx.runtime, id);
+    printKeyValue('approvalId', id);
+    printKeyValue('result', JSON.stringify(redactSecrets(result)));
+    return;
+  }
+  if (action === 'deny') {
+    if (!id) throw new Error('approval deny requires APPROVAL_ID.');
+    const result = denyApproval(ctx.runtime, id);
+    printKeyValue('approvalId', result.approvalId);
+    printKeyValue('status', result.status);
+    return;
+  }
+  throw new Error('approval command must be pending, show, approve, or deny.');
 }
 
 function latestAuditEvent(runtime: RuntimeContext): string {
@@ -1220,10 +1361,28 @@ commands.push({
 commands.push({
   name: '/approval',
   description: 'Show active approval mode and audit target',
-  execute: async (_args, ctx) => {
+  execute: async (args, ctx) => {
     syncRuntime(ctx);
-    printApprovalStatus(ctx);
+    await handleApprovalCommand(ctx, args);
     appendConfigStatusEvent(ctx.runtime, { command: '/approval', approvalMode: ctx.config.approvalMode });
+  },
+});
+
+commands.push({
+  name: '/approve',
+  description: 'Approve a pending tool action and execute it',
+  execute: async (args, ctx) => {
+    syncRuntime(ctx);
+    await handleApprovalCommand(ctx, `approve ${args.trim()}`);
+  },
+});
+
+commands.push({
+  name: '/deny',
+  description: 'Deny a pending tool action',
+  execute: async (args, ctx) => {
+    syncRuntime(ctx);
+    await handleApprovalCommand(ctx, `deny ${args.trim()}`);
   },
 });
 
@@ -1335,6 +1494,16 @@ commands.push({
     const flags = parseFlags(args.split(' ').filter(Boolean));
     const result = await runPipeline(ctx, flags);
     printRunResult(result);
+  },
+});
+
+commands.push({
+  name: '/certify',
+  description: 'Run deterministic harness certification',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-smoke');
+    printCertificationResult(result);
   },
 });
 
@@ -1525,6 +1694,29 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: true, exitCode: 0 };
     }
 
+    if (area === 'approval') {
+      await handleApprovalCommand(ctx, argv.slice(1).join(' '));
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'approve') {
+      const approvalId = action;
+      if (!approvalId) throw new Error('approve requires APPROVAL_ID.');
+      const result = await approveAndExecute(ctx.config, ctx.runtime, approvalId);
+      printKeyValue('approvalId', approvalId);
+      printKeyValue('result', JSON.stringify(redactSecrets(result)));
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'deny') {
+      const approvalId = action;
+      if (!approvalId) throw new Error('deny requires APPROVAL_ID.');
+      const result = denyApproval(ctx.runtime, approvalId);
+      printKeyValue('approvalId', result.approvalId);
+      printKeyValue('status', result.status);
+      return { ok: true, exitCode: 0 };
+    }
+
     if (area === 'fixtures') {
       const flags = parseFlags(argv.slice(1));
       if (wantsDefault(flags, 'leagues') || wantsDefault(flags, 'teams')) {
@@ -1593,6 +1785,31 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       const result = await runPipeline(ctx, flags);
       printRunResult(result);
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
+    if (area === 'certify') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-smoke');
+      printCertificationResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1 };
+    }
+
+    if (area === 'leaderboard') {
+      const flags = parseFlags(argv.slice(1));
+      const since = optionalStringFlag(flags, 'since');
+      const by = optionalStringFlag(flags, 'by') ?? 'market';
+      printKeyValue('since', since ?? 'all');
+      printLeaderboardRows(await readLeaderboardRows(ctx.config, since), by);
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (area === 'stats') {
+      const stats = computeNoParlayStats(ctx.config);
+      printKeyValue('runsWithHandoff', stats.runs);
+      printKeyValue('noParlayToday', stats.noParlay);
+      printKeyValue('analyticalCandidates', stats.promoted);
+      printKeyValue('noParlayRate', stats.percentNoParlay);
+      return { ok: true, exitCode: 0 };
     }
 
     if (area === 'export') {
@@ -1695,6 +1912,9 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana tui${RESET}`);
   console.log(`  ${CYAN}pnpm gana db status${RESET}`);
   console.log(`  ${CYAN}pnpm gana football status${RESET}`);
+  console.log(`  ${CYAN}pnpm gana approval pending|show APPROVAL_ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana approve APPROVAL_ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana deny APPROVAL_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana fixtures --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana odds --fixture-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live${RESET}`);
@@ -1705,6 +1925,9 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --validate auto|force|off${RESET}`);
+  console.log(`  ${CYAN}pnpm gana certify --profile ci-smoke${RESET}`);
+  console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
+  console.log(`  ${CYAN}pnpm gana stats${RESET}`);
   console.log(`  ${CYAN}pnpm gana export --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana artifacts --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana dashboard --port 4317${RESET}`);

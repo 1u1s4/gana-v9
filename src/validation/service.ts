@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { basename } from 'path';
 import type { AgentConfig } from '../config.js';
+import { calibrationPlot, type CalibrationBin } from '../analytics/calibration-plot.js';
+import { buildLeaderboard, type LeaderboardEntry } from '../analytics/leaderboard.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { MarketKey, MarketSelection } from '../domain/markets.js';
 import { API_FOOTBALL_PROVIDER } from '../providers/sports/types.js';
@@ -12,6 +14,7 @@ import type {
   ArtifactRecord,
   FixtureRecord,
   JsonValue,
+  LeaderboardEntryInput,
   ParlayLegRecord,
   ParlayRecord,
   PredictionRecord,
@@ -62,8 +65,26 @@ export interface ValidationRunResult {
   target: RunValidationInput;
   gateResult: ValidationGateResult;
   validations: ValidationArtifactView[];
+  analytics?: ValidationAnalytics;
   artifactPath?: string;
   error?: string;
+}
+
+export interface ValidationAnalytics {
+  trackingOnly: true;
+  disclaimer: string;
+  outcomes: Array<{
+    predictionId?: string;
+    probability: number;
+    outcome: 0 | 1;
+    promptVersion: string;
+    modelId: string;
+    market: string;
+    league: string;
+    confidenceBand?: string;
+  }>;
+  calibrationPlot: CalibrationBin[];
+  leaderboard: LeaderboardEntry[];
 }
 
 export interface ValidationDependencies {
@@ -119,6 +140,9 @@ export interface ValidationRepositories {
   validationArtifacts?: {
     create(input: ValidationArtifactInput): Promise<ValidationArtifactRecord>;
   };
+  leaderboardEntries?: {
+    createMany(inputs: LeaderboardEntryInput[]): Promise<unknown>;
+  };
 }
 
 interface PendingValidation {
@@ -166,8 +190,9 @@ export async function runValidation(
         ? [await validateParlayTarget(validationContext, input.parlayId, evaluatedAt, runId)]
         : await validateDateTarget(validationContext, input.date as string, evaluatedAt, runId, config.apiFootball.timezone);
 
+    const analytics = buildValidationAnalytics(pending);
     const gateResult = gateFromValidations(pending.map((item) => item.view));
-    const artifactPayload = buildArtifactPayload(runId, input, evaluatedAt, gateResult, pending.map((item) => item.view));
+    const artifactPayload = buildArtifactPayload(runId, input, evaluatedAt, gateResult, pending.map((item) => item.view), analytics);
     const artifactPath = artifactWriter(
       runId,
       gateResult.verdict === 'blocked' ? 'validations-blocked.json' : 'validations.json',
@@ -189,6 +214,7 @@ export async function runValidation(
       });
       persisted.push({ ...item.view, id: record.id });
     }
+    await persistLeaderboardEntries(repositories, runId, evaluatedAt, analytics);
 
     return {
       ok: true,
@@ -196,6 +222,7 @@ export async function runValidation(
       target: input,
       gateResult,
       validations: persisted,
+      analytics,
       artifactPath,
     };
   } catch (err: any) {
@@ -289,6 +316,12 @@ async function validatePredictionRecord(
       providerFixtureId: fixture.providerFixtureId,
       resultProviderSnapshotId: fetched.resultProviderSnapshotId ?? null,
       statisticsProviderSnapshotId: fetched.statisticsProviderSnapshotId ?? null,
+      modelProbability: numberOrUndefined(prediction.estimatedProbability) ?? numberOrUndefined(prediction.impliedProbability),
+      promptVersion: prediction.promptVersion,
+      modelId: prediction.model ?? 'unknown-model',
+      market: prediction.marketKey,
+      league: fixture.competitionId ?? 'unknown-league',
+      confidenceBand: metadataString(prediction.metadata, 'confidenceBand') ?? prediction.quality,
     },
   });
 }
@@ -529,6 +562,7 @@ function buildArtifactPayload(
   evaluatedAt: string,
   gateResult: ValidationGateResult,
   validations: ValidationArtifactView[],
+  analytics?: ValidationAnalytics,
 ): Record<string, unknown> {
   return {
     runId,
@@ -537,7 +571,61 @@ function buildArtifactPayload(
     settlementRuleVersion: SETTLEMENT_RULE_VERSION,
     gateResult,
     validations,
+    analytics,
   };
+}
+
+function buildValidationAnalytics(pending: PendingValidation[]): ValidationAnalytics {
+  const outcomes = pending.flatMap((item) => {
+    if (item.input.status !== 'won' && item.input.status !== 'lost') return [];
+    const metadata = objectRecord(item.input.metadata);
+    const probability = numberOrUndefined(metadata.modelProbability);
+    if (probability === undefined) return [];
+    return [{
+      predictionId: item.input.predictionId ?? undefined,
+      probability,
+      outcome: item.input.status === 'won' ? 1 as const : 0 as const,
+      promptVersion: stringValue(metadata.promptVersion, 'unknown-prompt'),
+      modelId: stringValue(metadata.modelId, 'unknown-model'),
+      market: stringValue(metadata.market, 'unknown-market'),
+      league: stringValue(metadata.league, 'unknown-league'),
+      confidenceBand: typeof metadata.confidenceBand === 'string' ? metadata.confidenceBand : undefined,
+    }];
+  });
+  return {
+    trackingOnly: true,
+    disclaimer: 'tracking-only-not-betting; uso analitico, no constituye recomendacion de apuesta, no garantiza resultado',
+    outcomes,
+    calibrationPlot: calibrationPlot(outcomes),
+    leaderboard: buildLeaderboard(outcomes),
+  };
+}
+
+async function persistLeaderboardEntries(
+  repositories: ValidationRepositories,
+  runId: string,
+  evaluatedAt: string,
+  analytics: ValidationAnalytics,
+): Promise<void> {
+  if (!repositories.leaderboardEntries || !analytics.leaderboard.length) return;
+  await repositories.leaderboardEntries.createMany(analytics.leaderboard.map((entry) => ({
+    runId,
+    promptVersion: entry.promptVersion,
+    modelId: entry.modelId,
+    market: entry.market,
+    league: entry.league,
+    brier: entry.brier,
+    logloss: entry.logloss,
+    clvPct: entry.clvPct ?? null,
+    hitrate: entry.hitrate,
+    n: entry.n,
+    lowSample: entry.lowSample,
+    generatedAt: new Date(evaluatedAt),
+    metadata: compactJson({
+      trackingOnly: true,
+      disclaimer: 'tracking-only-not-betting',
+    }),
+  }))).catch(() => undefined);
 }
 
 function defaultRepositories(): ValidationRepositories {
@@ -643,6 +731,19 @@ function numberOrUndefined(value: unknown): number | undefined {
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringValue(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function metadataString(metadata: unknown, key: string): string | undefined {
+  const value = objectRecord(metadata)[key];
+  return typeof value === 'string' ? value : undefined;
 }
 
 function compactJson(value: Record<string, unknown>): JsonValue {

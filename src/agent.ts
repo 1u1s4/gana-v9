@@ -2,6 +2,7 @@ import { OpenRouter } from '@openrouter/agent';
 import type { Item } from '@openrouter/agent';
 import { stepCountIs, maxCost } from '@openrouter/agent/stop-conditions';
 import { spawn } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import type { AgentConfig } from './config.js';
 import {
   deriveNativeWebSearchRequirement,
@@ -21,6 +22,23 @@ interface RunAgentOptions {
   signal?: AbortSignal;
   nativeWebSearchRequirement?: NativeWebSearchRequirement;
   runtime?: RuntimeContext;
+}
+
+function installAbortKill(child: ChildProcess, signal?: AbortSignal): () => void {
+  if (!signal) return () => undefined;
+  let killTimer: ReturnType<typeof setTimeout> | undefined;
+  const abort = () => {
+    if (child.exitCode === null) child.kill('SIGTERM');
+    killTimer = setTimeout(() => {
+      if (child.exitCode === null) child.kill('SIGKILL');
+    }, 2_000);
+  };
+  signal.addEventListener('abort', abort, { once: true });
+  if (signal.aborted) abort();
+  return () => {
+    signal.removeEventListener('abort', abort);
+    if (killTimer) clearTimeout(killTimer);
+  };
 }
 
 export async function runAgent(
@@ -445,14 +463,16 @@ async function runCodexAgent(
     stderr += chunk;
   });
 
-  options?.signal?.addEventListener('abort', () => {
-    child.kill('SIGTERM');
-  }, { once: true });
-
-  const exitCode = await new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', resolve);
-  });
+  const cleanupAbort = installAbortKill(child, options?.signal);
+  let exitCode: number | null;
+  try {
+    exitCode = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', resolve);
+    });
+  } finally {
+    cleanupAbort();
+  }
 
   if (stdoutBuffer.trim()) {
     try {
@@ -562,14 +582,16 @@ async function runGeminiAgent(
     stderr += chunk;
   });
 
-  options?.signal?.addEventListener('abort', () => {
-    child.kill('SIGTERM');
-  }, { once: true });
-
-  const exitCode = await new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', resolve);
-  });
+  const cleanupAbort = installAbortKill(child, options?.signal);
+  let exitCode: number | null;
+  try {
+    exitCode = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', resolve);
+    });
+  } finally {
+    cleanupAbort();
+  }
 
   if (stdoutBuffer.trim()) {
     try {
@@ -691,14 +713,16 @@ async function runCursorAgent(
     stderr += chunk;
   });
 
-  options?.signal?.addEventListener('abort', () => {
-    child.kill('SIGTERM');
-  }, { once: true });
-
-  const exitCode = await new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', resolve);
-  });
+  const cleanupAbort = installAbortKill(child, options?.signal);
+  let exitCode: number | null;
+  try {
+    exitCode = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', resolve);
+    });
+  } finally {
+    cleanupAbort();
+  }
 
   if (stdoutBuffer.trim()) {
     try {
