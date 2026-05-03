@@ -156,18 +156,15 @@ describe('runParlayBuild', () => {
           return { text: JSON.stringify({ parlays: [
             { title: 'Conservative A', predictionIds: ['prediction-1', 'prediction-2'], rationale: 'Two high confidence legs.' },
             { title: 'Conservative B', predictionIds: ['prediction-3', 'prediction-4'], rationale: 'Two independent legs.' },
+            { title: 'Conservative C', predictionIds: ['prediction-1', 'prediction-3', 'prediction-5'], rationale: 'Three independent conservative legs.' },
           ] }) } as any;
         }
         if (prompt.includes('(balanced)')) {
           return { text: JSON.stringify({ parlays: [
             { title: 'Balanced A', predictionIds: ['prediction-1', 'prediction-2', 'prediction-3'], rationale: 'Three compatible legs.' },
-            { title: 'Balanced B', predictionIds: ['prediction-2', 'prediction-3', 'prediction-4'], rationale: 'Three independent fixtures.' },
-            { title: 'Balanced C', predictionIds: ['prediction-1', 'prediction-3', 'prediction-4'], rationale: 'Higher quality blend.' },
           ] }) } as any;
         }
-        return { text: JSON.stringify({ parlays: [
-          { title: 'Aggressive A', predictionIds: ['prediction-1', 'prediction-2', 'prediction-3', 'prediction-4'], rationale: 'Four-leg upside profile.' },
-        ] }) } as any;
+        throw new Error('aggressive profile should not be requested in precision mode');
       },
       writeArtifact: (_runId, name) => {
         artifactNames.push(name);
@@ -179,11 +176,12 @@ describe('runParlayBuild', () => {
             assert.equal(query.runId, 'source-run-1');
             assert.deepEqual(query.status, ['candidate', 'review-required', 'promotable']);
             return [
-              prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.25, confidence: 0.8 }),
-              prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.6, confidence: 0.82 }),
-              prediction({ id: 'prediction-3', runId: 'source-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.84 }),
-              prediction({ id: 'prediction-4', runId: 'source-run-1', fixtureId: 'fixture-4', odds: 2, confidence: 0.86 }),
-              prediction({ id: 'prediction-low', runId: 'source-run-1', fixtureId: 'fixture-5', odds: 2, confidence: 0.59 }),
+              prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.2, confidence: 0.86, edge: 0.03 }),
+              prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.55, confidence: 0.87, edge: 0.03 }),
+              prediction({ id: 'prediction-3', runId: 'source-run-1', fixtureId: 'fixture-3', odds: 1.4, confidence: 0.88, edge: 0.03 }),
+              prediction({ id: 'prediction-4', runId: 'source-run-1', fixtureId: 'fixture-4', odds: 1.55, confidence: 0.89, edge: 0.03 }),
+              prediction({ id: 'prediction-5', runId: 'source-run-1', fixtureId: 'fixture-5', odds: 1.3, confidence: 0.9, edge: 0.03 }),
+              prediction({ id: 'prediction-low', runId: 'source-run-1', fixtureId: 'fixture-6', odds: 2, confidence: 0.71, edge: 0.03 }),
             ] as any[];
           },
           listForFixtureDate: async () => {
@@ -203,9 +201,9 @@ describe('runParlayBuild', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.sourceRunId, 'source-run-1');
-    assert.equal(result.portfolio?.parlays.length, 6);
-    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3', 'parlay-4', 'parlay-5', 'parlay-6']);
-    assert.equal(persisted.length, 6);
+    assert.equal(result.portfolio?.parlays.length, 4);
+    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3', 'parlay-4']);
+    assert.equal(persisted.length, 4);
     assert.equal(persisted[0].parlay.metadata.portfolioId, result.portfolio?.id);
     assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'conservative');
     assert.equal(persisted[0].legs.length, 2);
@@ -242,8 +240,8 @@ describe('runParlayBuild', () => {
       repositories: {
         predictions: {
           list: async () => [
-            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8, status: 'promotable' }),
-            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, status: 'promotable' }),
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8, status: 'promotable', edge: 0.03 }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, status: 'promotable', edge: 0.03 }),
           ] as any[],
           listForFixtureDate: async () => [],
         },
@@ -255,6 +253,10 @@ describe('runParlayBuild', () => {
 
     assert.match(conservativePrompt, /Use predictionIds only/);
     assert.match(conservativePrompt, /Do not use fixtureId/);
+    assert.match(conservativePrompt, /parlay-portfolio-v2/);
+    assert.match(conservativePrompt, /riskTags/);
+    assert.match(conservativePrompt, /edge/);
+    assert.match(conservativePrompt, /fragile_low_total_over/);
     assert.equal(result.ok, true);
     assert.equal(result.gateResult.verdict, 'promotable');
     assert.equal(result.portfolio?.parlays[0]?.build.parlay.status, 'promotable');
@@ -282,8 +284,8 @@ describe('runParlayBuild', () => {
       repositories: {
         predictions: {
           list: async () => [
-            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8 }),
-            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8 }),
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8, edge: 0.03 }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8, edge: 0.03 }),
           ] as any[],
           listForFixtureDate: async () => [],
         },
@@ -302,6 +304,119 @@ describe('runParlayBuild', () => {
     assert.match(result.gateResult.warnings.join('\n'), /duplicate fixture without justification/);
     assert.equal(result.portfolio?.parlays.length, 0);
     assert.equal(result.portfolio?.rejected.length, 1);
+  });
+
+  it('filters fragile low-edge legs out of the LLM portfolio prompt', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let inspectedPrompts = 0;
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        const prompt = String(input);
+        inspectedPrompts++;
+        assert.doesNotMatch(prompt, /prediction-fragile-over/);
+        assert.doesNotMatch(prompt, /prediction-fragile-dc/);
+        if (!prompt.includes('(conservative)')) return { text: JSON.stringify({ parlays: [] }) } as any;
+        return { text: JSON.stringify({ parlays: [
+          { title: 'Clean conservative', predictionIds: ['prediction-1', 'prediction-2'], rationale: 'Clean legs inside the profile range.' },
+        ] }) } as any;
+      },
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.4, confidence: 0.85, edge: 0.03 }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.4, confidence: 0.85, edge: 0.03 }),
+            prediction({
+              id: 'prediction-fragile-over',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-3',
+              marketKey: 'goals_over_under',
+              selectionKey: 'over',
+              line: 1.5,
+              odds: 1.33,
+              confidence: 0.9,
+              edge: 0.01,
+            }),
+            prediction({
+              id: 'prediction-fragile-dc',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-4',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_draw',
+              odds: 1.2,
+              confidence: 0.9,
+              edge: 0.01,
+            }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-1' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(inspectedPrompts, 2);
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.parlays.length, 1);
+  });
+
+  it('rejects portfolio parlays with draw-exposure legs', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        const prompt = String(input);
+        if (!prompt.includes('(conservative)')) return { text: JSON.stringify({ parlays: [] }) } as any;
+        return { text: JSON.stringify({ parlays: [
+          { title: 'Draw exposure', predictionIds: ['prediction-draw-exposure', 'prediction-2'], rationale: 'This tries to avoid the draw.' },
+        ] }) } as any;
+      },
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({
+              id: 'prediction-draw-exposure',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-1',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_away',
+              odds: 1.3,
+              confidence: 0.86,
+              edge: 0.03,
+            }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.86, edge: 0.03 }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-1' }) as any },
+        parlays: {
+          createWithLegs: async () => {
+            throw new Error('draw-exposure parlays should not be persisted');
+          },
+        },
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.match(result.gateResult.warnings.join('\n'), /draw exposure/);
+    assert.equal(result.portfolio?.parlays.length, 0);
   });
 
   it('writes a blocked artifact when database access is unavailable', async () => {

@@ -1,7 +1,40 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
-import { URL } from 'url';
-import type { AgentConfig } from '../config.js';
+import { createServer, type Server, type ServerResponse } from 'node:http';
+import { URL } from 'node:url';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { fixtureDateRange } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
+import type { AgentConfig } from '../config.js';
+import { dashboardHtml } from './page.js';
+import {
+  createMetadata,
+  normalizeSortAndDirectionForTab,
+  parseOverviewQuery,
+  type DashboardDirection,
+  type DashboardMetadata,
+  type DashboardTab,
+} from './query.js';
+import type {
+  DashboardCounts,
+  DashboardOverviewResponse,
+  DashboardParlayRow,
+  DashboardPredictionRow,
+  DashboardRunRow,
+  DashboardValidationRow,
+} from './types.js';
+
+type DashboardDb = Pick<
+  PrismaClient,
+  | 'prediction'
+  | 'parlay'
+  | 'validationArtifact'
+  | 'harnessRun'
+  | 'team'
+  | 'competition'
+> & {
+  $queryRaw: PrismaClient['$queryRaw'];
+};
+
+type DashboardEntityKind = 'prediction' | 'parlay' | 'validation' | 'run';
 
 export interface DashboardOptions {
   host?: string;
@@ -13,38 +46,83 @@ export interface DashboardServer {
   url: string;
 }
 
-const DEFAULT_HOST = '127.0.0.1';
-const DEFAULT_PORT = 4317;
-const MAX_TAKE = 200;
+export interface DashboardEntityResponse {
+  kind: DashboardEntityKind;
+  entity: DashboardPredictionRow | DashboardParlayRow | DashboardValidationRow | DashboardRunRow;
+  validationHistory?: DashboardValidationRow[];
+}
+
+type QueryArgs = Record<string, unknown>;
+type DateWindow = { start: Date; end: Date };
+type SortCandidateMap = {
+  predictions: ReadonlyArray<string>;
+  parlays: ReadonlyArray<string>;
+  validations: ReadonlyArray<string>;
+  runs: ReadonlyArray<string>;
+};
+
+const SORTABLE_FIELDS: SortCandidateMap = {
+  predictions: ['generatedAt', 'marketKey', 'selectionKey', 'odds', 'impliedProbability', 'edge', 'confidence', 'status'],
+  parlays: ['generatedAt', 'combinedOdds', 'aggregateConfidence', 'aggregateQuality', 'status'],
+  validations: ['evaluatedAt', 'status', 'createdAt'],
+  runs: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'],
+};
+
+const DEFAULT_SORT_BY = {
+  predictions: 'generatedAt',
+  parlays: 'generatedAt',
+  validations: 'evaluatedAt',
+  runs: 'createdAt',
+} as const;
 
 export async function startDashboardServer(
   config: AgentConfig,
   options: DashboardOptions = {},
+  db: DashboardDb = getPrismaClient(),
 ): Promise<DashboardServer> {
-  const host = options.host ?? DEFAULT_HOST;
-  const port = options.port ?? DEFAULT_PORT;
-  const db = getPrismaClient();
+  const host = options.host ?? '127.0.0.1';
+  const port = options.port ?? 4317;
 
   const server = createServer(async (req, res) => {
+    if (!req.method || req.method !== 'GET') {
+      return sendJson(res, 405, { error: 'method_not_allowed' });
+    }
+
     try {
       const url = new URL(req.url ?? '/', `http://${host}:${port}`);
-      if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' });
 
-      if (url.pathname === '/') return sendHtml(res, dashboardHtml());
-      if (url.pathname === '/api/overview') {
-        const data = await readOverview(db, config, url.searchParams);
-        return sendJson(res, 200, data);
+      if (url.pathname === '/') {
+        return sendHtml(res, dashboardHtml());
       }
+
+      if (url.pathname === '/api/metadata') {
+        return sendJson(res, 200, await readMetadata(db));
+      }
+
+      if (url.pathname === '/api/overview') {
+        return sendJson(res, 200, await readOverview(db, config, url.searchParams));
+      }
+
+      const entityMatch = /^\/api\/entity\/(prediction|parlay|validation|run)\/([^/]+)$/.exec(url.pathname);
+      if (entityMatch) {
+        const kind = entityMatch[1];
+        const id = entityMatch[2] ?? '';
+        if (!kind || !id) return sendJson(res, 400, { error: 'invalid_entity_request' });
+        const result = await readEntity(db, kind as DashboardEntityKind, id);
+        if ('error' in result) return sendJson(res, 404, result);
+        return sendJson(res, 200, result);
+      }
+
       if (url.pathname === '/api/health') {
         await db.$queryRaw`SELECT 1`;
         return sendJson(res, 200, { ok: true });
       }
 
       return sendJson(res, 404, { error: 'not_found' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       return sendJson(res, 500, {
         error: 'dashboard_error',
-        message: err?.message ?? String(err),
+        message: err instanceof Error ? err.message : String(err),
       });
     }
   });
@@ -56,97 +134,75 @@ export async function startDashboardServer(
       resolve();
     });
   });
-
-  return { server, url: `http://${host}:${port}` };
+  const address = server.address();
+  const actualPort = typeof address === 'object' && address ? address.port : port;
+  return { server, url: `http://${host}:${actualPort}` };
 }
 
-type DashboardDb = ReturnType<typeof getPrismaClient>;
-
-async function readOverview(db: DashboardDb, config: AgentConfig, params: URLSearchParams) {
-  const take = clampTake(params.get('take'));
-  const runId = cleanParam(params.get('runId'));
-  const status = cleanParam(params.get('status'));
-  const date = cleanDate(params.get('date'));
-  const range = date ? dateRange(date) : undefined;
-
-  const fixtureDateWhere = range
-    ? { fixture: { scheduledAt: { gte: range.start, lt: range.end } } }
-    : {};
-  const legDateWhere = range
-    ? { legs: { some: { fixture: { scheduledAt: { gte: range.start, lt: range.end } } } } }
-    : {};
-  const validationDateWhere = range
-    ? { evaluatedAt: { gte: range.start, lt: range.end } }
-    : {};
-
-  const predictionWhere = compact({
-    runId,
-    status,
-    ...fixtureDateWhere,
-  });
-  const parlayWhere = compact({
-    runId,
-    status,
-    ...legDateWhere,
-  });
-  const validationWhere = compact({
-    runId,
-    status,
-    ...validationDateWhere,
-  });
-  const runWhere = compact({ id: runId, status });
-
-  const [predictions, parlays, validations, runs, counts] = await Promise.all([
-    db.prediction.findMany({
-      where: predictionWhere,
-      orderBy: [{ generatedAt: 'desc' }, { id: 'asc' }],
-      take,
-      include: {
-        fixture: { include: { competition: true, homeTeam: true, awayTeam: true } },
-        validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
-      },
-    }),
-    db.parlay.findMany({
-      where: parlayWhere,
-      orderBy: [{ generatedAt: 'desc' }, { id: 'asc' }],
-      take,
-      include: {
-        legs: {
-          orderBy: { legIndex: 'asc' },
-          include: {
-            fixture: { include: { competition: true, homeTeam: true, awayTeam: true } },
-            prediction: true,
-          },
-        },
-        validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
-      },
-    }),
-    db.validationArtifact.findMany({
-      where: validationWhere,
-      orderBy: [{ evaluatedAt: 'desc' }, { id: 'asc' }],
-      take,
-      include: {
-        fixture: { include: { competition: true, homeTeam: true, awayTeam: true } },
-        prediction: true,
-        parlay: true,
-      },
-    }),
-    db.harnessRun.findMany({
-      where: runWhere,
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-      take: Math.min(take, 50),
-    }),
-    Promise.all([
-      db.prediction.count({ where: predictionWhere }),
-      db.parlay.count({ where: parlayWhere }),
-      db.validationArtifact.count({ where: validationWhere }),
-      db.harnessRun.count({ where: runWhere }),
-    ]),
+export async function readMetadata(db: DashboardDb): Promise<DashboardMetadata> {
+  const [teams, competitions, metadata] = await Promise.all([
+    db.team.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    db.competition.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    Promise.resolve(createMetadata()),
   ]);
 
-  return toPlain({
-    generatedAt: new Date(),
-    filters: { date, runId, status, take },
+  return {
+    ...metadata,
+    teams: teams.map((team) => ({ id: String(team.id), name: String(team.name) })),
+    competitions: competitions.map((competition) => ({ id: String(competition.id), name: String(competition.name) })),
+  };
+}
+
+export async function readOverview(
+  db: DashboardDb,
+  config: AgentConfig,
+  params: URLSearchParams,
+): Promise<DashboardOverviewResponse> {
+  const metadata = createMetadata();
+  const query = parseOverviewQuery(params, {
+    defaultTab: 'predictions',
+    defaultSortBy: DEFAULT_SORT_BY.predictions,
+    defaultDirection: 'desc',
+  });
+
+  const page = Math.max(1, query.page);
+  const normalized = normalizeSortAndDirectionForTab(query.tab, query.sort, query.direction);
+  const dateWindow = resolveDateWindow(query.dateFrom, query.dateTo, config.apiFootball.timezone);
+  const skip = (page - 1) * query.take;
+  const statusFilter = filterStatusByKind(query.tab, query.statuses, metadata);
+
+  const where = buildFilters(query, dateWindow, statusFilter);
+
+  const [counts, statusFacets, total, rows] = await Promise.all([
+    countAllTabs(db, where),
+    readStatusFacets(db, query.tab, where),
+    countActive(db, query.tab, where[query.tab]),
+    readActiveRows(db, query.tab, where[query.tab], normalized.sort, normalized.direction, skip, query.take),
+  ]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    activeTab: query.tab,
+    page,
+    take: query.take,
+    sort: normalized.sort,
+    direction: normalized.direction,
+    filters: {
+      date: query.date,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      fixtureStatus: query.fixtureStatuses,
+      runId: query.runId,
+      status: statusFilter,
+      market: query.market,
+      team: query.team,
+      competition: query.competition,
+      minConfidence: query.minConfidence,
+      maxConfidence: query.maxConfidence,
+      minEdge: query.minEdge,
+      maxEdge: query.maxEdge,
+      quality: query.qualities,
+    },
     config: {
       timezone: config.apiFootball.timezone,
       artifactRoot: config.artifactRoot,
@@ -154,120 +210,622 @@ async function readOverview(db: DashboardDb, config: AgentConfig, params: URLSea
       providerAgentic: config.provider,
       model: config.model,
     },
-    counts: {
-      predictions: counts[0],
-      parlays: counts[1],
-      validations: counts[2],
-      runs: counts[3],
+    counts,
+    pagination: {
+      page,
+      take: query.take,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / query.take)),
     },
-    predictions: predictions.map(mapPrediction),
-    parlays: parlays.map(mapParlay),
-    validations: validations.map(mapValidation),
-    runs: runs.map(mapRun),
-  });
-}
-
-function mapPrediction(row: any) {
-  return {
-    id: row.id,
-    runId: row.runId,
-    fixture: mapFixture(row.fixture),
-    marketKey: row.marketKey,
-    selectionKey: row.selectionKey,
-    line: row.line,
-    odds: row.odds,
-    impliedProbability: row.impliedProbability,
-    estimatedProbability: row.estimatedProbability,
-    edge: row.edge,
-    confidence: row.confidence,
-    quality: row.quality,
-    status: row.status,
-    rationale: row.rationaleRedacted,
-    warnings: row.warnings,
-    generatedAt: row.generatedAt,
-    latestValidation: row.validationArtifacts?.[0] ? mapValidation(row.validationArtifacts[0]) : null,
+    statusFacets,
+    predictions: rows.predictions,
+    parlays: rows.parlays,
+    validations: rows.validations,
+    runs: rows.runs,
   };
 }
 
-function mapParlay(row: any) {
+export async function readEntity(
+  db: DashboardDb,
+  kind: DashboardEntityKind,
+  id: string,
+): Promise<DashboardEntityResponse | { error: 'not_found'; message: string }> {
+  if (kind === 'prediction') {
+    const row = (await db.prediction.findUnique({
+      where: { id },
+      include: {
+        fixture: {
+          include: { competition: true, homeTeam: true, awayTeam: true },
+        },
+        validationArtifacts: {
+          orderBy: { evaluatedAt: 'desc' },
+          take: 15,
+        },
+      },
+    })) as unknown;
+
+    if (!row) return { error: 'not_found', message: `prediction ${id} not found` };
+    const prediction = mapPrediction(row);
+    const validationHistory = toArray(toRecord(row).validationArtifacts).map((item) => mapValidation(item));
+    return { kind: 'prediction', entity: prediction, validationHistory };
+  }
+
+  if (kind === 'parlay') {
+    const row = (await db.parlay.findUnique({
+      where: { id },
+      include: {
+        legs: {
+          orderBy: { legIndex: 'asc' },
+          include: {
+            fixture: {
+              include: { competition: true, homeTeam: true, awayTeam: true },
+            },
+            prediction: {
+              select: {
+                id: true,
+                status: true,
+                confidence: true,
+                edge: true,
+              },
+            },
+          },
+        },
+        validationArtifacts: {
+          orderBy: { evaluatedAt: 'desc' },
+          take: 15,
+        },
+      },
+    })) as unknown;
+
+    if (!row) return { error: 'not_found', message: `parlay ${id} not found` };
+    const parlay = mapParlay(row);
+    const validationHistory = toArray(toRecord(row).validationArtifacts).map((item) => mapValidation(item));
+    return { kind: 'parlay', entity: parlay, validationHistory };
+  }
+
+  if (kind === 'validation') {
+    const row = (await db.validationArtifact.findUnique({
+      where: { id },
+      include: {
+        fixture: {
+          include: { competition: true, homeTeam: true, awayTeam: true },
+        },
+      },
+    })) as unknown;
+
+    if (!row) return { error: 'not_found', message: `validation ${id} not found` };
+    return { kind: 'validation', entity: mapValidation(row) };
+  }
+
+  const row = (await db.harnessRun.findUnique({
+    where: { id },
+  })) as unknown;
+
+  if (!row) return { error: 'not_found', message: `run ${id} not found` };
+  return { kind: 'run', entity: mapRun(row) };
+}
+
+function filterStatusByKind(kind: DashboardTab, values: string[], metadata: DashboardMetadata): string[] {
+  if (!values.length) return [];
+  return values.filter((status) => metadata.statuses[kind].includes(status));
+}
+
+function buildFilters(query: ReturnType<typeof parseOverviewQuery>, dateWindow: DateWindow | undefined, statusFilter: string[]) {
+  const fixtureFilter = buildFixtureFilter(query, dateWindow);
   return {
-    id: row.id,
-    runId: row.runId,
-    combinedOdds: row.combinedOdds,
-    aggregateConfidence: row.aggregateConfidence,
-    aggregateQuality: row.aggregateQuality,
-    status: row.status,
-    rationale: row.rationaleRedacted,
-    warnings: row.warnings,
-    generatedAt: row.generatedAt,
-    latestValidation: row.validationArtifacts?.[0] ? mapValidation(row.validationArtifacts[0]) : null,
-    legs: (row.legs ?? []).map((leg: any) => ({
-      id: leg.id,
-      legIndex: leg.legIndex,
-      predictionId: leg.predictionId,
-      fixture: mapFixture(leg.fixture),
-      marketKey: leg.marketKey,
-      selectionKey: leg.selectionKey,
-      line: leg.line,
-      odds: leg.odds,
-      status: leg.status,
-      inclusionReason: leg.inclusionReason,
-      predictionStatus: leg.prediction?.status ?? null,
-      confidence: leg.prediction?.confidence ?? null,
-      edge: leg.prediction?.edge ?? null,
-    })),
+    predictions: buildPredictionWhere(query, fixtureFilter, statusFilter),
+    parlays: buildParlayWhere(query, fixtureFilter, statusFilter),
+    validations: buildValidationWhere(query, fixtureFilter, statusFilter, dateWindow),
+    runs: buildRunWhere(query, statusFilter, dateWindow),
   };
 }
 
-function mapValidation(row: any) {
+function buildPredictionWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  fixtureFilter: QueryArgs | undefined,
+  statusFilter: string[],
+): QueryArgs {
+  const where: QueryArgs = {};
+  if (query.runId) where.runId = query.runId;
+  if (statusFilter.length) where.status = inFilter(statusFilter);
+  if (query.market) where.marketKey = query.market;
+  if (query.qualities.length) where.quality = inFilter(query.qualities);
+  if (query.minConfidence !== undefined || query.maxConfidence !== undefined) {
+    where.confidence = numberRange(query.minConfidence, query.maxConfidence);
+  }
+  if (query.minEdge !== undefined || query.maxEdge !== undefined) {
+    where.edge = numberRange(query.minEdge, query.maxEdge);
+  }
+  if (fixtureFilter) where.fixture = fixtureFilter;
+  return where;
+}
+
+function buildParlayWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  fixtureFilter: QueryArgs | undefined,
+  statusFilter: string[],
+): QueryArgs {
+  const where: QueryArgs = {};
+  if (query.runId) where.runId = query.runId;
+  if (statusFilter.length) where.status = inFilter(statusFilter);
+  if (query.minConfidence !== undefined || query.maxConfidence !== undefined) {
+    where.aggregateConfidence = numberRange(query.minConfidence, query.maxConfidence);
+  }
+  const legWhere: QueryArgs = {};
+  if (query.market) legWhere.marketKey = query.market;
+  if (fixtureFilter) legWhere.fixture = fixtureFilter;
+  if (Object.keys(legWhere).length > 0) where.legs = { some: legWhere };
+  return where;
+}
+
+function buildValidationWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  fixtureFilter: QueryArgs | undefined,
+  statusFilter: string[],
+  dateWindow: DateWindow | undefined,
+): QueryArgs {
+  const where: QueryArgs = {};
+  if (query.runId) where.runId = query.runId;
+  if (statusFilter.length) where.status = inFilter(statusFilter);
+  if (dateWindow) where.evaluatedAt = dateRangeFilter(dateWindow);
+  if (fixtureFilter) where.fixture = fixtureFilter;
+  return where;
+}
+
+function buildRunWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  statusFilter: string[],
+  dateWindow: DateWindow | undefined,
+): QueryArgs {
+  const where: QueryArgs = {};
+  if (query.runId) where.id = query.runId;
+  if (statusFilter.length) where.status = inFilter(statusFilter);
+  if (dateWindow) where.createdAt = dateRangeFilter(dateWindow);
+  return where;
+}
+
+function buildFixtureFilter(
+  query: ReturnType<typeof parseOverviewQuery>,
+  dateWindow: DateWindow | undefined,
+): QueryArgs | undefined {
+  const clauses: QueryArgs[] = [];
+  if (query.team) clauses.push({ OR: [{ homeTeamId: query.team }, { awayTeamId: query.team }] });
+  if (query.competition) clauses.push({ competitionId: query.competition });
+  if (dateWindow) clauses.push({ scheduledAt: dateRangeFilter(dateWindow) });
+  if (query.fixtureStatuses.length) clauses.push({ status: inFilter(query.fixtureStatuses) });
+
+  if (!clauses.length) return undefined;
+  if (clauses.length === 1) return clauses[0] as QueryArgs;
+  return { AND: clauses };
+}
+
+async function readActiveRows(
+  db: DashboardDb,
+  tab: DashboardTab,
+  where: QueryArgs,
+  sort: string,
+  direction: DashboardDirection,
+  skip: number,
+  take: number,
+) {
+  const orderBy = buildOrderBy(tab, sort, direction);
+
+  if (tab === 'predictions') {
+    const predictions =
+      (await db.prediction.findMany({
+        where: where as unknown as Prisma.PredictionWhereInput,
+        orderBy: orderBy as Prisma.PredictionFindManyArgs['orderBy'],
+        skip,
+        take,
+        include: {
+          fixture: {
+            include: { competition: true, homeTeam: true, awayTeam: true },
+          },
+          validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
+        },
+      }) as unknown[]);
+
+    return {
+      predictions: predictions.map((row) => mapPrediction(row)),
+      parlays: [],
+      validations: [],
+      runs: [],
+    };
+  }
+
+  if (tab === 'parlays') {
+      const parlays =
+      (await db.parlay.findMany({
+        where: where as unknown as Prisma.ParlayWhereInput,
+        orderBy: orderBy as Prisma.ParlayFindManyArgs['orderBy'],
+        skip,
+        take,
+        include: {
+          validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
+          legs: {
+            orderBy: { legIndex: 'asc' },
+            include: {
+              fixture: {
+                include: { competition: true, homeTeam: true, awayTeam: true },
+              },
+              prediction: {
+                select: {
+                  id: true,
+                  status: true,
+                  confidence: true,
+                  edge: true,
+                },
+              },
+            },
+          },
+        },
+      }) as unknown[]);
+
+    return {
+      predictions: [],
+      parlays: parlays.map((row) => mapParlay(row)),
+      validations: [],
+      runs: [],
+    };
+  }
+
+  if (tab === 'validations') {
+    const validations =
+      (await db.validationArtifact.findMany({
+        where: where as unknown as Prisma.ValidationArtifactWhereInput,
+        orderBy: orderBy as Prisma.ValidationArtifactFindManyArgs['orderBy'],
+        skip,
+        take,
+        include: {
+          fixture: {
+            include: { competition: true, homeTeam: true, awayTeam: true },
+          },
+        },
+      }) as unknown[]);
+
+    return {
+      predictions: [],
+      parlays: [],
+      validations: validations.map((row) => mapValidation(row)),
+      runs: [],
+    };
+  }
+
+  const runs = (await db.harnessRun.findMany({
+    where: where as unknown as Prisma.HarnessRunWhereInput,
+    orderBy: orderBy as Prisma.HarnessRunFindManyArgs['orderBy'],
+    skip,
+    take,
+  }) as unknown[]);
+
   return {
-    id: row.id,
-    runId: row.runId,
-    predictionId: row.predictionId,
-    parlayId: row.parlayId,
-    fixture: row.fixture ? mapFixture(row.fixture) : null,
-    status: row.status,
-    reason: row.reason,
-    evaluatedAt: row.evaluatedAt,
-    outcome: row.outcome,
-    settlementRuleVersion: row.settlementRuleVersion,
+    predictions: [],
+    parlays: [],
+    validations: [],
+    runs: runs.map((row) => mapRun(row)),
   };
 }
 
-function mapRun(row: any) {
+async function readStatusFacets(
+  db: DashboardDb,
+  tab: DashboardTab,
+  where: ReturnType<typeof buildFilters>,
+): Promise<Record<string, number>> {
+  if (tab === 'predictions') {
+    const rows = (await (db.prediction as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+      by: ['status'],
+      where: where.predictions as unknown as Prisma.PredictionWhereInput,
+      _count: { _all: true },
+    })) as Array<{ status: string | null; _count: { _all: number | bigint } }>;
+    return statusFacetFromRows(rows);
+  }
+
+  if (tab === 'parlays') {
+    const rows = (await (db.parlay as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+      by: ['status'],
+      where: where.parlays as unknown as Prisma.ParlayWhereInput,
+      _count: { _all: true },
+    })) as Array<{ status: string | null; _count: { _all: number | bigint } }>;
+    return statusFacetFromRows(rows);
+  }
+
+  if (tab === 'validations') {
+    const rows = (await (db.validationArtifact as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+      by: ['status'],
+      where: where.validations as unknown as Prisma.ValidationArtifactWhereInput,
+      _count: { _all: true },
+    })) as Array<{ status: string | null; _count: { _all: number | bigint } }>;
+    return statusFacetFromRows(rows);
+  }
+
+  const rows = (await (db.harnessRun as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+    by: ['status'],
+    where: where.runs as unknown as Prisma.HarnessRunWhereInput,
+    _count: { _all: true },
+  })) as Array<{ status: string | null; _count: { _all: number | bigint } }>;
+  return statusFacetFromRows(rows);
+}
+
+function toStatusFacetCount(raw: number | bigint): number {
+  return typeof raw === 'bigint' ? Number(raw) : raw;
+}
+
+function statusFacetFromRows(rows: Array<{ status: string | null; _count: { _all: number | bigint } }>): Record<string, number> {
+  const facets: Record<string, number> = {};
+  for (const row of rows) {
+    const status = toStringValue(row.status);
+    if (!status) continue;
+    const count = toStatusFacetCount(row._count._all);
+    facets[status] = Number.isFinite(count) ? count : 0;
+  }
+  return facets;
+}
+
+async function countActive(db: DashboardDb, tab: DashboardTab, where: QueryArgs): Promise<number> {
+  if (tab === 'predictions') return db.prediction.count({ where });
+  if (tab === 'parlays') return db.parlay.count({ where });
+  if (tab === 'validations') return db.validationArtifact.count({ where });
+  return db.harnessRun.count({ where });
+}
+
+async function countAllTabs(db: DashboardDb, where: ReturnType<typeof buildFilters>): Promise<DashboardCounts> {
   return {
-    id: row.id,
-    runtime: row.runtime,
-    profile: row.profile,
-    providerSports: row.providerSports,
-    providerAgentic: row.providerAgentic,
-    model: row.model,
-    status: row.status,
-    verdict: row.verdict,
-    artifactDir: row.artifactDir,
-    startedAt: row.startedAt,
-    completedAt: row.completedAt,
-    createdAt: row.createdAt,
+    predictions: await db.prediction.count({ where: omitStatus(where.predictions) }),
+    parlays: await db.parlay.count({ where: omitStatus(where.parlays) }),
+    validations: await db.validationArtifact.count({ where: omitStatus(where.validations) }),
+    runs: await db.harnessRun.count({ where: omitStatus(where.runs) }),
   };
 }
 
-function mapFixture(row: any) {
-  if (!row) return null;
+function omitStatus(where: QueryArgs): QueryArgs {
+  const copied = { ...where };
+  delete copied.status;
+  return copied;
+}
+
+function resolveDateWindow(dateFrom: string | undefined, dateTo: string | undefined, timezone: string): DateWindow | undefined {
+  if (!dateFrom && !dateTo) return undefined;
+  const start = fixtureDateRange(dateFrom ?? dateTo ?? '', timezone).start;
+  const end = fixtureDateRange(dateTo ?? dateFrom ?? '', timezone).end;
+  return { start, end };
+}
+
+function dateRangeFilter(window: DateWindow): QueryArgs {
+  return { gte: window.start, lt: window.end };
+}
+
+function buildOrderBy(tab: DashboardTab, sort: string, direction: DashboardDirection): Array<Record<string, Prisma.SortOrder>> {
+  const safeSort = isAllowedSort(tab, sort) ? sort : DEFAULT_SORT_BY[tab];
+  const safeDirection: Prisma.SortOrder = direction === 'asc' ? Prisma.SortOrder.asc : Prisma.SortOrder.desc;
+  const candidate: Array<Record<string, Prisma.SortOrder>> = [{ [safeSort]: safeDirection }];
+
+  if (safeSort !== 'id') {
+    candidate.push({ id: safeDirection });
+  }
+  return candidate;
+}
+
+function isAllowedSort(tab: DashboardTab, sort: string): sort is string {
+  return (SORTABLE_FIELDS[tab] as ReadonlyArray<string>).includes(sort);
+}
+
+function numberRange(min: number | undefined, max: number | undefined): QueryArgs {
+  const range: QueryArgs = {};
+  if (min !== undefined) range.gte = min;
+  if (max !== undefined) range.lte = max;
+  return range;
+}
+
+function inFilter(values: string[]): QueryArgs {
+  return { in: values };
+}
+
+function mapPrediction(row: unknown): DashboardPredictionRow {
+  const item = toRecord(row);
+  const validationArtifacts = toArray(item.validationArtifacts);
+  const latestValidation = validationArtifacts[0] ? mapValidation(validationArtifacts[0]) : null;
+
   return {
-    id: row.id,
-    providerFixtureId: row.providerFixtureId,
-    scheduledAt: row.scheduledAt,
-    status: row.status,
-    scoreHome: row.scoreHome,
-    scoreAway: row.scoreAway,
-    competition: row.competition ? {
-      id: row.competition.id,
-      name: row.competition.name,
-      country: row.competition.country,
-    } : null,
-    homeTeam: row.homeTeam ? { id: row.homeTeam.id, name: row.homeTeam.name } : null,
-    awayTeam: row.awayTeam ? { id: row.awayTeam.id, name: row.awayTeam.name } : null,
+    id: toStringValue(item.id),
+    runId: toNullableString(item.runId),
+    fixture: mapFixture(item.fixture),
+    marketKey: toStringValue(item.marketKey),
+    selectionKey: toStringValue(item.selectionKey),
+    line: toNumber(item.line),
+    odds: toNumber(item.odds),
+    impliedProbability: toNumber(item.impliedProbability),
+    estimatedProbability: toNumberOrNull(item.estimatedProbability),
+    edge: toNumberOrNull(item.edge),
+    confidence: toNumber(item.confidence),
+    quality: toStringValue(item.quality),
+    status: toStringValue(item.status),
+    rationale: toStringValue(item.rationaleRedacted),
+    warnings: item.warnings ?? null,
+    generatedAt: toDateString(item.generatedAt),
+    latestValidation,
   };
+}
+
+function mapParlay(row: unknown): DashboardParlayRow {
+  const item = toRecord(row);
+  const validationArtifacts = toArray(item.validationArtifacts);
+  const latestValidation = validationArtifacts[0] ? mapValidation(validationArtifacts[0]) : null;
+  const legs = toArray(item.legs).map((leg) => mapParlayLeg(leg));
+
+  return {
+    id: toStringValue(item.id),
+    runId: toNullableString(item.runId),
+    combinedOdds: toNumberOrNull(item.combinedOdds),
+    aggregateConfidence: toNumber(item.aggregateConfidence),
+    aggregateQuality: toNumber(item.aggregateQuality),
+    status: toStringValue(item.status),
+    rationale: toStringValue(item.rationaleRedacted),
+    warnings: item.warnings ?? null,
+    generatedAt: toDateString(item.generatedAt),
+    latestValidation,
+    legs,
+  };
+}
+
+function mapParlayLeg(row: unknown) {
+  const item = toRecord(row);
+  const prediction = toRecord(item.prediction);
+
+  return {
+    id: toStringValue(item.id),
+    legIndex: toInteger(item.legIndex),
+    predictionId: toStringValue(item.predictionId),
+    fixture: mapFixture(item.fixture),
+    marketKey: toStringValue(item.marketKey),
+    selectionKey: toStringValue(item.selectionKey),
+    line: toNumberOrNull(item.line),
+    odds: toNumber(item.odds),
+    status: toStringValue(item.status),
+    inclusionReason: toNullableString(item.inclusionReason),
+    predictionStatus: toNullableString(prediction.status),
+    confidence: toNumberOrNull(prediction.confidence),
+    edge: toNumberOrNull(prediction.edge),
+  };
+}
+
+function mapValidation(row: unknown): DashboardValidationRow {
+  const item = toRecord(row);
+
+  return {
+    id: toStringValue(item.id),
+    runId: toNullableString(item.runId),
+    predictionId: toNullableString(item.predictionId),
+    parlayId: toNullableString(item.parlayId),
+    fixture: mapFixture(item.fixture),
+    status: toStringValue(item.status),
+    reason: toNullableString(item.reason),
+    evaluatedAt: toNullableDateString(item.evaluatedAt),
+    createdAt: toDateString(item.createdAt),
+    outcome: item.outcome,
+    settlementRuleVersion: toStringValue(item.settlementRuleVersion),
+  };
+}
+
+function mapRun(row: unknown): DashboardRunRow {
+  const item = toRecord(row);
+
+  return {
+    id: toStringValue(item.id),
+    runtime: toStringValue(item.runtime),
+    profile: toStringValue(item.profile),
+    providerSports: toStringValue(item.providerSports),
+    providerAgentic: toNullableString(item.providerAgentic),
+    model: toNullableString(item.model),
+    status: toStringValue(item.status),
+    verdict: toNullableString(item.verdict),
+    artifactDir: toNullableString(item.artifactDir),
+    startedAt: toNullableDateString(item.startedAt),
+    completedAt: toNullableDateString(item.completedAt),
+    createdAt: toDateString(item.createdAt),
+  };
+}
+
+function mapFixture(raw: unknown) {
+  const item = toRecord(raw);
+  if (!raw) return null;
+
+  const competition = toRecord(item.competition);
+  const homeTeam = toRecord(item.homeTeam);
+  const awayTeam = toRecord(item.awayTeam);
+
+  return {
+    id: toStringValue(item.id),
+    providerFixtureId: toStringValue(item.providerFixtureId),
+    scheduledAt: toNullableDateString(item.scheduledAt),
+    status: toStringValue(item.status),
+    scoreHome: toNumberOrNull(item.scoreHome),
+    scoreAway: toNumberOrNull(item.scoreAway),
+    competition: item.competition
+      ? {
+        id: toStringValue(competition.id),
+        name: toStringValue(competition.name),
+        country: toNullableString(competition.country),
+      }
+      : null,
+    homeTeam: item.homeTeam
+      ? {
+        id: toStringValue(homeTeam.id),
+        name: toStringValue(homeTeam.name),
+      }
+      : null,
+    awayTeam: item.awayTeam
+      ? {
+        id: toStringValue(awayTeam.id),
+        name: toStringValue(awayTeam.name),
+      }
+      : null,
+  };
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+}
+
+
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function toNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function toInteger(value: unknown): number {
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (value && typeof value === 'object' && 'toString' in value && typeof value.toString === 'function') {
+    const parsed = Number.parseFloat(value.toString());
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = toNumber(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toDateString(value: unknown): string {
+  const date = toDateOrNull(value);
+  return date ? date.toISOString() : '';
+}
+
+function toNullableDateString(value: unknown): string | null {
+  const date = toDateOrNull(value);
+  return date ? date.toISOString() : null;
+}
+
+function toDateOrNull(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
 }
 
 function sendHtml(res: ServerResponse, html: string): void {
@@ -286,33 +844,6 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(toPlain(body)));
 }
 
-function clampTake(value: string | null): number {
-  const parsed = value ? Number(value) : 50;
-  if (!Number.isFinite(parsed)) return 50;
-  return Math.max(1, Math.min(MAX_TAKE, Math.trunc(parsed)));
-}
-
-function cleanParam(value: string | null): string | undefined {
-  const clean = value?.trim();
-  return clean ? clean : undefined;
-}
-
-function cleanDate(value: string | null): string | undefined {
-  const clean = cleanParam(value);
-  return clean && /^\d{4}-\d{2}-\d{2}$/.test(clean) ? clean : undefined;
-}
-
-function dateRange(date: string): { start: Date; end: Date } {
-  const start = new Date(`${date}T00:00:00.000Z`);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-  return { start, end };
-}
-
-function compact<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
-}
-
 function toPlain(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value, (_key, item) => {
     if (typeof item === 'bigint') return item.toString();
@@ -321,358 +852,4 @@ function toPlain(value: unknown): unknown {
     }
     return item;
   }));
-}
-
-function dashboardHtml(): string {
-  return String.raw`<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gana Dashboard</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #f4f6f8;
-      --panel: #ffffff;
-      --line: #d7dde3;
-      --text: #17202a;
-      --muted: #66717d;
-      --accent: #126b61;
-      --accent-2: #b53f2f;
-      --good: #137a4a;
-      --warn: #9a6500;
-      --bad: #b42318;
-      --chip: #eef3f2;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 14px;
-    }
-    button, input, select { font: inherit; }
-    .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
-    header {
-      background: var(--panel);
-      border-bottom: 1px solid var(--line);
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      position: sticky;
-      top: 0;
-      z-index: 5;
-    }
-    .brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-    .brand h1 { margin: 0; font-size: 20px; line-height: 1.2; letter-spacing: 0; }
-    .brand span { color: var(--muted); white-space: nowrap; }
-    .toolbar { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-    label { color: var(--muted); display: grid; gap: 4px; font-size: 12px; }
-    input, select {
-      height: 34px;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text);
-      border-radius: 6px;
-      padding: 0 9px;
-      min-width: 132px;
-    }
-    .icon-btn, .tab {
-      height: 34px;
-      border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text);
-      border-radius: 6px;
-      padding: 0 10px;
-      cursor: pointer;
-    }
-    .icon-btn:hover, .tab:hover { border-color: var(--accent); }
-    .icon-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-    main { padding: 18px 20px 28px; display: grid; gap: 16px; }
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; }
-    .stat {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      min-height: 82px;
-    }
-    .stat b { display: block; font-size: 26px; line-height: 1.1; margin-top: 8px; }
-    .muted { color: var(--muted); }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-    .tab.active { background: var(--text); color: #fff; border-color: var(--text); }
-    .content { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start; }
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      min-width: 0;
-    }
-    .panel-head {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .panel-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 880px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #edf0f2; vertical-align: top; }
-    th { color: var(--muted); font-size: 12px; font-weight: 600; background: #fafbfc; }
-    tr { cursor: pointer; }
-    tr:hover { background: #f8fbfb; }
-    .match { font-weight: 700; }
-    .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      max-width: 100%;
-      min-height: 24px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: var(--chip);
-      color: var(--accent);
-      font-size: 12px;
-      font-weight: 700;
-      overflow-wrap: anywhere;
-    }
-    .badge.good { color: var(--good); background: #eaf6ef; }
-    .badge.warn { color: var(--warn); background: #fff4df; }
-    .badge.bad { color: var(--bad); background: #fdeceb; }
-    .cards { display: grid; gap: 10px; padding: 12px; }
-    .parlay {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      cursor: pointer;
-      background: #fff;
-    }
-    .parlay:hover { border-color: var(--accent); }
-    .parlay-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
-    .legs { display: grid; gap: 8px; margin-top: 10px; }
-    .leg { border-left: 3px solid var(--accent); padding-left: 8px; }
-    aside { position: sticky; top: 82px; }
-    .detail { padding: 14px; display: grid; gap: 12px; }
-    .detail h3 { margin: 0; font-size: 16px; line-height: 1.25; }
-    .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; }
-    .kv span:first-child { color: var(--muted); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
-    .empty { padding: 28px; color: var(--muted); text-align: center; }
-    .error { color: var(--bad); padding: 12px 14px; }
-    @media (max-width: 980px) {
-      header { align-items: stretch; flex-direction: column; }
-      .toolbar { justify-content: flex-start; }
-      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .content { grid-template-columns: 1fr; }
-      aside { position: static; }
-    }
-    @media (max-width: 620px) {
-      main { padding: 12px; }
-      .stats { grid-template-columns: 1fr; }
-      input, select { width: 100%; min-width: 0; }
-      label { flex: 1 1 150px; }
-      .toolbar { align-items: stretch; }
-      .icon-btn { flex: 1 1 80px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="shell">
-    <header>
-      <div class="brand">
-        <h1>Gana Dashboard</h1>
-        <span id="updated">Cargando</span>
-      </div>
-      <form class="toolbar" id="filters">
-        <label>Fecha <input type="date" name="date"></label>
-        <label>Run ID <input name="runId" placeholder="run id"></label>
-        <label>Estado <input name="status" placeholder="promotable"></label>
-        <label>Limite
-          <select name="take">
-            <option>50</option>
-            <option>100</option>
-            <option>200</option>
-          </select>
-        </label>
-        <button class="icon-btn primary" title="Actualizar" type="submit">↻</button>
-      </form>
-    </header>
-    <main>
-      <section class="stats" id="stats"></section>
-      <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="predictions">Predicciones</button>
-        <button class="tab" data-tab="parlays">Parlays</button>
-        <button class="tab" data-tab="validations">Validaciones</button>
-        <button class="tab" data-tab="runs">Runs</button>
-      </nav>
-      <section class="content">
-        <div class="panel">
-          <div class="panel-head">
-            <h2 id="section-title">Predicciones</h2>
-            <span class="muted" id="section-count"></span>
-          </div>
-          <div id="list"></div>
-        </div>
-        <aside class="panel">
-          <div class="panel-head"><h2>Detalle</h2></div>
-          <div class="detail" id="detail"><span class="muted">Selecciona una fila para revisar el detalle.</span></div>
-        </aside>
-      </section>
-    </main>
-  </div>
-  <script>
-    const state = { tab: 'predictions', data: null, selected: null };
-    const $ = (sel) => document.querySelector(sel);
-    const fmt = (v, digits = 3) => v === null || v === undefined ? '—' : Number(v).toFixed(digits);
-    const pct = (v) => v === null || v === undefined ? '—' : (Number(v) * 100).toFixed(1) + '%';
-    const dateTime = (v) => v ? new Date(v).toLocaleString() : '—';
-    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-    const matchName = (fixture) => {
-      if (!fixture) return 'Sin fixture';
-      const home = fixture.homeTeam?.name ?? 'Local';
-      const away = fixture.awayTeam?.name ?? 'Visita';
-      return home + ' vs ' + away;
-    };
-    const badgeClass = (status) => {
-      const s = String(status ?? '').toLowerCase();
-      if (['promotable', 'succeeded', 'won'].includes(s)) return 'good';
-      if (['blocked', 'failed', 'lost', 'error'].includes(s)) return 'bad';
-      if (['review-required', 'pending', 'running'].includes(s)) return 'warn';
-      return '';
-    };
-    const badge = (status) => '<span class="badge ' + badgeClass(status) + '">' + esc(status ?? 'none') + '</span>';
-
-    async function load() {
-      const params = new URLSearchParams(new FormData($('#filters')));
-      for (const [key, value] of [...params.entries()]) if (!value) params.delete(key);
-      const res = await fetch('/api/overview?' + params.toString());
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.message ?? body.error ?? 'Error');
-      state.data = body;
-      state.selected = null;
-      render();
-    }
-
-    function render() {
-      $('#updated').textContent = 'Actualizado ' + dateTime(state.data.generatedAt);
-      renderStats();
-      renderList();
-      renderDetail();
-    }
-
-    function renderStats() {
-      const c = state.data.counts;
-      $('#stats').innerHTML = [
-        ['Predicciones', c.predictions],
-        ['Parlays', c.parlays],
-        ['Validaciones', c.validations],
-        ['Runs', c.runs],
-      ].map(([label, value]) => '<article class="stat"><span class="muted">' + label + '</span><b>' + value + '</b></article>').join('');
-    }
-
-    function setTab(tab) {
-      state.tab = tab;
-      state.selected = null;
-      document.querySelectorAll('.tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tab));
-      renderList();
-      renderDetail();
-    }
-
-    function renderList() {
-      const title = { predictions: 'Predicciones', parlays: 'Parlays', validations: 'Validaciones', runs: 'Runs' }[state.tab];
-      const rows = state.data[state.tab] ?? [];
-      $('#section-title').textContent = title;
-      $('#section-count').textContent = rows.length + ' visibles';
-      if (!rows.length) {
-        $('#list').innerHTML = '<div class="empty">No hay datos para los filtros actuales.</div>';
-        return;
-      }
-      if (state.tab === 'predictions') return renderPredictions(rows);
-      if (state.tab === 'parlays') return renderParlays(rows);
-      if (state.tab === 'validations') return renderValidations(rows);
-      return renderRuns(rows);
-    }
-
-    function rowAttrs(type, id) {
-      return 'data-type="' + type + '" data-id="' + esc(id) + '"';
-    }
-
-    function renderPredictions(rows) {
-      $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Partido</th><th>Pick</th><th>Odds</th><th>Edge</th><th>Confianza</th><th>Estado</th><th>Generado</th></tr></thead><tbody>' +
-        rows.map((p) => '<tr ' + rowAttrs('predictions', p.id) + '><td><div class="match">' + esc(matchName(p.fixture)) + '</div><div class="sub">' + esc(p.fixture?.competition?.name ?? '') + ' · ' + dateTime(p.fixture?.scheduledAt) + '</div></td><td><b>' + esc(p.marketKey) + '</b><div class="sub">' + esc(p.selectionKey) + (p.line ? ' ' + esc(p.line) : '') + '</div></td><td>' + fmt(p.odds) + '</td><td>' + pct(p.edge) + '</td><td>' + pct(p.confidence) + '</td><td>' + badge(p.status) + '</td><td>' + dateTime(p.generatedAt) + '</td></tr>').join('') +
-        '</tbody></table></div>';
-    }
-
-    function renderParlays(rows) {
-      $('#list').innerHTML = '<div class="cards">' + rows.map((p) => '<article class="parlay" ' + rowAttrs('parlays', p.id) + '><div class="parlay-top"><div><b>' + esc(p.id) + '</b><div class="sub">' + p.legs.length + ' legs · ' + dateTime(p.generatedAt) + '</div></div><div>' + badge(p.status) + '</div></div><div class="sub">Odds ' + fmt(p.combinedOdds) + ' · Confianza ' + pct(p.aggregateConfidence) + ' · Calidad ' + pct(p.aggregateQuality) + '</div><div class="legs">' + p.legs.map((l) => '<div class="leg"><b>' + esc(matchName(l.fixture)) + '</b><div class="sub">' + esc(l.marketKey) + ' · ' + esc(l.selectionKey) + ' · ' + fmt(l.odds) + '</div></div>').join('') + '</div></article>').join('') + '</div>';
-    }
-
-    function renderValidations(rows) {
-      $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Objetivo</th><th>Partido</th><th>Resultado</th><th>Motivo</th><th>Evaluado</th></tr></thead><tbody>' +
-        rows.map((v) => '<tr ' + rowAttrs('validations', v.id) + '><td><div class="mono">' + esc(v.predictionId ?? v.parlayId ?? v.id) + '</div></td><td>' + esc(matchName(v.fixture)) + '</td><td>' + badge(v.status) + '</td><td>' + esc(v.reason ?? '—') + '</td><td>' + dateTime(v.evaluatedAt) + '</td></tr>').join('') +
-        '</tbody></table></div>';
-    }
-
-    function renderRuns(rows) {
-      $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Run</th><th>Estado</th><th>Veredicto</th><th>Provider</th><th>Creado</th></tr></thead><tbody>' +
-        rows.map((r) => '<tr ' + rowAttrs('runs', r.id) + '><td><div class="mono">' + esc(r.id) + '</div></td><td>' + badge(r.status) + '</td><td>' + esc(r.verdict ?? '—') + '</td><td>' + esc(r.providerAgentic ?? '—') + '</td><td>' + dateTime(r.createdAt) + '</td></tr>').join('') +
-        '</tbody></table></div>';
-    }
-
-    function renderDetail() {
-      const item = state.selected;
-      if (!item) {
-        $('#detail').innerHTML = '<span class="muted">Selecciona una fila para revisar el detalle.</span>';
-        return;
-      }
-      const title = item.fixture ? matchName(item.fixture) : item.id;
-      const body = [];
-      body.push('<h3>' + esc(title) + '</h3>');
-      body.push(kv('ID', '<span class="mono">' + esc(item.id) + '</span>'));
-      if (item.runId) body.push(kv('Run', '<span class="mono">' + esc(item.runId) + '</span>'));
-      if (item.status) body.push(kv('Estado', badge(item.status)));
-      if (item.marketKey) body.push(kv('Mercado', esc(item.marketKey) + ' · ' + esc(item.selectionKey)));
-      if (item.odds) body.push(kv('Odds', fmt(item.odds)));
-      if (item.edge !== undefined) body.push(kv('Edge', pct(item.edge)));
-      if (item.confidence !== undefined) body.push(kv('Confianza', pct(item.confidence)));
-      if (item.combinedOdds !== undefined) body.push(kv('Odds combo', fmt(item.combinedOdds)));
-      if (item.verdict !== undefined) body.push(kv('Veredicto', esc(item.verdict ?? '—')));
-      if (item.artifactDir) body.push(kv('Artifact', '<span class="mono">' + esc(item.artifactDir) + '</span>'));
-      if (item.rationale) body.push('<div><span class="muted">Racional</span><p>' + esc(item.rationale) + '</p></div>');
-      if (item.reason) body.push(kv('Motivo', esc(item.reason)));
-      if (item.latestValidation) body.push(kv('Validacion', badge(item.latestValidation.status)));
-      if (item.legs) body.push('<div><span class="muted">Legs</span><div class="legs">' + item.legs.map((l) => '<div class="leg"><b>' + esc(matchName(l.fixture)) + '</b><div class="sub">' + esc(l.marketKey) + ' · ' + esc(l.selectionKey) + ' · ' + fmt(l.odds) + '</div></div>').join('') + '</div></div>');
-      $('#detail').innerHTML = body.join('');
-    }
-
-    function kv(k, v) {
-      return '<div class="kv"><span>' + esc(k) + '</span><span>' + v + '</span></div>';
-    }
-
-    $('#filters').addEventListener('submit', (event) => {
-      event.preventDefault();
-      load().catch((err) => $('#list').innerHTML = '<div class="error">' + esc(err.message) + '</div>');
-    });
-    $('#tabs').addEventListener('click', (event) => {
-      const btn = event.target.closest('[data-tab]');
-      if (btn) setTab(btn.dataset.tab);
-    });
-    $('#list').addEventListener('click', (event) => {
-      const row = event.target.closest('[data-id]');
-      if (!row) return;
-      const rows = state.data[row.dataset.type] ?? [];
-      state.selected = rows.find((item) => item.id === row.dataset.id);
-      renderDetail();
-    });
-
-    load().catch((err) => $('#list').innerHTML = '<div class="error">' + esc(err.message) + '</div>');
-  </script>
-</body>
-</html>`;
 }

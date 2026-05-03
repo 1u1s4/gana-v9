@@ -31,18 +31,20 @@ import type {
   ParlayConfig,
   ParlayLeg,
   ParlayPredictionEvaluation,
+  ParlayRiskTag,
   ParlaySourcePrediction,
   ResolvedParlayConfig,
 } from './types.js';
 
 const ELIGIBLE_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
-const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v1';
+const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v2';
 const PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS = 120_000;
-const PORTFOLIO_MIN_CONFIDENCE = 0.6;
+const PORTFOLIO_MIN_CONFIDENCE = 0.72;
+const CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE = 0.62;
+const BALANCED_MIN_AGGREGATE_CONFIDENCE = 0.55;
 const PORTFOLIO_PROFILES = [
-  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 3.0, targetParlays: 2 },
-  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 4, minOdds: 3.0, maxOdds: 6.0, targetParlays: 3 },
-  { key: 'aggressive', label: 'Agresivo', minLegs: 4, maxLegs: 6, minOdds: 6.0, maxOdds: 15.0, targetParlays: 3 },
+  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 3 },
+  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 1 },
 ] as const;
 
 type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'];
@@ -308,7 +310,8 @@ async function runParlayPortfolio(
   });
   const pool = records
     .map(toSourcePrediction)
-    .filter((prediction) => prediction.confidence >= PORTFOLIO_MIN_CONFIDENCE);
+    .map(decoratePortfolioPrediction)
+    .filter(isPortfolioPoolEligible);
   const poolById = new Map(pool.map((prediction) => [prediction.id, prediction]));
   const portfolioId = randomUUID();
   const profileOutputs = await Promise.all(PORTFOLIO_PROFILES.map(async (profile) => {
@@ -464,19 +467,33 @@ function buildPortfolioProfilePrompt(input: {
     selection: prediction.selection,
     line: prediction.line ?? null,
     odds: prediction.odds,
+    impliedProbability: prediction.impliedProbability ?? null,
+    estimatedProbability: prediction.estimatedProbability ?? null,
+    edge: prediction.edge ?? null,
     confidence: prediction.confidence,
     quality: prediction.quality,
     status: prediction.status,
+    warnings: prediction.warnings ?? [],
+    riskTags: prediction.riskTags ?? [],
+    riskScore: prediction.riskScore ?? 0,
+    rationale: prediction.rationale ? truncateText(prediction.rationale, 220) : undefined,
   }));
 
   return [
     `System prompt - ${input.profile.label} (${input.profile.key})`,
     'You create analytical soccer parlay portfolios from already-scored atomic predictions.',
+    'Precision mode: generate fewer, cleaner parlays instead of forcing volume.',
     'Return JSON only. Do not include Markdown or commentary outside JSON.',
     'Use only prediction ids from the provided pool.',
     `Create up to ${input.profile.targetParlays} parlays for this profile.`,
     `Each parlay must contain ${input.profile.minLegs}-${input.profile.maxLegs} legs.`,
-    `Target combined decimal odds: ${input.profile.minOdds}-${input.profile.maxOdds}. If an otherwise strong parlay is outside that range, explain the risk note.`,
+    `Target combined decimal odds: ${input.profile.minOdds}-${input.profile.maxOdds}. Parlays outside this range will be rejected.`,
+    'Do not use legs tagged negative_edge or draw_exposure.',
+    'Do not use fragile_low_total_over when it is also low_edge.',
+    'Do not use fragile_low_price_dc when it is also low_edge.',
+    'Use at most one leg tagged review_required or research_warning per parlay.',
+    'Prefer 2-3 independent conservative legs over higher combined odds.',
+    'Each rationale must explain why every selected leg survives its main risk tag.',
     'Prefer diversity across fixtures, leagues and market types when quality is similar.',
     'Use predictionIds only. Do not use fixtureId, team id, odds quote id, or any other id in predictionIds.',
     'A fixture may appear more than once in the same parlay only when duplicateFixtureJustification is specific and non-empty.',
@@ -590,6 +607,10 @@ function validateParsedPortfolioParlay(
   if (reasons.length) return { ok: false, reasons };
 
   const selected = predictions.filter((prediction): prediction is ParlaySourcePrediction => Boolean(prediction));
+  const riskRejections = validatePortfolioRisk(selected, profile);
+  reasons.push(...riskRejections);
+  if (reasons.length) return { ok: false, reasons };
+
   const fixtureCounts = new Map<string, number>();
   for (const prediction of selected) fixtureCounts.set(prediction.fixtureId, (fixtureCounts.get(prediction.fixtureId) ?? 0) + 1);
   const duplicateFixtures = [...fixtureCounts.entries()].filter(([, count]) => count > 1).map(([fixtureId]) => fixtureId);
@@ -614,10 +635,23 @@ function validateParsedPortfolioParlay(
       : 'included-eligible-prediction',
   }));
   const combinedOdds = calculateCombinedOdds(legs);
+  const aggregateConfidence = calculateAggregateConfidence(selected);
+  if (combinedOdds !== undefined && (combinedOdds < profile.minOdds || combinedOdds > profile.maxOdds)) {
+    return {
+      ok: false,
+      reasons: [`combined odds ${round(combinedOdds)} outside ${profile.label} target ${profile.minOdds}-${profile.maxOdds}`],
+    };
+  }
+  const minAggregateConfidence = profile.key === 'conservative'
+    ? CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE
+    : BALANCED_MIN_AGGREGATE_CONFIDENCE;
+  if (aggregateConfidence < minAggregateConfidence) {
+    return {
+      ok: false,
+      reasons: [`aggregate confidence ${round(aggregateConfidence)} below ${profile.label} floor ${minAggregateConfidence}`],
+    };
+  }
   const constraintWarnings = [
-    ...((combinedOdds !== undefined && (combinedOdds < profile.minOdds || combinedOdds > profile.maxOdds))
-      ? [`combined odds ${round(combinedOdds)} outside ${profile.label} target ${profile.minOdds}-${profile.maxOdds}`]
-      : []),
     ...(duplicateFixtures.length ? [`duplicate fixture override: ${duplicateJustification}`] : []),
   ].filter(Boolean);
   const warnings = [
@@ -656,7 +690,7 @@ function validateParsedPortfolioParlay(
     sourceRunId,
     legs,
     combinedOdds: combinedOdds === undefined ? undefined : round(combinedOdds),
-    aggregateConfidence: round(calculateAggregateConfidence(selected)),
+    aggregateConfidence: round(aggregateConfidence),
     aggregateQuality: round(calculateAggregateQuality(selected)),
     rationale: rationaleParts.join(' '),
     warnings,
@@ -674,6 +708,37 @@ function validateParsedPortfolioParlay(
       config,
     },
   };
+}
+
+function validatePortfolioRisk(
+  selected: readonly ParlaySourcePrediction[],
+  profile: ParlayPortfolioProfileSpec,
+): string[] {
+  const reasons: string[] = [];
+  const reviewOrWarningCount = selected.filter((prediction) =>
+    hasRiskTag(prediction, 'review_required') || hasRiskTag(prediction, 'research_warning'),
+  ).length;
+
+  for (const prediction of selected) {
+    if (hasRiskTag(prediction, 'negative_edge')) {
+      reasons.push(`prediction has negative edge: ${prediction.id}`);
+    }
+    if (hasRiskTag(prediction, 'draw_exposure')) {
+      reasons.push(`prediction has draw exposure: ${prediction.id}`);
+    }
+    if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) {
+      reasons.push(`fragile low total over with low edge: ${prediction.id}`);
+    }
+    if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) {
+      reasons.push(`fragile low-price double chance with low edge: ${prediction.id}`);
+    }
+  }
+
+  if (reviewOrWarningCount > 1) {
+    reasons.push(`too many review-required or warning legs for ${profile.label}: ${reviewOrWarningCount}`);
+  }
+
+  return [...new Set(reasons)];
 }
 
 function gateFromPortfolio(portfolio: ParlayPortfolio): ParlayGateResult {
@@ -740,10 +805,58 @@ function toSourcePrediction(prediction: PredictionRecord): ParlaySourcePredictio
     selection: prediction.selectionKey,
     line: numberOrUndefined(prediction.line),
     odds: numberValue(prediction.odds),
+    impliedProbability: numberOrUndefined(prediction.impliedProbability),
+    estimatedProbability: numberOrUndefined(prediction.estimatedProbability),
+    edge: numberOrUndefined(prediction.edge),
     confidence: numberValue(prediction.confidence),
     quality: qualityValue(prediction.quality),
     status: prediction.status as PredictionStatus,
+    rationale: prediction.rationaleRedacted,
+    warnings: jsonStringArray(prediction.warnings),
   };
+}
+
+function decoratePortfolioPrediction(prediction: ParlaySourcePrediction): ParlaySourcePrediction {
+  const riskTags = portfolioRiskTags(prediction);
+  return {
+    ...prediction,
+    riskTags,
+    riskScore: riskTags.length,
+  };
+}
+
+function isPortfolioPoolEligible(prediction: ParlaySourcePrediction): boolean {
+  if (prediction.confidence < PORTFOLIO_MIN_CONFIDENCE) return false;
+  if (hasRiskTag(prediction, 'negative_edge')) return false;
+  if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) return false;
+  if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) return false;
+  return true;
+}
+
+function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] {
+  const tags: ParlayRiskTag[] = [];
+  const edge = prediction.edge;
+
+  if (edge === undefined || edge < 0.02) tags.push('low_edge');
+  if (edge !== undefined && edge < 0) tags.push('negative_edge');
+  if (prediction.confidence < 0.75) tags.push('low_confidence');
+  if (prediction.status === 'review-required') tags.push('review_required');
+  if ((prediction.warnings?.length ?? 0) > 0) tags.push('research_warning');
+  if (prediction.market === 'goals_over_under' && prediction.selection === 'over' && (prediction.line ?? 0) <= 1.5 && prediction.odds <= 1.4) {
+    tags.push('fragile_low_total_over');
+  }
+  if (prediction.market === 'double_chance' && prediction.odds <= 1.25) {
+    tags.push('fragile_low_price_dc');
+  }
+  if (prediction.market === 'double_chance' && prediction.selection === 'home_or_away') {
+    tags.push('draw_exposure');
+  }
+
+  return [...new Set(tags)];
+}
+
+function hasRiskTag(prediction: ParlaySourcePrediction, tag: ParlayRiskTag): boolean {
+  return prediction.riskTags?.includes(tag) ?? false;
 }
 
 function toParlayInput(
@@ -919,6 +1032,15 @@ function numberOrUndefined(value: unknown): number | undefined {
   if (value === null || value === undefined) return undefined;
   const parsed = numberValue(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function jsonStringArray(value: JsonValue | null | undefined): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).filter(Boolean);
+}
+
+function truncateText(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}...` : value;
 }
 
 function round(value: number): number {

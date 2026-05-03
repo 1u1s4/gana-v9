@@ -28,6 +28,16 @@ export type ParlayExclusionReason =
   | 'excluded-combined-odds-limit'
   | 'excluded-max-legs-reached';
 
+export type ParlayRiskTag =
+  | 'low_edge'
+  | 'negative_edge'
+  | 'low_confidence'
+  | 'review_required'
+  | 'research_warning'
+  | 'fragile_low_total_over'
+  | 'fragile_low_price_dc'
+  | 'draw_exposure';
+
 export interface ParlayConfig {
   minLegs?: number;
   maxLegs?: number;
@@ -55,6 +65,13 @@ export interface ParlaySourcePrediction {
   confidence: number;
   quality: PredictionQuality;
   status: PredictionStatus;
+  impliedProbability?: number;
+  estimatedProbability?: number;
+  edge?: number;
+  rationale?: string;
+  warnings?: string[];
+  riskTags?: ParlayRiskTag[];
+  riskScore?: number;
 }
 
 export interface ParlayLeg {
@@ -128,6 +145,22 @@ export const parlaySourcePredictionSchema = z.object({
   confidence: z.number().min(0).max(1),
   quality: predictionQualitySchema,
   status: predictionStatusSchema,
+  impliedProbability: z.number().min(0).max(1).optional(),
+  estimatedProbability: z.number().min(0).max(1).optional(),
+  edge: z.number().optional(),
+  rationale: z.string().optional(),
+  warnings: z.array(z.string()).optional(),
+  riskTags: z.array(z.enum([
+    'low_edge',
+    'negative_edge',
+    'low_confidence',
+    'review_required',
+    'research_warning',
+    'fragile_low_total_over',
+    'fragile_low_price_dc',
+    'draw_exposure',
+  ])).optional(),
+  riskScore: z.number().min(0).optional(),
 });
 
 export const parlayLegSchema = z.object({
