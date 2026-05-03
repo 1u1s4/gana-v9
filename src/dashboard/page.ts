@@ -207,6 +207,13 @@ export function dashboardHtml(): string {
           <label>Fecha desde <input type="date" name="dateFrom"></label>
           <label>Fecha hasta <input type="date" name="dateTo"></label>
           <label>Run ID <input name="runId" placeholder="run id"></label>
+          <label class="validation-target-filter">Tipo
+            <select name="validationTarget">
+              <option value="all">Todas</option>
+              <option value="prediction">Atómicas</option>
+              <option value="parlay">Parlays</option>
+            </select>
+          </label>
           <label class="filter-multi">Status
             <select name="status" multiple size="2"></select>
           </label>
@@ -340,6 +347,7 @@ export function dashboardHtml(): string {
         direction: 'desc',
         loading: false,
         filters: {
+          validationTarget: 'all',
           dateFrom: '',
           dateTo: '',
           runId: '',
@@ -390,6 +398,16 @@ export function dashboardHtml(): string {
         return '';
       };
       const badge = (value) => '<span class="badge ' + badgeClass(value) + '">' + esc(value ?? 'none') + '</span>';
+      const normalizeValidationTarget = (value) => {
+        if (value === 'prediction' || value === 'parlay') return value;
+        return 'all';
+      };
+
+      const validationTargetForRow = (row) => {
+        if (row?.parlayId) return { kind: 'parlay', label: 'Parlay', id: row.parlayId };
+        if (row?.predictionId) return { kind: 'prediction', label: 'Predicción', id: row.predictionId };
+        return { kind: '', label: 'Sin objetivo', id: '' };
+      };
 
       function toParams() {
         const params = new URLSearchParams();
@@ -398,6 +416,9 @@ export function dashboardHtml(): string {
         params.set('take', String(state.take));
         params.set('sort', state.sort);
         params.set('direction', state.direction);
+        if (state.filters.validationTarget && state.filters.validationTarget !== 'all') {
+          params.set('validationTarget', state.filters.validationTarget);
+        }
         if (state.filters.dateFrom) params.set('dateFrom', state.filters.dateFrom);
         if (state.filters.dateTo) params.set('dateTo', state.filters.dateTo);
         if (state.filters.runId) params.set('runId', state.filters.runId);
@@ -456,6 +477,7 @@ export function dashboardHtml(): string {
 
         state.filters.dateFrom = params.get('dateFrom') || '';
         state.filters.dateTo = params.get('dateTo') || '';
+        state.filters.validationTarget = normalizeValidationTarget(params.get('validationTarget'));
         state.filters.runId = sanitizeText(params.get('runId'));
         state.filters.market = sanitizeText(params.get('market'));
         state.filters.team = sanitizeText(params.get('team'));
@@ -508,6 +530,7 @@ export function dashboardHtml(): string {
         $('[name="maxConfidence"]').value = state.filters.maxConfidence;
         $('[name="minEdge"]').value = state.filters.minEdge;
         $('[name="maxEdge"]').value = state.filters.maxEdge;
+        $('[name="validationTarget"]').value = state.filters.validationTarget || 'all';
         $('[name="take"]').value = String(state.take);
         $('[name="sort"]').value = state.sort;
         $('[name="direction"]').value = state.direction;
@@ -521,10 +544,25 @@ export function dashboardHtml(): string {
         if (Array.isArray(metadata.qualities)) {
           state.filters.quality = state.filters.quality.filter((quality) => metadata.qualities.includes(quality));
         }
+        if (Array.isArray(metadata.validationTargets)) {
+          const allowedTargets = metadata.validationTargets.filter(Boolean);
+          if (!allowedTargets.includes(state.filters.validationTarget)) {
+            state.filters.validationTarget = 'all';
+          }
+        }
         const statusInput = $('[name="status"]');
         if (statusInput instanceof HTMLSelectElement) {
           const options = metadata.statuses[state.tab] ?? [];
           statusInput.innerHTML = '<option value="">Todos</option>' + options.map((item) => '<option value="' + esc(item) + '">' + esc(item) + '</option>').join('');
+        }
+        const validationTargetInput = $('[name="validationTarget"]');
+        if (validationTargetInput instanceof HTMLSelectElement) {
+          const options = metadata.validationTargets || ['all', 'prediction', 'parlay'];
+          validationTargetInput.innerHTML = options.map((option) => {
+            const label = option === 'all' ? 'Todas' : option === 'prediction' ? 'Atómicas' : 'Parlays';
+            return '<option value="' + esc(option) + '">' + esc(label) + '</option>';
+          }).join('');
+          if (!options.includes(state.filters.validationTarget)) state.filters.validationTarget = 'all';
         }
         const marketInput = $('[name="market"]');
         if (marketInput instanceof HTMLSelectElement) {
@@ -647,6 +685,10 @@ export function dashboardHtml(): string {
 
       function renderFiltersByTab() {
         if (!state.metadata) return;
+        const targetFilter = document.querySelector('.validation-target-filter');
+        if (targetFilter) {
+          targetFilter.style.display = state.tab === 'validations' ? 'grid' : 'none';
+        }
         const statusInput = $('[name="status"]');
         if (!(statusInput instanceof HTMLSelectElement)) return;
         const options = state.metadata.statuses[state.tab] || [];
@@ -726,15 +768,26 @@ export function dashboardHtml(): string {
       }
 
       function renderValidationRows(rows) {
-        const headers = TAB_SORT_HEADERS.validations;
         const sort = state.sort;
         $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
-          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
-            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
+          '<th><button class="sort" data-sort="evaluatedAt"><span>Evaluado</span><span>' +
+          (sort === 'evaluatedAt' ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>' +
+          '<th><button class="sort" data-sort="status"><span>Estado</span><span>' +
+          (sort === 'status' ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>' +
+          '<th>Motivo</th>' +
+          '<th>Tipo/Origen</th>' +
+          '<th>Objetivo</th>' +
+          '<th><button class="sort" data-sort="createdAt"><span>Creado</span><span>' +
+          (sort === 'createdAt' ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>' +
           '</tr></thead><tbody>' +
-          rows.map((row) => '<tr data-kind="validation" data-id="' + esc(row.id) + '"><td>' + fmtDate(row.evaluatedAt || row.createdAt) +
-            '</td><td>' + badge(row.status) + '</td><td><span class="mono">' + esc(row.predictionId || row.parlayId || row.id) +
-            '</span></td><td>' + esc(row.reason || '—') + '</td><td>' + fmtDate(row.createdAt) + '</td></tr>').join('') +
+          rows.map((row) => {
+            const target = validationTargetForRow(row);
+            const hasTarget = target.kind;
+            return '<tr data-kind="validation" data-id="' + esc(row.id) + '"><td>' + fmtDate(row.evaluatedAt || row.createdAt) +
+              '</td><td>' + badge(row.status) + '</td><td>' + esc(row.reason || '—') + '</td><td>' + esc(target.label) +
+              '</td><td>' + (hasTarget ? '<span class="chip-btn crosslink" data-kind="' + esc(target.kind) + '" data-id="' + esc(target.id) + '">' + esc(target.id) +
+                '</span>' : '—') + '</td><td>' + fmtDate(row.createdAt) + '</td></tr>';
+          }).join('') +
           '</tbody></table>';
       }
 
@@ -764,6 +817,10 @@ export function dashboardHtml(): string {
         sections.push('<h3>' + esc(title) + '</h3>');
         sections.push(kv('Tipo', esc(kind)));
         sections.push(kv('ID', '<span class=\"mono\">' + esc(data.id || '') + '</span>'));
+        if (kind === 'validation') {
+          const target = validationTargetForRow(data);
+          sections.push(kv('Pertenece a', esc(target.label)));
+        }
         if (data.status) sections.push(kv('Estado', badge(data.status)));
         if (data.runId) sections.push(kv('Run', '<span class=\"crosslink\" data-kind=\"run\" data-id=\"' + esc(data.runId) + '\">' + esc(data.runId) + '</span>'));
         if (links && links.length) {
@@ -794,11 +851,15 @@ export function dashboardHtml(): string {
           links = '<div class=\"chips\">' + items + '</div>';
         }
         if (kind === 'validation') {
-          if (entity.predictionId) {
-            links += '<div class=\"chips\"><span class=\"chip-btn crosslink\" data-kind=\"prediction\" data-id=\"' + esc(entity.predictionId) + '\">Predicción</span></div>';
+          const target = validationTargetForRow(entity);
+          if (target.id) {
+            links += '<div class=\"chips\"><span class=\"chip-btn crosslink\" data-kind=\"' + esc(target.kind) + '\" data-id=\"' + esc(target.id) + '\">Ver ' + esc(target.label) + '</span></div>';
           }
-          if (entity.parlayId) {
+          if (entity.parlayId && target.kind !== 'parlay') {
             links += '<div class=\"chips\"><span class=\"chip-btn crosslink\" data-kind=\"parlay\" data-id=\"' + esc(entity.parlayId) + '\">Parlay</span></div>';
+          }
+          if (entity.predictionId && target.kind !== 'prediction') {
+            links += '<div class=\"chips\"><span class=\"chip-btn crosslink\" data-kind=\"prediction\" data-id=\"' + esc(entity.predictionId) + '\">Predicción</span></div>';
           }
           if (entity.runId) {
             links += '<div class=\"chips\"><span class=\"chip-btn crosslink\" data-kind=\"run\" data-id=\"' + esc(entity.runId) + '\">Run</span></div>';
@@ -833,6 +894,7 @@ export function dashboardHtml(): string {
         state.filters.market = sanitizeText(readText('market'));
         state.filters.team = sanitizeText(readText('team'));
         state.filters.competition = sanitizeText(readText('competition'));
+        state.filters.validationTarget = normalizeValidationTarget(readText('validationTarget'));
         state.filters.status = readSelectValues('status');
         state.filters.quality = readSelectValues('quality');
         state.filters.minConfidence = sanitizeText(readText('minConfidence'));

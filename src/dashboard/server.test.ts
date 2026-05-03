@@ -197,6 +197,54 @@ describe('dashboard api queries', () => {
     assert.equal(overview.filters.runId, 'run-1');
   });
 
+  it('applies validationTarget=prediction in overview filters', async () => {
+    let validationWhere: Record<string, unknown> = {};
+    const baseDb = createDashboardDb();
+    const db = {
+      ...baseDb,
+      validationArtifact: {
+        ...baseDb.validationArtifact,
+        count: async ({ where }: { where: Record<string, unknown> }) => {
+          validationWhere = where;
+          return 5;
+        },
+        findMany: async () => [VALIDATION],
+      },
+    } as any;
+
+    const overview = await readOverview(db, config, new URLSearchParams('tab=validations&validationTarget=prediction'));
+    assert.equal(overview.filters.validationTarget, 'prediction');
+    assert.equal(overview.activeTab, 'validations');
+    const predictionClause = validationWhere.predictionId;
+    const parlayClause = validationWhere.parlayId;
+    assert.equal((predictionClause as { not: null })?.not, null);
+    assert.equal(parlayClause, null);
+  });
+
+  it('applies validationTarget=parlay in overview filters', async () => {
+    let validationWhere: Record<string, unknown> = {};
+    const baseDb = createDashboardDb();
+    const db = {
+      ...baseDb,
+      validationArtifact: {
+        ...baseDb.validationArtifact,
+        count: async ({ where }: { where: Record<string, unknown> }) => {
+          validationWhere = where;
+          return 5;
+        },
+        findMany: async () => [VALIDATION],
+      },
+    } as any;
+
+    const overview = await readOverview(db, config, new URLSearchParams('tab=validations&validationTarget=parlay'));
+    assert.equal(overview.filters.validationTarget, 'parlay');
+    assert.equal(overview.activeTab, 'validations');
+    const parlayClause = validationWhere.parlayId;
+    const predictionClause = validationWhere.predictionId;
+    assert.equal((parlayClause as { not: null })?.not, null);
+    assert.equal(predictionClause, null);
+  });
+
   it('reads prediction entity and validation history', async () => {
     const db = createDashboardDb() as any;
     const response = await readEntity(db, 'prediction', 'prediction-1');

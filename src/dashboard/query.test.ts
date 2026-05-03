@@ -57,6 +57,17 @@ describe('parseOverviewQuery', () => {
     assert.equal(invalidDate.dateTo, undefined);
   });
 
+  it('parses validationTarget with valid values and defaults to all', () => {
+    const withPrediction = parse('validationTarget=prediction');
+    assert.equal(withPrediction.validationTarget, 'prediction');
+    const withParlay = parse('validationTarget=parlay');
+    assert.equal(withParlay.validationTarget, 'parlay');
+    const withInvalid = parse('validationTarget=invalid');
+    assert.equal(withInvalid.validationTarget, 'all');
+    const without = parse('');
+    assert.equal(without.validationTarget, 'all');
+  });
+
   it('normalizes status and quality multi values', () => {
     const query = parse('status=won&status=lost,pending&quality=HIGH,low&runId=run-1&minConfidence=0.6&maxConfidence=0.9');
     assert.deepEqual(query.statuses, ['won', 'lost', 'pending']);
@@ -70,6 +81,9 @@ describe('parseOverviewQuery', () => {
     const metadata = createMetadata();
     assert.equal(metadata.tabs.includes('predictions'), true);
     assert.equal(metadata.tabs.includes('runs'), true);
+    assert.equal(metadata.validationTargets.includes('all'), true);
+    assert.equal(metadata.validationTargets.includes('prediction'), true);
+    assert.equal(metadata.validationTargets.includes('parlay'), true);
     assert.equal(metadata.takeOptions[0], 25);
     assert.equal(metadata.takeOptions.includes(200), true);
     assert.equal(metadata.sortOptions.predictions.includes('selectionKey'), true);

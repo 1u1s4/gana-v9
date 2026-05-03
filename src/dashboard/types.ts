@@ -156,6 +156,7 @@ export interface DashboardOverviewResponse {
   sort: string;
   direction: 'asc' | 'desc';
   filters: {
+    validationTarget?: 'all' | 'prediction' | 'parlay';
     date?: string;
     dateFrom?: string;
     dateTo?: string;

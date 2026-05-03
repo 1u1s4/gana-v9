@@ -12,6 +12,7 @@ export interface ParsedOverviewQuery {
   take: number;
   sort: string;
   direction: DashboardDirection;
+  validationTarget: 'all' | 'prediction' | 'parlay';
   date?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -37,6 +38,7 @@ export interface DashboardQueryOptions {
 export interface DashboardMetadata {
   tabs: DashboardTab[];
   statuses: DashboardStatusOptions;
+  validationTargets: readonly ('all' | 'prediction' | 'parlay')[];
   markets: readonly string[];
   qualities: readonly string[];
   teams: ReadonlyArray<DashboardMetadataOption>;
@@ -72,9 +74,11 @@ export const DIRECTION_OPTIONS: readonly DashboardDirection[] = ['asc', 'desc'];
 
 const VALID_PREDICTION_STATUSES = [...PREDICTION_STATUSES, ...['promotable', 'blocked', 'review-required', 'candidate', 'draft']];
 const VALID_PREDICTION_QUALITIES = [...PREDICTION_QUALITIES, ...['low', 'medium', 'high']];
+const VALID_VALIDATION_TARGETS = ['all', 'prediction', 'parlay'] as const;
 
 export function parseOverviewQuery(params: URLSearchParams, options: DashboardQueryOptions): ParsedOverviewQuery {
   const tab = normalizeTab(params.get('tab'), options.defaultTab);
+  const validationTarget = normalizeValidationTarget(params.get('validationTarget'));
   const page = normalizePositiveInt(params.get('page'), 1);
   const take = normalizePositiveInt(params.get('take'), DEFAULT_TAKE, 1, MAX_TAKE);
 
@@ -107,6 +111,7 @@ export function parseOverviewQuery(params: URLSearchParams, options: DashboardQu
 
   return {
     tab,
+    validationTarget,
     page,
     take,
     sort,
@@ -137,6 +142,7 @@ export function createMetadata(): DashboardMetadata {
       validations: ['pending', 'won', 'lost', 'push', 'voided', 'error', 'blocked'],
       runs: ['created', 'queued', 'running', 'succeeded', 'failed', 'cancelled'],
     },
+    validationTargets: VALID_VALIDATION_TARGETS,
     markets: MARKET_KEYS,
     qualities: [...new Set(VALID_PREDICTION_QUALITIES)],
     teams: [],
@@ -237,6 +243,12 @@ function cleanDate(value: string | undefined): string | undefined {
 
   const parsedDate = new Date(trimmed);
   return Number.isNaN(parsedDate.getTime()) ? undefined : trimmed;
+}
+
+function normalizeValidationTarget(value: string | null): 'all' | 'prediction' | 'parlay' {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return 'all';
+  return VALID_VALIDATION_TARGETS.includes(normalized as never) ? (normalized as 'all' | 'prediction' | 'parlay') : 'all';
 }
 
 function isQuality(value: string): value is string {
