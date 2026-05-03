@@ -17,6 +17,7 @@ function testConfig() {
       defaultSeason: 2026,
       defaultSeasonInferred: false,
       timezone: 'America/Guatemala',
+      leaguePresetsPath: join(mkdtempSync(join(tmpdir(), 'gana-league-presets-')), 'league-presets.json'),
       defaultLeagues: [],
       defaultTeams: [],
       defaultMarkets: ['h2h'],

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mkdtempSync, readFileSync } from 'fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { loadConfig } from './config.js';
@@ -14,6 +14,9 @@ function context() {
     databaseUrl: '',
     profile: 'standard',
     approvalMode: 'manual',
+    apiFootball: {
+      leaguePresetsPath: join(root, 'league-presets.json'),
+    },
   }, { skipApiKey: true });
   return {
     config,
@@ -29,6 +32,9 @@ function commandContext(): CommandContext {
     databaseUrl: '',
     profile: 'standard',
     approvalMode: 'manual',
+    apiFootball: {
+      leaguePresetsPath: join(root, 'league-presets.json'),
+    },
   }, { skipApiKey: true });
   return {
     config,
@@ -264,6 +270,55 @@ describe('artifacts command surface', () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
     assert.match(output, /pnpm gana artifacts --run-id RUN_ID/);
+  });
+});
+
+describe('league preset command surface', () => {
+  it('lists league presets from the configured JSON file without requiring a database', async () => {
+    const ctx = context();
+    writeFileSync(ctx.config.apiFootball.leaguePresetsPath, `${JSON.stringify({
+      presetKey: 'default',
+      leagues: [
+        { id: '140', name: 'La Liga', country: 'Spain', season: 2026, priority: 20, enabled: true },
+      ],
+    })}\n`);
+
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    const output = await captureConsole(async () => {
+      result = await dispatchHeadless(['leagues', 'list'], ctx);
+    });
+
+    assert.equal(result?.ok, true);
+    assert.equal(result?.exitCode, 0);
+    assert.match(output, /140/);
+    assert.match(output, /La Liga/);
+  });
+
+  it('adds league presets to the configured JSON file with priority', async () => {
+    const ctx = context();
+
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless([
+        'leagues',
+        'add',
+        '--id',
+        '339',
+        '--name',
+        'Liga Nacional',
+        '--country',
+        'Guatemala',
+        '--priority',
+        '110',
+      ], ctx);
+    });
+
+    assert.equal(result?.ok, true);
+    assert.equal(result?.exitCode, 0);
+
+    const file = JSON.parse(readFileSync(ctx.config.apiFootball.leaguePresetsPath, 'utf-8'));
+    assert.equal(file.leagues[0].id, '339');
+    assert.equal(file.leagues[0].priority, 110);
   });
 });
 

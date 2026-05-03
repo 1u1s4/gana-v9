@@ -45,6 +45,7 @@ export interface RequestedLeaguePresetView {
   name?: string;
   country?: string | null;
   season?: number | null;
+  priority?: number | null;
 }
 
 export interface RequestedTeamPresetView {

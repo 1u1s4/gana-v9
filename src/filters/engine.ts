@@ -27,24 +27,6 @@ interface FixtureDiscoveryRequest {
 }
 
 const FIXTURE_DISCOVERY_CONCURRENCY = 6;
-const DEFAULT_LEAGUE_PRIORITY = new Map<string, number>([
-  ['39', 10], // England Premier League
-  ['140', 20], // Spain La Liga
-  ['78', 30], // Germany Bundesliga
-  ['61', 40], // France Ligue 1
-  ['135', 50], // Italy Serie A
-  ['88', 60], // Netherlands Eredivisie
-  ['188', 70], // Australia A-League
-  ['98', 80], // Japan J1 League
-  ['71', 90], // Brazil Serie A
-  ['253', 100], // MLS
-  ['339', 110], // Guatemala Liga Nacional
-  ['262', 120], // Liga MX
-  ['242', 130], // Ecuador Liga Pro
-  ['292', 140], // K League 1
-  ['103', 150], // Norway Eliteserien
-  ['113', 160], // Sweden Allsvenskan
-]);
 
 export async function discoverFixtures(
   config: AgentConfig,
@@ -53,6 +35,7 @@ export async function discoverFixtures(
 ): Promise<FixtureDiscoveryResult> {
   const filters = resolveFilterConfig(config, query);
   const leaguePresets = filters.useDefaultLeagues ? sortLeaguePresetsForDiscovery(await listLeaguePresets(config)) : [];
+  const leaguePriorities = leaguePriorityMap(leaguePresets);
   const teamPresets = filters.useDefaultTeams ? await listTeamPresets(config) : [];
   const requests = buildFixtureDiscoveryRequests(leaguePresets, teamPresets);
   const validRequests = requests.filter((request) => {
@@ -88,7 +71,7 @@ export async function discoverFixtures(
 
   const evaluations: FixtureFilterEvaluation[] = [];
   const fixtures: Fixture[] = [];
-  for (const { fixture, reasons } of sortFixtureEntriesForSelection([...byProviderFixtureId.values()])) {
+  for (const { fixture, reasons } of sortFixtureEntriesForSelection([...byProviderFixtureId.values()], leaguePriorities)) {
     const includedReasons = [...reasons];
     if (
       filters.combineMode === 'AND'
@@ -126,6 +109,7 @@ export async function discoverFixtures(
       name: league.name,
       country: league.country,
       season: league.season,
+      priority: league.priority,
     })),
     requestedTeams: teamPresets.map((team) => ({
       providerTeamId: team.providerTeamId,
@@ -136,25 +120,33 @@ export async function discoverFixtures(
   };
 }
 
-function sortLeaguePresetsForDiscovery<T extends { providerCompetitionId: string; name?: string | null }>(presets: T[]): T[] {
+function sortLeaguePresetsForDiscovery<T extends { providerCompetitionId: string; name?: string | null; priority?: number | null }>(presets: T[]): T[] {
+  const priorities = leaguePriorityMap(presets);
   return [...presets].sort((a, b) => {
-    const priority = leaguePriority(Number(a.providerCompetitionId)) - leaguePriority(Number(b.providerCompetitionId));
+    const priority = leaguePriority(Number(a.providerCompetitionId), priorities) - leaguePriority(Number(b.providerCompetitionId), priorities);
     if (priority !== 0) return priority;
     return (a.name ?? '').localeCompare(b.name ?? '');
   });
 }
 
-function sortFixtureEntriesForSelection<T extends { fixture: Fixture }>(entries: T[]): T[] {
+function sortFixtureEntriesForSelection<T extends { fixture: Fixture }>(entries: T[], priorities: Map<string, number>): T[] {
   return [...entries].sort((a, b) => {
-    const priority = leaguePriority(a.fixture.leagueId) - leaguePriority(b.fixture.leagueId);
+    const priority = leaguePriority(a.fixture.leagueId, priorities) - leaguePriority(b.fixture.leagueId, priorities);
     if (priority !== 0) return priority;
     return Date.parse(a.fixture.scheduledAt) - Date.parse(b.fixture.scheduledAt);
   });
 }
 
-function leaguePriority(leagueId: number | undefined): number {
+function leaguePriority(leagueId: number | undefined, priorities: Map<string, number>): number {
   if (leagueId === undefined || !Number.isFinite(leagueId)) return Number.MAX_SAFE_INTEGER;
-  return DEFAULT_LEAGUE_PRIORITY.get(String(leagueId)) ?? 10_000;
+  return priorities.get(String(leagueId)) ?? 10_000;
+}
+
+function leaguePriorityMap<T extends { providerCompetitionId: string; priority?: number | null }>(presets: T[]): Map<string, number> {
+  return new Map(presets.map((preset, index) => [
+    preset.providerCompetitionId,
+    preset.priority ?? 10_000 + index,
+  ]));
 }
 
 function chunks<T>(items: T[], size: number): T[][] {

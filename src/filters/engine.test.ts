@@ -26,6 +26,7 @@ const config: Pick<AgentConfig, 'apiFootball'> = {
     defaultSeason: 2026,
     defaultSeasonInferred: false,
     timezone: 'America/Guatemala',
+    leaguePresetsPath: 'config/league-presets.test.json',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,

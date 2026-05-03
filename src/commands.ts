@@ -320,8 +320,9 @@ function printFiltersStatus(status: FiltersStatus): void {
   }
   printKeyValue('season', status.filters.defaultSeason);
   printKeyValue('markets', status.filters.defaultMarkets.join(', '));
-  printKeyValue('leagues', status.filters.defaultLeagues.length ? status.filters.defaultLeagues.length : 'none');
-  printKeyValue('teams', status.filters.defaultTeams.length ? status.filters.defaultTeams.length : 'none');
+  printKeyValue('leaguePresetsPath', status.filters.leaguePresetsPath);
+  printKeyValue('legacyConfigLeagues', status.filters.defaultLeagues.length ? status.filters.defaultLeagues.length : 'none');
+  printKeyValue('legacyConfigTeams', status.filters.defaultTeams.length ? status.filters.defaultTeams.length : 'none');
   printKeyValue('lowOddsThreshold', status.filters.lowOddsThreshold);
   printKeyValue('kickoffWindowHours', status.filters.kickoffWindowHours);
   printKeyValue('includeLiveFixtures', status.filters.includeLiveFixtures);
@@ -627,16 +628,18 @@ async function runLowOddsScan(ctx: HeadlessCommandContext | CommandContext, flag
 }
 
 async function printPresetCounts(config: AgentConfig): Promise<void> {
+  try {
+    const leagues = await listLeaguePresets(config);
+    printKeyValue('activeLeaguePresets', leagues.length);
+  } catch (err: any) {
+    console.log(`  ${YELLOW}!${RESET} ${DIM}Could not load league preset count: ${err?.message ?? err}${RESET}`);
+  }
   if (!config.databaseUrl) return;
   try {
-    const [leagues, teams] = await Promise.all([
-      listLeaguePresets(config),
-      listTeamPresets(config),
-    ]);
-    printKeyValue('activeLeaguePresets', leagues.length);
+    const teams = await listTeamPresets(config);
     printKeyValue('activeTeamPresets', teams.length);
   } catch (err: any) {
-    console.log(`  ${YELLOW}!${RESET} ${DIM}Could not load preset counts: ${err?.message ?? err}${RESET}`);
+    console.log(`  ${YELLOW}!${RESET} ${DIM}Could not load team preset count: ${err?.message ?? err}${RESET}`);
   }
 }
 
@@ -1359,7 +1362,7 @@ commands.push({
     if (!action || action === 'list') {
       const leagues = await listLeaguePresets(ctx.config);
       for (const league of leagues) {
-        console.log(`  ${CYAN}${league.providerCompetitionId}${RESET} ${league.name} ${DIM}${league.country ?? ''}${RESET}`);
+        console.log(`  ${CYAN}${league.providerCompetitionId}${RESET} ${league.name} ${DIM}${league.country ?? ''} priority:${league.priority ?? 'default'}${RESET}`);
       }
       return;
     }
@@ -1369,6 +1372,7 @@ commands.push({
         name: requireStringFlag(flags, 'name'),
         country: optionalStringFlag(flags, 'country'),
         season: optionalNumberFlag(flags, 'season'),
+        priority: optionalNumberFlag(flags, 'priority'),
       });
       console.log(`  ${GREEN}✓${RESET} ${DIM}league preset${RESET} ${CYAN}${league.providerCompetitionId}${RESET}`);
       return;
@@ -1592,7 +1596,9 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       const flags = parseFlags(argv.slice(2));
       if (action === 'list') {
         const leagues = await listLeaguePresets(ctx.config);
-        for (const league of leagues) console.log(`  ${CYAN}${league.providerCompetitionId}${RESET} ${league.name} ${DIM}${league.country ?? ''}${RESET}`);
+        for (const league of leagues) {
+          console.log(`  ${CYAN}${league.providerCompetitionId}${RESET} ${league.name} ${DIM}${league.country ?? ''} priority:${league.priority ?? 'default'}${RESET}`);
+        }
         return { ok: true, exitCode: 0 };
       }
       if (action === 'add') {
@@ -1601,6 +1607,7 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
           name: requireStringFlag(flags, 'name'),
           country: optionalStringFlag(flags, 'country'),
           season: optionalNumberFlag(flags, 'season'),
+          priority: optionalNumberFlag(flags, 'priority'),
         });
         console.log(`  ${GREEN}✓${RESET} ${DIM}league preset${RESET} ${CYAN}${league.providerCompetitionId}${RESET}`);
         return { ok: true, exitCode: 0 };

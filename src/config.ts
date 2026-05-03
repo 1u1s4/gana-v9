@@ -24,6 +24,7 @@ export interface ApiFootballFilterConfig {
   defaultSeason: number;
   defaultSeasonInferred: boolean;
   timezone: string;
+  leaguePresetsPath: string;
   defaultLeagues: ApiFootballLeagueRef[];
   defaultTeams: ApiFootballTeamRef[];
   defaultMarkets: MarketKey[];
@@ -77,6 +78,10 @@ export interface AgentConfig extends GanaConfigExtension {
 }
 
 export type AppConfig = AgentConfig;
+export type AgentConfigOverrides = Partial<Omit<AgentConfig, 'apiFootball' | 'display'>> & {
+  apiFootball?: Partial<ApiFootballFilterConfig>;
+  display?: Partial<DisplayConfig>;
+};
 
 export function inferSeasonFromDate(date: Date): number {
   return date.getUTCFullYear();
@@ -157,6 +162,7 @@ const DEFAULTS: AgentConfig = {
     defaultSeason: DEFAULT_SEASON,
     defaultSeasonInferred: defaultSeasonFromEnv === undefined,
     timezone: 'America/Guatemala',
+    leaguePresetsPath: 'config/league-presets.json',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,
@@ -212,7 +218,7 @@ const DEFAULTS: AgentConfig = {
 };
 
 export function loadConfig(
-  overrides: Partial<AgentConfig> = {},
+  overrides: AgentConfigOverrides = {},
   opts?: { skipApiKey?: boolean; validateAgentAuth?: boolean },
 ): AgentConfig {
   let config: AgentConfig = { ...DEFAULTS, display: { ...DEFAULTS.display }, apiFootball: { ...DEFAULTS.apiFootball } };
@@ -288,6 +294,7 @@ export function loadConfig(
   const envMaxFixtures = parseNumber(process.env.GANA_MAX_FIXTURES_PER_RUN);
   const envWindow = parseNumber(process.env.GANA_KICKOFF_WINDOW_HOURS);
   const envTimezone = process.env.GANA_FIXTURE_TIMEZONE || process.env.GANA_TIMEZONE;
+  const envLeaguePresetsPath = process.env.GANA_LEAGUE_PRESETS_PATH;
   const envMarkets = parseMarkets(process.env.GANA_DEFAULT_MARKETS);
   const envIncludeLive = parseBoolean(process.env.GANA_INCLUDE_LIVE_FIXTURES);
   const envIncludeCompleted = parseBoolean(process.env.GANA_INCLUDE_COMPLETED_FIXTURES);
@@ -299,6 +306,7 @@ export function loadConfig(
     ...(envMaxFixtures !== undefined && { maxFixturesPerRun: envMaxFixtures }),
     ...(envWindow !== undefined && { kickoffWindowHours: envWindow }),
     ...(envTimezone && { timezone: envTimezone }),
+    ...(envLeaguePresetsPath && { leaguePresetsPath: envLeaguePresetsPath }),
     ...(envMarkets && { defaultMarkets: envMarkets }),
     ...(envIncludeLive !== undefined && { includeLiveFixtures: envIncludeLive }),
     ...(envIncludeCompleted !== undefined && { includeCompletedFixtures: envIncludeCompleted }),
