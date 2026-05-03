@@ -4,9 +4,11 @@
 
 Cerrar la brecha entre el MVP harness-first actual y un harness production-grade alineado con la guia de "harness engineering". El proyecto ya tiene runtime, artifacts, auditoria, policy, evidencia, predicciones, validacion y persistencia, pero varias capas existen como modulos aislados y todavia no estan conectadas como una capa de control uniforme.
 
-Este plan formaliza approval real, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, MCP y Skills, manteniendo la restriccion explicita de no automatizacion monetaria.
+Este plan formaliza approval real, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, MCP, Skills y la capa de calidad analitica de predictions y parlays, manteniendo la restriccion explicita de no automatizacion monetaria.
 
 El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance: Gana v9 es TUI-first, single-user y local; los proveedores agentic (Codex, Gemini, Cursor) ya traen su propio aislamiento. La defensa se basa en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy, no en aislamiento por proceso/tarea.
+
+La calidad analitica no se trata como un problema de prompt: se trata como una capa de modulos deterministicos sobre el harness (devig, fair price, edge gate, calibracion, correlacion, parlay candidate generator, validation analytics, leaderboard) y como gates duros que el modelo no puede saltar.
 
 ## SRS cubierto
 
@@ -28,6 +30,7 @@ El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance:
 | Observabilidad tipo trace/span/costo                                              |           parcial | medio-bajo |
 | Evals/certificacion harness-grade                                                 |        incompleto |       bajo |
 | MCP/Skills/retrieval formal                                                       | ausente o parcial |       bajo |
+| Calidad analitica (devig, edge, calibracion, correlacion, CLV)                    |        incompleto |       bajo |
 
 ## Lo que ya esta alineado
 
@@ -49,6 +52,11 @@ El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance:
 8. Evidence pack actual no incluye sources/claims/approvals/gates/hashes/reproduction como secciones explicitas.
 9. Retrieval no esta formalizado: hay evidencia pero no ranking, frescura ni provenance obligatoria.
 10. No existe frontera MCP ni estructura de Skills versionadas.
+11. Odds entran sin remocion de vig ni consenso multi-bookmaker, asi que el "edge" comparado contra el mercado no es defendible.
+12. Predictions se modelan como verdict textual y no como probabilidad calibrada con `edge`, `confidenceBand`, `blockers` ni gates duros antes de promover.
+13. Parlays se construyen sin modelo de correlacion entre legs, sin diversificacion estructural y sin variantes (`top-ev`, `low-variance`, `high-conviction`).
+14. Validation no produce metricas analiticas comparables (Brier, log loss, CLV, calibration plot) ni leaderboard por skill/modelo/mercado/liga.
+15. No hay disciplina formal de "no-jugar": no existe gate global que convierta el default del run en `no-parlay-today` cuando faltan condiciones.
 
 ## Modulos nuevos
 
@@ -95,6 +103,42 @@ skills/
   score-prediction-v1/
   build-parlay-v1/
   validate-settlement-v1/
+
+src/markets/devig.ts
+src/markets/fair-price.ts
+src/markets/line-movement.ts
+src/markets/efficiency.ts
+src/markets/lineup-gate.ts
+
+src/scoring/calibration.ts
+src/scoring/ensemble.ts
+src/scoring/edge-gate.ts
+src/scoring/disagreement.ts
+
+src/parlay/correlation.ts
+src/parlay/candidate-generator.ts
+src/parlay/ranker.ts
+src/parlay/diversifier.ts
+
+src/analytics/brier.ts
+src/analytics/logloss.ts
+src/analytics/clv.ts
+src/analytics/calibration-plot.ts
+src/analytics/leaderboard.ts
+src/analytics/holdout.ts
+
+skills/
+  devig-and-fairprice-v1/
+  line-movement-tracker-v1/
+  lineup-confirmation-gate-v1/
+  research-fixture-v2/
+  score-prediction-v2/
+  ensemble-disagreement-v1/
+  correlation-model-v1/
+  parlay-candidate-generator-v1/
+  parlay-ranker-v1/
+  validation-clv-v1/
+  calibration-monitor-v1/
 ```
 
 ## Modulos afectados
@@ -105,6 +149,10 @@ skills/
 - `src/permissions/*`: extender de "evaluacion + audit" a approval real con persistencia.
 - `src/observability/events.ts`: mantener eventos JSONL y agregar capa de spans.
 - `src/runtime/evidence-pack.ts`: emitir manifest v2 con secciones explicitas.
+- `src/research/*`: producir claims con `sourceId` real, diversidad de fuentes obligatoria, deteccion de contradicciones y `availableAt` por evidencia.
+- `src/scoring/*`: pasar de `verdict` textual a output probabilistico calibrado con `edge`, `confidenceBand` y `blockers`.
+- `src/parlay/*`: dejar de multiplicar probabilidades como independientes y pasar a candidate generator + ranker con correlacion explicita.
+- `src/validation/*`: emitir metricas analiticas (Brier, log loss, CLV, calibration plot) y enlazar al leaderboard.
 
 ---
 
@@ -611,6 +659,244 @@ skills/
 
 ---
 
+# P3 - Calidad analitica de predictions y parlays
+
+Esta capa convierte el harness en un producto analitico defendible. Es complementaria a P0/P1/P2: el harness puede ser perfecto y aun asi producir predictions ruidosas si la entrada no se procesa, el modelo no se calibra, los parlays no controlan correlacion y la validacion no aporta feedback. Toda esta capa respeta la regla del proyecto: artifacts analiticos, no recomendacion de apuesta. Las metricas tipo `roiHipotetico` y `clv` se exportan como `tracking-only` con disclaimer en evidence pack.
+
+## P3.14 Devig + fair price + market efficiency
+
+### Problema
+
+Las odds entran al pipeline como cuota cruda de un solo bookmaker. Comparar `modelProbability` contra `1 / odds` sin remover el vig es comparar contra mercado mas margen.
+
+### Cambios
+
+- Snapshot multi-bookmaker (>=3) por `(fixture, market, selection)`.
+- Implementar devig por proporcionalidad y por shin/power method en `src/markets/devig.ts`.
+- Producir `marketImpliedProbability`, `marketFairProbability`, `overround` y `consensusFairOdds` ponderados por liquidez.
+- `marketEfficiencyScore` por mercado: dispersion entre bookmakers, conteo de bookmakers, `overround`, freshness.
+
+### Aceptacion
+
+- Toda `OddsSnapshot` se persiste con `overround` y `fairPrice` por seleccion.
+- Mercados con menos de N bookmakers o con `marketEfficiencyScore` debajo de umbral quedan marcados `low-liquidity` y bloquean promocion.
+- Test unit: devig de mercado simetrico produce probabilidades que suman 1 dentro de tolerancia.
+
+---
+
+## P3.15 Prediction probabilistica + edge gate + calibracion
+
+### Contrato
+
+```ts
+type Prediction = {
+  fixtureId: string;
+  market: MarketKey;
+  selection: string;
+  modelProbability: number;       // 0..1
+  marketImpliedProbability: number;
+  marketFairProbability: number;
+  edge: number;                   // model - fair
+  confidenceBand: 'low' | 'medium' | 'high';
+  rationaleClaims: ClaimId[];
+  blockers: string[];
+  promotable: boolean;
+  promptVersion: string;
+  modelId: string;
+};
+```
+
+### Reglas
+
+- `verdict` textual sigue existiendo pero la decision se toma sobre `edge` y `confidenceBand`.
+- Edge minimo configurable por mercado y persistido por `prompt-version`:
+  - `1X2`: medium >= 3%, high >= 6%.
+  - `Over/Under`: medium >= 4%, high >= 7%.
+  - `BTTS`: medium >= 5%, high >= 8%.
+  - Player props / corners / cards: medium >= 6%, high >= 10%, mas datos especificos obligatorios.
+- Calibracion explicita con isotonic regression o Platt scaling sobre output del modelo, almacenada por `(market, prompt-version)`.
+
+### Edge gate (gates duros antes de promover)
+
+- `modelProbability < marketFairProbability` -> `blockers += ['no-edge']`.
+- `confidenceBand === 'low'` -> no promovible.
+- linea movida contra el pick > umbral -> `blockers += ['stale-pick']`.
+- XI no confirmado en mercado dependiente -> `blockers += ['lineup-pending']`.
+- `evidenceCoverage < umbral` -> `blockers += ['evidence-thin']`.
+- mercado `low-liquidity` -> `blockers += ['low-liquidity']`.
+
+### Aceptacion
+
+- Toda prediction lleva probabilidad calibrada y bandera `promotable` calculada deterministicamente.
+- Prediction con cualquier blocker no entra a parlay builder.
+- Test unit: edge gate con cada blocker individual marca prediction como no promovible.
+- Test unit: calibracion isotonic ajustada sobre golden corpus produce monotonicidad por bin.
+
+---
+
+## P3.16 Gates de lineup y line movement
+
+### Lineup confirmation gate
+
+- Mercados sensibles a XI: `over_under_goals`, `btts`, props de jugador, ratings.
+- Si XI no confirmado y kickoff < 90 minutos: `blockers += ['lineup-pending']`.
+- Si baja clave detectada despues de research: emitir `evidence.invalidated` y bloquear hasta refresco.
+
+### Line movement gate
+
+- Snapshots de odds en T-24h, T-6h, T-1h y closing si hay tiempo.
+- `lineMovementVelocity` calculado por seleccion.
+- Si la linea se mueve mas de X% contra el pick desde el snapshot del research: `blockers += ['stale-pick']` hasta nuevo snapshot.
+- Persistir `lineOpen`, `lineNow`, `lineClose` (cuando exista) en `OddsSnapshot`.
+
+### Aceptacion
+
+- Test integracion: pick con linea movida 8% queda bloqueado y reactivado cuando entra nuevo snapshot favorable.
+- Test integracion: research de prop sin XI confirmado es bloqueado y libera al confirmar XI.
+
+---
+
+## P3.17 Ensemble multi-proveedor y deteccion de desacuerdo
+
+### Reglas
+
+- Toda skill critica (`research-fixture`, `score-prediction`) puede correrse con dos proveedores agentic distintos (Codex + Gemini, por ejemplo).
+- Combinador con pesos por performance historica (mantenido por `analytics/leaderboard`).
+- Acuerdo en selection -> `confidenceBand` no degrada.
+- Desacuerdo en selection -> `confidenceBand` degrada un nivel.
+- Probabilidades muy distintas (delta > 15 puntos) -> emitir `model.disagreement`, marcar `blockers += ['model-disagreement']`.
+
+### Aceptacion
+
+- Spans incluyen los dos proveedores y la decision del ensemble.
+- Test integracion: dos predictions con probabilidades 0.55 y 0.78 producen `model-disagreement`.
+
+---
+
+## P3.18 Parlay correlation, candidate generator y ranker
+
+### Problema
+
+Multiplicar probabilidades de legs como si fueran independientes es el error mas comun. Mismo fixture y mercados correlacionados (1X+Over, BTTS+Over, mismo equipo en handicap y total) sobrestiman la probabilidad conjunta.
+
+### Modelo de correlacion
+
+- `src/parlay/correlation.ts` con matriz empirica precomputada por pares de mercados, ajustable por liga.
+- Para legs en el mismo fixture: estimar joint probability con un Dixon-Coles ligero o lookup en la matriz.
+- Para legs en fixtures distintos: asumir independencia salvo factor compartido detectado (mismo arbitro, misma copa, condiciones meteorologicas).
+
+### Candidate generator
+
+```ts
+type ParlayCandidate = {
+  parlayId: string;
+  legs: PredictionId[];
+  combinedFairProbability: number;
+  combinedMarketOdds: number;
+  combinedFairOdds: number;
+  expectedEdge: number;
+  correlationPenalty: number;
+  diversityScore: number;
+  riskScore: number;
+  reason: 'top-ev' | 'low-variance' | 'high-conviction' | 'rejected';
+  blockers: string[];
+};
+```
+
+### Reglas duras
+
+- max N legs (default 4, configurable).
+- max 1-2 legs por liga.
+- max 1 leg por equipo.
+- prohibido dos legs del mismo fixture salvo que la matriz de correlacion provea joint probability fiable.
+- prob conjunta minima: parlay con `combinedFairProbability < 5%` queda como `low-conviction`, no `top-ev`.
+- cuota maxima de parlay configurable (default 50.0); arriba de ese umbral, marcado `lottery-ticket` y bloqueado.
+
+### Ranker
+
+- Ordena candidatos por `expectedEdge - riskWeight * riskScore`.
+- Devuelve hasta tres parlays con perfiles distintos: `top-ev`, `low-variance`, `high-conviction`.
+- Si ningun candidato pasa los gates, el run termina con `handoff.parlay = no-parlay-today` y razon detallada.
+
+### Aceptacion
+
+- Test unit: parlay con dos legs `1X` y `Over 0.5` del mismo fixture aplica correlacion y degrada `expectedEdge`.
+- Test unit: 5 legs todos del mismo equipo es bloqueado por diversidad.
+- Test integracion: run sin candidatos validos produce handoff `no-parlay-today` reproducible.
+
+---
+
+## P3.19 Validation analytics y leaderboard
+
+### Metricas obligatorias por run
+
+- Brier score por mercado.
+- Log loss por mercado.
+- ROI hipotetico marcado `tracking-only-not-betting` por confidenceBand.
+- CLV % cuando exista `lineClose`.
+- Hit rate por confidenceBand.
+- EV realizado vs EV esperado por parlay.
+
+### Calibration plot
+
+- Bins de 10 puntos sobre `modelProbability` vs frecuencia observada.
+- Almacenado por `(market, prompt-version, modelId)` en `src/analytics/calibration-plot.ts`.
+- Adjuntado al evidence pack v2 cuando aplique.
+
+### Leaderboard interno
+
+```text
+prompt-version | modelo | mercado | liga | brier | logloss | clv% | hitrate | n
+```
+
+- Persistido en DB (`leaderboard_entries`) y exportado como artifact.
+- Comando: `pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league`.
+
+### Reglas de evaluacion honesta
+
+- Reportar siempre `n` (tamano de muestra) y banda de confianza.
+- No tunear umbrales sobre la misma ventana usada para reporte: holdout obligatorio en `src/analytics/holdout.ts`.
+- Toda mejora de prompt o umbral se valida en holdout antes de promover, registro en `evals/`.
+
+### Aceptacion
+
+- Run replay produce calibration plot y leaderboard entries reproducibles.
+- Holdout set congelado se mantiene fuera de tuning.
+- Test integracion: muestra `n < 30` produce reporte con flag `low-sample`.
+
+---
+
+## P3.20 Disciplina no-jugar y handoff `no-parlay-today`
+
+### Default
+
+El default de un run no es "promover el mejor parlay disponible", es **no promover salvo que se cumpla la suma de gates**:
+
+- >=N predictions con `confidenceBand: 'high'`.
+- todas con edge positivo y sin blockers.
+- correlacion controlada por la matriz.
+- manifest hash deterministico.
+- certify pass.
+
+### KPI obligatorio
+
+- `% de runs sin parlay promovido` se reporta por dia/semana/mes en `pnpm gana stats`.
+- Un sistema sano dice "hoy no" la mayoria del tiempo. Valor objetivo no se fija aqui, pero se monitorea para detectar overpromote.
+
+### Disclaimer reforzado
+
+- Cada `handoff.md` incluye: "uso analitico, no constituye recomendacion de apuesta, no garantiza resultado".
+- Evidence pack v2 incluye `analyticalOnly: true` y `monetaryActions: 'forbidden-by-policy'`.
+- Lista de palabras clave (`bet`, `stake`, `wager`, `apostar`, `colocar`) en input/output activa `policy.evaluate` con `blocked` y emite audit event.
+
+### Aceptacion
+
+- Test integracion: corpus replay con todos los gates positivos promueve parlay.
+- Test integracion: corpus replay con `low-liquidity` en uno de los legs produce `no-parlay-today`.
+- Certify falla si `handoff.md` o evidence pack carecen del disclaimer.
+
+---
+
 # Matriz de alineacion por capas de la guia
 
 | Capa                | Estado                                                           | Brecha                                                                             | Prioridad |
@@ -623,25 +909,52 @@ skills/
 | 6. Observability    | Event types, JSONL, audit, snapshots                             | Trace/span jerarquico, costos, tokens, latency, retries, anomaly detection         | Alta      |
 | 7. Evaluation       | Unit tests y planes de certification                             | Eval harness, golden fixtures, trajectory eval, safety evals, `gana certify` real  | Critica   |
 
+## Apendice: capa de calidad analitica (no esta en la guia, es del dominio Gana)
+
+| Sub-capa                  | Estado                              | Brecha                                                                              | Prioridad |
+| ------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------- | --------- |
+| Market data (devig/fair)  | Odds crudas un solo bookmaker       | Multi-bookmaker, devig, fair price, market efficiency, line movement                | Critica   |
+| Prediction probabilistica | Verdict textual                     | Probabilidad calibrada, edge gate, blockers, confidenceBand, calibracion isotonic   | Critica   |
+| Lineup/line gates         | No existen                          | Lineup confirmation, stale-pick detection                                           | Alta      |
+| Ensemble                  | Provider unico                      | Ensemble multi-proveedor, deteccion de desacuerdo, pesos por performance            | Alta      |
+| Parlay correlation        | Multiplicacion como independientes  | Modelo de correlacion, candidate generator, ranker, variantes, diversidad           | Critica   |
+| Validation analytics      | Settlement basico                   | Brier, log loss, CLV, calibration plot, leaderboard, holdout                        | Alta      |
+| Disciplina no-jugar       | No formalizada                      | Default `no-parlay-today`, KPI de % no promovido, disclaimer reforzado en artifacts | Critica   |
+
 ---
 
 # Orden congelado de PRs
 
 ```text
-PR-14 Tool registry unico                   (P0.1)
-PR-15 Approval real con pausa/reanudacion   (P0.2)
-PR-16 Shell/file/egress/filesystem policy   (P0.3)
-PR-17 Trace/span runtime                    (P1.6)
-PR-18 Evidence pack v2                      (P1.7)
-PR-19 Certification smoke `gana certify`    (P0.5)
-PR-20 HarnessTask dispatcher/recovery       (P0.4)
-PR-21 Retrieval formal                      (P1.8)
-PR-22 MCP server minimo + Skills v1         (P1.9 + P1.10)
-PR-23 OpenTelemetry exportador opcional     (P2.11)
-PR-24 Governance scorecard + dashboard visor (P2.12 + P2.13)
+PR-14 Tool registry unico                          (P0.1)
+PR-15 Approval real con pausa/reanudacion          (P0.2)
+PR-16 Shell/file/egress/filesystem policy          (P0.3)
+PR-17 Trace/span runtime                           (P1.6)
+PR-18 Evidence pack v2                             (P1.7)
+PR-19 Certification smoke `gana certify`           (P0.5)
+PR-20 HarnessTask dispatcher/recovery              (P0.4)
+PR-21 Retrieval formal                             (P1.8)
+PR-22 MCP server minimo + Skills v1                (P1.9 + P1.10)
+PR-23 OpenTelemetry exportador opcional            (P2.11)
+PR-24 Governance scorecard + dashboard visor       (P2.12 + P2.13)
+PR-25 Devig + fair price + market efficiency       (P3.14)
+PR-26 Prediction probabilistica + edge gate        (P3.15)
+PR-27 Gates lineup y line movement                 (P3.16)
+PR-28 Ensemble multi-proveedor + disagreement      (P3.17)
+PR-29 Parlay correlation + candidate generator     (P3.18)
+PR-30 Validation analytics + leaderboard + holdout (P3.19)
+PR-31 Disciplina no-jugar + disclaimer reforzado   (P3.20)
 ```
 
-PR-14 a PR-16 deben mergear antes que PR-17 a PR-19. PR-20 puede iniciar en paralelo con PR-17 si el tool registry ya esta congelado. PR-22 no debe abrirse antes de cerrar PR-15 y PR-16.
+Dependencias clave:
+
+- PR-14 a PR-16 deben mergear antes que PR-17 a PR-19.
+- PR-20 puede iniciar en paralelo con PR-17 si el tool registry ya esta congelado.
+- PR-22 no debe abrirse antes de cerrar PR-15 y PR-16.
+- PR-25 (devig) es prerequisito de PR-26 (edge gate) y de PR-29 (parlay con `combinedFairProbability`).
+- PR-26 es prerequisito de PR-29 y de PR-30 (no se puede medir Brier/CLV sobre verdict textual).
+- PR-28 (ensemble) puede correr en paralelo con PR-26 si la probabilidad calibrada ya esta congelada.
+- PR-31 (disciplina no-jugar) es ultimo: agrupa los gates de P3.14-P3.19 en el default del run.
 
 ---
 
@@ -658,6 +971,13 @@ Incluido:
 - Eval harness `gana certify --profile ci-smoke`.
 - Retrieval formal con BM25, frescura y provenance obligatoria.
 - MCP server minimo y Skills versionadas.
+- Devig + fair price multi-bookmaker como entrada canonica de odds.
+- Prediction probabilistica calibrada con `edge`, `confidenceBand`, `blockers` y gates duros antes de promover.
+- Lineup gate y line movement gate como bloqueadores explicitos.
+- Ensemble multi-proveedor con deteccion de desacuerdo.
+- Parlay con modelo de correlacion, candidate generator, ranker y variantes (`top-ev`, `low-variance`, `high-conviction`).
+- Validation analytics con Brier, log loss, CLV, calibration plot, leaderboard y holdout.
+- Disciplina no-jugar: default `no-parlay-today` cuando faltan condiciones, con disclaimer reforzado.
 
 Fuera:
 
@@ -668,6 +988,8 @@ Fuera:
 - Multi-worker deployment como prerequisito.
 - Apuestas monetarias, casas de apuestas o movimiento de fondos.
 - Dependencia estrategica de OpenRouter como runtime, model registry o proveedor de tools.
+- Modelos cuantitativos pesados tipo XGBoost/red neuronal entrenados localmente: la calidad analitica de Gana v9 se apoya en devig, calibracion ligera (isotonic/Platt), correlacion empirica y disciplina de gates, no en modelos propios entrenados desde cero. Reabrir solo si el leaderboard demuestra estancamiento sostenido pese a mejoras de prompts y ensembles.
+- Recomendaciones de apuesta, tips, picks o cualquier salida que se pueda interpretar como consejo financiero. Las metricas tipo `roiHipotetico` y `clv` se exportan unicamente como `tracking-only-not-betting` con disclaimer obligatorio.
 
 ---
 
@@ -684,28 +1006,48 @@ Fuera:
 - MCP tools y resources pasan por el mismo policy engine que las tools locales.
 - OpenRouter queda solo como compatibilidad; no como runtime ni proveedor de tools.
 - Restriccion monetaria sigue activa: el sistema produce artifacts analiticos, no ejecuta apuestas, no mueve fondos y no presenta resultados como garantia.
+- Toda `OddsSnapshot` lleva multi-bookmaker, `overround` y `fairPrice` por seleccion; mercados sin minimo de bookmakers o por debajo del `marketEfficiencyScore` umbral no son promovibles.
+- Toda `Prediction` lleva `modelProbability`, `marketFairProbability`, `edge`, `confidenceBand`, `blockers` y `promotable` calculado deterministicamente.
+- Toda promocion de prediction o parlay tiene cero `blockers`, edge positivo, sources frescas y, cuando aplica, XI confirmado y linea estable.
+- Parlays se construyen con modelo de correlacion explicito; legs del mismo fixture sin joint probability fiable son rechazados.
+- Validation produce Brier, log loss, CLV (cuando aplica), calibration plot y leaderboard entries; holdout set permanece fuera del tuning.
+- El default de un run sin condiciones suficientes es `handoff.parlay = no-parlay-today`, no un parlay degradado.
+- Cada `handoff.md` y evidence pack contienen disclaimer explicito de uso analitico; certify falla si falta.
 
 # Pruebas
 
-- Unit tests por modulo nuevo (`registry`, `approval-store`, `scheduler`, `dispatcher`, `recovery`, `idempotency`, `bm25`, `freshness`, `provenance`).
+- Unit tests por modulo nuevo (`registry`, `approval-store`, `scheduler`, `dispatcher`, `recovery`, `idempotency`, `bm25`, `freshness`, `provenance`, `devig`, `fair-price`, `edge-gate`, `calibration`, `correlation`, `candidate-generator`, `ranker`, `brier`, `logloss`, `clv`, `calibration-plot`, `holdout`).
+- Property-based tests (fast-check) en normalizacion de markets, devig y agregacion de probabilidades.
 - Integration tests:
   - approval requested -> approved -> executed con mismo `toolCallId`;
   - approval requested -> denied no ejecuta y emite `approval.denied`;
   - run interrumpido en `score.fixture` se reanuda sin reejecutar `fixtures.fetch`;
   - lease vencido se recupera y aumenta `attempts`;
   - `dangerous_shell` sin approval no ejecuta;
-  - retrieval bloquea source stale segun tipo/edad/estado de fixture.
+  - retrieval bloquea source stale segun tipo/edad/estado de fixture;
+  - prediction con `low-liquidity` no entra a parlay;
+  - parlay con dos legs correlacionados del mismo fixture aplica penalizacion y degrada `expectedEdge`;
+  - parlay con 5 legs todos del mismo equipo es rechazado por diversidad;
+  - ensemble con probabilidades 0.55 y 0.78 emite `model-disagreement`;
+  - linea movida 8% contra el pick bloquea promocion hasta nuevo snapshot;
+  - prop con XI no confirmado bloquea hasta confirmacion;
+  - run sin candidatos validos produce `no-parlay-today` reproducible.
 - Certification:
   - `pnpm gana certify --profile ci-smoke` deterministico sobre replay fixture;
   - manifest hash estable;
   - secret leak en log/artifact rompe certify;
   - prediction sin evidence rompe certify;
-  - tool mutante sin approval rompe certify.
+  - prediction sin `edge` o sin `confidenceBand` rompe certify;
+  - tool mutante sin approval rompe certify;
+  - handoff sin disclaimer rompe certify;
+  - calibration plot fuera de tolerancia sobre golden corpus rompe certify.
 - Acceptance manual:
   - `/approval pending` lista pendientes redacted;
   - `/approve APPROVAL_ID` reanuda la accion original;
   - `pnpm gana approve APPROVAL_ID` funciona en headless;
-  - run completo en `replay` produce evidence pack v2 reproducible.
+  - run completo en `replay` produce evidence pack v2 reproducible;
+  - `pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league` produce reporte con `n` y banda de confianza;
+  - run con condiciones insuficientes muestra `no-parlay-today` con razones detalladas en TUI.
 
 # Riesgos
 
@@ -716,3 +1058,10 @@ Fuera:
 - MCP expuesto incorrectamente puede saltarse policy; no abrir MCP antes de cerrar approval real (PR-15) y tools seguras con egress/filesystem policy (PR-16).
 - Skills versionadas requieren disciplina de bump; sin esto, drift de prompt no se detecta y certify pierde valor.
 - Evidence pack v2 cambia el contrato de manifest; congelar `manifestVersion: 2` y mantener migracion explicita desde v1.
+- Devig sin suficientes bookmakers produce `fairPrice` sesgado; aplicar umbral minimo de bookmakers y marcar mercados pobres como `low-liquidity` para no contaminar el edge gate.
+- Calibracion isotonic puede sobreajustar con muestras pequenas; reportar siempre `n` y mantener el ajuste por `(market, prompt-version)` con holdout.
+- Modelo de correlacion de parlay es la pieza mas frágil: empezar con matriz empirica conservadora y solo refinarla cuando haya volumen historico suficiente. Subestimar correlacion infla el edge esperado.
+- Ensemble multi-proveedor multiplica costo de tokens; combinar con budgets y cost-aware routing para no descontrolar el gasto.
+- `roiHipotetico` y CLV pueden interpretarse como recomendacion si se publican fuera de contexto; mantener disclaimer en todo artifact y bloquear cualquier output que use lenguaje de apuesta.
+- Look-ahead leakage es un riesgo silencioso: toda evidencia y stat debe llevar `availableAt`, y la skill debe filtrar por kickoff. Una sola fuga invalida el leaderboard historico.
+- Confirmation bias: si el prompt de research conoce el `verdict` antes de buscar, encontrara evidencia para sustentarlo. Mantener separacion de fases research/score y evals que detecten correlacion sospechosa entre prompt e input.
