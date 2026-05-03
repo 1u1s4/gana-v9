@@ -4,7 +4,7 @@
 
 Cerrar la brecha entre el MVP harness-first actual y un harness production-grade alineado con la guia de "harness engineering". El proyecto ya tiene runtime, artifacts, auditoria, policy, evidencia, predicciones, validacion y persistencia, pero varias capas existen como modulos aislados y todavia no estan conectadas como una capa de control uniforme.
 
-Este plan formaliza approval real, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, MCP, Skills y la capa de calidad analitica de predictions y parlays, manteniendo la restriccion explicita de no automatizacion monetaria.
+Este plan formaliza approval real, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, Skills y la capa de calidad analitica de predictions y parlays, manteniendo la restriccion explicita de no automatizacion monetaria.
 
 El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance: Gana v9 es TUI-first, single-user y local; los proveedores agentic (Codex, Gemini, Cursor) ya traen su propio aislamiento. La defensa se basa en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy, no en aislamiento por proceso/tarea.
 
@@ -29,7 +29,7 @@ La calidad analitica no se trata como un problema de prompt: se trata como una c
 | Runtime durable con scheduler/dispatcher/recovery real                            |           parcial | medio-bajo |
 | Observabilidad tipo trace/span/costo                                              |           parcial | medio-bajo |
 | Evals/certificacion harness-grade                                                 |        incompleto |       bajo |
-| MCP/Skills/retrieval formal                                                       | ausente o parcial |       bajo |
+| Skills/retrieval formal                                                           | ausente o parcial |       bajo |
 | Calidad analitica (devig, edge, calibracion, correlacion, CLV)                    |        incompleto |       bajo |
 
 ## Lo que ya esta alineado
@@ -51,7 +51,7 @@ La calidad analitica no se trata como un problema de prompt: se trata como una c
 7. Falta eval harness `gana certify` con goldens, safety checks y manifest deterministico.
 8. Evidence pack actual no incluye sources/claims/approvals/gates/hashes/reproduction como secciones explicitas.
 9. Retrieval no esta formalizado: hay evidencia pero no ranking, frescura ni provenance obligatoria.
-10. No existe frontera MCP ni estructura de Skills versionadas.
+10. No existe estructura de Skills versionadas con tests, drift detection ni bump obligatorio por cambio de prompt.
 11. Odds entran sin remocion de vig ni consenso multi-bookmaker, asi que el "edge" comparado contra el mercado no es defendible.
 12. Predictions se modelan como verdict textual y no como probabilidad calibrada con `edge`, `confidenceBand`, `blockers` ni gates duros antes de promover.
 13. Parlays se construyen sin modelo de correlacion entre legs, sin diversificacion estructural y sin variantes (`top-ev`, `low-variance`, `high-conviction`).
@@ -92,11 +92,6 @@ src/retrieval/corpus.ts
 src/retrieval/bm25.ts
 src/retrieval/freshness.ts
 src/retrieval/provenance.ts
-
-src/mcp/server.ts
-src/mcp/resources.ts
-src/mcp/tools.ts
-src/mcp/policy.ts
 
 skills/
   research-fixture-v1/
@@ -169,7 +164,7 @@ skills/
 - Crear `src/tools/registry.ts` con `registerTool` unico:
 
 ```ts
-type ToolOrigin = 'native-provider' | 'mcp' | 'local';
+type ToolOrigin = 'native-provider' | 'local';
 
 type RegisteredTool = {
   name: string;
@@ -195,7 +190,7 @@ listTools(): RegisteredTool[];
 ```ts
 type ResearchSearchTool = {
   mode: 'disabled' | 'cached' | 'live';
-  provider: 'codex-native' | 'gemini-native' | 'mcp-search' | 'replay';
+  provider: 'codex-native' | 'gemini-native' | 'replay';
   required: boolean;
 };
 ```
@@ -543,46 +538,7 @@ if (source.type === 'odds' && ageMinutes > 60 && fixture.status === 'scheduled')
 
 ---
 
-## P1.9 MCP server minimo
-
-### Modulos
-
-```text
-src/mcp/server.ts
-src/mcp/resources.ts
-src/mcp/tools.ts
-src/mcp/policy.ts
-```
-
-### Recursos read-only
-
-```text
-gana://runs/{runId}
-gana://artifacts/{runId}/manifest
-gana://fixtures/{fixtureId}
-gana://evidence/{bundleId}
-gana://predictions/{predictionId}
-```
-
-### Tools gobernadas
-
-```text
-gana.run_pipeline
-gana.research_fixture
-gana.score_fixture
-gana.validate_run
-gana.export_evidence_pack
-```
-
-### Reglas
-
-- Toda tool MCP pasa por el mismo policy engine que las tools locales.
-- No se duplica seguridad entre TUI, CLI, agente y MCP.
-- MCP solo se habilita despues de P0.1 y P0.2.
-
----
-
-## P1.10 Skills versionadas
+## P1.9 Skills versionadas
 
 ### Estructura
 
@@ -934,7 +890,7 @@ PR-18 Evidence pack v2                             (P1.7)
 PR-19 Certification smoke `gana certify`           (P0.5)
 PR-20 HarnessTask dispatcher/recovery              (P0.4)
 PR-21 Retrieval formal                             (P1.8)
-PR-22 MCP server minimo + Skills v1                (P1.9 + P1.10)
+PR-22 Skills versionadas                           (P1.9)
 PR-23 OpenTelemetry exportador opcional            (P2.11)
 PR-24 Governance scorecard + dashboard visor       (P2.12 + P2.13)
 PR-25 Devig + fair price + market efficiency       (P3.14)
@@ -950,7 +906,7 @@ Dependencias clave:
 
 - PR-14 a PR-16 deben mergear antes que PR-17 a PR-19.
 - PR-20 puede iniciar en paralelo con PR-17 si el tool registry ya esta congelado.
-- PR-22 no debe abrirse antes de cerrar PR-15 y PR-16.
+- PR-22 (Skills versionadas) puede correr en paralelo despues de PR-14 (registry) y PR-19 (certify), porque el bump de version se valida en certify.
 - PR-25 (devig) es prerequisito de PR-26 (edge gate) y de PR-29 (parlay con `combinedFairProbability`).
 - PR-26 es prerequisito de PR-29 y de PR-30 (no se puede medir Brier/CLV sobre verdict textual).
 - PR-28 (ensemble) puede correr en paralelo con PR-26 si la probabilidad calibrada ya esta congelada.
@@ -963,14 +919,14 @@ Dependencias clave:
 Incluido:
 
 - Approval real con persistencia, pausa y reanudacion.
-- Tool registry unico para tools locales, server-native y MCP.
+- Tool registry unico para tools locales y server-native (proveedores agentic).
 - Pipeline durable basado en `HarnessTask`.
 - Egress allowlist y reglas de filesystem aplicadas como policy en las tools.
 - Trace/span jerarquico con costos.
 - Evidence pack v2 con secciones explicitas y reproduction command.
 - Eval harness `gana certify --profile ci-smoke`.
 - Retrieval formal con BM25, frescura y provenance obligatoria.
-- MCP server minimo y Skills versionadas.
+- Skills versionadas con tests, drift detection y bump obligatorio por cambio de prompt.
 - Devig + fair price multi-bookmaker como entrada canonica de odds.
 - Prediction probabilistica calibrada con `edge`, `confidenceBand`, `blockers` y gates duros antes de promover.
 - Lineup gate y line movement gate como bloqueadores explicitos.
@@ -983,6 +939,7 @@ Fuera:
 
 - Vector DB obligatoria desde el inicio.
 - Sandbox real con aislamiento por proceso o tarea (Firecracker/gVisor o equivalente). Gana v9 confia en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy. Reabrir solo si aparece uno de estos disparadores: ejecucion no supervisada en cloud, multi-tenant, multi-worker en la misma maquina con cargas de varios runs en paralelo, o introduccion de un tool que ejecute codigo arbitrario fuera de los proveedores agentic.
+- MCP server como frontera de integracion. Gana v9 es TUI/CLI single-user local; TUI, CLI, agente y certify ya comparten el mismo tool registry y policy engine, no hace falta exponer una superficie adicional. Reabrir solo si aparece uno de estos disparadores: integracion estable con un cliente externo (otra IDE, otro agente, dashboard separado) que necesite hablar con Gana via protocolo estandar; necesidad de exponer recursos `gana://...` a un tercero auditado; o decision de producto de ofrecer Gana como backend de otros agentes.
 - Dashboard web como control plane.
 - API publica obligatoria.
 - Multi-worker deployment como prerequisito.
@@ -1003,7 +960,6 @@ Fuera:
 - Evidence pack v2 incluye sources, claims, predictions, validations, approvals, gates, hashes y reproduction command.
 - Spans cubren llm calls, tool calls, retrievals, policy decisions y gates.
 - Retrieval bloquea sources stale y exige `sourceId` por claim.
-- MCP tools y resources pasan por el mismo policy engine que las tools locales.
 - OpenRouter queda solo como compatibilidad; no como runtime ni proveedor de tools.
 - Restriccion monetaria sigue activa: el sistema produce artifacts analiticos, no ejecuta apuestas, no mueve fondos y no presenta resultados como garantia.
 - Toda `OddsSnapshot` lleva multi-bookmaker, `overround` y `fairPrice` por seleccion; mercados sin minimo de bookmakers o por debajo del `marketEfficiencyScore` umbral no son promovibles.
@@ -1055,7 +1011,6 @@ Fuera:
 - Sin sandbox real, la defensa depende de tool registry, approval, redaccion, allowlist de comandos y reglas de filesystem/egress como policy. Documentar este limite en el README del MVP y revisar la decision si aparece alguno de los disparadores listados en "Fuera de alcance".
 - Tool registry unico puede romper integraciones existentes con OpenRouter; mantener `openrouter` solo como compatibilidad y no como runtime.
 - Trace/span agrega volumen a `.artifacts`; aplicar sampling y retention desde el inicio.
-- MCP expuesto incorrectamente puede saltarse policy; no abrir MCP antes de cerrar approval real (PR-15) y tools seguras con egress/filesystem policy (PR-16).
 - Skills versionadas requieren disciplina de bump; sin esto, drift de prompt no se detecta y certify pierde valor.
 - Evidence pack v2 cambia el contrato de manifest; congelar `manifestVersion: 2` y mantener migracion explicita desde v1.
 - Devig sin suficientes bookmakers produce `fairPrice` sesgado; aplicar umbral minimo de bookmakers y marcar mercados pobres como `low-liquidity` para no contaminar el edge gate.
