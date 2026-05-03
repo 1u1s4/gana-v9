@@ -4,7 +4,9 @@
 
 Cerrar la brecha entre el MVP harness-first actual y un harness production-grade alineado con la guia de "harness engineering". El proyecto ya tiene runtime, artifacts, auditoria, policy, evidencia, predicciones, validacion y persistencia, pero varias capas existen como modulos aislados y todavia no estan conectadas como una capa de control uniforme.
 
-Este plan formaliza approval real, sandbox/egress, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, MCP y Skills, manteniendo la restriccion explicita de no automatizacion monetaria.
+Este plan formaliza approval real, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, MCP y Skills, manteniendo la restriccion explicita de no automatizacion monetaria.
+
+El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance: Gana v9 es TUI-first, single-user y local; los proveedores agentic (Codex, Gemini, Cursor) ya traen su propio aislamiento. La defensa se basa en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy, no en aislamiento por proceso/tarea.
 
 ## SRS cubierto
 
@@ -22,7 +24,6 @@ Este plan formaliza approval real, sandbox/egress, tool registry unico, runtime 
 | Persistencia, artifacts y evidencia                                               | bastante avanzado | medio-alto |
 | Policy, redaccion y auditoria                                                     |   bien encaminado | medio-alto |
 | Approval real con pausa/reanudacion                                               |        incompleto |       bajo |
-| Sandboxing/aislamiento fuerte                                                     |             debil |       bajo |
 | Runtime durable con scheduler/dispatcher/recovery real                            |           parcial | medio-bajo |
 | Observabilidad tipo trace/span/costo                                              |           parcial | medio-bajo |
 | Evals/certificacion harness-grade                                                 |        incompleto |       bajo |
@@ -42,7 +43,7 @@ Este plan formaliza approval real, sandbox/egress, tool registry unico, runtime 
 2. Tools mutantes (`shell`, `file_write`) sin schemas seguros, sin `dryRun`, sin `reason` obligatorio, sin `idempotencyKey`.
 3. `SERVER_TOOLS` de OpenRouter (`openrouter:web_search`, `openrouter:datetime`) entran al agente sin pasar por `guardTool`.
 4. Pipeline ejecuta como flujo sincrono y no usa `HarnessTask` como cola durable.
-5. Falta sandbox real (filesystem por run, egress allowlist, secrets scoped).
+5. Falta egress allowlist y reglas de filesystem como policy (no como sandbox real): hoy `shell` y `file_write` corren contra el entorno local sin restricciones explicitas.
 6. Eventos existen pero no hay trace/span jerarquico con costos y latencias por step/tool.
 7. Falta eval harness `gana certify` con goldens, safety checks y manifest deterministico.
 8. Evidence pack actual no incluye sources/claims/approvals/gates/hashes/reproduction como secciones explicitas.
@@ -67,9 +68,8 @@ src/runtime/worker.ts
 src/runtime/recovery.ts
 src/runtime/idempotency.ts
 
-src/sandbox/policy.ts
-src/sandbox/filesystem.ts
-src/sandbox/egress.ts
+src/permissions/egress-policy.ts
+src/permissions/filesystem-policy.ts
 
 src/observability/spans.ts
 src/observability/trace-writer.ts
@@ -244,22 +244,43 @@ type ShellInput = {
 };
 ```
 
-### Reglas
+### Reglas de tools
 
 - `file_write.path` debe ser repo-relative; bloquear `..` y rutas absolutas.
 - `file_edit` exige `expectedSha256` o relectura previa para evitar conflictos.
 - `shell` solo acepta comandos allowlisted por defecto.
-- Comandos libres se enrutan a `dangerous_shell`, que siempre exige approval manual, sandbox y allowlist explicita.
+- Comandos libres se enrutan a `dangerous_shell`, que siempre exige approval manual y allowlist explicita.
 - Toda mutacion exige `reason`.
 - Toda accion riesgosa tiene `dryRun` default `true`.
 - Toda ejecucion exige `idempotencyKey`.
 
+### Reglas de filesystem (policy, no sandbox)
+
+- Escritura permitida solo dentro de `.artifacts/` salvo approval explicito.
+- Bloqueo de paths absolutos y `..` a nivel de schema.
+- Bloqueo de rutas sensibles por defecto: `.env`, `.git/`, `node_modules/`, fuera del workspace.
+- No pasar `.env` completo al proceso hijo: solo variables explicitamente requeridas por la tool.
+- `cwd` controlado por la tool, no por el modelo.
+
+### Reglas de egress (policy, no sandbox)
+
+- Allowlist de hosts por perfil:
+  - `mock`/`replay`: red deshabilitada (`off`).
+  - `live-readonly`: API-Football y proveedor LLM agentic.
+- Cualquier host fuera de allowlist queda bloqueado en la tool y emite `policy.evaluate` con resultado `blocked`.
+- Web search obedece `ResearchSearchTool.mode` y nunca usa OpenRouter como runtime de red.
+- Secretos se inyectan scoped por tool (no globales en el proceso).
+
 ### Aceptacion
 
 - `file_write` con path absoluto o `..` falla schema.
+- `file_write` fuera de `.artifacts/` sin approval es bloqueado.
 - `shell` con comando fuera de allowlist se enruta a `dangerous_shell` o falla.
 - `dangerous_shell` sin approval no ejecuta.
+- Llamada saliente a host fuera de allowlist es bloqueada y auditada.
+- En `mock`/`replay` no hay trafico saliente (verificado en certify).
 - Test unit cubre rechazo de paths sensibles (`.env`, `.git/`, fuera del workspace).
+- Test unit cubre bloqueo de host fuera de allowlist por perfil.
 
 ---
 
@@ -554,42 +575,7 @@ skills/
 
 # P2 - Madurez production-grade
 
-## P2.11 Sandbox y egress policy
-
-### Contrato
-
-```ts
-type SandboxPolicy = {
-  filesystem: 'read-only' | 'workspace-write' | 'artifact-write';
-  network: 'off' | 'provider-allowlist' | 'live-readonly';
-  allowedHosts: string[];
-  secrets: 'none' | 'scoped-provider-token';
-  timeoutMs: number;
-  maxOutputBytes: number;
-};
-```
-
-### Perfiles
-
-| Perfil          | Filesystem                    | Network            | Secrets |
-| --------------- | ----------------------------- | ------------------ | ------- |
-| `mock`          | artifact-write                | off                | none    |
-| `replay`        | artifact-write                | off                | none    |
-| `live-readonly` | workspace-read/artifact-write | provider allowlist | scoped  |
-| `release-grade` | task sandbox                  | allowlist estricta | scoped  |
-
-### Reglas iniciales (sin Firecracker/gVisor)
-
-- directorio por run/task;
-- bloqueo de rutas absolutas y `..`;
-- no escritura fuera de `.artifacts` salvo approval;
-- egress deshabilitado por defecto;
-- allowlist para API-Football y proveedor LLM;
-- no pasar `.env` completo al proceso hijo.
-
----
-
-## P2.12 OpenTelemetry o exportador compatible
+## P2.11 OpenTelemetry o exportador compatible
 
 - Mantener JSONL local como fuente.
 - Diseñar contrato de spans/eventos exportable a OTel.
@@ -597,7 +583,7 @@ type SandboxPolicy = {
 
 ---
 
-## P2.13 Governance scorecard por run
+## P2.12 Governance scorecard por run
 
 ```json
 {
@@ -617,7 +603,7 @@ type SandboxPolicy = {
 
 ---
 
-## P2.14 Dashboard como visor read-only
+## P2.13 Dashboard como visor read-only
 
 - TUI primero, dashboard despues.
 - `src/dashboard` solo expone runs, traces, artifacts y validations.
@@ -632,7 +618,7 @@ type SandboxPolicy = {
 | 1. Instruction      | Prompts research/scoring, guard contra acciones monetarias       | Prompt library formal, prompt hash, Skills, spotlighting de contenido no confiable | Alta      |
 | 2. Tools            | Tools locales con schemas Zod y policy wrapper                   | Approval real, dry-run, idempotency, server tools gobernados, schemas mas seguros  | Critica   |
 | 3. Memory/Retrieval | Evidence, sources, claims, bundles                               | Retrieval engine, freshness, ranking, provenance obligatoria, memory decay         | Alta      |
-| 4. Execution        | Pipeline canonico y artifacts                                    | Scheduler/dispatcher/recovery real, queue durable, sandbox, egress control         | Critica   |
+| 4. Execution        | Pipeline canonico y artifacts                                    | Scheduler/dispatcher/recovery real, queue durable, egress allowlist, filesystem policy | Critica   |
 | 5. Policy/Approval  | Metadata, redaccion, audit, perfiles `standard`/`full-permissions` | Pausa/reanuda approval, RBAC/principal, approvals en DB, policy para server tools  | Critica   |
 | 6. Observability    | Event types, JSONL, audit, snapshots                             | Trace/span jerarquico, costos, tokens, latency, retries, anomaly detection         | Alta      |
 | 7. Evaluation       | Unit tests y planes de certification                             | Eval harness, golden fixtures, trajectory eval, safety evals, `gana certify` real  | Critica   |
@@ -644,19 +630,18 @@ type SandboxPolicy = {
 ```text
 PR-14 Tool registry unico                   (P0.1)
 PR-15 Approval real con pausa/reanudacion   (P0.2)
-PR-16 Shell/file tools seguras              (P0.3)
+PR-16 Shell/file/egress/filesystem policy   (P0.3)
 PR-17 Trace/span runtime                    (P1.6)
 PR-18 Evidence pack v2                      (P1.7)
 PR-19 Certification smoke `gana certify`    (P0.5)
 PR-20 HarnessTask dispatcher/recovery       (P0.4)
-PR-21 Sandbox/egress policy                 (P2.11)
-PR-22 Retrieval formal                      (P1.8)
-PR-23 MCP server minimo + Skills v1         (P1.9 + P1.10)
-PR-24 OpenTelemetry exportador opcional     (P2.12)
-PR-25 Governance scorecard + dashboard visor (P2.13 + P2.14)
+PR-21 Retrieval formal                      (P1.8)
+PR-22 MCP server minimo + Skills v1         (P1.9 + P1.10)
+PR-23 OpenTelemetry exportador opcional     (P2.11)
+PR-24 Governance scorecard + dashboard visor (P2.12 + P2.13)
 ```
 
-PR-14 a PR-16 deben mergear antes que PR-17 a PR-19. PR-20 puede iniciar en paralelo con PR-17 si el tool registry ya esta congelado. PR-23 no debe abrirse antes de cerrar PR-15 y PR-21.
+PR-14 a PR-16 deben mergear antes que PR-17 a PR-19. PR-20 puede iniciar en paralelo con PR-17 si el tool registry ya esta congelado. PR-22 no debe abrirse antes de cerrar PR-15 y PR-16.
 
 ---
 
@@ -667,7 +652,7 @@ Incluido:
 - Approval real con persistencia, pausa y reanudacion.
 - Tool registry unico para tools locales, server-native y MCP.
 - Pipeline durable basado en `HarnessTask`.
-- Sandbox por perfil y egress allowlist.
+- Egress allowlist y reglas de filesystem aplicadas como policy en las tools.
 - Trace/span jerarquico con costos.
 - Evidence pack v2 con secciones explicitas y reproduction command.
 - Eval harness `gana certify --profile ci-smoke`.
@@ -677,7 +662,7 @@ Incluido:
 Fuera:
 
 - Vector DB obligatoria desde el inicio.
-- Firecracker/gVisor obligatorios desde el inicio.
+- Sandbox real con aislamiento por proceso o tarea (Firecracker/gVisor o equivalente). Gana v9 confia en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy. Reabrir solo si aparece uno de estos disparadores: ejecucion no supervisada en cloud, multi-tenant, multi-worker en la misma maquina con cargas de varios runs en paralelo, o introduccion de un tool que ejecute codigo arbitrario fuera de los proveedores agentic.
 - Dashboard web como control plane.
 - API publica obligatoria.
 - Multi-worker deployment como prerequisito.
@@ -690,6 +675,7 @@ Fuera:
 
 - Ninguna tool entra al agente sin metadata, schema, policy, redaccion, audit, timeout y clasificacion de riesgo.
 - `file_write`, `file_edit`, `shell`, `artifact_promote` y `prediction_promote` quedan pendientes en approval pending y se reanudan sin perder contexto.
+- Egress fuera de allowlist y escritura fuera de `.artifacts/` quedan bloqueados a nivel de tool.
 - `executeRunPipeline` puede interrumpirse y reanudarse usando `HarnessTask`.
 - `pnpm gana certify --profile ci-smoke` corre sin credenciales reales y compara contra golden manifest.
 - Evidence pack v2 incluye sources, claims, predictions, validations, approvals, gates, hashes y reproduction command.
@@ -724,9 +710,9 @@ Fuera:
 # Riesgos
 
 - Approval real introduce estado adicional: persistir en DB y en `audit-log.jsonl` para evitar inconsistencias.
-- Sandbox sin Firecracker/gVisor es defensa en profundidad limitada; redaccion y egress allowlist no son sustituto de aislamiento real, documentar claramente el limite del MVP.
+- Sin sandbox real, la defensa depende de tool registry, approval, redaccion, allowlist de comandos y reglas de filesystem/egress como policy. Documentar este limite en el README del MVP y revisar la decision si aparece alguno de los disparadores listados en "Fuera de alcance".
 - Tool registry unico puede romper integraciones existentes con OpenRouter; mantener `openrouter` solo como compatibilidad y no como runtime.
 - Trace/span agrega volumen a `.artifacts`; aplicar sampling y retention desde el inicio.
-- MCP expuesto incorrectamente puede saltarse policy; no abrir MCP antes de cerrar approval real y sandbox.
+- MCP expuesto incorrectamente puede saltarse policy; no abrir MCP antes de cerrar approval real (PR-15) y tools seguras con egress/filesystem policy (PR-16).
 - Skills versionadas requieren disciplina de bump; sin esto, drift de prompt no se detecta y certify pierde valor.
 - Evidence pack v2 cambia el contrato de manifest; congelar `manifestVersion: 2` y mantener migracion explicita desde v1.
