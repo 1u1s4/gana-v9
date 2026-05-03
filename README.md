@@ -38,6 +38,7 @@ GANA_MAX_FIXTURES_PER_RUN=5 pnpm gana run --date YYYY-MM-DD
 pnpm gana artifacts --run-id RUN_ID
 pnpm gana export --run-id RUN_ID
 pnpm gana validate --date YYYY-MM-DD
+pnpm gana dashboard --port 4317
 ```
 
 Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini`, `cursor` u `openrouter`). El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
@@ -56,6 +57,7 @@ Providers validos:
 Comandos disponibles dentro de la TUI:
 
 - `/help`: lista comandos.
+- `/dashboard`: sirve una interfaz web local para ver predicciones, parlays, validaciones y runs.
 - `/provider`: lista providers disponibles y cambia entre `codex`, `gemini`, `cursor` y `openrouter`.
 - `/model`: lista, busca y cambia modelos del provider activo.
 - `/fast`: alterna modo rapido cuando el provider/modelo lo soporta.
@@ -117,3 +119,13 @@ Backend OpenRouter:
 - Incluye lectura, escritura y edicion de archivos.
 - Incluye busqueda por glob y grep, listado de directorios y ejecucion de shell con timeout.
 - Incluye web search y datetime como herramientas server-side de OpenRouter.
+
+## Dashboard local
+
+Para revisar los resultados guardados en la DB:
+
+```bash
+pnpm gana dashboard --port 4317
+```
+
+Abre `http://127.0.0.1:4317`. La interfaz permite filtrar por fecha, run id, estado y limite; muestra predicciones, parlays, validaciones y runs con detalle lateral. Requiere `DATABASE_URL` y usa solo lectura sobre los datos persistidos.

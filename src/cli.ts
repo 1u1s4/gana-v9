@@ -586,6 +586,7 @@ async function main() {
     || command === 'run'
     || command === 'export'
     || command === 'artifacts'
+    || command === 'dashboard'
     || command === 'leagues'
     || command === 'teams'
     || command === 'scan'

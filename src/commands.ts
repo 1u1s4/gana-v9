@@ -40,6 +40,7 @@ import {
   runValidation as runServiceValidation,
 } from './runtime/run-service.js';
 import { getDbStatus } from './storage/db-status.js';
+import { startDashboardServer, type DashboardOptions } from './dashboard/server.js';
 import type { Fixture } from './domain/fixtures.js';
 import { isMarketKey, MARKET_KEYS, type MarketKey } from './domain/markets.js';
 import type { OddsQuote } from './domain/odds.js';
@@ -613,6 +614,20 @@ function configWithMarketOverride(config: AgentConfig, markets: MarketKey[] | un
       defaultMarkets: markets,
     },
   };
+}
+
+function optionalDashboardOptions(flags: Record<string, string | true>): DashboardOptions {
+  return {
+    port: optionalPositiveIntegerFlag(flags, 'port'),
+    host: optionalStringFlag(flags, 'host'),
+  };
+}
+
+async function serveDashboard(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<void> {
+  const dashboard = await startDashboardServer(ctx.config, optionalDashboardOptions(flags));
+  console.log(`  ${GREEN}✓${RESET} ${DIM}dashboard${RESET} ${CYAN}${dashboard.url}${RESET}`);
+  console.log(`  ${DIM}Press Ctrl+C to stop.${RESET}`);
+  await new Promise<void>((resolve) => dashboard.server.once('close', resolve));
 }
 
 async function runLowOddsScan(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<LowOddsScanView> {
@@ -1343,6 +1358,15 @@ commands.push({
 });
 
 commands.push({
+  name: '/dashboard',
+  description: 'Serve local predictions dashboard',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    await serveDashboard(ctx, flags);
+  },
+});
+
+commands.push({
   name: '/filters',
   description: 'Show active sports filter defaults',
   execute: async (_args, ctx) => {
@@ -1584,6 +1608,12 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: true, exitCode: 0 };
     }
 
+    if (area === 'dashboard') {
+      const flags = parseFlags(argv.slice(1));
+      await serveDashboard(ctx, flags);
+      return { ok: true, exitCode: 0 };
+    }
+
     if (area === 'filters' && action === 'show') {
       const status = getFiltersStatus(ctx.config);
       printFiltersStatus(status);
@@ -1677,6 +1707,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --validate auto|force|off${RESET}`);
   console.log(`  ${CYAN}pnpm gana export --run-id RUN_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana artifacts --run-id RUN_ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana dashboard --port 4317${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);
