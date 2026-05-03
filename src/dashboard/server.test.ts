@@ -30,10 +30,37 @@ const VALIDATION = {
   predictionId: 'prediction-1',
   parlayId: null,
   fixture: FIXTURE,
+  prediction: {
+    id: 'prediction-1',
+    marketKey: 'h2h',
+    selectionKey: 'home',
+    line: null,
+    fixture: FIXTURE,
+  },
+  parlay: null,
   status: 'won',
   reason: 'ok',
   evaluatedAt: new Date('2026-05-01T15:00:00.000Z'),
   createdAt: new Date('2026-05-01T13:00:00.000Z'),
+  outcome: { reason: 'resolved' },
+  settlementRuleVersion: 'v1',
+};
+
+const PARLAY_VALIDATION = {
+  id: 'validation-2',
+  runId: 'run-1',
+  predictionId: null,
+  parlayId: 'parlay-1',
+  fixture: FIXTURE,
+  prediction: null,
+  parlay: {
+    id: 'parlay-1',
+    legs: [{ id: 'leg-1' }, { id: 'leg-2' }],
+  },
+  status: 'won',
+  reason: 'parlay-ok',
+  evaluatedAt: new Date('2026-05-01T16:00:00.000Z'),
+  createdAt: new Date('2026-05-01T14:00:00.000Z'),
   outcome: { reason: 'resolved' },
   settlementRuleVersion: 'v1',
 };
@@ -197,6 +224,61 @@ describe('dashboard api queries', () => {
     assert.equal(overview.filters.runId, 'run-1');
   });
 
+  it('maps atomic validation targets with readable summary', async () => {
+    const overview = await readOverview(createDashboardDb() as any, config, new URLSearchParams('tab=validations'));
+    assert.equal(overview.validations[0]?.target.kind, 'prediction');
+    assert.equal(overview.validations[0]?.target.label, 'Atómica');
+    assert.equal(overview.validations[0]?.target.summary, 'Home vs Away · h2h · home');
+  });
+
+  it('maps parlay validation targets with parlay summary', async () => {
+    const baseDb = createDashboardDb();
+    const db = {
+      ...baseDb,
+      validationArtifact: {
+        ...baseDb.validationArtifact,
+        findMany: async () => [PARLAY_VALIDATION],
+        findUnique: async ({ where }: { where: { id?: string } }) => {
+          if (where?.id === 'validation-2') return PARLAY_VALIDATION;
+          return null;
+        },
+      },
+    } as any;
+
+    const overview = await readOverview(db, config, new URLSearchParams('tab=validations&validationTarget=parlay'));
+    assert.equal(overview.validations[0]?.target.kind, 'parlay');
+    assert.equal(overview.validations[0]?.target.label, 'Parlay');
+    assert.equal(overview.validations[0]?.target.summary, 'Parlay de 2 legs');
+
+    const entity = await readEntity(db, 'validation', 'validation-2');
+    if ('error' in entity) {
+      assert.fail('validation should exist');
+    }
+    assert.equal(entity.entity.target.kind, 'parlay');
+    assert.equal(entity.entity.target.summary, 'Parlay de 2 legs');
+  });
+
+  it('preserves target type when validation relation is missing', async () => {
+    const orphanValidation = {
+      ...VALIDATION,
+      id: 'validation-3',
+      prediction: null,
+    };
+    const baseDb = createDashboardDb();
+    const db = {
+      ...baseDb,
+      validationArtifact: {
+        ...baseDb.validationArtifact,
+        findMany: async () => [orphanValidation],
+      },
+    } as any;
+
+    const overview = await readOverview(db, config, new URLSearchParams('tab=validations&validationTarget=prediction'));
+    assert.equal(overview.validations[0]?.target.kind, 'prediction');
+    assert.equal(overview.validations[0]?.target.id, 'prediction-1');
+    assert.equal(overview.validations[0]?.target.summary, null);
+  });
+
   it('applies validationTarget=prediction in overview filters', async () => {
     let validationWhere: Record<string, unknown> = {};
     const baseDb = createDashboardDb();
@@ -255,6 +337,7 @@ describe('dashboard api queries', () => {
     assert.equal(response.entity.id, 'prediction-1');
     assert.equal(Array.isArray(response.validationHistory), true);
     assert.equal(response.validationHistory?.length, 1);
+    assert.equal(response.validationHistory?.[0]?.target.kind, 'prediction');
   });
 
   it('returns entity not found for missing validation id', async () => {

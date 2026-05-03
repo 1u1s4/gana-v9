@@ -101,6 +101,7 @@ export interface DashboardValidationRow extends DashboardOverviewRow {
   runId: string | null;
   predictionId: string | null;
   parlayId: string | null;
+  target: DashboardValidationTargetRow;
   fixture: DashboardFixtureRow | null;
   status: string;
   reason: string | null;
@@ -108,6 +109,13 @@ export interface DashboardValidationRow extends DashboardOverviewRow {
   createdAt: string;
   outcome?: unknown;
   settlementRuleVersion: string;
+}
+
+export interface DashboardValidationTargetRow {
+  kind: 'prediction' | 'parlay' | 'unknown';
+  id: string | null;
+  label: string;
+  summary: string | null;
 }
 
 export interface DashboardRunRow extends DashboardOverviewRow {

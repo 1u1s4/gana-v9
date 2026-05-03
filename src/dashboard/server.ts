@@ -291,6 +291,20 @@ export async function readEntity(
         fixture: {
           include: { competition: true, homeTeam: true, awayTeam: true },
         },
+        prediction: {
+          include: {
+            fixture: {
+              include: { competition: true, homeTeam: true, awayTeam: true },
+            },
+          },
+        },
+        parlay: {
+          include: {
+            legs: {
+              select: { id: true },
+            },
+          },
+        },
       },
     })) as unknown;
 
@@ -488,6 +502,20 @@ async function readActiveRows(
         include: {
           fixture: {
             include: { competition: true, homeTeam: true, awayTeam: true },
+          },
+          prediction: {
+            include: {
+              fixture: {
+                include: { competition: true, homeTeam: true, awayTeam: true },
+              },
+            },
+          },
+          parlay: {
+            include: {
+              legs: {
+                select: { id: true },
+              },
+            },
           },
         },
       }) as unknown[]);
@@ -705,6 +733,7 @@ function mapValidation(row: unknown): DashboardValidationRow {
     runId: toNullableString(item.runId),
     predictionId: toNullableString(item.predictionId),
     parlayId: toNullableString(item.parlayId),
+    target: mapValidationTarget(item),
     fixture: mapFixture(item.fixture),
     status: toStringValue(item.status),
     reason: toNullableString(item.reason),
@@ -713,6 +742,67 @@ function mapValidation(row: unknown): DashboardValidationRow {
     outcome: item.outcome,
     settlementRuleVersion: toStringValue(item.settlementRuleVersion),
   };
+}
+
+function mapValidationTarget(item: Record<string, unknown>) {
+  const parlayId = toNullableString(item.parlayId);
+  const predictionId = toNullableString(item.predictionId);
+
+  if (parlayId) {
+    return {
+      kind: 'parlay' as const,
+      id: parlayId,
+      label: 'Parlay',
+      summary: formatParlayTargetSummary(item.parlay),
+    };
+  }
+
+  if (predictionId) {
+    return {
+      kind: 'prediction' as const,
+      id: predictionId,
+      label: 'Atómica',
+      summary: formatPredictionTargetSummary(item.prediction, item.fixture),
+    };
+  }
+
+  return {
+    kind: 'unknown' as const,
+    id: null,
+    label: 'Sin objetivo',
+    summary: null,
+  };
+}
+
+function formatPredictionTargetSummary(predictionRaw: unknown, fallbackFixtureRaw: unknown): string | null {
+  const prediction = toRecord(predictionRaw);
+  const marketKey = toNullableString(prediction.marketKey);
+  const selectionKey = toNullableString(prediction.selectionKey);
+  if (!marketKey || !selectionKey) return null;
+
+  const match = formatFixtureMatch(prediction.fixture ?? fallbackFixtureRaw);
+  const line = toNumberOrNull(prediction.line);
+  const selection = line === null ? selectionKey : `${selectionKey} ${line}`;
+  const parts = [match, marketKey, selection].filter((value): value is string => Boolean(value));
+  return parts.length ? parts.join(' · ') : null;
+}
+
+function formatParlayTargetSummary(parlayRaw: unknown): string | null {
+  const parlay = toRecord(parlayRaw);
+  const legs = toArray(parlay.legs);
+  if (!legs.length) return null;
+  return `Parlay de ${legs.length} legs`;
+}
+
+function formatFixtureMatch(raw: unknown): string | null {
+  if (!raw) return null;
+  const fixture = toRecord(raw);
+  const homeTeam = toRecord(fixture.homeTeam);
+  const awayTeam = toRecord(fixture.awayTeam);
+  const home = toNullableString(homeTeam.name);
+  const away = toNullableString(awayTeam.name);
+  if (!home || !away) return null;
+  return `${home} vs ${away}`;
 }
 
 function mapRun(row: unknown): DashboardRunRow {

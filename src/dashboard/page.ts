@@ -404,9 +404,26 @@ export function dashboardHtml(): string {
       };
 
       const validationTargetForRow = (row) => {
+        if (row?.target) {
+          const target = row.target;
+          if (target.kind === 'prediction' || target.kind === 'parlay') {
+            return {
+              kind: target.kind,
+              label: target.label || (target.kind === 'prediction' ? 'Atómica' : 'Parlay'),
+              id: target.id || '',
+              summary: target.summary || null,
+            };
+          }
+          return {
+            kind: '',
+            label: target.label || 'Sin objetivo',
+            id: target.id || '',
+            summary: target.summary || null,
+          };
+        }
         if (row?.parlayId) return { kind: 'parlay', label: 'Parlay', id: row.parlayId };
-        if (row?.predictionId) return { kind: 'prediction', label: 'Predicción', id: row.predictionId };
-        return { kind: '', label: 'Sin objetivo', id: '' };
+        if (row?.predictionId) return { kind: 'prediction', label: 'Atómica', id: row.predictionId };
+        return { kind: '', label: 'Sin objetivo', id: '', summary: null };
       };
 
       function toParams() {
@@ -775,7 +792,7 @@ export function dashboardHtml(): string {
           '<th><button class="sort" data-sort="status"><span>Estado</span><span>' +
           (sort === 'status' ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>' +
           '<th>Motivo</th>' +
-          '<th>Tipo/Origen</th>' +
+          '<th>Tipo</th>' +
           '<th>Objetivo</th>' +
           '<th><button class="sort" data-sort="createdAt"><span>Creado</span><span>' +
           (sort === 'createdAt' ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>' +
@@ -783,10 +800,12 @@ export function dashboardHtml(): string {
           rows.map((row) => {
             const target = validationTargetForRow(row);
             const hasTarget = target.kind;
+            const summary = target.summary || target.id || '—';
             return '<tr data-kind="validation" data-id="' + esc(row.id) + '"><td>' + fmtDate(row.evaluatedAt || row.createdAt) +
-              '</td><td>' + badge(row.status) + '</td><td>' + esc(row.reason || '—') + '</td><td>' + esc(target.label) +
-              '</td><td>' + (hasTarget ? '<span class="chip-btn crosslink" data-kind="' + esc(target.kind) + '" data-id="' + esc(target.id) + '">' + esc(target.id) +
-                '</span>' : '—') + '</td><td>' + fmtDate(row.createdAt) + '</td></tr>';
+              '</td><td>' + badge(row.status) + '</td><td>' + esc(row.reason || '—') + '</td><td><span class="tag">' + esc(target.label) +
+              '</span></td><td><div>' + esc(summary) + '</div>' +
+              (hasTarget && target.id ? '<div class="sub mono"><span class="crosslink" data-kind="' + esc(target.kind) + '" data-id="' + esc(target.id) + '">' + esc(target.id) +
+                '</span></div>' : '') + '</td><td>' + fmtDate(row.createdAt) + '</td></tr>';
           }).join('') +
           '</tbody></table>';
       }
@@ -814,12 +833,16 @@ export function dashboardHtml(): string {
         const title = data.fixture ? matchName(data.fixture) : data.id || '';
         const sections = [];
         const kv = (label, value) => '<div class=\"kv\"><span>' + esc(label) + '</span><span>' + value + '</span></div>';
+        const validationTarget = kind === 'validation' ? validationTargetForRow(data) : null;
         sections.push('<h3>' + esc(title) + '</h3>');
-        sections.push(kv('Tipo', esc(kind)));
+        sections.push(kv('Tipo', esc(kind === 'validation' ? (validationTarget?.label || 'Sin objetivo') : kind)));
         sections.push(kv('ID', '<span class=\"mono\">' + esc(data.id || '') + '</span>'));
         if (kind === 'validation') {
-          const target = validationTargetForRow(data);
-          sections.push(kv('Pertenece a', esc(target.label)));
+          const target = validationTarget || validationTargetForRow(data);
+          sections.push(kv('Pertenece a', esc(target.summary || '—')));
+          sections.push(kv('ID objetivo', target.id && target.kind
+            ? '<span class=\"crosslink mono\" data-kind=\"' + esc(target.kind) + '\" data-id=\"' + esc(target.id) + '\">' + esc(target.id) + '</span>'
+            : '—'));
         }
         if (data.status) sections.push(kv('Estado', badge(data.status)));
         if (data.runId) sections.push(kv('Run', '<span class=\"crosslink\" data-kind=\"run\" data-id=\"' + esc(data.runId) + '\">' + esc(data.runId) + '</span>'));
