@@ -1,1 +1,117 @@
-{"type":"object","required":["sources","claims"],"properties":{"sources":{"type":"array"},"claims":{"type":"array"}}}
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sources", "evidenceItems", "claims", "gateResult", "warnings", "metadata"],
+  "properties": {
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "externalId", "title", "capturedAt", "metadata"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": {
+            "type": "string",
+            "enum": ["api-football", "provider-snapshot", "web-search", "db", "artifact"]
+          },
+          "externalId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "capturedAt": { "type": "string", "minLength": 1 },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {},
+            "required": []
+          }
+        }
+      }
+    },
+    "evidenceItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "sourceId", "claimIds", "summary", "confidence", "metadata"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "sourceId": { "type": "string", "minLength": 1 },
+          "claimIds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "summary": { "type": "string", "minLength": 1 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {},
+            "required": []
+          }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "statement", "subject", "supportLevel", "evidenceIds", "conflictStatus", "metadata"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "statement": { "type": "string", "minLength": 1 },
+          "subject": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id"],
+            "properties": {
+              "type": { "type": "string", "enum": ["fixture", "team", "market"] },
+              "id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "supportLevel": {
+            "type": "string",
+            "enum": ["supported", "partial", "weak", "unsupported", "conflicting"]
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "conflictStatus": { "type": "string", "enum": ["none", "potential", "conflict"] },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {},
+            "required": []
+          }
+        }
+      }
+    },
+    "gateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "reasons", "warnings"],
+      "properties": {
+        "verdict": { "type": "string", "enum": ["promotable", "review-required", "blocked"] },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "required": []
+    }
+  }
+}

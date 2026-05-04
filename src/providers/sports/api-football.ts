@@ -123,6 +123,8 @@ export class ApiFootballProvider implements SportsDataProvider {
     const fixture = persisted?.[0]?.fixture ?? fallbackFixtureFromNormalized(normalized);
     return {
       ...fixture,
+      homeTeamName: normalized.homeTeam?.name,
+      awayTeamName: normalized.awayTeam?.name,
       ...(response.providerSnapshotId && { providerSnapshotId: response.providerSnapshotId }),
     };
   }
@@ -919,6 +921,8 @@ function fallbackFixtureFromNormalized(normalized: NormalizedFixture): Fixture {
     season: normalized.season ?? undefined,
     homeTeamId: normalized.homeTeam?.providerTeamId ?? 'unknown-home-team',
     awayTeamId: normalized.awayTeam?.providerTeamId ?? 'unknown-away-team',
+    homeTeamName: normalized.homeTeam?.name,
+    awayTeamName: normalized.awayTeam?.name,
     scheduledAt: (normalized.scheduledAt ?? new Date(0)).toISOString(),
     status: normalized.status,
     scoreHome: normalized.scoreHome ?? undefined,

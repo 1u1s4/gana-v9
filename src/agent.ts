@@ -3,6 +3,9 @@ import type { Item } from '@openrouter/agent';
 import { stepCountIs, maxCost } from '@openrouter/agent/stop-conditions';
 import { spawn } from 'child_process';
 import type { ChildProcess } from 'child_process';
+import { existsSync, mkdtempSync, readFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { AgentConfig } from './config.js';
 import {
   deriveNativeWebSearchRequirement,
@@ -22,6 +25,9 @@ interface RunAgentOptions {
   signal?: AbortSignal;
   nativeWebSearchRequirement?: NativeWebSearchRequirement;
   runtime?: RuntimeContext;
+  outputSchemaPath?: string;
+  outputLastMessagePath?: string;
+  useStdinPrompt?: boolean;
 }
 
 function installAbortKill(child: ChildProcess, signal?: AbortSignal): () => void {
@@ -111,6 +117,8 @@ export async function runAgent(
 interface CodexJsonEvent {
   type: string;
   thread_id?: string;
+  message?: string;
+  error?: { message?: string };
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
@@ -220,7 +228,18 @@ function requiresNativeWebSearch(requirement: NativeWebSearchRequirement): boole
   return requirement.required && requirement.enforce;
 }
 
-export function codexArgs(config: AgentConfig, prompt: string, requirement: NativeWebSearchRequirement): string[] {
+interface CodexArgsOptions {
+  outputSchemaPath?: string;
+  outputLastMessagePath?: string;
+  useStdinPrompt?: boolean;
+}
+
+export function codexArgs(
+  config: AgentConfig,
+  prompt: string,
+  requirement: NativeWebSearchRequirement,
+  options: CodexArgsOptions = {},
+): string[] {
   const configArgs: string[] = [];
   if (config.nativeWebSearch || requirement.required) {
     configArgs.push('-c', `web_search="${requirement.mode ?? config.nativeWebSearchMode}"`);
@@ -231,15 +250,20 @@ export function codexArgs(config: AgentConfig, prompt: string, requirement: Nati
   if (config.fastMode) {
     configArgs.push('-c', 'service_tier="fast"');
   }
+  const outputArgs: string[] = [];
+  if (options.outputSchemaPath) outputArgs.push('--output-schema', options.outputSchemaPath);
+  if (options.outputLastMessagePath) outputArgs.push('--output-last-message', options.outputLastMessagePath);
+  const promptArg = options.useStdinPrompt ? '-' : prompt;
 
   if (config.codexThreadId) {
-    return ['exec', 'resume', '--json', ...configArgs, '-m', config.model, config.codexThreadId, prompt];
+    return ['exec', 'resume', '--json', ...configArgs, ...outputArgs, '-m', config.model, config.codexThreadId, promptArg];
   }
 
   return [
     'exec',
     '--json',
     ...configArgs,
+    ...outputArgs,
     '--color',
     'never',
     '-C',
@@ -248,7 +272,7 @@ export function codexArgs(config: AgentConfig, prompt: string, requirement: Nati
     config.codexSandbox,
     '-m',
     config.model,
-    prompt,
+    promptArg,
   ];
 }
 
@@ -357,22 +381,39 @@ async function runCodexAgent(
 ) {
   const requirement = nativeWebRequirement(config, options);
   const prompt = inputToCodexPrompt(config, input, requirement);
-  const child = spawn('codex', codexArgs(config, prompt, requirement), {
+  const outputLastMessagePath = options?.outputLastMessagePath
+    ?? (options?.outputSchemaPath ? join(mkdtempSync(join(tmpdir(), 'gana-codex-')), 'last-message.json') : undefined);
+  const useStdinPrompt = Boolean(options?.useStdinPrompt || options?.outputSchemaPath);
+  const child = spawn('codex', codexArgs(config, prompt, requirement, {
+    outputSchemaPath: options?.outputSchemaPath,
+    outputLastMessagePath,
+    useStdinPrompt,
+  }), {
     cwd: process.cwd(),
     env: {
       ...process.env,
       CODEX_HOME: config.codexHome,
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [useStdinPrompt ? 'pipe' : 'ignore', 'pipe', 'pipe'],
   });
+  if (useStdinPrompt) child.stdin?.end(prompt);
+  if (!child.stdout || !child.stderr) {
+    throw new Error('codex process did not expose stdout/stderr streams');
+  }
 
   let stdoutBuffer = '';
   let stderr = '';
   let text = '';
   let usage: AgentUsage = {};
   let sawNativeWebSearch = false;
+  let providerError = '';
 
   const handleEvent = (event: CodexJsonEvent) => {
+    if ((event.type === 'error' || event.type === 'turn.failed') && (event.message || event.error?.message)) {
+      providerError = event.message ?? event.error?.message ?? '';
+      return;
+    }
+
     if (event.type === 'thread.started' && event.thread_id) {
       config.codexThreadId = event.thread_id;
       return;
@@ -483,10 +524,14 @@ async function runCodexAgent(
   }
 
   if (exitCode !== 0) {
-    throw new Error((stderr.trim() || `codex exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
+    throw new Error((stderr.trim() || providerError || `codex exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
   }
   if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
     throw new Error(formatNativeWebSearchEnforcementError(requirement));
+  }
+  if (!text.trim() && outputLastMessagePath && existsSync(outputLastMessagePath)) {
+    const lastMessage = readFileSync(outputLastMessagePath, 'utf8').trim();
+    if (lastMessage) text = lastMessage;
   }
 
   return { text, usage, output: text };

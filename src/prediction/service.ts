@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { join } from 'path';
 import type { AgentConfig } from '../config.js';
 import { runAgentWithRetry } from '../agent.js';
 import { createApiFootballPersistence, createApiFootballProvider } from '../providers/sports/api-football.js';
@@ -31,7 +32,8 @@ import { buildAtomicPrediction, scorePredictionCandidate } from './scoring.js';
 import { SCORE_PREDICTION_PROMPT_VERSION, buildScorePredictionPrompt, type ResearchWebMode } from './prompts.js';
 import { SCORING_RULE_VERSION, type PredictionRecordView } from './types.js';
 
-const SCORING_AGENT_TIMEOUT_MS = 120_000;
+const SCORING_AGENT_TIMEOUT_MS = 300_000;
+const SCORING_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/score-prediction-v1/output.schema.json');
 const MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT = 80;
 
 export interface RunFixtureScoringInput {
@@ -469,6 +471,8 @@ async function runScoringAgent(
     return await runner(config, prompt, {
       ...options,
       signal: controller.signal,
+      outputSchemaPath: SCORING_OUTPUT_SCHEMA_PATH,
+      useStdinPrompt: true,
     });
   } catch (err: any) {
     if (controller.signal.aborted) {

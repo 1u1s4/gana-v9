@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["parlays", "noParlayReason"],
+  "properties": {
+    "parlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "predictionIds", "rationale", "riskNotes", "duplicateFixtureJustification"],
+        "properties": {
+          "title": { "type": ["string", "null"] },
+          "predictionIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "rationale": { "type": "string", "minLength": 1 },
+          "riskNotes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "duplicateFixtureJustification": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "noParlayReason": { "type": ["string", "null"] }
+  }
+}

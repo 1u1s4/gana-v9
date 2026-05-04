@@ -164,7 +164,7 @@ describe('runParlayBuild', () => {
             { title: 'Balanced A', predictionIds: ['prediction-1', 'prediction-2', 'prediction-3'], rationale: 'Three compatible legs.' },
           ] }) } as any;
         }
-        throw new Error('aggressive profile should not be requested in precision mode');
+        return { text: JSON.stringify({ parlays: [], noParlayReason: 'Strict profiles already filled the portfolio.' }) } as any;
       },
       writeArtifact: (_runId, name) => {
         artifactNames.push(name);
@@ -253,7 +253,7 @@ describe('runParlayBuild', () => {
 
     assert.match(conservativePrompt, /Use predictionIds only/);
     assert.match(conservativePrompt, /Do not use fixtureId/);
-    assert.match(conservativePrompt, /parlay-portfolio-v2/);
+    assert.match(conservativePrompt, /parlay-portfolio-v3/);
     assert.match(conservativePrompt, /riskTags/);
     assert.match(conservativePrompt, /edge/);
     assert.match(conservativePrompt, /fragile_low_total_over/);
@@ -261,6 +261,218 @@ describe('runParlayBuild', () => {
     assert.equal(result.gateResult.verdict, 'promotable');
     assert.equal(result.portfolio?.parlays[0]?.build.parlay.status, 'promotable');
     assert.deepEqual(result.portfolio?.parlays[0]?.build.parlay.warnings, ['Normal match-state variance.']);
+  });
+
+  it('blocks with diagnostics when portfolio LLM prompts fail', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    const artifactNames: string[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async () => {
+        throw new Error('Reading additional input from stdin...');
+      },
+      writeArtifact: (_runId, name) => {
+        artifactNames.push(name);
+        return `/tmp/${name}`;
+      },
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({
+              id: 'prediction-1',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-1',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_away',
+              odds: 1.29,
+              confidence: 0.7,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.4,
+              warnings: ['research is not promotable'],
+            }),
+            prediction({
+              id: 'prediction-2',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-2',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_away',
+              odds: 1.3,
+              confidence: 0.7,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.4,
+              warnings: ['research is not promotable'],
+            }),
+            prediction({
+              id: 'prediction-3',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-3',
+              marketKey: 'goals_over_under',
+              selectionKey: 'over',
+              line: 1.5,
+              odds: 1.2,
+              confidence: 0.7,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.06,
+              warnings: ['research is not promotable'],
+            }),
+            prediction({
+              id: 'prediction-4',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-4',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_away',
+              odds: 1.37,
+              confidence: 0.7,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.4,
+              warnings: ['research is not promotable'],
+            }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-fallback' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.equal(result.portfolio?.parlays.length, 0);
+    assert.equal(result.portfolio?.profiles[0].included, 0);
+    assert.match(result.gateResult.warnings.join('\n'), /Reading additional input from stdin/);
+    assert.doesNotMatch(result.gateResult.warnings.join('\n'), /deterministic portfolio fallback/);
+    assert.equal(persisted.length, 0);
+    assert.deepEqual(artifactNames, ['parlay-portfolio-blocked.json']);
+  });
+
+  it('blocks with a no-parlay reason when the LLM returns an empty portfolio', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async () => ({ text: JSON.stringify({ parlays: [], noParlayReason: 'No compatible legs inside target odds.' }) }) as any,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.3, confidence: 0.7, quality: 'medium', status: 'review-required', edge: 0.03, warnings: ['research warning'] }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.35, confidence: 0.7, quality: 'medium', status: 'review-required', edge: 0.03, warnings: ['research warning'] }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-fallback' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.equal(result.portfolio?.parlays.length, 0);
+    assert.equal(result.portfolio?.rejected.length, 0);
+    assert.match(result.gateResult.warnings.join('\n'), /No compatible legs inside target odds/);
+  });
+
+  it('lets the review profile use weaker warning legs as review-required LLM output', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    let reviewPrompt = '';
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        const prompt = String(input);
+        if (!prompt.includes('(review)')) return { text: JSON.stringify({ parlays: [] }) } as any;
+        reviewPrompt = prompt;
+        return { text: JSON.stringify({ parlays: [
+          {
+            title: 'Review-only double chance',
+            predictionIds: ['prediction-1', 'prediction-2'],
+            rationale: 'Two weak but high-edge review legs remain analytical only.',
+            riskNotes: ['Draw exposure and research warnings keep this review-required.'],
+          },
+        ] }) } as any;
+      },
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({
+              id: 'prediction-1',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-1',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_away',
+              odds: 1.29,
+              confidence: 0.7,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.4,
+              warnings: ['research is not promotable'],
+            }),
+            prediction({
+              id: 'prediction-2',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-2',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_away',
+              odds: 1.3,
+              confidence: 0.7,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.4,
+              warnings: ['research is not promotable'],
+            }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-review' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    assert.match(reviewPrompt, /Review profile/);
+    assert.match(reviewPrompt, /Minimum leg confidence for this profile: 0.7/);
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(result.portfolio?.parlays.length, 1);
+    assert.equal(result.portfolio?.parlays[0].profile, 'review');
+    assert.equal(result.portfolio?.parlays[0].build.parlay.status, 'review-required');
+    assert.equal(result.portfolio?.parlays[0].build.config.minPredictionConfidence, 0.7);
+    assert.equal(persisted.length, 1);
   });
 
   it('rejects LLM portfolio parlays that duplicate a fixture without justification', async () => {
@@ -363,7 +575,7 @@ describe('runParlayBuild', () => {
       },
     });
 
-    assert.equal(inspectedPrompts, 2);
+    assert.equal(inspectedPrompts, 3);
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.parlays.length, 1);
   });
@@ -415,7 +627,7 @@ describe('runParlayBuild', () => {
 
     assert.equal(result.ok, false);
     assert.equal(result.gateResult.verdict, 'blocked');
-    assert.match(result.gateResult.warnings.join('\n'), /draw exposure/);
+    assert.match(result.gateResult.warnings.join('\n'), /unknown prediction id: prediction-draw-exposure/);
     assert.equal(result.portfolio?.parlays.length, 0);
   });
 

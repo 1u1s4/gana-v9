@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { basename } from 'path';
+import { basename, join } from 'path';
 import { runAgentWithRetry } from '../agent.js';
 import type { AgentConfig } from '../config.js';
 import type { MarketKey } from '../domain/markets.js';
@@ -37,14 +37,17 @@ import type {
 } from './types.js';
 
 const ELIGIBLE_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
-const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v2';
+const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v3';
+const PARLAY_PORTFOLIO_SCHEMA_PATH = join(process.cwd(), 'skills/parlay-portfolio-v1/output.schema.json');
 const PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS = 120_000;
 const PORTFOLIO_MIN_CONFIDENCE = 0.72;
+const PORTFOLIO_REVIEW_MIN_CONFIDENCE = 0.7;
 const CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE = 0.62;
 const BALANCED_MIN_AGGREGATE_CONFIDENCE = 0.55;
 const PORTFOLIO_PROFILES = [
-  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 3 },
-  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 1 },
+  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
+  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 1, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
+  { key: 'review', label: 'Revision', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.2, targetParlays: 1, minConfidence: PORTFOLIO_REVIEW_MIN_CONFIDENCE, maxReviewOrWarningLegs: 99, allowDrawExposure: true, reviewOnly: true },
 ] as const;
 
 type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'];
@@ -60,6 +63,7 @@ interface ParsedPortfolioParlay {
 
 interface ParsedPortfolioOutput {
   parlays: ParsedPortfolioParlay[];
+  noParlayReason?: string;
 }
 
 interface PortfolioBuild {
@@ -132,6 +136,21 @@ export interface ParlayPortfolio {
     index: number;
     reasons: string[];
   }>;
+  diagnostics?: {
+    sourcePredictions: number;
+    pool: Array<{
+      profile: ParlayPortfolioProfile;
+      eligible: number;
+      excluded: number;
+      excludedReasons: Array<{ predictionId: string; reasons: string[] }>;
+    }>;
+    agentOutputs?: Array<{
+      profile: ParlayPortfolioProfile;
+      rawOutput: string;
+      noParlayReason?: string;
+      warnings: string[];
+    }>;
+  };
 }
 
 export interface ParlayServiceRepositories {
@@ -308,13 +327,32 @@ async function runParlayPortfolio(
     status: ELIGIBLE_PREDICTION_STATUSES,
     take: 500,
   });
-  const pool = records
-    .map(toSourcePrediction)
-    .map(decoratePortfolioPrediction)
-    .filter(isPortfolioPoolEligible);
-  const poolById = new Map(pool.map((prediction) => [prediction.id, prediction]));
+  const sourcePredictions = records.map(toSourcePrediction);
+  const decoratedPredictions = sourcePredictions.map(decoratePortfolioPrediction);
   const portfolioId = randomUUID();
+  const poolDiagnostics = PORTFOLIO_PROFILES.map((profile) => {
+    const excludedReasons = decoratedPredictions
+      .map((prediction) => ({ predictionId: prediction.id, reasons: portfolioPoolExclusionReasons(prediction, profile) }))
+      .filter((item) => item.reasons.length > 0);
+    return {
+      profile: profile.key,
+      eligible: decoratedPredictions.length - excludedReasons.length,
+      excluded: excludedReasons.length,
+      excludedReasons,
+    };
+  });
   const profileOutputs = await Promise.all(PORTFOLIO_PROFILES.map(async (profile) => {
+    const pool = decoratedPredictions.filter((prediction) => isPortfolioPoolEligible(prediction, profile));
+    if (!pool.length) {
+      return {
+        profile: profile.key,
+        rawOutput: '',
+        output: { parlays: [] as ParsedPortfolioParlay[], noParlayReason: `${profile.key} pool is empty after portfolio filters` },
+        warnings: [`empty-pool: ${profile.key} pool is empty after portfolio filters`],
+        pool,
+      };
+    }
+    let rawOutput = '';
     try {
       const prompt = buildPortfolioProfilePrompt({
         portfolioId,
@@ -325,18 +363,23 @@ async function runParlayPortfolio(
         predictions: pool,
       });
       const result = await runParlayPortfolioAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, { runtime });
+      rawOutput = result.text;
+      const output = parsePortfolioAgentOutput(rawOutput);
+      const warnings = output.noParlayReason ? [`no-parlay-reason: ${output.noParlayReason}`] : [];
       return {
         profile: profile.key,
-        rawOutput: result.text,
-        output: parsePortfolioAgentOutput(result.text),
-        warnings: [] as string[],
+        rawOutput,
+        output,
+        warnings,
+        pool,
       };
     } catch (err: any) {
       return {
         profile: profile.key,
-        rawOutput: '',
+        rawOutput,
         output: { parlays: [] as ParsedPortfolioParlay[] },
         warnings: [`${profile.key} parlay prompt failed: ${err?.message ?? String(err)}`],
+        pool,
       };
     }
   }));
@@ -347,6 +390,7 @@ async function runParlayPortfolio(
   const profileSummaries: ParlayPortfolio['profiles'] = [];
   for (const profileSpec of PORTFOLIO_PROFILES) {
     const output = profileOutputs.find((item) => item.profile === profileSpec.key);
+    const poolById = new Map((output?.pool ?? []).map((prediction) => [prediction.id, prediction]));
     const parsedParlays = output?.output.parlays.slice(0, profileSpec.targetParlays) ?? [];
     let included = 0;
     let rejectedCount = 0;
@@ -378,9 +422,19 @@ async function runParlayPortfolio(
     profiles: profileSummaries,
     parlays: builds,
     rejected,
+    diagnostics: {
+      sourcePredictions: sourcePredictions.length,
+      pool: poolDiagnostics,
+      agentOutputs: profileOutputs.map((output) => ({
+        profile: output.profile,
+        rawOutput: output.rawOutput,
+        noParlayReason: output.output.noParlayReason,
+        warnings: output.warnings,
+      })),
+    },
   };
   const gateResult = gateFromPortfolio(portfolio);
-  const fallbackBuild = builds[0]?.build ?? buildParlay({
+  const representativeBuild = builds[0]?.build ?? buildParlay({
     id: randomUUID(),
     sourceRunId,
     generatedAt,
@@ -397,7 +451,7 @@ async function runParlayPortfolio(
     artifactWriter(
       runId,
       'parlays.json',
-      artifactPayloadFor(runId, date, generatedAt, fallbackBuild, gateFromBuild(fallbackBuild)),
+      artifactPayloadFor(runId, date, generatedAt, representativeBuild, gateFromBuild(representativeBuild)),
     );
   }
 
@@ -428,7 +482,7 @@ async function runParlayPortfolio(
       runId,
       date,
       gateResult,
-      build: fallbackBuild,
+      build: representativeBuild,
       portfolio,
       persistedParlayId: persistedParlayIds[0],
       persistedParlayIds,
@@ -488,10 +542,17 @@ function buildPortfolioProfilePrompt(input: {
     `Create up to ${input.profile.targetParlays} parlays for this profile.`,
     `Each parlay must contain ${input.profile.minLegs}-${input.profile.maxLegs} legs.`,
     `Target combined decimal odds: ${input.profile.minOdds}-${input.profile.maxOdds}. Parlays outside this range will be rejected.`,
-    'Do not use legs tagged negative_edge or draw_exposure.',
+    `Minimum leg confidence for this profile: ${input.profile.minConfidence}.`,
+    input.profile.reviewOnly
+      ? 'Review profile: weaker legs are allowed only as review-required analytical output.'
+      : 'Strict profile: preserve promotable/candidate status only when validation allows it.',
+    input.profile.allowDrawExposure
+      ? 'Draw exposure is allowed only with a specific risk note explaining why it remains review-required.'
+      : 'Do not use legs tagged negative_edge or draw_exposure.',
+    input.profile.allowDrawExposure ? 'Do not use legs tagged negative_edge.' : undefined,
     'Do not use fragile_low_total_over when it is also low_edge.',
     'Do not use fragile_low_price_dc when it is also low_edge.',
-    'Use at most one leg tagged review_required or research_warning per parlay.',
+    `Use at most ${input.profile.maxReviewOrWarningLegs} leg(s) tagged review_required or research_warning per parlay.`,
     'Prefer 2-3 independent conservative legs over higher combined odds.',
     'Each rationale must explain why every selected leg survives its main risk tag.',
     'Prefer diversity across fixtures, leagues and market types when quality is similar.',
@@ -510,6 +571,7 @@ function buildPortfolioProfilePrompt(input: {
           duplicateFixtureJustification: 'required only when one fixture appears more than once',
         },
       ],
+      noParlayReason: 'optional short reason when no parlay should be generated',
     }),
     '',
     'Context:',
@@ -519,11 +581,11 @@ function buildPortfolioProfilePrompt(input: {
       date: input.date,
       generatedAt: input.generatedAt,
       promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
-      minConfidence: PORTFOLIO_MIN_CONFIDENCE,
+      minConfidence: input.profile.minConfidence,
       profile: input.profile,
       predictionPool: compactPredictions,
     }),
-  ].join('\n');
+  ].filter((line): line is string => typeof line === 'string').join('\n');
 }
 
 async function runParlayPortfolioAgent(
@@ -539,6 +601,8 @@ async function runParlayPortfolioAgent(
       runtime: options.runtime,
       signal: controller.signal,
       maxRetries: 1,
+      outputSchemaPath: PARLAY_PORTFOLIO_SCHEMA_PATH,
+      useStdinPrompt: true,
     });
   } finally {
     clearTimeout(timeout);
@@ -549,6 +613,7 @@ function parsePortfolioAgentOutput(text: string): ParsedPortfolioOutput {
   const parsed = parseJsonObject(text);
   const parlays = Array.isArray(parsed?.parlays) ? parsed.parlays : [];
   return {
+    noParlayReason: typeof parsed?.noParlayReason === 'string' ? parsed.noParlayReason : undefined,
     parlays: parlays.map((item: any) => ({
       title: typeof item?.title === 'string' ? item.title : undefined,
       predictionIds: Array.isArray(item?.predictionIds) ? item.predictionIds.map(String).filter(Boolean) : [],
@@ -575,7 +640,7 @@ function parseJsonObject(text: string): any {
       try { return JSON.parse(text.slice(start, end + 1)); } catch { /* fall through */ }
     }
   }
-  return {};
+  throw new Error(`invalid-json: portfolio agent output was not valid JSON (${truncateText(text, 160) || 'empty output'})`);
 }
 
 function validateParsedPortfolioParlay(
@@ -598,7 +663,7 @@ function validateParsedPortfolioParlay(
   const predictions = uniquePredictionIds.map((id) => poolById.get(id));
   for (const [index, prediction] of predictions.entries()) {
     if (!prediction) reasons.push(`unknown prediction id: ${uniquePredictionIds[index]}`);
-    else if (prediction.confidence < PORTFOLIO_MIN_CONFIDENCE) reasons.push(`prediction below confidence floor: ${prediction.id}`);
+    else if (prediction.confidence < profile.minConfidence) reasons.push(`prediction below ${profile.label} confidence floor: ${prediction.id}`);
   }
   if (!parsed.rationale.trim()) reasons.push('missing rationale');
 
@@ -644,7 +709,9 @@ function validateParsedPortfolioParlay(
   }
   const minAggregateConfidence = profile.key === 'conservative'
     ? CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE
-    : BALANCED_MIN_AGGREGATE_CONFIDENCE;
+    : profile.key === 'balanced'
+      ? BALANCED_MIN_AGGREGATE_CONFIDENCE
+      : 0;
   if (aggregateConfidence < minAggregateConfidence) {
     return {
       ok: false,
@@ -658,7 +725,7 @@ function validateParsedPortfolioParlay(
     ...constraintWarnings,
     ...(parsed.riskNotes ?? []),
   ].filter(Boolean);
-  const status: PredictionStatus = constraintWarnings.length || selected.some((prediction) => prediction.status === 'review-required')
+  const status: PredictionStatus = constraintWarnings.length || profile.reviewOnly || selected.some((prediction) => prediction.status === 'review-required')
     ? 'review-required'
     : selected.some((prediction) => prediction.status === 'candidate')
       ? 'candidate'
@@ -678,7 +745,7 @@ function validateParsedPortfolioParlay(
     minLegs: profile.minLegs,
     maxLegs: profile.maxLegs,
     allowMultipleLegsPerFixture: Boolean(duplicateFixtures.length),
-    minPredictionConfidence: PORTFOLIO_MIN_CONFIDENCE,
+    minPredictionConfidence: profile.minConfidence,
     maxCombinedOdds: profile.maxOdds,
   };
   const rationaleParts = [
@@ -723,7 +790,7 @@ function validatePortfolioRisk(
     if (hasRiskTag(prediction, 'negative_edge')) {
       reasons.push(`prediction has negative edge: ${prediction.id}`);
     }
-    if (hasRiskTag(prediction, 'draw_exposure')) {
+    if (hasRiskTag(prediction, 'draw_exposure') && !profile.allowDrawExposure) {
       reasons.push(`prediction has draw exposure: ${prediction.id}`);
     }
     if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) {
@@ -734,7 +801,7 @@ function validatePortfolioRisk(
     }
   }
 
-  if (reviewOrWarningCount > 1) {
+  if (reviewOrWarningCount > profile.maxReviewOrWarningLegs) {
     reasons.push(`too many review-required or warning legs for ${profile.label}: ${reviewOrWarningCount}`);
   }
 
@@ -743,20 +810,23 @@ function validatePortfolioRisk(
 
 function gateFromPortfolio(portfolio: ParlayPortfolio): ParlayGateResult {
   if (!portfolio.parlays.length) {
+    const diagnostics = [...new Set([
+      ...portfolio.profiles.flatMap((profile) => profile.warnings),
+      ...portfolio.rejected.flatMap((rejection) => rejection.reasons.map((reason) => `${rejection.profile}[${rejection.index}]: ${reason}`)),
+    ])];
     return {
       verdict: 'blocked',
-      reasons: ['no valid analytical parlays generated'],
-      warnings: [
-        ...portfolio.profiles.flatMap((profile) => profile.warnings),
-        ...portfolio.rejected.flatMap((rejection) => rejection.reasons.map((reason) => `${rejection.profile}[${rejection.index}]: ${reason}`)),
-      ],
+      reasons: diagnostics.length
+        ? ['no valid analytical parlays generated', ...diagnostics]
+        : ['no valid analytical parlays generated'],
+      warnings: diagnostics,
     };
   }
-  const warnings = [
+  const warnings = [...new Set([
     ...portfolio.profiles.flatMap((profile) => profile.warnings),
     ...portfolio.parlays.flatMap((entry) => entry.build.parlay.warnings),
     ...portfolio.rejected.flatMap((rejection) => rejection.reasons.map((reason) => `${rejection.profile}[${rejection.index}]: ${reason}`)),
-  ];
+  ])];
   const verdict: PredictionStatus = portfolio.parlays.some((entry) => entry.build.parlay.status === 'review-required') || portfolio.rejected.length
     ? 'review-required'
     : portfolio.parlays.some((entry) => entry.build.parlay.status === 'candidate')
@@ -839,12 +909,28 @@ function decoratePortfolioPrediction(prediction: ParlaySourcePrediction): Parlay
   };
 }
 
-function isPortfolioPoolEligible(prediction: ParlaySourcePrediction): boolean {
-  if (prediction.confidence < PORTFOLIO_MIN_CONFIDENCE) return false;
-  if (hasRiskTag(prediction, 'negative_edge')) return false;
-  if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) return false;
-  if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) return false;
-  return true;
+function isPortfolioPoolEligible(
+  prediction: ParlaySourcePrediction,
+  profile: ParlayPortfolioProfileSpec,
+): boolean {
+  return portfolioPoolExclusionReasons(prediction, profile).length === 0;
+}
+
+function portfolioPoolExclusionReasons(
+  prediction: ParlaySourcePrediction,
+  profile: ParlayPortfolioProfileSpec,
+): string[] {
+  const reasons: string[] = [];
+  if (prediction.confidence < profile.minConfidence) reasons.push(`below ${profile.label} confidence floor`);
+  if (hasRiskTag(prediction, 'negative_edge')) reasons.push('negative edge');
+  if (hasRiskTag(prediction, 'draw_exposure') && !profile.allowDrawExposure) reasons.push('draw exposure');
+  if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) {
+    reasons.push('fragile low total over with low edge');
+  }
+  if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) {
+    reasons.push('fragile low-price double chance with low edge');
+  }
+  return reasons;
 }
 
 function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] {
@@ -1003,6 +1089,11 @@ function artifactPayloadFor(
   build: BuildParlayResult,
   gateResult: ParlayGateResult,
 ): Record<string, unknown> {
+  const parlay = {
+    ...build.parlay,
+    warnings: [...build.parlay.warnings],
+    legs: build.parlay.legs.map((leg) => ({ ...leg })),
+  };
   return {
     runId,
     date,
@@ -1015,8 +1106,12 @@ function artifactPayloadFor(
     },
     notice: 'This parlay candidate is an analytical artifact only; it cannot execute wagers or monetary actions.',
     config: build.config,
-    gateResult,
-    parlay: build.parlay,
+    gateResult: {
+      ...gateResult,
+      reasons: [...gateResult.reasons],
+      warnings: [...gateResult.warnings],
+    },
+    parlay,
     included: build.evaluations
       .filter((evaluation) => evaluation.eligible)
       .map((evaluation) => ({

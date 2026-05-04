@@ -52,6 +52,20 @@ describe('native provider args', () => {
     assert.equal(argValue(codexArgs(cfg, 'prompt', requirement(cfg)), '--sandbox'), 'danger-full-access');
   });
 
+  it('can send Codex prompts over stdin with structured output files', () => {
+    const cfg = config({ provider: 'codex' });
+    const args = codexArgs(cfg, 'prompt', requirement(cfg), {
+      outputSchemaPath: '/tmp/schema.json',
+      outputLastMessagePath: '/tmp/last-message.json',
+      useStdinPrompt: true,
+    });
+
+    assert.equal(argValue(args, '--output-schema'), '/tmp/schema.json');
+    assert.equal(argValue(args, '--output-last-message'), '/tmp/last-message.json');
+    assert.equal(args.at(-1), '-');
+    assert.equal(args.includes('prompt'), false);
+  });
+
   it('does not elevate Gemini approval mode from full-permissions profile alone', () => {
     const cfg = config({
       provider: 'gemini',

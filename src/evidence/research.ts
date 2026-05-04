@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { join } from 'path';
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import { isMarketKey } from '../domain/markets.js';
@@ -82,7 +83,8 @@ const BLOCKED_GATE: ResearchGateResult = {
   reasons: ['research failed'],
   warnings: [],
 };
-const RESEARCH_AGENT_TIMEOUT_MS = 120_000;
+const RESEARCH_AGENT_TIMEOUT_MS = 300_000;
+const RESEARCH_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/research-fixture-v2/output.schema.json');
 
 export async function runFixtureResearch(
   config: AgentConfig,
@@ -282,6 +284,8 @@ async function runResearchAgent(
     return await runner(config, prompt, {
       ...options,
       signal: controller.signal,
+      outputSchemaPath: RESEARCH_OUTPUT_SCHEMA_PATH,
+      useStdinPrompt: true,
     });
   } catch (err: any) {
     if (controller.signal.aborted) {
@@ -320,7 +324,7 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
   });
 
   const repairedClaims = claims.map((claim: any) => {
-    const subject = repairClaimSubject(claim?.subject, claim?.id, warnings);
+    const subject = repairClaimSubject(claim?.subject, claim?.id, claim?.statement, warnings);
     if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject };
     const repairedEvidenceIds: string[] = [];
     for (const evidenceId of claim.evidenceIds) {
@@ -350,12 +354,20 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
   };
 }
 
-function repairClaimSubject(subject: any, claimId: unknown, warnings: string[]): any {
+function repairClaimSubject(subject: any, claimId: unknown, statement: unknown, warnings: string[]): any {
   if (subject?.type !== 'market') return subject;
   if (isMarketKey(subject.market)) return subject;
   if (isMarketKey(subject.id)) {
     warnings.push(`mapped market subject id "${subject.id}" to subject.market on claim "${String(claimId ?? 'unknown')}"`);
     return { ...subject, market: subject.id };
+  }
+  if (typeof statement === 'string') {
+    const inferredMarket = ['h2h', 'double_chance', 'goals_over_under', 'corners_over_under', 'btts']
+      .find((market) => statement.includes(market));
+    if (isMarketKey(inferredMarket)) {
+      warnings.push(`inferred market subject "${inferredMarket}" from statement on claim "${String(claimId ?? 'unknown')}"`);
+      return { ...subject, market: inferredMarket };
+    }
   }
   return subject;
 }
@@ -659,10 +671,16 @@ function fixtureMetadataSummary(fixture: Fixture): string {
   const score = Number.isFinite(fixture.scoreHome) && Number.isFinite(fixture.scoreAway)
     ? `, score ${fixture.scoreHome}-${fixture.scoreAway}`
     : '';
+  const homeTeam = fixture.homeTeamName
+    ? `${fixture.homeTeamName} (${fixture.homeTeamId})`
+    : fixture.homeTeamId;
+  const awayTeam = fixture.awayTeamName
+    ? `${fixture.awayTeamName} (${fixture.awayTeamId})`
+    : fixture.awayTeamId;
   return [
     `API-Football fixture ${fixture.providerFixtureId}`,
-    `home team ${fixture.homeTeamId}`,
-    `away team ${fixture.awayTeamId}`,
+    `home team ${homeTeam}`,
+    `away team ${awayTeam}`,
     `status ${fixture.status}`,
     `scheduledAt ${fixture.scheduledAt}${score}`,
   ].join(', ');
@@ -690,7 +708,10 @@ function fixtureStatisticsClaim(statistics: FixtureStatistics): string {
 }
 
 function fixtureMetadataClaim(fixture: Fixture): string {
-  return `API-Football lists fixture ${fixture.providerFixtureId} as ${fixture.status} with scheduled kickoff ${fixture.scheduledAt}.`;
+  const matchup = fixture.homeTeamName && fixture.awayTeamName
+    ? `${fixture.homeTeamName} vs ${fixture.awayTeamName}`
+    : `fixture ${fixture.providerFixtureId}`;
+  return `API-Football lists ${matchup} (${fixture.providerFixtureId}) as ${fixture.status} with scheduled kickoff ${fixture.scheduledAt}.`;
 }
 
 function redactErrorMessage(error: string): string {
