@@ -196,6 +196,30 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
   });
 
+  it('normalizes web-search capturedAt offsets before schema validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      sources: [{
+        id: 'source-web-1',
+        type: 'web-search',
+        url: 'https://example.com/team-news',
+        title: 'Team news',
+        capturedAt: '2026-05-06T09:30:00-03:00',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.sources.find((source) => source.id === 'source-web-1')?.capturedAt, '2026-05-06T12:30:00.000Z');
+  });
+
   it('adds a synthetic web-search source when native web search was used but omitted from JSON', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -352,6 +376,35 @@ describe('runFixtureResearch', () => {
     const artifact = JSON.parse(readFileSync(result.artifactPath as string, 'utf-8')) as ResearchBundle;
     assert.equal(artifact.metadata?.fallback, true);
     assert.equal(artifact.gateResult.verdict, 'review-required');
+  });
+
+  it('retries once when live web research returns incomplete JSON before falling back', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    let retryPrompt = '';
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, input) => {
+        attempts += 1;
+        retryPrompt = String(input);
+        return {
+          text: attempts === 1 ? '{"sources":[' : agentOutput({
+            gateResult: { verdict: 'promotable', reasons: ['retry returned valid JSON'], warnings: [] },
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(attempts, 2);
+    assert.match(retryPrompt, /previous research response was not parseable strict JSON/);
   });
 
   it('returns blocked and writes redacted raw output when agent output is not JSON', async () => {

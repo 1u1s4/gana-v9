@@ -185,6 +185,95 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].edge, 0.56 - (1 / 2.1));
   });
 
+  it('repairs LLM evidence and claim references that omit persisted bundle prefixes', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const prefixedEvidence = evidenceItems.map((item) => ({ ...item, id: `research-bundle-1:${item.id}` }));
+    const prefixedClaims = claims.map((claim) => ({
+      ...claim,
+      id: `research-bundle-1:${claim.id}`,
+      evidenceIds: ['research-bundle-1:evidence-1', 'research-bundle-1:evidence-2'],
+    }));
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        evidenceItems: { list: async () => prefixedEvidence },
+        claims: { list: async () => prefixedClaims },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'promotable');
+    assert.deepEqual(persisted[0].evidenceIds, ['research-bundle-1:evidence-1', 'research-bundle-1:evidence-2']);
+    assert.deepEqual(result.predictions[0].claimIds, ['research-bundle-1:claim-1']);
+  });
+
+  it('augments under-cited LLM picks with gate-approved evidence to avoid false evidence-thin blockers', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'promotable');
+    assert.deepEqual(persisted[0].evidenceIds, ['evidence-1', 'evidence-2']);
+    assert.equal(persisted[0].warnings.includes('evidence-thin'), false);
+  });
+
   it('keeps scoring prompts compact by trimming representative allowed quotes', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

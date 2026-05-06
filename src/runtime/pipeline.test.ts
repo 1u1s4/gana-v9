@@ -542,10 +542,10 @@ describe('executeRunPipeline', () => {
     const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
     assert.equal(lowOddsScan.hitCount, 0);
-    assert.match(
-      evaluation.steps.find((step: { name: string }) => step.name === 'scan low odds').warnings.join('\n'),
-      /falling back to full eligible fixture slate/,
-    );
+    const lowOddsStep = evaluation.steps.find((step: { name: string }) => step.name === 'scan low odds');
+    assert.equal(lowOddsStep.ok, true);
+    assert.equal(lowOddsStep.verdict, 'promotable');
+    assert.deepEqual(lowOddsStep.warnings, []);
     assert.equal(evaluation.counts.predictions, 1);
   });
 

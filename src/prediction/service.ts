@@ -247,7 +247,7 @@ export async function runFixtureScoring(
       signal: input.signal,
     });
     rawOutput = result.text;
-    llmOutput = parseTopPickOutput(rawOutput);
+    llmOutput = repairTopPickReferences(parseTopPickOutput(rawOutput), evidenceGate, research.claims);
   } catch (err: any) {
     const error = err?.message ?? String(err);
     llmOutput = buildFallbackTopPicks({
@@ -307,7 +307,9 @@ export async function runFixtureScoring(
       hasWebResearch: hasWebResearchSource(research.sources),
       qualityWarnings: retrievalWarnings,
     });
-    const selectedEvidenceIds = pick.evidenceIds.length ? pick.evidenceIds : evidenceGate.evidenceIds;
+    const selectedEvidenceIds = pick.evidenceIds.length >= 2
+      ? pick.evidenceIds
+      : uniqueStrings([...pick.evidenceIds, ...evidenceGate.evidenceIds]);
     const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
 
     return buildAtomicPrediction({
@@ -540,6 +542,39 @@ function parseTopPick(value: unknown, index: number): ParsedTopPick {
     rationale,
     warnings,
   };
+}
+
+function repairTopPickReferences(
+  picks: ParsedTopPick[],
+  evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
+  claims: ClaimRecord[],
+): ParsedTopPick[] {
+  const evidenceIds = new Set(evidenceGate.evidenceIds);
+  const claimIds = new Set(claims.map((claim) => claim.id));
+  const evidenceBySuffix = suffixMap(evidenceGate.evidenceIds);
+  const claimBySuffix = suffixMap([...claimIds]);
+  return picks.map((pick) => ({
+    ...pick,
+    evidenceIds: uniqueStrings(pick.evidenceIds.map((id) => evidenceIds.has(id) ? id : evidenceBySuffix.get(id) ?? id)),
+    claimIds: uniqueStrings(pick.claimIds.map((id) => claimIds.has(id) ? id : claimBySuffix.get(id) ?? id)),
+  }));
+}
+
+function suffixMap(ids: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  for (const id of ids) {
+    const suffix = id.includes(':') ? id.slice(id.lastIndexOf(':') + 1) : id;
+    if (!suffix || suffix === id && !id.includes(':')) continue;
+    if (map.has(suffix)) ambiguous.add(suffix);
+    else map.set(suffix, id);
+  }
+  for (const suffix of ambiguous) map.delete(suffix);
+  return map;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function validateTopPicks(

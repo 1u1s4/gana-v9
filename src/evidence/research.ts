@@ -84,6 +84,7 @@ const BLOCKED_GATE: ResearchGateResult = {
   warnings: [],
 };
 const RESEARCH_AGENT_TIMEOUT_MS = 300_000;
+const RESEARCH_AGENT_JSON_ATTEMPTS = 2;
 const RESEARCH_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/research-fixture-v2/output.schema.json');
 
 export async function runFixtureResearch(
@@ -120,24 +121,29 @@ export async function runFixtureResearch(
   });
 
   let rawOutput = '';
+  let parsed: ReturnType<typeof parseResearchJson> | undefined;
   const nativeWebSearchTrace = createNativeWebSearchTrace();
-  try {
-    const nativeWebSearchRequirement = deriveNativeWebSearchRequirement(config, {
-      required: input.web === 'live',
-      reason: 'research fixture',
-    });
-    const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, {
-      nativeWebSearchRequirement,
-      onEvent: (event) => recordNativeWebSearchEvent(nativeWebSearchTrace, event),
-      signal: input.signal,
-    });
-    rawOutput = result.text;
-  } catch (err: any) {
-    const error = redactErrorMessage(err?.message ?? String(err));
-    return buildAndPersistAgentFailureFallback(config, input, runtime, deps, runId, fixture, createdAt, error, providerContext);
-  }
+  for (let attempt = 1; attempt <= RESEARCH_AGENT_JSON_ATTEMPTS; attempt += 1) {
+    try {
+      const nativeWebSearchRequirement = deriveNativeWebSearchRequirement(config, {
+        required: input.web === 'live',
+        reason: 'research fixture',
+      });
+      const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, config, researchPromptForAttempt(prompt, attempt), {
+        nativeWebSearchRequirement,
+        onEvent: (event) => recordNativeWebSearchEvent(nativeWebSearchTrace, event),
+        signal: input.signal,
+      });
+      rawOutput = result.text;
+    } catch (err: any) {
+      const error = redactErrorMessage(err?.message ?? String(err));
+      return buildAndPersistAgentFailureFallback(config, input, runtime, deps, runId, fixture, createdAt, error, providerContext);
+    }
 
-  const parsed = parseResearchJson(rawOutput);
+    parsed = parseResearchJson(rawOutput);
+    if (parsed.ok) break;
+  }
+  parsed ??= { ok: false, error: 'Research output must be strict JSON: no output returned' };
   if (!parsed.ok) {
     if (input.web === 'live' || input.web === 'cached') {
       return buildAndPersistAgentFailureFallback(
@@ -210,6 +216,14 @@ export function parseResearchJson(rawOutput: string): { ok: true; value: any } |
   try {
     return { ok: true, value: JSON.parse(trimmed) };
   } catch (err: any) {
+    const balanced = extractFirstBalancedJsonObject(trimmed);
+    if (balanced) {
+      try {
+        return { ok: true, value: JSON.parse(balanced) };
+      } catch {
+        // Fall through to the original strict JSON error for actionable debugging.
+      }
+    }
     const start = trimmed.indexOf('{');
     const end = trimmed.lastIndexOf('}');
     if (start !== -1 && end > start) {
@@ -221,6 +235,42 @@ export function parseResearchJson(rawOutput: string): { ok: true; value: any } |
     }
     return { ok: false, error: `Research output must be strict JSON: ${err?.message ?? err}` };
   }
+}
+
+function extractFirstBalancedJsonObject(text: string): string | undefined {
+  const start = text.indexOf('{');
+  if (start === -1) return undefined;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, index + 1);
+    }
+  }
+  return undefined;
+}
+
+function researchPromptForAttempt(prompt: string, attempt: number): string {
+  if (attempt <= 1) return prompt;
+  return `${prompt}\n\nRetry instruction: the previous research response was not parseable strict JSON. Return exactly one complete JSON object that validates the schema. Do not include markdown, prose, comments, trailing text, or a partial object.`;
 }
 
 function createNativeWebSearchTrace(): NativeWebSearchTrace {
@@ -770,13 +820,22 @@ function uniqueStrings(values: string[]): string[] {
 
 function normalizeSourceRecords(sources: SourceRecord[]): SourceRecord[] {
   return sources.map((source) => {
-    if (!source.url || isValidUrl(source.url)) return source;
-    return {
+    const normalized = {
       ...source,
+      capturedAt: normalizeIsoDateTime(source.capturedAt),
+    };
+    if (!normalized.url || isValidUrl(normalized.url)) return normalized;
+    return {
+      ...normalized,
       url: undefined,
-      artifactPath: source.artifactPath ?? source.url,
+      artifactPath: normalized.artifactPath ?? normalized.url,
     };
   });
+}
+
+function normalizeIsoDateTime(value: string): string {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
 }
 
 function isValidUrl(value: string): boolean {
