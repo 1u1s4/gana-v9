@@ -25,7 +25,9 @@ export function evaluateEdgeGate(input: ProbabilisticPredictionInput): EdgeGateR
   if ((input.evidenceCoverage ?? 1) < 0.6) blockers.push('evidence-thin');
   if (input.lowLiquidity) blockers.push('low-liquidity');
   if (input.stalePick) blockers.push('stale-pick');
-  if (input.lineupPending) blockers.push('lineup-pending');
+  // lineup-pending is informational risk context, not a hard edge blocker.
+  // Pre-kickoff lineups are often unavailable for today fixtures; blocking on them
+  // downgrades otherwise valid analytical picks/parlays to review-required.
   if (input.modelDisagreement) blockers.push('model-disagreement');
   return { edge, blockers, promotable: blockers.length === 0 };
 }

@@ -428,8 +428,9 @@ describe('runFixtureScoring', () => {
 
     assert.equal(result.ok, false);
     assert.equal(result.gateResult.verdict, 'blocked');
-    assert.deepEqual(result.predictions[0].blockers.sort(), ['lineup-pending', 'model-disagreement', 'stale-pick']);
-    assert.deepEqual(persisted[0].metadata.blockers.sort(), ['lineup-pending', 'model-disagreement', 'stale-pick']);
+    assert.deepEqual(result.predictions[0].blockers.sort(), ['model-disagreement', 'stale-pick']);
+    assert.match(result.predictions[0].warnings.join('\n'), /lineup-pending/);
+    assert.deepEqual(persisted[0].metadata.blockers.sort(), ['model-disagreement', 'stale-pick']);
   });
 
   it('downgrades predictions when linked research sources are stale', async () => {

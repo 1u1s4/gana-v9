@@ -164,7 +164,7 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
     rationale: input.rationale ?? 'Rule-based scoring v1 from persisted odds and linked research evidence.',
     blockers: edgeGate.blockers,
     promotable: edgeGate.promotable,
-    warnings: [...new Set([...(input.warnings ?? []), ...candidate.reasons, ...edgeGate.blockers])],
+    warnings: [...new Set([...(input.warnings ?? []), ...candidate.reasons, ...edgeGate.blockers, ...(input.lineupPending ? ['lineup-pending'] : [])])],
     parlayEligible: input.parlayEligible,
     providerAgentic: input.providerAgentic as PredictionRecordView['providerAgentic'],
     model: input.model,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { scorePredictionCandidate } from './scoring.js';
+import { buildAtomicPrediction, scorePredictionCandidate } from './scoring.js';
 
 function candidate(overrides: Record<string, unknown> = {}) {
   return {
@@ -83,5 +83,32 @@ describe('prediction scoring', () => {
 
     assert.equal(result.valid, false);
     assert.match(result.reasons.join('\n'), /line forbidden/i);
+  });
+
+  it('keeps lineup-pending as a non-blocking warning for otherwise promotable predictions', () => {
+    const prediction = buildAtomicPrediction({
+      runId: 'run-1',
+      fixtureId: 'fixture-1',
+      providerFixtureId: '1001',
+      oddsSnapshotId: 'odds-snapshot-1',
+      oddsQuoteId: 'odds-quote-1',
+      market: 'btts',
+      selection: 'yes',
+      odds: 2,
+      marketFairProbability: 0.45,
+      estimatedProbability: 0.9,
+      evidenceIds: ['evidence-1', 'evidence-2'],
+      claimIds: ['claim-1'],
+      status: 'promotable',
+      confidence: 0.9,
+      rationale: 'BTTS is supported by the supplied evidence.',
+      lineupPending: true,
+      generatedAt: '2026-05-06T20:00:00.000Z',
+    });
+
+    assert.equal(prediction.status, 'promotable');
+    assert.equal(prediction.promotable, true);
+    assert.deepEqual(prediction.blockers, []);
+    assert.match(prediction.warnings.join('\n'), /lineup-pending/);
   });
 });
