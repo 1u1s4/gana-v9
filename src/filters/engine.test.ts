@@ -27,6 +27,7 @@ const config: Pick<AgentConfig, 'apiFootball'> = {
     defaultSeasonInferred: false,
     timezone: 'America/Guatemala',
     leaguePresetsPath: 'config/league-presets.test.json',
+    bookmakerPresetsPath: 'config/bookmaker-presets.test.json',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,

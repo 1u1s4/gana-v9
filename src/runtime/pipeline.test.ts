@@ -18,6 +18,8 @@ function testConfig() {
       defaultSeasonInferred: false,
       timezone: 'America/Guatemala',
       leaguePresetsPath: join(mkdtempSync(join(tmpdir(), 'gana-league-presets-')), 'league-presets.json'),
+      bookmakerPresetsPath: join(mkdtempSync(join(tmpdir(), 'gana-bookmaker-presets-')), 'bookmaker-presets.json'),
+      bookmakerAllowlist: ['test-book'],
       defaultLeagues: [],
       defaultTeams: [],
       defaultMarkets: ['h2h'],

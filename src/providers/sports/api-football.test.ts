@@ -57,15 +57,26 @@ describe('api-football provider', () => {
         return jsonResponse({
           paging: { current: 1, total: 1 },
           response: [{
-            bookmakers: [{
-              id: 6,
-              name: 'Bet365',
-              bets: [{
-                id: 1,
-                name: 'Match Winner',
-                values: [{ value: 'Home', odd: '1.80' }],
-              }],
-            }],
+            bookmakers: [
+              {
+                id: 6,
+                name: 'Bet365',
+                bets: [{
+                  id: 1,
+                  name: 'Match Winner',
+                  values: [{ value: 'Home', odd: '1.80' }],
+                }],
+              },
+              {
+                id: 42,
+                name: 'Random Book',
+                bets: [{
+                  id: 1,
+                  name: 'Match Winner',
+                  values: [{ value: 'Away', odd: '2.10' }],
+                }],
+              },
+            ],
           }],
         });
       }
@@ -93,7 +104,7 @@ describe('api-football provider', () => {
       },
     };
 
-    const provider = createApiFootballProvider(testConfig(), persistence);
+    const provider = createApiFootballProvider(testConfig({ bookmakerAllowlist: ['bet365', 'Stake', 'Pinnacle'] }), persistence);
     const results = await provider.scanOdds({
       date: '2026-05-01',
       league: 39,
@@ -113,6 +124,7 @@ describe('api-football provider', () => {
     assert.equal(persistedSnapshots.length, 1);
     assert.equal(persistedSnapshots[0].fixtureId, 'fixture-1001');
     assert.equal(persistedSnapshots[0].providerFixtureId, '1001');
+    assert.equal(persistedSnapshots[0].bookmakerCount, 1);
     assert.equal(persistedSnapshots[0].quotes.length, 1);
 
     const fixtureRequest = requests.find((request) => request.pathname === '/fixtures');
@@ -131,7 +143,7 @@ describe('api-football provider', () => {
   });
 });
 
-function testConfig(): ApiFootballProviderConfig {
+function testConfig(apiFootball: Partial<ApiFootballProviderConfig['apiFootball']> = {}): ApiFootballProviderConfig {
   return {
     apiFootballKey: 'test-api-football-key',
     apiFootballBaseUrl: 'https://v3.football.api-sports.io',
@@ -140,6 +152,7 @@ function testConfig(): ApiFootballProviderConfig {
       defaultSeasonInferred: false,
       timezone: 'America/Guatemala',
       leaguePresetsPath: 'config/league-presets.test.json',
+      bookmakerPresetsPath: 'config/bookmaker-presets.test.json',
       defaultLeagues: [],
       defaultTeams: [],
       defaultMarkets: ['h2h'],
@@ -148,6 +161,7 @@ function testConfig(): ApiFootballProviderConfig {
       includeLiveFixtures: true,
       includeCompletedFixtures: true,
       maxFixturesPerRun: 10,
+      ...apiFootball,
     },
   };
 }

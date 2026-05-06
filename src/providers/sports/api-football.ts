@@ -197,20 +197,24 @@ export class ApiFootballProvider implements SportsDataProvider {
   async getCanonicalOddsSnapshot(input: OddsQuery): Promise<CanonicalOddsSnapshot> {
     const fixture = await this.resolveFixtureForOdds(input.fixtureId);
     const pages = await this.requestPagedOdds(input.fixtureId);
-    const quotes = pages.flatMap((page) => mapApiFootballOdds(page.payload, {
+    const mappedQuotes = pages.flatMap((page) => mapApiFootballOdds(page.payload, {
       fixtureId: fixture.id,
       providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
       capturedAt: page.capturedAt,
     }));
+    const quotes = filterQuotesByBookmakerAllowlist(
+      dedupeQuotes(mappedQuotes),
+      this.config.apiFootball.bookmakerAllowlist,
+    );
     const firstPage = pages[0];
     const snapshot: CanonicalOddsSnapshot = {
       fixtureId: fixture.id,
       providerFixtureId: input.fixtureId,
       providerSnapshotId: firstPage?.providerSnapshotId ?? `provider-snapshot:${firstPage?.payloadHash ?? 'unknown'}`,
       capturedAt: firstPage?.capturedAt.toISOString() ?? new Date().toISOString(),
-      bookmakerCount: countBookmakers(pages.map((page) => page.payload)),
+      bookmakerCount: countBookmakersFromQuotes(quotes),
       payloadHash: firstPage?.payloadHash ?? 'unknown',
-      quotes: dedupeQuotes(quotes),
+      quotes,
     };
 
     return await this.persistence.persistOddsSnapshot?.(snapshot) ?? snapshot;
@@ -651,18 +655,34 @@ function readPagingTotal(payload: unknown): number {
   return typeof total === 'number' && Number.isInteger(total) && total > 1 ? total : 1;
 }
 
-function countBookmakers(payloads: unknown[]): number {
-  const bookmakers = new Set<string>();
-  for (const payload of payloads) {
-    if (!payload || typeof payload !== 'object' || !Array.isArray((payload as any).response)) continue;
-    for (const item of (payload as any).response) {
-      const list = Array.isArray(item?.bookmakers) ? item.bookmakers : [];
-      for (const bookmaker of list) {
-        bookmakers.add(String(bookmaker?.id ?? bookmaker?.name ?? 'unknown'));
-      }
-    }
+function countBookmakersFromQuotes(quotes: OddsQuote[]): number {
+  return new Set(quotes.map((quote) => normalizeBookmakerName(quote.bookmaker ?? 'unknown'))).size;
+}
+
+function filterQuotesByBookmakerAllowlist(quotes: OddsQuote[], allowlist: string[] | undefined): OddsQuote[] {
+  const normalizedAllowlist = normalizeBookmakerAllowlist(allowlist);
+  if (!normalizedAllowlist.size) return quotes;
+  return quotes.filter((quote) => isAllowedBookmaker(quote.bookmaker, normalizedAllowlist));
+}
+
+function normalizeBookmakerAllowlist(allowlist: string[] | undefined): Set<string> {
+  return new Set((allowlist ?? [])
+    .map(normalizeBookmakerName)
+    .filter((value) => value.length > 0));
+}
+
+function isAllowedBookmaker(bookmaker: string | undefined, allowlist: Set<string>): boolean {
+  const bookmakerName = normalizeBookmakerName(bookmaker ?? '');
+  if (!bookmakerName) return false;
+  if (allowlist.has(bookmakerName)) return true;
+  for (const allowed of allowlist) {
+    if (bookmakerName.startsWith(allowed) || allowed.startsWith(bookmakerName)) return true;
   }
-  return bookmakers.size;
+  return false;
+}
+
+function normalizeBookmakerName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 interface OddsMarketAnalytics {

@@ -25,6 +25,7 @@ export interface ApiFootballFilterConfig {
   defaultSeasonInferred: boolean;
   timezone: string;
   leaguePresetsPath: string;
+  bookmakerPresetsPath: string;
   defaultLeagues: ApiFootballLeagueRef[];
   defaultTeams: ApiFootballTeamRef[];
   defaultMarkets: MarketKey[];
@@ -137,6 +138,37 @@ function parseMarkets(value: string | undefined): MarketKey[] | undefined {
   return markets.length ? markets : undefined;
 }
 
+function parseStringList(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  const items = value.split(',').map((part) => part.trim()).filter(Boolean);
+  return items.length ? items : undefined;
+}
+
+const DEFAULT_BOOKMAKER_ALLOWLIST = ['Bet365', 'Stake', 'Pinnacle'];
+
+function readBookmakerAllowlist(path: string): string[] {
+  const filePath = resolve(path);
+  if (!existsSync(filePath)) return DEFAULT_BOOKMAKER_ALLOWLIST;
+  const file = JSON.parse(readFileSync(filePath, 'utf-8')) as unknown;
+  if (Array.isArray(file)) return file.map(String).filter(Boolean);
+  if (!file || typeof file !== 'object') return DEFAULT_BOOKMAKER_ALLOWLIST;
+  const entries = Array.isArray((file as any).bookmakers) ? (file as any).bookmakers : [];
+  const names: string[] = [];
+  for (const entry of entries) {
+    if (typeof entry === 'string') {
+      names.push(entry);
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') continue;
+    if ((entry as any).enabled === false) continue;
+    if (typeof (entry as any).name === 'string') names.push((entry as any).name);
+    if (Array.isArray((entry as any).aliases)) {
+      names.push(...(entry as any).aliases.map(String));
+    }
+  }
+  return names.length ? names : DEFAULT_BOOKMAKER_ALLOWLIST;
+}
+
 function mergeApiFootballConfig(
   base: ApiFootballFilterConfig,
   override: Partial<ApiFootballFilterConfig> | undefined,
@@ -182,6 +214,7 @@ const DEFAULTS: AgentConfig = {
     defaultSeasonInferred: defaultSeasonFromEnv === undefined,
     timezone: 'America/Guatemala',
     leaguePresetsPath: 'config/league-presets.json',
+    bookmakerPresetsPath: 'config/bookmaker-presets.json',
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,
@@ -350,6 +383,8 @@ export function loadConfig(
   const envWindow = parseNumber(process.env.GANA_KICKOFF_WINDOW_HOURS);
   const envTimezone = process.env.GANA_FIXTURE_TIMEZONE || process.env.GANA_TIMEZONE;
   const envLeaguePresetsPath = process.env.GANA_LEAGUE_PRESETS_PATH;
+  const envBookmakerPresetsPath = process.env.GANA_BOOKMAKER_PRESETS_PATH;
+  const envBookmakers = parseStringList(process.env.GANA_BOOKMAKER_ALLOWLIST ?? process.env.GANA_BOOKMAKERS);
   const envMarkets = parseMarkets(process.env.GANA_DEFAULT_MARKETS);
   const envIncludeLive = parseBoolean(process.env.GANA_INCLUDE_LIVE_FIXTURES);
   const envIncludeCompleted = parseBoolean(process.env.GANA_INCLUDE_COMPLETED_FIXTURES);
@@ -362,6 +397,10 @@ export function loadConfig(
     ...(envWindow !== undefined && { kickoffWindowHours: envWindow }),
     ...(envTimezone && { timezone: envTimezone }),
     ...(envLeaguePresetsPath && { leaguePresetsPath: envLeaguePresetsPath }),
+    ...(envBookmakerPresetsPath && { bookmakerPresetsPath: envBookmakerPresetsPath }),
+    bookmakerAllowlist: envBookmakers ?? config.apiFootball.bookmakerAllowlist ?? readBookmakerAllowlist(
+      envBookmakerPresetsPath ?? config.apiFootball.bookmakerPresetsPath,
+    ),
     ...(envMarkets && { defaultMarkets: envMarkets }),
     ...(envIncludeLive !== undefined && { includeLiveFixtures: envIncludeLive }),
     ...(envIncludeCompleted !== undefined && { includeCompletedFixtures: envIncludeCompleted }),

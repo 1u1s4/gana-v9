@@ -1,0 +1,22 @@
+{
+  "bookmakers": [
+    {
+      "name": "Bet365",
+      "aliases": ["bet365"],
+      "enabled": true,
+      "priority": 10
+    },
+    {
+      "name": "Stake",
+      "aliases": ["Stake.com", "stake"],
+      "enabled": true,
+      "priority": 20
+    },
+    {
+      "name": "Pinnacle",
+      "aliases": ["Pinnacle Sports", "pinnacle"],
+      "enabled": true,
+      "priority": 30
+    }
+  ]
+}
