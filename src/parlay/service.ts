@@ -36,7 +36,8 @@ import type {
   ResolvedParlayConfig,
 } from './types.js';
 
-const ELIGIBLE_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
+const MAIN_PARLAY_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'promotable'];
+const PORTFOLIO_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
 const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v3';
 const PARLAY_PORTFOLIO_SCHEMA_PATH = join(process.cwd(), 'skills/parlay-portfolio-v1/output.schema.json');
 const PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS = 120_000;
@@ -224,7 +225,7 @@ export async function runParlayBuild(
   }
 
   const predictionQuery = {
-    status: ELIGIBLE_PREDICTION_STATUSES,
+    status: MAIN_PARLAY_PREDICTION_STATUSES,
     take: 500,
   };
   const predictionSourceRunId = input.sourceRunId;
@@ -334,7 +335,7 @@ async function runParlayPortfolio(
 
   const records = await repositories.predictions.list({
     runId: sourceRunId,
-    status: ELIGIBLE_PREDICTION_STATUSES,
+    status: PORTFOLIO_PREDICTION_STATUSES,
     take: 500,
   });
   const sourcePredictions = records.map(toSourcePrediction);

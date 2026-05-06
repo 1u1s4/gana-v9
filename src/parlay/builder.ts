@@ -118,6 +118,7 @@ function evaluatePrediction(
 
   if (prediction.status === 'blocked') reasons.push('excluded-blocked-prediction');
   if (prediction.status === 'draft') reasons.push('excluded-draft-prediction');
+  if (prediction.status === 'review-required') reasons.push('excluded-review-required-prediction');
   if (!isMarketKey(prediction.market)) {
     reasons.push('excluded-invalid-market');
   } else {

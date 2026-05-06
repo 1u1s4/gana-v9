@@ -18,6 +18,7 @@ export type ParlayInclusionReason =
 export type ParlayExclusionReason =
   | 'excluded-blocked-prediction'
   | 'excluded-draft-prediction'
+  | 'excluded-review-required-prediction'
   | 'excluded-duplicate-fixture'
   | 'excluded-invalid-confidence'
   | 'excluded-invalid-market'

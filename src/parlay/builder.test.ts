@@ -40,14 +40,15 @@ describe('parlay builder', () => {
     assert.deepEqual(result.evaluations[4]?.excludedReasons, ['excluded-max-legs-reached']);
   });
 
-  it('excludes blocked and draft predictions with explicit reasons', () => {
+  it('excludes blocked, draft, and review-required predictions with explicit reasons', () => {
     const result = buildParlay({
       id: 'parlay-1',
       generatedAt: '2026-04-25T12:00:00.000Z',
       predictions: [
         prediction({ id: 'prediction-1', fixtureId: 'fixture-1', status: 'blocked' }),
         prediction({ id: 'prediction-2', fixtureId: 'fixture-2', status: 'draft' }),
-        prediction({ id: 'prediction-3', fixtureId: 'fixture-3', status: 'candidate' }),
+        prediction({ id: 'prediction-3', fixtureId: 'fixture-3', status: 'review-required' }),
+        prediction({ id: 'prediction-4', fixtureId: 'fixture-4', status: 'candidate' }),
       ],
     });
 
@@ -61,6 +62,10 @@ describe('parlay builder', () => {
       result.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.excludedReasons,
       ['excluded-draft-prediction'],
     );
+    assert.deepEqual(
+      result.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-3')?.excludedReasons,
+      ['excluded-review-required-prediction'],
+    );
     assert.match(result.parlay.rationale, /1 eligible leg\(s\) selected, 2 required/);
   });
 
@@ -70,7 +75,7 @@ describe('parlay builder', () => {
       generatedAt: '2026-04-25T12:00:00.000Z',
       predictions: [
         prediction({ id: 'prediction-1', fixtureId: 'fixture-1', status: 'promotable', parlayEligible: false }),
-        prediction({ id: 'prediction-2', fixtureId: 'fixture-2', status: 'review-required', warnings: ['research is not promotable'] }),
+        prediction({ id: 'prediction-2', fixtureId: 'fixture-2', status: 'promotable', warnings: ['research is not promotable'] }),
         prediction({ id: 'prediction-3', fixtureId: 'fixture-3', status: 'promotable' }),
         prediction({ id: 'prediction-4', fixtureId: 'fixture-4', status: 'promotable' }),
       ],

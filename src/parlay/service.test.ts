@@ -72,7 +72,7 @@ describe('runParlayBuild', () => {
           },
           listForFixtureDate: async (date, query) => {
             assert.equal(date, '2026-04-25');
-            assert.deepEqual(query.status, ['candidate', 'review-required', 'promotable']);
+            assert.deepEqual(query.status, ['candidate', 'promotable']);
             return [
               prediction({ id: 'prediction-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8 }),
               prediction({ id: 'prediction-2', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.7 }),
@@ -136,7 +136,7 @@ describe('runParlayBuild', () => {
     assert.equal(result.ok, true);
     assert.deepEqual(listQuery, {
       runId: 'current-run-1',
-      status: ['candidate', 'review-required', 'promotable'],
+      status: ['candidate', 'promotable'],
       take: 500,
     });
     assert.equal(result.build.parlay.legs.length, 2);
