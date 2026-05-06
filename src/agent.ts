@@ -251,7 +251,9 @@ export function codexArgs(
     configArgs.push('-c', 'service_tier="fast"');
   }
   const outputArgs: string[] = [];
-  if (options.outputSchemaPath) outputArgs.push('--output-schema', options.outputSchemaPath);
+  // `codex exec resume` currently rejects --output-schema even though fresh `codex exec` accepts it.
+  // Keep schema enforcement for fresh turns, but rely on prompt/schema validation + retry for resumed threads.
+  if (options.outputSchemaPath && !config.codexThreadId) outputArgs.push('--output-schema', options.outputSchemaPath);
   if (options.outputLastMessagePath) outputArgs.push('--output-last-message', options.outputLastMessagePath);
   const promptArg = options.useStdinPrompt ? '-' : prompt;
 

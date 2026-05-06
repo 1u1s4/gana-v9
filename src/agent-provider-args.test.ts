@@ -66,6 +66,21 @@ describe('native provider args', () => {
     assert.equal(args.includes('prompt'), false);
   });
 
+  it('omits unsupported Codex resume --output-schema while preserving last-message capture', () => {
+    const cfg = config({ provider: 'codex', codexThreadId: 'thread-1' });
+    const args = codexArgs(cfg, 'prompt', requirement(cfg), {
+      outputSchemaPath: '/tmp/schema.json',
+      outputLastMessagePath: '/tmp/last-message.json',
+      useStdinPrompt: true,
+    });
+
+    assert.equal(args.slice(0, 3).join(' '), 'exec resume --json');
+    assert.equal(args.includes('--output-schema'), false);
+    assert.equal(argValue(args, '--output-last-message'), '/tmp/last-message.json');
+    assert.equal(args.at(-2), 'thread-1');
+    assert.equal(args.at(-1), '-');
+  });
+
   it('does not elevate Gemini approval mode from full-permissions profile alone', () => {
     const cfg = config({
       provider: 'gemini',
