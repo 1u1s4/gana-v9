@@ -1,6 +1,7 @@
 import type { FixtureStatus } from '../storage/types.js';
 
 export interface DashboardStatusOptions {
+  fixtures: string[];
   predictions: string[];
   parlays: string[];
   validations: string[];
@@ -20,10 +21,11 @@ export interface DashboardOverviewMetadata {
 
 export interface DashboardRowMeta {
   id: string;
-  kind: 'prediction' | 'parlay' | 'validation' | 'run';
+  kind: 'fixture' | 'prediction' | 'parlay' | 'validation' | 'run';
 }
 
 export interface DashboardCounts {
+  fixtures: number;
   predictions: number;
   parlays: number;
   validations: number;
@@ -131,11 +133,20 @@ export interface DashboardRunRow extends DashboardOverviewRow {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  taskCount?: number;
+  artifactCount?: number;
+  predictionCount?: number;
+  parlayCount?: number;
+  validationCount?: number;
+  recentPredictions?: DashboardPredictionRow[];
+  recentParlays?: DashboardParlayRow[];
+  recentValidations?: DashboardValidationRow[];
 }
 
 export interface DashboardFixtureRow {
   id: string;
   providerFixtureId: string;
+  season?: number | null;
   scheduledAt: string | null;
   status: FixtureStatus | string;
   scoreHome: number | null;
@@ -147,6 +158,23 @@ export interface DashboardFixtureRow {
   } | null;
   homeTeam: { id: string; name: string } | null;
   awayTeam: { id: string; name: string } | null;
+  predictionCount?: number;
+  parlayLegCount?: number;
+  validationCount?: number;
+  latestPrediction?: Pick<
+    DashboardPredictionRow,
+    'id' | 'runId' | 'marketKey' | 'selectionKey' | 'line' | 'odds' | 'edge' | 'confidence' | 'quality' | 'status' | 'generatedAt'
+  > | null;
+  latestValidation?: Pick<
+    DashboardValidationRow,
+    'id' | 'runId' | 'predictionId' | 'parlayId' | 'status' | 'reason' | 'evaluatedAt' | 'createdAt' | 'target'
+  > | null;
+  recentPredictions?: Array<Pick<
+    DashboardPredictionRow,
+    'id' | 'runId' | 'marketKey' | 'selectionKey' | 'line' | 'odds' | 'edge' | 'confidence' | 'quality' | 'status' | 'generatedAt'
+  >>;
+  recentParlayLegs?: DashboardParlayLegRow[];
+  recentValidations?: DashboardValidationRow[];
 }
 
 export interface DashboardOverviewResponse {
@@ -183,6 +211,7 @@ export interface DashboardOverviewResponse {
   counts: DashboardCounts;
   pagination: DashboardPagination;
   statusFacets: Record<string, number>;
+  fixtures: DashboardFixtureRow[];
   predictions: DashboardPredictionRow[];
   parlays: DashboardParlayRow[];
   validations: DashboardValidationRow[];

@@ -165,6 +165,7 @@ export function dashboardHtml(): string {
     .pager-group { display: inline-flex; gap: 8px; }
     .detail { padding: 14px; display: grid; gap: 12px; max-height: 80vh; overflow: auto; }
     .detail h3 { margin: 0; font-size: 16px; line-height: 1.25; }
+    .detail h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0; }
     .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; }
     .kv span:first-child { color: var(--muted); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
@@ -177,6 +178,16 @@ export function dashboardHtml(): string {
     .chip-btn:hover { border-color: var(--accent); }
     .muted-inline { color: var(--muted); font-size: 12px; }
     .crosslink { color: var(--accent); text-decoration: underline; cursor: pointer; }
+    .scoreline { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
+    .scoreline span { min-width: 22px; text-align: center; padding: 2px 6px; border-radius: 4px; background: #eef3f2; }
+    .insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .insight { border: 1px solid #edf0f2; border-radius: 6px; padding: 8px; min-width: 0; background: #fbfcfd; }
+    .insight span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+    .insight b { display: block; font-size: 16px; overflow-wrap: anywhere; }
+    .detail-card { border: 1px solid #edf0f2; border-radius: 6px; padding: 10px; background: #fff; display: grid; gap: 8px; }
+    .detail-list { display: grid; gap: 8px; }
+    .detail-line { display: grid; gap: 3px; padding: 8px; border: 1px solid #edf0f2; border-radius: 6px; background: #fbfcfd; }
+    .rationale { white-space: pre-wrap; line-height: 1.45; }
     @media (max-width: 980px) {
       header { align-items: stretch; flex-direction: column; }
       .toolbar { justify-content: flex-start; }
@@ -259,7 +270,8 @@ export function dashboardHtml(): string {
     <main class="main">
       <section class="stats" id="stats"></section>
       <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="predictions">Predicciones</button>
+        <button class="tab active" data-tab="fixtures">Partidos</button>
+        <button class="tab" data-tab="predictions">Predicciones</button>
         <button class="tab" data-tab="parlays">Parlays</button>
         <button class="tab" data-tab="validations">Validaciones</button>
         <button class="tab" data-tab="runs">Runs</button>
@@ -267,7 +279,7 @@ export function dashboardHtml(): string {
       <section class="content">
         <div class="panel">
           <div class="panel-head">
-            <h2 id="section-title">Predicciones</h2>
+            <h2 id="section-title">Partidos</h2>
             <span class="muted" id="section-count"></span>
           </div>
           <div id="list" class="empty">Cargando…</div>
@@ -290,18 +302,27 @@ export function dashboardHtml(): string {
   <script>
     (function () {
       const TAB_LABELS = {
+        fixtures: 'Partidos',
         predictions: 'Predicciones',
         parlays: 'Parlays',
         validations: 'Validaciones',
         runs: 'Runs',
       };
       const KIND_TO_TAB = {
+        fixture: 'fixtures',
         prediction: 'predictions',
         parlay: 'parlays',
         validation: 'validations',
         run: 'runs',
       };
       const TAB_SORT_HEADERS = {
+        fixtures: [
+          ['partido', 'scheduledAt'],
+          ['estado', 'status'],
+          ['predicción', 'updatedAt'],
+          ['resultado', 'updatedAt'],
+          ['actividad', 'createdAt'],
+        ],
         predictions: [
           ['partido', 'marketKey'],
           ['pick', 'selectionKey'],
@@ -332,15 +353,16 @@ export function dashboardHtml(): string {
           ['Fin', 'completedAt'],
         ],
       };
-      const ALLOWED_TABS = ['predictions', 'parlays', 'validations', 'runs'];
+      const ALLOWED_TABS = ['fixtures', 'predictions', 'parlays', 'validations', 'runs'];
       const DEFAULT_SORT_BY = {
+        fixtures: 'scheduledAt',
         predictions: 'generatedAt',
         parlays: 'generatedAt',
         validations: 'evaluatedAt',
         runs: 'createdAt',
       };
       const state = {
-        tab: 'predictions',
+        tab: 'fixtures',
         take: 50,
         page: 1,
         sort: '',
@@ -378,11 +400,30 @@ export function dashboardHtml(): string {
       const fmtPct = (value, digits = 1) => value == null ? '—' : (Number(value) * 100).toFixed(digits) + '%';
       const fmtNum = (value, digits = 3) => value == null ? '—' : Number(value).toFixed(digits);
       const fmtDate = (value) => value ? new Date(value).toLocaleString() : '—';
+      const fmtScore = (fixture) => {
+        if (!fixture || fixture.scoreHome == null || fixture.scoreAway == null) return '—';
+        return '<span class="scoreline"><span>' + esc(fixture.scoreHome) + '</span><b>-</b><span>' + esc(fixture.scoreAway) + '</span></span>';
+      };
       const matchName = (fixture) => {
         if (!fixture) return 'Sin fixture';
         const home = fixture.homeTeam?.name ?? 'Local';
         const away = fixture.awayTeam?.name ?? 'Visita';
         return home + ' vs ' + away;
+      };
+      const marketLabel = (row) => {
+        if (!row) return '—';
+        const line = row.line == null ? '' : ' ' + row.line;
+        return String(row.marketKey || 'mercado') + ' · ' + String(row.selectionKey || 'pick') + line;
+      };
+      const fixtureMeta = (fixture) => {
+        if (!fixture) return '—';
+        const parts = [
+          fixture.competition?.name || '',
+          fixture.competition?.country || '',
+          fixture.scheduledAt ? fmtDate(fixture.scheduledAt) : '',
+          fixture.providerFixtureId ? 'provider ' + fixture.providerFixtureId : '',
+        ].filter(Boolean);
+        return parts.join(' · ') || '—';
       };
       const hasText = (value) => String(value ?? '').trim().length > 0;
 
@@ -692,6 +733,7 @@ export function dashboardHtml(): string {
               '<span class="muted">' + esc(status) + '</span><b>' + count + '</b></article>';
           }));
         } else {
+          cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="fixtures"><span class="muted">Partidos</span><b>' + state.data.counts.fixtures + '</b></article>');
           cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="predictions"><span class="muted">Predicciones</span><b>' + state.data.counts.predictions + '</b></article>');
           cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="parlays"><span class="muted">Parlays</span><b>' + state.data.counts.parlays + '</b></article>');
           cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="validations"><span class="muted">Validaciones</span><b>' + state.data.counts.validations + '</b></article>');
@@ -726,6 +768,7 @@ export function dashboardHtml(): string {
           $('#list').innerHTML = '<div class="empty">No hay datos para los filtros actuales.</div>';
           return;
         }
+        if (state.tab === 'fixtures') return renderFixtureRows(rows);
         if (state.tab === 'predictions') return renderPredictionRows(rows);
         if (state.tab === 'parlays') return renderParlayRows(rows);
         if (state.tab === 'validations') return renderValidationRows(rows);
@@ -745,10 +788,35 @@ export function dashboardHtml(): string {
 
       function rowsForActiveTab() {
         if (!state.data) return [];
+        if (state.tab === 'fixtures') return state.data.fixtures || [];
         if (state.tab === 'predictions') return state.data.predictions || [];
         if (state.tab === 'parlays') return state.data.parlays || [];
         if (state.tab === 'validations') return state.data.validations || [];
         return state.data.runs || [];
+      }
+
+      function renderFixtureRows(rows) {
+        const sort = state.sort;
+        const headers = TAB_SORT_HEADERS.fixtures;
+        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
+            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
+          '</tr></thead><tbody>' +
+          rows.map((row) => {
+            const latest = row.latestPrediction;
+            const validation = row.latestValidation;
+            const activity = [
+              (row.predictionCount ?? 0) + ' pred.',
+              (row.parlayLegCount ?? 0) + ' legs',
+              (row.validationCount ?? 0) + ' val.',
+            ].join(' · ');
+            return '<tr data-kind="fixture" data-id="' + esc(row.id) + '"><td><div class="match">' + esc(matchName(row)) +
+              '</div><div class="sub">' + esc(fixtureMeta(row)) + '</div></td><td>' + badge(row.status) +
+              '</td><td>' + (latest ? '<b>' + esc(marketLabel(latest)) + '</b><div class="sub">odds ' + fmtNum(latest.odds) + ' · edge ' + fmtPct(latest.edge, 1) + ' · conf. ' + fmtPct(latest.confidence, 1) + '</div>' : '<span class="muted-inline">Sin predicción</span>') +
+              '</td><td>' + fmtScore(row) + '<div class="sub">' + (validation ? badge(validation.status) + ' ' + esc(validation.reason || '') : 'Sin validación') + '</div>' +
+              '</td><td><div>' + esc(activity) + '</div><div class="sub mono">' + esc(row.id) + '</div></td></tr>';
+          }).join('') +
+          '</tbody></table></div>';
       }
 
       function renderPredictionRows(rows) {
@@ -760,6 +828,7 @@ export function dashboardHtml(): string {
           '</tr></thead><tbody>' +
           rows.map((row) => '<tr data-kind="prediction" data-id="' + esc(row.id) + '"><td><div class="match">' + esc(matchName(row.fixture)) +
             '</div><div class="sub">' + esc(row.fixture?.competition?.name || '') + ' · ' + esc(row.fixture ? fmtDate(row.fixture.scheduledAt) : '') +
+            '</div><div class="sub">' + fmtScore(row.fixture) + ' ' + (row.latestValidation ? badge(row.latestValidation.status) : '') +
             '</div></td><td><b>' + esc(row.marketKey) + '</b><div class="sub">' + esc(row.selectionKey) + (row.line ? ' ' + esc(row.line) : '') +
             '</div></td><td>' + fmtNum(row.odds) + '</td><td>' + fmtPct(row.impliedProbability, 1) + '</td><td>' + fmtPct(row.edge, 1) + '</td><td>' +
             fmtPct(row.confidence, 1) + '</td><td>' + badge(row.status) + '</td><td>' + fmtDate(row.generatedAt) +
@@ -776,7 +845,7 @@ export function dashboardHtml(): string {
           '<th>Legs</th>' +
           '</tr></thead><tbody>' +
           rows.map((row) => '<tr data-kind="parlay" data-id="' + esc(row.id) + '"><td><div class="mono">' + esc(row.id) + '</div><div class="sub">' +
-            fmtDate(row.generatedAt) + '</div></td><td>' + fmtNum(row.combinedOdds) + '</td><td>' + fmtPct(row.aggregateConfidence, 1) + '</td><td>' +
+            fmtDate(row.generatedAt) + '</div><div class="sub">' + (row.latestValidation ? badge(row.latestValidation.status) : 'Sin validación') + '</div></td><td>' + fmtNum(row.combinedOdds) + '</td><td>' + fmtPct(row.aggregateConfidence, 1) + '</td><td>' +
             fmtPct(row.aggregateQuality, 1) + '</td><td>' + badge(row.status) + '</td><td><div class="chips">' +
             row.legs.slice(0, 2).map((leg) => '<button class="chip-btn crosslink" data-kind="prediction" data-id="' + esc(leg.predictionId) + '">' + esc(matchName(leg.fixture)) + '</button>').join('') +
             (row.legs.length > 2 ? '<span class="muted-inline">+' + (row.legs.length - 2) + '</span>' : '') +
@@ -816,13 +885,28 @@ export function dashboardHtml(): string {
         $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
           headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
             (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
-          '<th>Proveedor</th>' +
+          '<th>Proveedor</th><th>Actividad</th>' +
           '</tr></thead><tbody>' +
           rows.map((row) => '<tr data-kind="run" data-id="' + esc(row.id) + '"><td>' + fmtDate(row.createdAt) +
             '</td><td>' + badge(row.status) + '</td><td>' + esc(row.verdict || '—') +
             '</td><td>' + fmtDate(row.startedAt) + '</td><td>' + fmtDate(row.completedAt) +
-            '</td><td>' + esc(row.providerAgentic || '—') + ' · ' + esc(row.profile) + ' · ' + esc(row.runtime) + '</td></tr>').join('') +
+            '</td><td>' + esc(row.providerAgentic || '—') + ' · ' + esc(row.profile) + ' · ' + esc(row.runtime) + '</td><td>' +
+            esc((row.predictionCount ?? 0) + ' pred. · ' + (row.parlayCount ?? 0) + ' parlays · ' + (row.validationCount ?? 0) + ' val.') +
+            '</td></tr>').join('') +
           '</tbody></table>';
+      }
+
+      function renderMiniPrediction(row) {
+        return '<div class="detail-line"><b>' + esc(marketLabel(row)) + '</b><span class="sub">odds ' + fmtNum(row.odds) +
+          ' · edge ' + fmtPct(row.edge, 1) + ' · conf. ' + fmtPct(row.confidence, 1) + ' · ' + esc(row.quality || 'n/a') +
+          '</span><span>' + badge(row.status) + ' <span class="crosslink mono" data-kind="prediction" data-id="' + esc(row.id) + '">' + esc(row.id) + '</span></span></div>';
+      }
+
+      function renderMiniValidation(row) {
+        const target = validationTargetForRow(row);
+        return '<div class="detail-line"><span>' + badge(row.status) + ' ' + esc(row.reason || '') + '</span><span class="sub">' +
+          esc(target.summary || target.label || 'Validación') + ' · ' + fmtDate(row.evaluatedAt || row.createdAt) +
+          '</span><span class="crosslink mono" data-kind="validation" data-id="' + esc(row.id) + '">' + esc(row.id) + '</span></div>';
       }
 
       function renderDetail(kind, data, links) {
@@ -830,13 +914,82 @@ export function dashboardHtml(): string {
           $('#detail').innerHTML = '<span class=\"muted\">Sin detalle disponible.</span>';
           return;
         }
-        const title = data.fixture ? matchName(data.fixture) : data.id || '';
+        const title = kind === 'fixture' ? matchName(data) : data.fixture ? matchName(data.fixture) : data.id || '';
         const sections = [];
         const kv = (label, value) => '<div class=\"kv\"><span>' + esc(label) + '</span><span>' + value + '</span></div>';
         const validationTarget = kind === 'validation' ? validationTargetForRow(data) : null;
         sections.push('<h3>' + esc(title) + '</h3>');
         sections.push(kv('Tipo', esc(kind === 'validation' ? (validationTarget?.label || 'Sin objetivo') : kind)));
         sections.push(kv('ID', '<span class=\"mono\">' + esc(data.id || '') + '</span>'));
+        if (kind === 'fixture') {
+          sections.push('<div class="insight-grid">' +
+            '<div class="insight"><span>Resultado</span><b>' + fmtScore(data) + '</b></div>' +
+            '<div class="insight"><span>Predicciones</span><b>' + esc(data.predictionCount ?? 0) + '</b></div>' +
+            '<div class="insight"><span>Parlay legs</span><b>' + esc(data.parlayLegCount ?? 0) + '</b></div>' +
+            '</div>');
+          sections.push(kv('Competencia', esc(data.competition?.name || '—')));
+          sections.push(kv('Programado', esc(fmtDate(data.scheduledAt))));
+          sections.push(kv('Estado', badge(data.status)));
+          if (data.latestPrediction) {
+            sections.push('<div class="detail-card"><h4>Última predicción</h4>' + renderMiniPrediction(data.latestPrediction) + '</div>');
+          }
+          if (Array.isArray(data.recentPredictions) && data.recentPredictions.length) {
+            sections.push('<div class="detail-card"><h4>Predicciones recientes</h4><div class="detail-list">' + data.recentPredictions.map(renderMiniPrediction).join('') + '</div></div>');
+          }
+          if (Array.isArray(data.recentValidations) && data.recentValidations.length) {
+            sections.push('<div class="detail-card"><h4>Resultados y settlement</h4><div class="detail-list">' + data.recentValidations.map(renderMiniValidation).join('') + '</div></div>');
+          }
+        }
+        if (kind === 'prediction') {
+          sections.push('<div class="insight-grid">' +
+            '<div class="insight"><span>Odds</span><b>' + esc(fmtNum(data.odds)) + '</b></div>' +
+            '<div class="insight"><span>Edge</span><b>' + esc(fmtPct(data.edge, 1)) + '</b></div>' +
+            '<div class="insight"><span>Confianza</span><b>' + esc(fmtPct(data.confidence, 1)) + '</b></div>' +
+            '</div>');
+          sections.push(kv('Pick', esc(marketLabel(data))));
+          sections.push(kv('Probabilidad', esc('impl. ' + fmtPct(data.impliedProbability, 1) + ' · modelo ' + fmtPct(data.estimatedProbability, 1))));
+          if (data.fixture) sections.push(kv('Partido', '<span class="crosslink" data-kind="fixture" data-id="' + esc(data.fixture.id) + '">' + esc(matchName(data.fixture)) + '</span>'));
+          if (data.latestValidation) sections.push(kv('Última validación', badge(data.latestValidation.status) + ' ' + esc(data.latestValidation.reason || '')));
+          if (data.rationale) sections.push('<div class="detail-card"><h4>Rationale</h4><div class="rationale">' + esc(data.rationale) + '</div></div>');
+        }
+        if (kind === 'parlay') {
+          sections.push('<div class="insight-grid">' +
+            '<div class="insight"><span>Odds combinadas</span><b>' + esc(fmtNum(data.combinedOdds)) + '</b></div>' +
+            '<div class="insight"><span>Confianza</span><b>' + esc(fmtPct(data.aggregateConfidence, 1)) + '</b></div>' +
+            '<div class="insight"><span>Calidad</span><b>' + esc(fmtPct(data.aggregateQuality, 1)) + '</b></div>' +
+            '</div>');
+          if (data.latestValidation) sections.push(kv('Última validación', badge(data.latestValidation.status) + ' ' + esc(data.latestValidation.reason || '')));
+          if (Array.isArray(data.legs) && data.legs.length) {
+            sections.push('<div class="detail-card"><h4>Legs</h4><div class="detail-list">' + data.legs.map((leg) =>
+              '<div class="detail-line"><b>' + esc(matchName(leg.fixture)) + '</b><span class="sub">' + esc(marketLabel(leg)) +
+              ' · odds ' + fmtNum(leg.odds) + ' · edge ' + fmtPct(leg.edge, 1) + ' · conf. ' + fmtPct(leg.confidence, 1) +
+              '</span><span>' + badge(leg.status) + ' <span class="crosslink mono" data-kind="prediction" data-id="' + esc(leg.predictionId) + '">' + esc(leg.predictionId) + '</span></span></div>'
+            ).join('') + '</div></div>');
+          }
+          if (data.rationale) sections.push('<div class="detail-card"><h4>Rationale</h4><div class="rationale">' + esc(data.rationale) + '</div></div>');
+        }
+        if (kind === 'run') {
+          sections.push('<div class="insight-grid">' +
+            '<div class="insight"><span>Predicciones</span><b>' + esc(data.predictionCount ?? 0) + '</b></div>' +
+            '<div class="insight"><span>Parlays</span><b>' + esc(data.parlayCount ?? 0) + '</b></div>' +
+            '<div class="insight"><span>Validaciones</span><b>' + esc(data.validationCount ?? 0) + '</b></div>' +
+            '</div>');
+          sections.push(kv('Perfil', esc(data.profile || '—')));
+          sections.push(kv('Proveedor/modelo', esc((data.providerAgentic || '—') + ' · ' + (data.model || 'sin modelo'))));
+          sections.push(kv('Ventana', esc(fmtDate(data.startedAt) + ' → ' + fmtDate(data.completedAt))));
+          if (data.artifactDir) sections.push(kv('Artifacts', '<span class="mono">' + esc(data.artifactDir) + '</span>'));
+          if (Array.isArray(data.recentPredictions) && data.recentPredictions.length) {
+            sections.push('<div class="detail-card"><h4>Predicciones del run</h4><div class="detail-list">' + data.recentPredictions.slice(0, 5).map(renderMiniPrediction).join('') + '</div></div>');
+          }
+          if (Array.isArray(data.recentParlays) && data.recentParlays.length) {
+            sections.push('<div class="detail-card"><h4>Parlays del run</h4><div class="detail-list">' + data.recentParlays.slice(0, 5).map((parlay) =>
+              '<div class="detail-line"><b>Parlay ' + esc(parlay.id) + '</b><span class="sub">odds ' + fmtNum(parlay.combinedOdds) + ' · ' + (parlay.legs?.length || 0) + ' legs · conf. ' + fmtPct(parlay.aggregateConfidence, 1) + '</span><span>' + badge(parlay.status) + ' <span class="crosslink mono" data-kind="parlay" data-id="' + esc(parlay.id) + '">' + esc(parlay.id) + '</span></span></div>'
+            ).join('') + '</div></div>');
+          }
+          if (Array.isArray(data.recentValidations) && data.recentValidations.length) {
+            sections.push('<div class="detail-card"><h4>Validaciones del run</h4><div class="detail-list">' + data.recentValidations.slice(0, 5).map(renderMiniValidation).join('') + '</div></div>');
+          }
+        }
         if (kind === 'validation') {
           const target = validationTarget || validationTargetForRow(data);
           sections.push(kv('Pertenece a', esc(target.summary || '—')));
@@ -1007,6 +1160,12 @@ export function dashboardHtml(): string {
         state.selectedId = id;
         await loadEntity(kind, id);
         syncUrl();
+      });
+
+      $('#detail').addEventListener('click', async (event) => {
+        const link = event.target.closest('.crosslink[data-kind][data-id], .chip-btn[data-kind][data-id]');
+        if (!(link instanceof HTMLElement) || !link.dataset.kind || !link.dataset.id) return;
+        await openRelatedEntity(link.dataset.kind, link.dataset.id);
       });
 
       $('#stats').addEventListener('click', (event) => {

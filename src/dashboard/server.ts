@@ -15,6 +15,7 @@ import {
 } from './query.js';
 import type {
   DashboardCounts,
+  DashboardFixtureRow,
   DashboardOverviewResponse,
   DashboardParlayRow,
   DashboardPredictionRow,
@@ -28,13 +29,14 @@ type DashboardDb = Pick<
   | 'parlay'
   | 'validationArtifact'
   | 'harnessRun'
+  | 'fixture'
   | 'team'
   | 'competition'
 > & {
   $queryRaw: PrismaClient['$queryRaw'];
 };
 
-type DashboardEntityKind = 'prediction' | 'parlay' | 'validation' | 'run';
+type DashboardEntityKind = 'fixture' | 'prediction' | 'parlay' | 'validation' | 'run';
 
 export interface DashboardOptions {
   host?: string;
@@ -48,13 +50,14 @@ export interface DashboardServer {
 
 export interface DashboardEntityResponse {
   kind: DashboardEntityKind;
-  entity: DashboardPredictionRow | DashboardParlayRow | DashboardValidationRow | DashboardRunRow;
+  entity: DashboardFixtureRow | DashboardPredictionRow | DashboardParlayRow | DashboardValidationRow | DashboardRunRow;
   validationHistory?: DashboardValidationRow[];
 }
 
 type QueryArgs = Record<string, unknown>;
 type DateWindow = { start: Date; end: Date };
 type SortCandidateMap = {
+  fixtures: ReadonlyArray<string>;
   predictions: ReadonlyArray<string>;
   parlays: ReadonlyArray<string>;
   validations: ReadonlyArray<string>;
@@ -62,6 +65,7 @@ type SortCandidateMap = {
 };
 
 const SORTABLE_FIELDS: SortCandidateMap = {
+  fixtures: ['scheduledAt', 'status', 'createdAt', 'updatedAt'],
   predictions: ['generatedAt', 'marketKey', 'selectionKey', 'odds', 'impliedProbability', 'edge', 'confidence', 'status'],
   parlays: ['generatedAt', 'combinedOdds', 'aggregateConfidence', 'aggregateQuality', 'status'],
   validations: ['evaluatedAt', 'status', 'createdAt'],
@@ -69,6 +73,7 @@ const SORTABLE_FIELDS: SortCandidateMap = {
 };
 
 const DEFAULT_SORT_BY = {
+  fixtures: 'scheduledAt',
   predictions: 'generatedAt',
   parlays: 'generatedAt',
   validations: 'evaluatedAt',
@@ -103,7 +108,7 @@ export async function startDashboardServer(
         return sendJson(res, 200, await readOverview(db, config, url.searchParams));
       }
 
-      const entityMatch = /^\/api\/entity\/(prediction|parlay|validation|run)\/([^/]+)$/.exec(url.pathname);
+      const entityMatch = /^\/api\/entity\/(fixture|prediction|parlay|validation|run)\/([^/]+)$/.exec(url.pathname);
       if (entityMatch) {
         const kind = entityMatch[1];
         const id = entityMatch[2] ?? '';
@@ -160,8 +165,8 @@ export async function readOverview(
 ): Promise<DashboardOverviewResponse> {
   const metadata = createMetadata();
   const query = parseOverviewQuery(params, {
-    defaultTab: 'predictions',
-    defaultSortBy: DEFAULT_SORT_BY.predictions,
+    defaultTab: 'fixtures',
+    defaultSortBy: DEFAULT_SORT_BY.fixtures,
     defaultDirection: 'desc',
   });
 
@@ -219,6 +224,7 @@ export async function readOverview(
       totalPages: Math.max(1, Math.ceil(total / query.take)),
     },
     statusFacets,
+    fixtures: rows.fixtures,
     predictions: rows.predictions,
     parlays: rows.parlays,
     validations: rows.validations,
@@ -231,6 +237,62 @@ export async function readEntity(
   kind: DashboardEntityKind,
   id: string,
 ): Promise<DashboardEntityResponse | { error: 'not_found'; message: string }> {
+  if (kind === 'fixture') {
+    const row = (await db.fixture.findUnique({
+      where: { id },
+      include: {
+        competition: true,
+        homeTeam: true,
+        awayTeam: true,
+        _count: {
+          select: { predictions: true, parlayLegs: true, validationArtifacts: true },
+        },
+        predictions: {
+          orderBy: { generatedAt: 'desc' },
+          take: 8,
+          include: {
+            validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
+          },
+        },
+        parlayLegs: {
+          orderBy: { legIndex: 'asc' },
+          take: 12,
+          include: {
+            prediction: {
+              select: {
+                id: true,
+                status: true,
+                confidence: true,
+                edge: true,
+              },
+            },
+          },
+        },
+        validationArtifacts: {
+          orderBy: { evaluatedAt: 'desc' },
+          take: 12,
+          include: {
+            prediction: {
+              include: {
+                fixture: {
+                  include: { competition: true, homeTeam: true, awayTeam: true },
+                },
+              },
+            },
+            parlay: {
+              include: {
+                legs: { select: { id: true } },
+              },
+            },
+          },
+        },
+      },
+    })) as unknown;
+
+    if (!row) return { error: 'not_found', message: `fixture ${id} not found` };
+    return { kind: 'fixture', entity: mapFixture(row, true) as DashboardFixtureRow };
+  }
+
   if (kind === 'prediction') {
     const row = (await db.prediction.findUnique({
       where: { id },
@@ -314,10 +376,69 @@ export async function readEntity(
 
   const row = (await db.harnessRun.findUnique({
     where: { id },
+    include: {
+      _count: {
+        select: { tasks: true, artifacts: true, predictions: true, parlays: true, validationArtifacts: true },
+      },
+      predictions: {
+        orderBy: { generatedAt: 'desc' },
+        take: 8,
+        include: {
+          fixture: {
+            include: { competition: true, homeTeam: true, awayTeam: true },
+          },
+          validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
+        },
+      },
+      parlays: {
+        orderBy: { generatedAt: 'desc' },
+        take: 8,
+        include: {
+          validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
+          legs: {
+            orderBy: { legIndex: 'asc' },
+            include: {
+              fixture: {
+                include: { competition: true, homeTeam: true, awayTeam: true },
+              },
+              prediction: {
+                select: {
+                  id: true,
+                  status: true,
+                  confidence: true,
+                  edge: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      validationArtifacts: {
+        orderBy: { evaluatedAt: 'desc' },
+        take: 8,
+        include: {
+          fixture: {
+            include: { competition: true, homeTeam: true, awayTeam: true },
+          },
+          prediction: {
+            include: {
+              fixture: {
+                include: { competition: true, homeTeam: true, awayTeam: true },
+              },
+            },
+          },
+          parlay: {
+            include: {
+              legs: { select: { id: true } },
+            },
+          },
+        },
+      },
+    },
   })) as unknown;
 
   if (!row) return { error: 'not_found', message: `run ${id} not found` };
-  return { kind: 'run', entity: mapRun(row) };
+  return { kind: 'run', entity: mapRun(row, true) };
 }
 
 function filterStatusByKind(kind: DashboardTab, values: string[], metadata: DashboardMetadata): string[] {
@@ -328,11 +449,51 @@ function filterStatusByKind(kind: DashboardTab, values: string[], metadata: Dash
 function buildFilters(query: ReturnType<typeof parseOverviewQuery>, dateWindow: DateWindow | undefined, statusFilter: string[]) {
   const fixtureFilter = buildFixtureFilter(query, dateWindow);
   return {
+    fixtures: buildFixtureWhere(query, fixtureFilter, statusFilter),
     predictions: buildPredictionWhere(query, fixtureFilter, statusFilter),
     parlays: buildParlayWhere(query, fixtureFilter, statusFilter),
     validations: buildValidationWhere(query, fixtureFilter, statusFilter, dateWindow),
     runs: buildRunWhere(query, statusFilter, dateWindow),
   };
+}
+
+function buildFixtureWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  fixtureFilter: QueryArgs | undefined,
+  statusFilter: string[],
+): QueryArgs {
+  const clauses: QueryArgs[] = [];
+  if (fixtureFilter) clauses.push(fixtureFilter);
+  if (statusFilter.length) clauses.push({ status: inFilter(statusFilter) });
+  if (query.runId) {
+    clauses.push({
+      OR: [
+        { predictions: { some: { runId: query.runId } } },
+        { parlayLegs: { some: { parlay: { runId: query.runId } } } },
+        { validationArtifacts: { some: { runId: query.runId } } },
+      ],
+    });
+  }
+
+  const predictionClauses: QueryArgs[] = [];
+  if (query.market) predictionClauses.push({ marketKey: query.market });
+  if (query.qualities.length) predictionClauses.push({ quality: inFilter(query.qualities) });
+  if (query.minConfidence !== undefined || query.maxConfidence !== undefined) {
+    predictionClauses.push({ confidence: numberRange(query.minConfidence, query.maxConfidence) });
+  }
+  if (query.minEdge !== undefined || query.maxEdge !== undefined) {
+    predictionClauses.push({ edge: numberRange(query.minEdge, query.maxEdge) });
+  }
+  if (predictionClauses.length) {
+    const predictionWhere = predictionClauses.length === 1 ? predictionClauses[0] : { AND: predictionClauses };
+    const relationClauses: QueryArgs[] = [{ predictions: { some: predictionWhere } }];
+    if (query.market) relationClauses.push({ parlayLegs: { some: { marketKey: query.market } } });
+    clauses.push(relationClauses.length === 1 ? relationClauses[0] as QueryArgs : { OR: relationClauses });
+  }
+
+  if (!clauses.length) return {};
+  if (clauses.length === 1) return clauses[0] as QueryArgs;
+  return { AND: clauses };
 }
 
 function buildPredictionWhere(
@@ -433,6 +594,57 @@ async function readActiveRows(
 ) {
   const orderBy = buildOrderBy(tab, sort, direction);
 
+  if (tab === 'fixtures') {
+    const fixtures =
+      (await db.fixture.findMany({
+        where: where as unknown as Prisma.FixtureWhereInput,
+        orderBy: orderBy as Prisma.FixtureFindManyArgs['orderBy'],
+        skip,
+        take,
+        include: {
+          competition: true,
+          homeTeam: true,
+          awayTeam: true,
+          _count: {
+            select: { predictions: true, parlayLegs: true, validationArtifacts: true },
+          },
+          predictions: {
+            orderBy: { generatedAt: 'desc' },
+            take: 1,
+            include: {
+              validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
+            },
+          },
+          validationArtifacts: {
+            orderBy: { evaluatedAt: 'desc' },
+            take: 1,
+            include: {
+              prediction: {
+                include: {
+                  fixture: {
+                    include: { competition: true, homeTeam: true, awayTeam: true },
+                  },
+                },
+              },
+              parlay: {
+                include: {
+                  legs: { select: { id: true } },
+                },
+              },
+            },
+          },
+        },
+      }) as unknown[]);
+
+    return {
+      fixtures: fixtures.map((row) => mapFixture(row, true) as DashboardFixtureRow),
+      predictions: [],
+      parlays: [],
+      validations: [],
+      runs: [],
+    };
+  }
+
   if (tab === 'predictions') {
     const predictions =
       (await db.prediction.findMany({
@@ -449,6 +661,7 @@ async function readActiveRows(
       }) as unknown[]);
 
     return {
+      fixtures: [],
       predictions: predictions.map((row) => mapPrediction(row)),
       parlays: [],
       validations: [],
@@ -485,6 +698,7 @@ async function readActiveRows(
       }) as unknown[]);
 
     return {
+      fixtures: [],
       predictions: [],
       parlays: parlays.map((row) => mapParlay(row)),
       validations: [],
@@ -521,6 +735,7 @@ async function readActiveRows(
       }) as unknown[]);
 
     return {
+      fixtures: [],
       predictions: [],
       parlays: [],
       validations: validations.map((row) => mapValidation(row)),
@@ -533,9 +748,15 @@ async function readActiveRows(
     orderBy: orderBy as Prisma.HarnessRunFindManyArgs['orderBy'],
     skip,
     take,
+    include: {
+      _count: {
+        select: { tasks: true, artifacts: true, predictions: true, parlays: true, validationArtifacts: true },
+      },
+    },
   }) as unknown[]);
 
   return {
+    fixtures: [],
     predictions: [],
     parlays: [],
     validations: [],
@@ -548,6 +769,15 @@ async function readStatusFacets(
   tab: DashboardTab,
   where: ReturnType<typeof buildFilters>,
 ): Promise<Record<string, number>> {
+  if (tab === 'fixtures') {
+    const rows = (await (db.fixture as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+      by: ['status'],
+      where: where.fixtures as unknown as Prisma.FixtureWhereInput,
+      _count: { _all: true },
+    })) as Array<{ status: string | null; _count: { _all: number | bigint } }>;
+    return statusFacetFromRows(rows);
+  }
+
   if (tab === 'predictions') {
     const rows = (await (db.prediction as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
       by: ['status'],
@@ -599,6 +829,7 @@ function statusFacetFromRows(rows: Array<{ status: string | null; _count: { _all
 }
 
 async function countActive(db: DashboardDb, tab: DashboardTab, where: QueryArgs): Promise<number> {
+  if (tab === 'fixtures') return db.fixture.count({ where });
   if (tab === 'predictions') return db.prediction.count({ where });
   if (tab === 'parlays') return db.parlay.count({ where });
   if (tab === 'validations') return db.validationArtifact.count({ where });
@@ -607,6 +838,7 @@ async function countActive(db: DashboardDb, tab: DashboardTab, where: QueryArgs)
 
 async function countAllTabs(db: DashboardDb, where: ReturnType<typeof buildFilters>): Promise<DashboardCounts> {
   return {
+    fixtures: await db.fixture.count({ where: omitStatus(where.fixtures) }),
     predictions: await db.prediction.count({ where: omitStatus(where.predictions) }),
     parlays: await db.parlay.count({ where: omitStatus(where.parlays) }),
     validations: await db.validationArtifact.count({ where: omitStatus(where.validations) }),
@@ -668,7 +900,7 @@ function mapPrediction(row: unknown): DashboardPredictionRow {
     fixture: mapFixture(item.fixture),
     marketKey: toStringValue(item.marketKey),
     selectionKey: toStringValue(item.selectionKey),
-    line: toNumber(item.line),
+    line: toNumberOrNull(item.line),
     odds: toNumber(item.odds),
     impliedProbability: toNumber(item.impliedProbability),
     estimatedProbability: toNumberOrNull(item.estimatedProbability),
@@ -805,10 +1037,10 @@ function formatFixtureMatch(raw: unknown): string | null {
   return `${home} vs ${away}`;
 }
 
-function mapRun(row: unknown): DashboardRunRow {
+function mapRun(row: unknown, includeActivity = false): DashboardRunRow {
   const item = toRecord(row);
-
-  return {
+  const counts = toRecord(item._count);
+  const run: DashboardRunRow = {
     id: toStringValue(item.id),
     runtime: toStringValue(item.runtime),
     profile: toStringValue(item.profile),
@@ -821,20 +1053,55 @@ function mapRun(row: unknown): DashboardRunRow {
     startedAt: toNullableDateString(item.startedAt),
     completedAt: toNullableDateString(item.completedAt),
     createdAt: toDateString(item.createdAt),
+    taskCount: toIntegerOrUndefined(counts.tasks),
+    artifactCount: toIntegerOrUndefined(counts.artifacts),
+    predictionCount: toIntegerOrUndefined(counts.predictions),
+    parlayCount: toIntegerOrUndefined(counts.parlays),
+    validationCount: toIntegerOrUndefined(counts.validationArtifacts),
+  };
+
+  if (includeActivity) {
+    run.recentPredictions = toArray(item.predictions).map((prediction) => mapPrediction(prediction));
+    run.recentParlays = toArray(item.parlays).map((parlay) => mapParlay(parlay));
+    run.recentValidations = toArray(item.validationArtifacts).map((validation) => mapValidation(validation));
+  }
+
+  return run;
+}
+
+function mapPredictionSummary(raw: unknown) {
+  const item = toRecord(raw);
+  return {
+    id: toStringValue(item.id),
+    runId: toNullableString(item.runId),
+    marketKey: toStringValue(item.marketKey),
+    selectionKey: toStringValue(item.selectionKey),
+    line: toNumberOrNull(item.line),
+    odds: toNumber(item.odds),
+    edge: toNumberOrNull(item.edge),
+    confidence: toNumber(item.confidence),
+    quality: toStringValue(item.quality),
+    status: toStringValue(item.status),
+    generatedAt: toDateString(item.generatedAt),
   };
 }
 
-function mapFixture(raw: unknown) {
+function mapFixture(raw: unknown, includeActivity = false): DashboardFixtureRow | null {
   const item = toRecord(raw);
   if (!raw) return null;
 
   const competition = toRecord(item.competition);
   const homeTeam = toRecord(item.homeTeam);
   const awayTeam = toRecord(item.awayTeam);
+  const counts = toRecord(item._count);
+  const recentPredictions = includeActivity ? toArray(item.predictions).map((prediction) => mapPredictionSummary(prediction)) : [];
+  const recentParlayLegs = includeActivity ? toArray(item.parlayLegs).map((leg) => mapParlayLeg(leg)) : [];
+  const recentValidations = includeActivity ? toArray(item.validationArtifacts).map((validation) => mapValidation(validation)) : [];
 
-  return {
+  const fixture: DashboardFixtureRow = {
     id: toStringValue(item.id),
     providerFixtureId: toStringValue(item.providerFixtureId),
+    season: toIntegerOrNull(item.season),
     scheduledAt: toNullableDateString(item.scheduledAt),
     status: toStringValue(item.status),
     scoreHome: toNumberOrNull(item.scoreHome),
@@ -858,7 +1125,20 @@ function mapFixture(raw: unknown) {
         name: toStringValue(awayTeam.name),
       }
       : null,
+    predictionCount: toIntegerOrUndefined(counts.predictions),
+    parlayLegCount: toIntegerOrUndefined(counts.parlayLegs),
+    validationCount: toIntegerOrUndefined(counts.validationArtifacts),
+    latestPrediction: recentPredictions[0] ?? null,
+    latestValidation: recentValidations[0] ?? null,
   };
+
+  if (includeActivity) {
+    fixture.recentPredictions = recentPredictions;
+    fixture.recentParlayLegs = recentParlayLegs;
+    fixture.recentValidations = recentValidations;
+  }
+
+  return fixture;
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -885,6 +1165,18 @@ function toInteger(value: unknown): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+function toIntegerOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = toInteger(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toIntegerOrUndefined(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const parsed = toInteger(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function toNumber(value: unknown): number {

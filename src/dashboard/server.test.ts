@@ -22,6 +22,11 @@ const FIXTURE = {
   },
   homeTeam: { id: 'team-1', name: 'Home' },
   awayTeam: { id: 'team-2', name: 'Away' },
+  _count: {
+    predictions: 1,
+    parlayLegs: 1,
+    validationArtifacts: 1,
+  },
 };
 
 const VALIDATION = {
@@ -131,6 +136,13 @@ const RUN = {
   startedAt: new Date('2026-05-01T09:00:00.000Z'),
   completedAt: new Date('2026-05-01T12:00:00.000Z'),
   createdAt: new Date('2026-05-01T08:30:00.000Z'),
+  _count: {
+    tasks: 0,
+    artifacts: 0,
+    predictions: 1,
+    parlays: 1,
+    validationArtifacts: 1,
+  },
 };
 
 function createDashboardDb() {
@@ -152,6 +164,29 @@ function createDashboardDb() {
         { status: 'won', _count: { _all: 2 } },
       ],
       count: async () => 2,
+    },
+    fixture: {
+      findMany: async () => [{
+        ...FIXTURE,
+        predictions: [PREDICTION],
+        parlayLegs: [PARLAY.legs[0]],
+        validationArtifacts: [VALIDATION],
+      }],
+      findUnique: async ({ where }: { where: { id?: string } }) => {
+        if (where?.id === 'fixture-1') {
+          return {
+            ...FIXTURE,
+            predictions: [PREDICTION],
+            parlayLegs: [PARLAY.legs[0]],
+            validationArtifacts: [VALIDATION],
+          };
+        }
+        return null;
+      },
+      groupBy: async () => [
+        { status: 'scheduled', _count: { _all: 1 } },
+      ],
+      count: async () => 1,
     },
     parlay: {
       findMany: async () => [PARLAY],
@@ -178,7 +213,14 @@ function createDashboardDb() {
     harnessRun: {
       findMany: async () => [RUN],
       findUnique: async ({ where }: { where: { id?: string } }) => {
-        if (where?.id === 'run-1') return RUN;
+        if (where?.id === 'run-1') {
+          return {
+            ...RUN,
+            predictions: [PREDICTION],
+            parlays: [PARLAY],
+            validationArtifacts: [VALIDATION],
+          };
+        }
         return null;
       },
       groupBy: async () => [
@@ -202,9 +244,24 @@ describe('dashboard api queries', () => {
     const metadata = await readMetadata(createDashboardDb() as any);
     assert.equal(metadata.teams.length, 2);
     assert.equal(metadata.competitions.length, 1);
+    assert.equal(metadata.tabs.includes('fixtures'), true);
+    assert.equal(metadata.statuses.fixtures.includes('scheduled'), true);
     assert.equal(metadata.statuses.predictions.includes('candidate'), true);
     assert.equal(metadata.directions.includes('asc'), true);
+    assert.equal(metadata.sortOptions.fixtures.includes('scheduledAt'), true);
     assert.equal(metadata.sortOptions.predictions.includes('selectionKey'), true);
+  });
+
+  it('reads overview for fixtures with prediction, parlay and validation activity', async () => {
+    const overview = await readOverview(createDashboardDb() as any, config, new URLSearchParams('tab=fixtures&status=scheduled'));
+    assert.equal(overview.activeTab, 'fixtures');
+    assert.equal(overview.counts.fixtures, 1);
+    assert.equal(overview.fixtures.length, 1);
+    assert.equal(overview.fixtures[0]?.predictionCount, 1);
+    assert.equal(overview.fixtures[0]?.parlayLegCount, 1);
+    assert.equal(overview.fixtures[0]?.validationCount, 1);
+    assert.equal(overview.fixtures[0]?.latestPrediction?.marketKey, 'h2h');
+    assert.equal(overview.fixtures[0]?.latestValidation?.status, 'won');
   });
 
   it('reads overview for predictions with filters, pagination and sort', async () => {
@@ -339,6 +396,35 @@ describe('dashboard api queries', () => {
     assert.equal(Array.isArray(response.validationHistory), true);
     assert.equal(response.validationHistory?.length, 1);
     assert.equal(response.validationHistory?.[0]?.target.kind, 'prediction');
+  });
+
+  it('reads fixture entity with recent prediction and settlement detail', async () => {
+    const response = await readEntity(createDashboardDb() as any, 'fixture', 'fixture-1');
+    if ('error' in response) {
+      assert.fail('fixture should exist');
+    }
+    assert.equal(response.kind, 'fixture');
+    assert.equal(response.entity.id, 'fixture-1');
+    const fixture = response.entity as any;
+    assert.equal(Array.isArray(fixture.recentPredictions), true);
+    assert.equal(Array.isArray(fixture.recentValidations), true);
+    assert.equal(fixture.latestPrediction?.marketKey, 'h2h');
+    assert.equal(fixture.latestValidation?.status, 'won');
+  });
+
+  it('reads run entity with prediction, parlay and validation activity', async () => {
+    const response = await readEntity(createDashboardDb() as any, 'run', 'run-1');
+    if ('error' in response) {
+      assert.fail('run should exist');
+    }
+    assert.equal(response.kind, 'run');
+    const run = response.entity as any;
+    assert.equal(run.predictionCount, 1);
+    assert.equal(run.parlayCount, 1);
+    assert.equal(run.validationCount, 1);
+    assert.equal(run.recentPredictions[0]?.id, 'prediction-1');
+    assert.equal(run.recentParlays[0]?.id, 'parlay-1');
+    assert.equal(run.recentValidations[0]?.id, 'validation-1');
   });
 
   it('returns entity not found for missing validation id', async () => {

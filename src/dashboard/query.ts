@@ -2,7 +2,7 @@ import type { DashboardStatusOptions } from './types.js';
 import { PREDICTION_QUALITIES, PREDICTION_STATUSES } from '../prediction/types.js';
 import { MARKET_KEYS } from '../domain/markets.js';
 
-export type DashboardTab = 'predictions' | 'parlays' | 'validations' | 'runs';
+export type DashboardTab = 'fixtures' | 'predictions' | 'parlays' | 'validations' | 'runs';
 
 export type DashboardDirection = 'asc' | 'desc';
 
@@ -46,6 +46,7 @@ export interface DashboardMetadata {
   directions: readonly DashboardDirection[];
   takeOptions: readonly number[];
   sortOptions: {
+    fixtures: readonly string[];
     predictions: readonly string[];
     parlays: readonly string[];
     validations: readonly string[];
@@ -58,12 +59,13 @@ export interface DashboardMetadataOption {
   name: string;
 }
 
-export const DASHBOARD_TABS: DashboardTab[] = ['predictions', 'parlays', 'validations', 'runs'];
+export const DASHBOARD_TABS: DashboardTab[] = ['fixtures', 'predictions', 'parlays', 'validations', 'runs'];
 export const MAX_TAKE = 200;
 export const DEFAULT_TAKE = 50;
 export const TAKE_OPTIONS = [25, 50, 100, 200] as const;
 
 export const OVERVIEW_SORT_OPTIONS = {
+  fixtures: ['scheduledAt', 'status', 'createdAt', 'updatedAt'] as const,
   predictions: ['generatedAt', 'marketKey', 'selectionKey', 'odds', 'impliedProbability', 'edge', 'confidence', 'status'] as const,
   parlays: ['generatedAt', 'combinedOdds', 'aggregateConfidence', 'aggregateQuality', 'status'] as const,
   validations: ['evaluatedAt', 'status', 'createdAt'] as const,
@@ -137,6 +139,7 @@ export function createMetadata(): DashboardMetadata {
   return {
     tabs: DASHBOARD_TABS,
     statuses: {
+      fixtures: ['scheduled', 'live', 'completed', 'cancelled', 'unknown'],
       predictions: VALID_PREDICTION_STATUSES,
       parlays: [...new Set(['draft', 'candidate', 'review-required', 'promotable', 'blocked'])],
       validations: ['pending', 'won', 'lost', 'push', 'voided', 'error', 'blocked'],
@@ -150,6 +153,7 @@ export function createMetadata(): DashboardMetadata {
     directions: DIRECTION_OPTIONS,
     takeOptions: TAKE_OPTIONS,
     sortOptions: {
+      fixtures: OVERVIEW_SORT_OPTIONS.fixtures,
       predictions: OVERVIEW_SORT_OPTIONS.predictions,
       parlays: OVERVIEW_SORT_OPTIONS.parlays,
       validations: OVERVIEW_SORT_OPTIONS.validations,
