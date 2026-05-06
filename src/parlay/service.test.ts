@@ -97,8 +97,12 @@ describe('runParlayBuild', () => {
     assert.equal(result.build.parlay.combinedOdds, 3);
     assert.equal(result.artifactPath, '/tmp/parlays.json');
     assert.equal(artifactPayload.analyticalArtifactOnly, true);
+    assert.equal(artifactPayload.qualityVerdict, 'candidate');
+    assert.equal(artifactPayload.executionCapability, 'none');
     assert.match(artifactPayload.notice, /cannot execute/i);
     assert.equal(persisted.parlay.artifactId, 'artifact-parlays-1');
+    assert.equal(persisted.parlay.metadata.qualityVerdict, 'candidate');
+    assert.equal(persisted.parlay.metadata.executionCapability, 'none');
     assert.equal(persisted.legs.length, 2);
   });
 
@@ -136,6 +140,41 @@ describe('runParlayBuild', () => {
       take: 500,
     });
     assert.equal(result.build.parlay.legs.length, 2);
+  });
+
+  it('keeps hard research warning predictions out of the main parlay build', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunId: 'current-run-1' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/parlays.json',
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'prediction-1', runId: 'current-run-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8, metadata: { parlayEligible: false } }),
+            prediction({ id: 'prediction-2', runId: 'current-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, warnings: ['research is not promotable'] }),
+            prediction({ id: 'prediction-3', runId: 'current-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.8 }),
+            prediction({ id: 'prediction-4', runId: 'current-run-1', fixtureId: 'fixture-4', odds: 1.5, confidence: 0.8 }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-parlays-1' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['prediction-3', 'prediction-4']);
+    assert.deepEqual(
+      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-1')?.excludedReasons,
+      ['excluded-parlay-ineligible'],
+    );
+    assert.deepEqual(
+      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.excludedReasons,
+      ['excluded-research-not-promotable'],
+    );
   });
 
   it('builds and persists an LLM parlay portfolio from source-run predictions', async () => {

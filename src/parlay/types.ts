@@ -28,7 +28,9 @@ export type ParlayExclusionReason =
   | 'excluded-combined-odds-limit'
   | 'excluded-max-legs-reached'
   | 'excluded-prediction-blockers'
-  | 'excluded-no-edge';
+  | 'excluded-no-edge'
+  | 'excluded-parlay-ineligible'
+  | 'excluded-research-not-promotable';
 
 export type ParlayRiskTag =
   | 'low_edge'
@@ -74,6 +76,7 @@ export interface ParlaySourcePrediction {
   marketFairProbability?: number;
   rationale?: string;
   warnings?: string[];
+  parlayEligible?: boolean;
   riskTags?: ParlayRiskTag[];
   riskScore?: number;
 }
@@ -156,6 +159,7 @@ export const parlaySourcePredictionSchema = z.object({
   marketFairProbability: z.number().min(0).max(1).optional(),
   rationale: z.string().optional(),
   warnings: z.array(z.string()).optional(),
+  parlayEligible: z.boolean().optional(),
   riskTags: z.array(z.enum([
     'low_edge',
     'negative_edge',

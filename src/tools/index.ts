@@ -16,6 +16,7 @@ import { listDirTool } from './list-dir.js';
 import { dangerousShellTool, shellTool } from './shell.js';
 import { artifactPromoteTool, predictionPromoteTool } from './promote.js';
 import { ToolRegistry, riskFromMetadata } from './registry.js';
+import { createBrowserUseTool } from './browser.js';
 
 export const tools = [
   fileReadTool,
@@ -28,6 +29,14 @@ export const tools = [
   dangerousShellTool,
   artifactPromoteTool,
   predictionPromoteTool,
+  createBrowserUseTool({ artifactRoot: '.artifacts/gana-v9', browserUse: {
+    apiKey: '',
+    baseUrl: 'https://api.browser-use.com',
+    enabled: true,
+    maxTasksPerMonth: 10,
+    maxConcurrentSessions: 3,
+    timeoutMs: 180_000,
+  } }),
 ];
 
 type ClientTool = {
@@ -40,7 +49,7 @@ type ClientTool = {
 };
 
 export interface ToolPolicyContext {
-  config: Pick<AgentConfig, 'profile' | 'approvalMode' | 'artifactRoot'>;
+  config: Pick<AgentConfig, 'profile' | 'approvalMode' | 'artifactRoot' | 'browserUse'>;
   runtime?: RuntimeContext;
 }
 
@@ -63,7 +72,7 @@ export function createTools(context: ToolPolicyContext): any[] {
 
 export function createToolRegistry(context: ToolPolicyContext): ToolRegistry {
   const registry = new ToolRegistry();
-  for (const item of LOCAL_TOOLS) {
+  for (const item of [...LOCAL_TOOLS, createBrowserUseTool(context.config)] as const) {
     const toolDef = item as unknown as ClientTool & { function: { inputSchema?: any } };
     const name = toolDef.function.name;
     registry.registerTool({

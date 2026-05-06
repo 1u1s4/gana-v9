@@ -36,6 +36,16 @@ export interface ApiFootballFilterConfig {
   bookmakerAllowlist?: string[];
 }
 
+export interface BrowserUseConfig {
+  apiKey: string;
+  baseUrl: string;
+  enabled: boolean;
+  model?: string;
+  maxTasksPerMonth: number;
+  maxConcurrentSessions: number;
+  timeoutMs: number;
+}
+
 export interface GanaConfigExtension {
   runtime: GanaRuntime;
   profile: GanaProfile;
@@ -45,6 +55,7 @@ export interface GanaConfigExtension {
   artifactRoot: string;
   approvalMode: ApprovalMode;
   apiFootball: ApiFootballFilterConfig;
+  browserUse: BrowserUseConfig;
 }
 
 export interface AgentConfig extends GanaConfigExtension {
@@ -78,8 +89,9 @@ export interface AgentConfig extends GanaConfigExtension {
 }
 
 export type AppConfig = AgentConfig;
-export type AgentConfigOverrides = Partial<Omit<AgentConfig, 'apiFootball' | 'display'>> & {
+export type AgentConfigOverrides = Partial<Omit<AgentConfig, 'apiFootball' | 'browserUse' | 'display'>> & {
   apiFootball?: Partial<ApiFootballFilterConfig>;
+  browserUse?: Partial<BrowserUseConfig>;
   display?: Partial<DisplayConfig>;
 };
 
@@ -147,6 +159,13 @@ function mergeApiFootballConfig(
   };
 }
 
+function mergeBrowserUseConfig(
+  base: BrowserUseConfig,
+  override: Partial<BrowserUseConfig> | undefined,
+): BrowserUseConfig {
+  return override ? { ...base, ...override } : { ...base };
+}
+
 const defaultSeasonFromEnv = parseNumber(process.env.GANA_DEFAULT_SEASON);
 const DEFAULT_SEASON = defaultSeasonFromEnv ?? inferSeasonFromDate(new Date());
 
@@ -171,6 +190,15 @@ const DEFAULTS: AgentConfig = {
     includeLiveFixtures: false,
     includeCompletedFixtures: false,
     maxFixturesPerRun: 80,
+  },
+  browserUse: {
+    apiKey: '',
+    baseUrl: 'https://api.browser-use.com',
+    enabled: true,
+    model: undefined,
+    maxTasksPerMonth: 10,
+    maxConcurrentSessions: 3,
+    timeoutMs: 180_000,
   },
   provider: 'codex',
   apiKey: '',
@@ -221,7 +249,12 @@ export function loadConfig(
   overrides: AgentConfigOverrides = {},
   opts?: { skipApiKey?: boolean; validateAgentAuth?: boolean },
 ): AgentConfig {
-  let config: AgentConfig = { ...DEFAULTS, display: { ...DEFAULTS.display }, apiFootball: { ...DEFAULTS.apiFootball } };
+  let config: AgentConfig = {
+    ...DEFAULTS,
+    display: { ...DEFAULTS.display },
+    apiFootball: { ...DEFAULTS.apiFootball },
+    browserUse: { ...DEFAULTS.browserUse },
+  };
 
   const configPath = resolve('agent.config.json');
   if (existsSync(configPath)) {
@@ -232,7 +265,10 @@ export function loadConfig(
     if (file.apiFootball) {
       config.apiFootball = mergeApiFootballConfig(config.apiFootball, file.apiFootball);
     }
-    config = { ...config, ...file, display: config.display, apiFootball: config.apiFootball };
+    if (file.browserUse) {
+      config.browserUse = mergeBrowserUseConfig(config.browserUse, file.browserUse);
+    }
+    config = { ...config, ...file, display: config.display, apiFootball: config.apiFootball, browserUse: config.browserUse };
   }
 
   if (process.env.OPENROUTER_API_KEY) config.apiKey = process.env.OPENROUTER_API_KEY;
@@ -260,6 +296,25 @@ export function loadConfig(
   if (process.env.AGENT_NATIVE_WEB_SEARCH === 'false') config.nativeWebSearch = false;
   if (process.env.AGENT_NATIVE_WEB_SEARCH_MODE === 'cached' || process.env.AGENT_NATIVE_WEB_SEARCH_MODE === 'live') {
     config.nativeWebSearchMode = process.env.AGENT_NATIVE_WEB_SEARCH_MODE;
+  }
+  if (process.env.BROWSER_USE_API_KEY) config.browserUse.apiKey = process.env.BROWSER_USE_API_KEY;
+  if (process.env.BROWSER_USE_BASE_URL) config.browserUse.baseUrl = process.env.BROWSER_USE_BASE_URL;
+  {
+    const enabled = parseBoolean(process.env.AGENT_BROWSER_FALLBACK);
+    if (enabled !== undefined) config.browserUse.enabled = enabled;
+  }
+  if (process.env.BROWSER_USE_MODEL) config.browserUse.model = process.env.BROWSER_USE_MODEL;
+  {
+    const maxTasks = parseNumber(process.env.BROWSER_USE_MAX_TASKS_PER_MONTH);
+    if (maxTasks !== undefined) config.browserUse.maxTasksPerMonth = maxTasks;
+  }
+  {
+    const maxConcurrent = parseNumber(process.env.BROWSER_USE_MAX_CONCURRENT_SESSIONS);
+    if (maxConcurrent !== undefined) config.browserUse.maxConcurrentSessions = maxConcurrent;
+  }
+  {
+    const timeoutMs = parseNumber(process.env.BROWSER_USE_TIMEOUT_MS);
+    if (timeoutMs !== undefined) config.browserUse.timeoutMs = timeoutMs;
   }
   if (
     process.env.AGENT_REASONING_EFFORT === 'low'
@@ -318,7 +373,10 @@ export function loadConfig(
   if (overrides.apiFootball) {
     config.apiFootball = mergeApiFootballConfig(config.apiFootball, overrides.apiFootball);
   }
-  config = { ...config, ...overrides, display: config.display, apiFootball: config.apiFootball };
+  if (overrides.browserUse) {
+    config.browserUse = mergeBrowserUseConfig(config.browserUse, overrides.browserUse);
+  }
+  config = { ...config, ...overrides, display: config.display, apiFootball: config.apiFootball, browserUse: config.browserUse };
   if (config.profile === 'full-permissions' && !overrides.approvalMode && !process.env.GANA_APPROVAL_MODE) {
     config.approvalMode = 'auto-grant';
   }

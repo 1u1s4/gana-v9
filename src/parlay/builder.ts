@@ -136,6 +136,8 @@ function evaluatePrediction(
   if (prediction.confidence < config.minPredictionConfidence) {
     reasons.push('excluded-below-min-confidence');
   }
+  if (prediction.parlayEligible === false) reasons.push('excluded-parlay-ineligible');
+  if (hasHardResearchWarning(prediction)) reasons.push('excluded-research-not-promotable');
   if (prediction.blockers?.length) reasons.push('excluded-prediction-blockers');
   if (prediction.edge !== undefined && prediction.edge <= 0) reasons.push('excluded-no-edge');
   if (
@@ -152,6 +154,12 @@ function evaluatePrediction(
   }
 
   return [...new Set(reasons)];
+}
+
+function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {
+  return (prediction.warnings ?? []).some((warning) =>
+    /research is not promotable|fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+  );
 }
 
 function deriveParlayStatus(predictions: readonly ParlaySourcePrediction[], minLegs: number): ParlayStatus {

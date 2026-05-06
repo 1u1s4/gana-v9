@@ -41,11 +41,18 @@ pnpm gana validate --date YYYY-MM-DD
 pnpm gana dashboard --port 4317
 ```
 
-Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini`, `cursor` u `openrouter`). El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
+Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini`, `cursor` u `openrouter`). La DB canonica del RC actual es DigitalOcean MySQL via Prisma; PostgreSQL queda como migracion futura documentada, no como requisito operativo actual. El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
 
 ## Configuracion
 
 Puedes ajustar el provider, modelo, estilo visual, presupuesto y carpeta de sesiones en `agent.config.json`.
+
+Browser Use fallback:
+
+- `AGENT_BROWSER_FALLBACK=true` habilita la herramienta local `browser` para agentes OpenRouter cuando el web search nativo no sea suficiente.
+- `BROWSER_USE_API_KEY` configura Browser Use Cloud.
+- Los limites por defecto respetan la capa free: `BROWSER_USE_MAX_TASKS_PER_MONTH=10`, `BROWSER_USE_MAX_CONCURRENT_SESSIONS=3`, `BROWSER_USE_TIMEOUT_MS=180000`.
+- Esta herramienta es solo para research de lectura; queda cubierta por policy, auditoria, redaccion y bloqueo de automatizacion monetaria.
 
 Providers validos:
 
@@ -118,7 +125,7 @@ Backend OpenRouter:
 - Disponible configurando `provider: "openrouter"` y `OPENROUTER_API_KEY`.
 - Incluye lectura, escritura y edicion de archivos.
 - Incluye busqueda por glob y grep, listado de directorios y ejecucion de shell con timeout.
-- Incluye web search y datetime como herramientas server-side de OpenRouter.
+- Incluye el fallback local `browser` via Browser Use Cloud, gobernado por policy y cuotas configuradas.
 
 ## Dashboard local
 

@@ -127,6 +127,15 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     destructive: false,
     requiresApproval: 'standard',
   },
+  browser: {
+    name: 'browser',
+    readOnly: true,
+    mutatesFilesystem: false,
+    runsShell: false,
+    network: true,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
 };
 
 export function getToolMetadata(name: string): ToolMetadata {

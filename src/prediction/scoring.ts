@@ -61,6 +61,7 @@ export interface BuildAtomicPredictionInput {
   quality?: PredictionQuality;
   rationale?: string;
   warnings?: string[];
+  parlayEligible?: boolean;
   providerAgentic?: string;
   model?: string;
   researchBundleId?: string;
@@ -164,6 +165,7 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
     blockers: edgeGate.blockers,
     promotable: edgeGate.promotable,
     warnings: [...new Set([...(input.warnings ?? []), ...candidate.reasons, ...edgeGate.blockers])],
+    parlayEligible: input.parlayEligible,
     providerAgentic: input.providerAgentic as PredictionRecordView['providerAgentic'],
     model: input.model,
     promptVersion: SCORE_PREDICTION_PROMPT_VERSION,

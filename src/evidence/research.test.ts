@@ -341,6 +341,32 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped market subject id "goals_over_under"/);
   });
 
+  it('repairs non-schema conflict statuses to potential before validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      claims: [{
+        id: 'claim-1',
+        statement: 'A live source reports minor timing uncertainty.',
+        subject: { type: 'fixture', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'minor',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.claims[0]?.conflictStatus, 'potential');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped conflictStatus "minor" to "potential"/);
+  });
+
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -404,7 +430,38 @@ describe('runFixtureResearch', () => {
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.gateResult.verdict, 'promotable');
     assert.equal(attempts, 2);
-    assert.match(retryPrompt, /previous research response was not parseable strict JSON/);
+    assert.match(retryPrompt, /minimal-research-retry mode/);
+  });
+
+  it('retries live web research in minimal mode after an agent timeout', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    let retryPrompt = '';
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, input) => {
+        attempts += 1;
+        retryPrompt = String(input);
+        if (attempts === 1) throw new Error('research agent timed out after 300s');
+        return {
+          text: agentOutput({
+            gateResult: { verdict: 'promotable', reasons: ['minimal timeout retry returned valid JSON'], warnings: [] },
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(attempts, 2);
+    assert.match(retryPrompt, /minimal-research-retry mode/);
+    assert.match(retryPrompt, /maximum 2 current web sources/);
   });
 
   it('returns blocked and writes redacted raw output when agent output is not JSON', async () => {

@@ -296,9 +296,19 @@ function defaultPersistArtifact(repositories: ParlayServiceRepositories) {
         date: input.date,
         parlayBuilderRuleVersion: PARLAY_BUILDER_RULE_VERSION,
         analyticalArtifactOnly: true,
+        qualityVerdict: payloadVerdict(input.payload),
+        executionCapability: 'none',
       }),
     });
   };
+}
+
+function payloadVerdict(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  const gateResult = (payload as { gateResult?: unknown }).gateResult;
+  if (!gateResult || typeof gateResult !== 'object' || Array.isArray(gateResult)) return undefined;
+  const verdict = (gateResult as { verdict?: unknown }).verdict;
+  return typeof verdict === 'string' ? verdict : undefined;
 }
 
 async function runParlayPortfolio(
@@ -854,6 +864,8 @@ function portfolioArtifactPayloadFor(
     parlayBuilderRuleVersion: PARLAY_BUILDER_RULE_VERSION,
     promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
     analyticalArtifactOnly: true,
+    qualityVerdict: gateResult.verdict,
+    executionCapability: 'none',
     notice: 'This portfolio is an analytical artifact only; it has no monetary action capability.',
     gateResult,
     portfolio: {
@@ -880,6 +892,7 @@ function toSourcePrediction(prediction: PredictionRecord): ParlaySourcePredictio
     edge: numberOrUndefined(prediction.edge),
     blockers: metadataStringArray(prediction.metadata, 'blockers'),
     marketFairProbability: metadataNumber(prediction.metadata, 'marketFairProbability'),
+    parlayEligible: metadataBool(prediction.metadata, 'parlayEligible'),
     confidence: numberValue(prediction.confidence),
     quality: qualityValue(prediction.quality),
     status: prediction.status as PredictionStatus,
@@ -898,6 +911,12 @@ function metadataNumber(metadata: unknown, key: string): number | undefined {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
   const value = (metadata as Record<string, unknown>)[key];
   return typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : undefined;
+}
+
+function metadataBool(metadata: unknown, key: string): boolean | undefined {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === 'boolean' ? value : undefined;
 }
 
 function decoratePortfolioPrediction(prediction: ParlaySourcePrediction): ParlaySourcePrediction {
@@ -921,6 +940,8 @@ function portfolioPoolExclusionReasons(
   profile: ParlayPortfolioProfileSpec,
 ): string[] {
   const reasons: string[] = [];
+  if (!profile.reviewOnly && prediction.parlayEligible === false) reasons.push('not parlay eligible');
+  if (!profile.reviewOnly && hasHardResearchWarning(prediction)) reasons.push('hard research warning');
   if (prediction.confidence < profile.minConfidence) reasons.push(`below ${profile.label} confidence floor`);
   if (hasRiskTag(prediction, 'negative_edge')) reasons.push('negative edge');
   if (hasRiskTag(prediction, 'draw_exposure') && !profile.allowDrawExposure) reasons.push('draw exposure');
@@ -931,6 +952,12 @@ function portfolioPoolExclusionReasons(
     reasons.push('fragile low-price double chance with low edge');
   }
   return reasons;
+}
+
+function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {
+  return (prediction.warnings ?? []).some((warning) =>
+    /research is not promotable|fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+  );
 }
 
 function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] {
@@ -984,6 +1011,8 @@ function toParlayInput(
       config: build.config,
       evaluations: build.evaluations,
       analyticalArtifactOnly: true,
+      qualityVerdict: build.parlay.status,
+      executionCapability: 'none',
       ...metadataExtra,
     }),
   };
@@ -1100,6 +1129,8 @@ function artifactPayloadFor(
     generatedAt,
     parlayBuilderRuleVersion: PARLAY_BUILDER_RULE_VERSION,
     analyticalArtifactOnly: true,
+    qualityVerdict: gateResult.verdict,
+    executionCapability: 'none',
     handoff: {
       parlay: build.parlay.status === 'blocked' ? 'no-parlay-today' : 'analytical-candidate',
       disclaimer: 'uso analitico, no constituye recomendacion de apuesta, no garantiza resultado',

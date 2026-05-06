@@ -43,6 +43,7 @@ export const predictionCandidateSchema = z.object({
   claimIds: z.array(z.string().min(1)).default([]),
   rationale: z.string().min(1).optional(),
   warnings: z.array(z.string().min(1)).default([]),
+  parlayEligible: z.boolean().optional(),
 }).superRefine((candidate, ctx) => {
   if (candidate.evidenceIds.length === 0) {
     ctx.addIssue({

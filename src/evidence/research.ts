@@ -137,6 +137,10 @@ export async function runFixtureResearch(
       rawOutput = result.text;
     } catch (err: any) {
       const error = redactErrorMessage(err?.message ?? String(err));
+      if (isResearchTimeoutError(error) && attempt < RESEARCH_AGENT_JSON_ATTEMPTS) {
+        rawOutput = '';
+        continue;
+      }
       return buildAndPersistAgentFailureFallback(config, input, runtime, deps, runId, fixture, createdAt, error, providerContext);
     }
 
@@ -270,7 +274,19 @@ function extractFirstBalancedJsonObject(text: string): string | undefined {
 
 function researchPromptForAttempt(prompt: string, attempt: number): string {
   if (attempt <= 1) return prompt;
-  return `${prompt}\n\nRetry instruction: the previous research response was not parseable strict JSON. Return exactly one complete JSON object that validates the schema. Do not include markdown, prose, comments, trailing text, or a partial object.`;
+  return [
+    prompt,
+    '',
+    'Retry instruction: the previous research response failed or timed out. Use minimal-research-retry mode:',
+    '- maximum 2 current web sources',
+    '- maximum 4 claims',
+    '- concise evidence summaries only',
+    '- strict JSON only; no markdown, prose, comments, trailing text, or partial objects',
+  ].join('\n');
+}
+
+function isResearchTimeoutError(error: string): boolean {
+  return /timed out|timeout|aborted/i.test(error);
 }
 
 function createNativeWebSearchTrace(): NativeWebSearchTrace {
@@ -375,7 +391,8 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
 
   const repairedClaims = claims.map((claim: any) => {
     const subject = repairClaimSubject(claim?.subject, claim?.id, claim?.statement, warnings);
-    if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject };
+    const conflictStatus = repairClaimConflictStatus(claim?.conflictStatus, claim?.id, warnings);
+    if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject, conflictStatus };
     const repairedEvidenceIds: string[] = [];
     for (const evidenceId of claim.evidenceIds) {
       if (typeof evidenceId !== 'string') continue;
@@ -391,7 +408,7 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
       }
       warnings.push(`removed unknown evidence reference "${evidenceId}" from claim "${claim.id ?? 'unknown'}"`);
     }
-    return { ...claim, subject, evidenceIds: uniqueStrings(repairedEvidenceIds) };
+    return { ...claim, subject, conflictStatus, evidenceIds: uniqueStrings(repairedEvidenceIds) };
   });
 
   return {
@@ -402,6 +419,16 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
     },
     warnings: uniqueStrings(warnings),
   };
+}
+
+function repairClaimConflictStatus(value: unknown, claimId: unknown, warnings: string[]): 'none' | 'potential' | 'conflict' {
+  if (value === 'none' || value === 'potential' || value === 'conflict') return value;
+  if (typeof value === 'string' && /minor|partial|possible|uncertain|warning/i.test(value)) {
+    warnings.push(`mapped conflictStatus "${value}" to "potential" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'potential';
+  }
+  warnings.push(`mapped invalid conflictStatus "${String(value ?? 'unknown')}" to "potential" on claim "${String(claimId ?? 'unknown')}"`);
+  return 'potential';
 }
 
 function repairClaimSubject(subject: any, claimId: unknown, statement: unknown, warnings: string[]): any {

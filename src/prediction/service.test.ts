@@ -183,6 +183,7 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].impliedProbability, 1 / 2.1);
     assert.equal(persisted[0].estimatedProbability, 0.56);
     assert.equal(persisted[0].edge, 0.56 - (1 / 2.1));
+    assert.equal(persisted[0].metadata.parlayEligible, true);
   });
 
   it('repairs LLM evidence and claim references that omit persisted bundle prefixes', async () => {
@@ -434,6 +435,7 @@ describe('runFixtureScoring', () => {
   it('downgrades predictions when linked research sources are stale', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
     const staleSource = {
       ...sourceRecords[0],
       capturedAt: new Date('2026-04-25T09:00:00.000Z'),
@@ -464,12 +466,16 @@ describe('runFixtureScoring', () => {
         usage: {},
         output: '',
       }),
-      persistPredictions: async (records: any[]) => records,
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
     });
 
     assert.equal(result.ok, true);
     assert.equal(result.gateResult.verdict, 'review-required');
     assert.match(result.predictions[0].warnings.join('\n'), /stale odds source/);
+    assert.equal(persisted[0].metadata.parlayEligible, false);
   });
 
   it('blocks without a persisted odds snapshot and does not persist predictions', async () => {

@@ -312,6 +312,8 @@ export async function runFixtureScoring(
       : uniqueStrings([...pick.evidenceIds, ...evidenceGate.evidenceIds]);
     const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
 
+    const warnings = [...gate.warnings, ...retrievalWarnings, ...candidateScore.reasons, ...pick.warnings];
+
     return buildAtomicPrediction({
       runId,
       fixtureId: fixture.id,
@@ -334,7 +336,8 @@ export async function runFixtureScoring(
       status: gate.verdict,
       confidence: pick.confidence,
       rationale: pick.rationale,
-      warnings: [...gate.warnings, ...retrievalWarnings, ...candidateScore.reasons, ...pick.warnings],
+      warnings,
+      parlayEligible: isParlayEligibleResearch(research.researchBundle ?? undefined, warnings),
       providerAgentic: config.provider,
       model: config.model,
       researchBundleId: research.researchBundle?.id,
@@ -938,6 +941,7 @@ function toPredictionInput(
       confidenceBand: prediction.confidenceBand ?? prediction.quality,
       blockers: prediction.blockers,
       promotable: prediction.promotable ?? prediction.status === 'promotable',
+      parlayEligible: prediction.parlayEligible,
     }),
   };
 }
@@ -1024,6 +1028,24 @@ function metadataBool(metadata: unknown, key: string): boolean | undefined {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
   const value = (metadata as Record<string, unknown>)[key];
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function isParlayEligibleResearch(researchBundle: ResearchBundleRecord | undefined, warnings: string[]): boolean {
+  return researchBundleVerdict(researchBundle) === 'promotable'
+    && !warnings.some((warning) =>
+      /fallback research|research is not promotable|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+    );
+}
+
+function researchBundleVerdict(researchBundle: ResearchBundleRecord | undefined): string | undefined {
+  if (!researchBundle) return undefined;
+  if (typeof researchBundle.status === 'string') return researchBundle.status;
+  const gate = researchBundle.gateResult;
+  if (gate && typeof gate === 'object' && !Array.isArray(gate)) {
+    const verdict = (gate as { verdict?: unknown }).verdict;
+    if (typeof verdict === 'string') return verdict;
+  }
+  return undefined;
 }
 
 function metadataNumber(metadata: unknown, key: string): number | undefined {

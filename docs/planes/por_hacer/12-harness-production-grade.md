@@ -15,8 +15,10 @@ La calidad analitica no se trata como un problema de prompt: se trata como una c
 - Secciones 2.6, 2.8, 2.9, 2.10 (runtime, profile, approval, redaccion).
 - Secciones 5.2, 5.3 (arquitectura, scheduler, dispatcher, recovery, artifact writer).
 - Secciones 10.5, 14, 15, 16, 17.4, 17.6 (artifacts, eventos, evidencia, seguridad, audit, sources).
-- Seccion 18 (criterios de aceptacion 6, 22, 23 y certificacion `ci-smoke`).
+- Seccion 18 (criterios de aceptacion 6, 22, 23 y certificacion deterministica `ci-smoke`).
 - Seccion 19 (cambios requeridos sobre el codigo actual: separar provider agentic de runtime, no depender de OpenRouter como runtime).
+
+Nota de coherencia productiva: `ci-smoke` es solo el nombre historico del perfil de certificacion deterministica sobre replay fixture. No es un flujo operativo del producto, no reemplaza acceptance live, no consume providers reales y no debe presentarse como modo productivo.
 
 ## Diagnostico de partida
 
