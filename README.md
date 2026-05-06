@@ -64,7 +64,7 @@ Providers validos:
 Comandos disponibles dentro de la TUI:
 
 - `/help`: lista comandos.
-- `/dashboard`: sirve una interfaz web local para ver predicciones, parlays, validaciones y runs.
+- `/dashboard`: sirve una interfaz web local para ver partidos/resultados, predicciones, parlays, validaciones y runs.
 - `/provider`: lista providers disponibles y cambia entre `codex`, `gemini`, `cursor` y `openrouter`.
 - `/model`: lista, busca y cambia modelos del provider activo.
 - `/fast`: alterna modo rapido cuando el provider/modelo lo soporta.
@@ -135,4 +135,4 @@ Para revisar los resultados guardados en la DB:
 pnpm gana dashboard --port 4317
 ```
 
-Abre `http://127.0.0.1:4317`. La interfaz permite filtrar por fecha, run id, estado y limite; muestra predicciones, parlays, validaciones y runs con detalle lateral. Requiere `DATABASE_URL` y usa solo lectura sobre los datos persistidos.
+Abre `http://127.0.0.1:4317`. La interfaz permite filtrar por fecha, run id, estado y limite; muestra partidos/resultados, predicciones, parlays, validaciones y runs con detalle lateral. Requiere `DATABASE_URL` y usa solo lectura sobre los datos persistidos.

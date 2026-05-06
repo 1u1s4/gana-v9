@@ -329,6 +329,67 @@ describe('runFixtureScoring', () => {
     assert.match(payload.providerContextWarnings.join('\n'), /allowedQuotes trimmed/);
   });
 
+  it('blocks LLM outputs that omit available markets instead of adding deterministic fallback picks', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted = false;
+    const bttsQuote = {
+      ...oddsQuote,
+      id: 'odds-quote-btts',
+      marketKey: 'btts',
+      selectionKey: 'no',
+      line: null,
+      price: 1.72,
+      impliedProbability: 0.5813953488,
+    };
+    const cornersQuote = {
+      ...oddsQuote,
+      id: 'odds-quote-corners',
+      marketKey: 'corners_over_under',
+      selectionKey: 'over',
+      line: 9.5,
+      price: 1.9,
+      impliedProbability: 0.5263157895,
+    };
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => [oddsQuote, bttsQuote, cornersQuote] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async () => {
+        persisted = true;
+        return [];
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.match(result.error ?? '', /omitted required market "btts"/);
+    assert.match(result.error ?? '', /omitted required market "corners_over_under"/);
+    assert.equal(persisted, false);
+  });
+
   it('blocks invalid LLM picks that reference quotes outside the persisted odds snapshot', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

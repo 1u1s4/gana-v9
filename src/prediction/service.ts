@@ -275,7 +275,7 @@ export async function runFixtureScoring(
   }
 
   const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
-  const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims);
+  const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes);
   if (topPickIssues.length) {
     const result = blockedResult(runId, artifactWriter, {
       error: `Prediction LLM output failed validation: ${topPickIssues.join('; ')}`,
@@ -585,11 +585,17 @@ function validateTopPicks(
   quoteById: Map<string, OddsQuoteRecord>,
   evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
   claims: ClaimRecord[],
+  requiredCoverageQuotes: OddsQuoteRecord[] = [],
 ): string[] {
   const issues: string[] = [];
   const evidenceIds = new Set(evidenceGate.evidenceIds);
   const claimIds = new Set(claims.map((claim) => claim.id));
   const seenQuoteIds = new Set<string>();
+  const coveredMarkets = new Set(picks.map((pick) => pick.market));
+  const requiredMarkets = new Set(requiredCoverageQuotes.map((quote) => quote.marketKey));
+  for (const market of requiredMarkets) {
+    if (!coveredMarkets.has(market)) issues.push(`LLM output omitted required market "${market}" despite available allowedQuotes`);
+  }
 
   for (const [index, pick] of picks.entries()) {
     const quote = quoteById.get(pick.oddsQuoteId);
