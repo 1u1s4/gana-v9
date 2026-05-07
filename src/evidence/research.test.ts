@@ -367,6 +367,71 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped conflictStatus "minor" to "potential"/);
   });
 
+  it('promotes objectively sufficient live research despite soft LLM review warnings', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      sources: [{
+        id: 'source-web-1',
+        type: 'web-search',
+        url: 'https://example.com/team-news',
+        title: 'Team news',
+        capturedAt: createdAt.toISOString(),
+      }, {
+        id: 'source-web-2',
+        type: 'web-search',
+        url: 'https://example.com/match-preview',
+        title: 'Match preview',
+        capturedAt: createdAt.toISOString(),
+      }],
+      evidenceItems: [{
+        id: 'evidence-1',
+        sourceId: 'source-web-1',
+        claimIds: ['claim-1'],
+        summary: 'Current team news supports the fixture context.',
+        confidence: 0.82,
+      }, {
+        id: 'evidence-2',
+        sourceId: 'source-web-2',
+        claimIds: ['claim-2'],
+        summary: 'Current market preview supports the odds context.',
+        confidence: 0.78,
+      }],
+      claims: [{
+        id: 'claim-1',
+        statement: 'Home team context is supported by current reporting.',
+        subject: { type: 'fixture', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }, {
+        id: 'claim-2',
+        statement: 'The goals market context is supported by current reporting.',
+        subject: { type: 'market', market: 'goals_over_under' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-2'],
+        conflictStatus: 'none',
+      }],
+      gateResult: {
+        verdict: 'review-required',
+        reasons: ['structured research was generated and web-search evidence is present'],
+        warnings: ['fixture-statistics context is incomplete, so tactical confidence remains limited', 'odds-led lean'],
+      },
+      warnings: ['fixture-statistics context is incomplete, so tactical confidence remains limited', 'odds-led lean'],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /odds-led lean/);
+  });
+
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

@@ -594,7 +594,7 @@ async function writeAndPersistResearchBundle(
   const webWarnings = web !== 'off' && !validatedBundle.sources.some((source) => source.type === 'web-search')
     ? [`web ${web} requested but no web-search source was included`]
     : [];
-  const bundle = mergeGateWarnings(validatedBundle, webWarnings);
+  const bundle = normalizeResearchGateResult(mergeGateWarnings(validatedBundle, webWarnings), web);
   const artifactPath = writeArtifact(config, runId, 'research-bundle.json', bundle);
 
   try {
@@ -623,6 +623,64 @@ async function writeAndPersistResearchBundle(
     gateResult: bundle.gateResult,
     artifactPath,
   };
+}
+
+function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMode): ResearchBundle {
+  if (bundle.gateResult.verdict === 'blocked') return bundle;
+
+  const warnings = uniqueStrings([...bundle.warnings, ...bundle.gateResult.warnings]);
+  const reasons = uniqueStrings(bundle.gateResult.reasons);
+  const hasLiveWebEvidence = web === 'off' || bundle.sources.some((source) => source.type === 'web-search');
+  const fallback = bundle.metadata?.fallback === true || warnings.some(isHardResearchWarning) || reasons.some(isHardResearchWarning);
+  const sufficientEvidence = hasSufficientIndependentEvidence(bundle);
+  const agentPromotable = bundle.gateResult.verdict === 'promotable';
+  const verdict = !fallback && hasLiveWebEvidence && (agentPromotable || sufficientEvidence) ? 'promotable' : 'review-required';
+  const normalizedReasons = verdict === 'promotable'
+    ? uniqueStrings([...reasons.filter((reason) => !/not promotable|insufficient for promotion/i.test(reason)), 'objective research gate passed with current web evidence'])
+    : reasons;
+
+  return {
+    ...bundle,
+    warnings,
+    gateResult: {
+      ...bundle.gateResult,
+      verdict,
+      reasons: normalizedReasons,
+      warnings,
+    },
+  };
+}
+
+function hasSufficientIndependentEvidence(bundle: ResearchBundle): boolean {
+  const strongEvidenceIds = new Set(bundle.evidenceItems
+    .filter((evidence) => evidenceConfidence(evidence.confidence) >= 0.65)
+    .map((evidence) => evidence.id));
+  const linkedStrongEvidenceIds = new Set<string>();
+  let supportedClaimCount = 0;
+
+  for (const claim of bundle.claims) {
+    if (claim.conflictStatus === 'conflict') return false;
+    if (claim.supportLevel !== 'supported') continue;
+    const claimStrongEvidence = claim.evidenceIds.filter((id) => strongEvidenceIds.has(id));
+    if (!claimStrongEvidence.length) continue;
+    supportedClaimCount += 1;
+    claimStrongEvidence.forEach((id) => linkedStrongEvidenceIds.add(id));
+  }
+
+  return supportedClaimCount >= 2 && linkedStrongEvidenceIds.size >= 2;
+}
+
+function evidenceConfidence(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (value && typeof (value as { toNumber?: unknown }).toNumber === 'function') {
+    return (value as { toNumber: () => number }).toNumber();
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function isHardResearchWarning(message: string): boolean {
+  return /fallback research|agentic research failed|research agent timed out|no web-search source|not included in the structured output|missing web-search|web-search evidence was required but not included|interrupted|insufficient evidence|conflict|contradict|mismatch|stale/i.test(message);
 }
 
 async function createDefaultSportsProvider(
