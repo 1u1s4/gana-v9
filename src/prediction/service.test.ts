@@ -235,6 +235,66 @@ describe('runFixtureScoring', () => {
     assert.deepEqual(result.predictions[0].claimIds, ['research-bundle-1:claim-1']);
   });
 
+  it('repairs LLM evidence references that cite source ids or urls instead of evidence item ids', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const webSource = {
+      ...sourceRecords[0],
+      id: 'source-web-1',
+      sourceType: 'web-search',
+      url: 'https://example.com/match-preview',
+      externalId: 'match-preview',
+    };
+    const webEvidence = evidenceItems.map((item, index) => ({
+      ...item,
+      id: `web-evidence-${index + 1}`,
+      sourceId: webSource.id,
+    }));
+    const webClaims = [{
+      ...claims[0],
+      id: 'web-claim-1',
+      evidenceIds: webEvidence.map((item) => item.id),
+    }];
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        sourceRecords: { list: async () => [webSource] },
+        evidenceItems: { list: async () => webEvidence },
+        claims: { list: async () => webClaims },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['other-bundle:web-evidence-1'],
+            claimIds: ['web-claim-1'],
+            rationale: 'Home selection is supported by the supplied web preview evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'promotable');
+    assert.deepEqual(persisted[0].evidenceIds, ['web-evidence-1', 'web-evidence-2']);
+  });
+
   it('augments under-cited LLM picks with gate-approved evidence to avoid false evidence-thin blockers', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -312,6 +372,18 @@ describe('runFixtureScoring', () => {
               evidenceIds: ['evidence-1', 'evidence-2'],
               claimIds: ['claim-1'],
               rationale: 'Home selection is supported by the supplied evidence.',
+              warnings: [],
+            }, {
+              oddsQuoteId: 'corner-quote-18',
+              market: 'corners_over_under',
+              selection: 'over',
+              line: 9.5,
+              odds: 2.3,
+              probability: 0.5,
+              confidence: 0.68,
+              evidenceIds: ['evidence-1', 'evidence-2'],
+              claimIds: ['claim-1'],
+              rationale: 'Corners over is supported by the supplied evidence and odds context.',
               warnings: [],
             }],
           }),

@@ -21,9 +21,10 @@ export function evaluateEdgeGate(input: ProbabilisticPredictionInput): EdgeGateR
   const blockers: string[] = [];
   const edge = input.modelProbability - input.marketFairProbability;
   if (edge <= 0) blockers.push('no-edge');
-  if (input.confidenceBand === 'low') blockers.push('low-confidence');
-  if ((input.evidenceCoverage ?? 1) < 0.6) blockers.push('evidence-thin');
-  if (input.lowLiquidity) blockers.push('low-liquidity');
+  // Confidence, evidence coverage, and liquidity are soft risk signals for analytical review.
+  // They should not hard-block an otherwise positive-edge LLM prediction; callers surface
+  // them as warnings so parlays can still be generated as review-required artifacts.
+
   if (input.stalePick) blockers.push('stale-pick');
   // lineup-pending is informational risk context, not a hard edge blocker.
   // Pre-kickoff lineups are often unavailable for today fixtures; blocking on them

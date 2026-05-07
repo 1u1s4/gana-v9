@@ -5,11 +5,28 @@ export function dashboardHtml(): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gana Dashboard</title>
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem('gana-dashboard-theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+      } catch {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
   <style>
     :root {
       color-scheme: light;
       --bg: #f4f6f8;
       --panel: #ffffff;
+      --panel-soft: #fbfcfd;
+      --control: #ffffff;
+      --table-head: #fafbfc;
+      --table-line: #edf0f2;
+      --row-selected: #f0f9f8;
+      --row-hover: #f8fbfb;
       --line: #d7dde3;
       --text: #17202a;
       --muted: #66717d;
@@ -19,6 +36,36 @@ export function dashboardHtml(): string {
       --warn: #9a6500;
       --bad: #b42318;
       --chip: #eef3f2;
+      --good-bg: #eaf6ef;
+      --warn-bg: #fff4df;
+      --bad-bg: #fdeceb;
+      --tag-bg: #f1f5f9;
+      --tag-text: #334155;
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #101418;
+      --panel: #171d23;
+      --panel-soft: #1d252d;
+      --control: #12181e;
+      --table-head: #141a20;
+      --table-line: #26313a;
+      --row-selected: #102924;
+      --row-hover: #1b252c;
+      --line: #2c3741;
+      --text: #e7edf2;
+      --muted: #98a7b3;
+      --accent: #2db7a3;
+      --accent-2: #ff8068;
+      --good: #55d08f;
+      --warn: #f0b759;
+      --bad: #ff7b72;
+      --chip: #19322f;
+      --good-bg: #113321;
+      --warn-bg: #352713;
+      --bad-bg: #3a1d1d;
+      --tag-bg: #222c35;
+      --tag-text: #cbd5df;
     }
     * { box-sizing: border-box; }
     body {
@@ -51,7 +98,7 @@ export function dashboardHtml(): string {
     input, select, .btn {
       height: 34px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--control);
       color: var(--text);
       border-radius: 6px;
       padding: 0 9px;
@@ -68,7 +115,7 @@ export function dashboardHtml(): string {
     .icon-btn, .tab {
       height: 34px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: var(--control);
       color: var(--text);
       border-radius: 6px;
       padding: 0 10px;
@@ -129,13 +176,13 @@ export function dashboardHtml(): string {
     .panel-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 940px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #edf0f2; vertical-align: top; }
-    th { color: var(--muted); font-size: 12px; font-weight: 600; background: #fafbfc; position: relative; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--table-line); vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; font-weight: 600; background: var(--table-head); position: relative; }
     th button { all: unset; cursor: pointer; display: inline-flex; width: 100%; align-items: center; gap: 6px; }
     th button:hover { color: var(--accent); }
     tbody tr { cursor: pointer; }
-    tbody tr.selected { background: #f0f9f8; }
-    tbody tr:hover { background: #f8fbfb; }
+    tbody tr.selected { background: var(--row-selected); }
+    tbody tr:hover { background: var(--row-hover); }
     .match { font-weight: 700; }
     .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
     .badge {
@@ -151,15 +198,15 @@ export function dashboardHtml(): string {
       font-weight: 700;
       overflow-wrap: anywhere;
     }
-    .badge.good { color: var(--good); background: #eaf6ef; }
-    .badge.warn { color: var(--warn); background: #fff4df; }
-    .badge.bad { color: var(--bad); background: #fdeceb; }
+    .badge.good { color: var(--good); background: var(--good-bg); }
+    .badge.warn { color: var(--warn); background: var(--warn-bg); }
+    .badge.bad { color: var(--bad); background: var(--bad-bg); }
     .pager {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 10px 12px;
-      border-top: 1px solid #edf0f2;
+      border-top: 1px solid var(--table-line);
       gap: 10px;
     }
     .pager-group { display: inline-flex; gap: 8px; }
@@ -172,21 +219,21 @@ export function dashboardHtml(): string {
     .empty, .loading, .error { padding: 28px; color: var(--muted); text-align: center; }
     .error { color: var(--bad); }
     .section-title { display: flex; align-items: center; gap: 8px; }
-    .tag { display: inline-block; padding: 2px 6px; border-radius: 999px; background: #f1f5f9; color: #334155; font-size: 11px; margin-right: 6px; }
+    .tag { display: inline-block; padding: 2px 6px; border-radius: 999px; background: var(--tag-bg); color: var(--tag-text); font-size: 11px; margin-right: 6px; }
     .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-    .chip-btn { cursor: pointer; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; font-size: 11px; background: #fff; }
+    .chip-btn { cursor: pointer; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; font-size: 11px; background: var(--control); color: var(--text); }
     .chip-btn:hover { border-color: var(--accent); }
     .muted-inline { color: var(--muted); font-size: 12px; }
     .crosslink { color: var(--accent); text-decoration: underline; cursor: pointer; }
     .scoreline { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
-    .scoreline span { min-width: 22px; text-align: center; padding: 2px 6px; border-radius: 4px; background: #eef3f2; }
+    .scoreline span { min-width: 22px; text-align: center; padding: 2px 6px; border-radius: 4px; background: var(--chip); }
     .insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .insight { border: 1px solid #edf0f2; border-radius: 6px; padding: 8px; min-width: 0; background: #fbfcfd; }
+    .insight { border: 1px solid var(--table-line); border-radius: 6px; padding: 8px; min-width: 0; background: var(--panel-soft); }
     .insight span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
     .insight b { display: block; font-size: 16px; overflow-wrap: anywhere; }
-    .detail-card { border: 1px solid #edf0f2; border-radius: 6px; padding: 10px; background: #fff; display: grid; gap: 8px; }
+    .detail-card { border: 1px solid var(--table-line); border-radius: 6px; padding: 10px; background: var(--control); display: grid; gap: 8px; }
     .detail-list { display: grid; gap: 8px; }
-    .detail-line { display: grid; gap: 3px; padding: 8px; border: 1px solid #edf0f2; border-radius: 6px; background: #fbfcfd; }
+    .detail-line { display: grid; gap: 3px; padding: 8px; border: 1px solid var(--table-line); border-radius: 6px; background: var(--panel-soft); }
     .rationale { white-space: pre-wrap; line-height: 1.45; }
     @media (max-width: 980px) {
       header { align-items: stretch; flex-direction: column; }
@@ -264,6 +311,7 @@ export function dashboardHtml(): string {
             </select>
           </label>
         </div>
+        <button class="icon-btn" id="theme-toggle" title="Cambiar modo oscuro" type="button">Oscuro</button>
         <button class="icon-btn primary" title="Actualizar" type="submit">Actualizar</button>
       </form>
     </header>
@@ -387,6 +435,7 @@ export function dashboardHtml(): string {
         selectedKind: null,
         selectedId: null,
         metadata: null,
+        theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
       };
 
       const $ = (selector) => document.querySelector(selector);
@@ -429,6 +478,19 @@ export function dashboardHtml(): string {
 
       function sanitizeText(value) {
         return hasText(value) ? String(value).trim() : '';
+      }
+
+      function applyTheme(theme) {
+        state.theme = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.dataset.theme = state.theme;
+        const toggle = $('#theme-toggle');
+        if (toggle) {
+          toggle.textContent = state.theme === 'dark' ? 'Claro' : 'Oscuro';
+          toggle.title = state.theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+        }
+        try {
+          localStorage.setItem('gana-dashboard-theme', state.theme);
+        } catch {}
       }
 
       const badgeClass = (status) => {
@@ -1125,6 +1187,10 @@ export function dashboardHtml(): string {
         state.take = Number.isFinite(nextTake) && nextTake > 0 ? nextTake : state.take;
       });
 
+      $('#theme-toggle').addEventListener('click', () => {
+        applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+      });
+
       document.getElementById('tabs').addEventListener('click', (event) => {
         const button = event.target.closest('[data-tab]');
         if (button) {
@@ -1234,6 +1300,7 @@ export function dashboardHtml(): string {
       }
 
       async function boot() {
+        applyTheme(state.theme);
         syncStateFromUrl();
         try {
           await loadMetadata();

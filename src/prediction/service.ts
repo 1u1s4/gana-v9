@@ -247,31 +247,24 @@ export async function runFixtureScoring(
       signal: input.signal,
     });
     rawOutput = result.text;
-    llmOutput = repairTopPickReferences(parseTopPickOutput(rawOutput), evidenceGate, research.claims);
+    llmOutput = completeGateEvidence(repairTopPickReferences(
+      parseTopPickOutput(rawOutput),
+      evidenceGate,
+      research.claims,
+      research.evidenceItems,
+      research.sources,
+    ), evidenceGate);
   } catch (err: any) {
     const error = err?.message ?? String(err);
-    llmOutput = buildFallbackTopPicks({
-      oddsQuotes: promptOddsQuotes,
-      evidenceGate,
-      claimIds: research.claims.map((claim) => claim.id),
-      warning: `prediction LLM scoring failed; generated deterministic API-Football fallback picks: ${error}`,
-    });
-    rawOutput = JSON.stringify({
-      fallback: true,
+    const result = blockedResult(runId, artifactWriter, {
       error,
-      predictions: llmOutput,
-    }, null, 2);
-    if (!llmOutput.length) {
-      const result = blockedResult(runId, artifactWriter, {
-        error,
-        reasons: ['prediction LLM scoring failed', 'fallback scoring unavailable'],
-        fixtureId: fixture.id,
-        providerFixtureId: fixture.providerFixtureId,
-        oddsSnapshotId: oddsSnapshot.id,
-      });
-      await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
-      return result;
-    }
+      reasons: ['prediction LLM scoring failed'],
+      fixtureId: fixture.id,
+      providerFixtureId: fixture.providerFixtureId,
+      oddsSnapshotId: oddsSnapshot.id,
+    });
+    await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
+    return result;
   }
 
   const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
@@ -551,29 +544,83 @@ function repairTopPickReferences(
   picks: ParsedTopPick[],
   evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
   claims: ClaimRecord[],
+  evidenceItems: EvidenceItemRecord[] = [],
+  sources: SourceRecordRecord[] = [],
 ): ParsedTopPick[] {
   const evidenceIds = new Set(evidenceGate.evidenceIds);
   const claimIds = new Set(claims.map((claim) => claim.id));
   const evidenceBySuffix = suffixMap(evidenceGate.evidenceIds);
   const claimBySuffix = suffixMap([...claimIds]);
+  const evidenceBySourceRef = evidenceSourceReferenceMap(evidenceItems, sources, evidenceIds);
   return picks.map((pick) => ({
     ...pick,
-    evidenceIds: uniqueStrings(pick.evidenceIds.map((id) => evidenceIds.has(id) ? id : evidenceBySuffix.get(id) ?? id)),
-    claimIds: uniqueStrings(pick.claimIds.map((id) => claimIds.has(id) ? id : claimBySuffix.get(id) ?? id)),
+    evidenceIds: uniqueStrings(pick.evidenceIds.flatMap((id) => {
+      if (evidenceIds.has(id)) return [id];
+      const bySource = evidenceBySourceRef.get(id);
+      if (bySource?.length) return bySource;
+      return [evidenceBySuffix.get(id) ?? evidenceBySuffix.get(idSuffix(id)) ?? id];
+    })),
+    claimIds: uniqueStrings(pick.claimIds.map((id) => claimIds.has(id) ? id : claimBySuffix.get(id) ?? claimBySuffix.get(idSuffix(id)) ?? id)),
   }));
+}
+
+function evidenceSourceReferenceMap(
+  evidenceItems: EvidenceItemRecord[],
+  sources: SourceRecordRecord[],
+  allowedEvidenceIds: Set<string>,
+): Map<string, string[]> {
+  const evidenceIdsBySource = new Map<string, string[]>();
+  for (const item of evidenceItems) {
+    if (!allowedEvidenceIds.has(item.id)) continue;
+    const current = evidenceIdsBySource.get(item.sourceId) ?? [];
+    current.push(item.id);
+    evidenceIdsBySource.set(item.sourceId, current);
+  }
+
+  const map = new Map<string, string[]>();
+  for (const source of sources) {
+    const ids = evidenceIdsBySource.get(source.id);
+    if (!ids?.length) continue;
+    for (const ref of uniqueStrings([
+      source.id,
+      source.url ?? '',
+      source.externalId ?? '',
+      source.providerSnapshotId ?? '',
+    ].filter(Boolean))) {
+      map.set(ref, ids);
+    }
+  }
+  return map;
 }
 
 function suffixMap(ids: string[]): Map<string, string> {
   const map = new Map<string, string>();
   const ambiguous = new Set<string>();
   for (const id of ids) {
-    const suffix = id.includes(':') ? id.slice(id.lastIndexOf(':') + 1) : id;
-    if (!suffix || suffix === id && !id.includes(':')) continue;
+    const suffix = idSuffix(id);
+    if (!suffix) continue;
     if (map.has(suffix)) ambiguous.add(suffix);
     else map.set(suffix, id);
   }
   for (const suffix of ambiguous) map.delete(suffix);
   return map;
+}
+
+function completeGateEvidence(picks: ParsedTopPick[], evidenceGate: ReturnType<typeof evaluateEvidenceGate>): ParsedTopPick[] {
+  const allowed = new Set(evidenceGate.evidenceIds);
+  return picks.map((pick) => {
+    const validEvidenceIds = uniqueStrings(pick.evidenceIds.filter((id) => allowed.has(id)));
+    return {
+      ...pick,
+      evidenceIds: validEvidenceIds.length
+        ? validEvidenceIds
+        : evidenceGate.evidenceIds.slice(0, Math.min(2, evidenceGate.evidenceIds.length)),
+    };
+  });
+}
+
+function idSuffix(id: string): string {
+  return id.includes(':') ? id.slice(id.lastIndexOf(':') + 1) : id;
 }
 
 function uniqueStrings(values: string[]): string[] {
@@ -680,58 +727,6 @@ function selectScoringPromptQuotes(quotes: OddsQuoteRecord[]): OddsQuoteRecord[]
   return [...grouped.values()]
     .sort(comparePromptQuotes)
     .slice(0, MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT);
-}
-
-function buildFallbackTopPicks(input: {
-  oddsQuotes: OddsQuoteRecord[];
-  evidenceGate: ReturnType<typeof evaluateEvidenceGate>;
-  claimIds: string[];
-  warning: string;
-}): ParsedTopPick[] {
-  if (!input.evidenceGate.evidenceIds.length) return [];
-  const selected: OddsQuoteRecord[] = [];
-  const seenMarkets = new Set<string>();
-  for (const quote of [...input.oddsQuotes].sort(compareFallbackQuotes)) {
-    if (seenMarkets.has(quote.marketKey)) continue;
-    selected.push(quote);
-    seenMarkets.add(quote.marketKey);
-    if (selected.length >= 3) break;
-  }
-
-  return selected.map((quote) => {
-    const odds = numberValue(quote.price);
-    const implied = numberOrUndefined(quote.impliedProbability) ?? (Number.isFinite(odds) && odds > 1 ? 1 / odds : 0.5);
-    const probability = Math.min(0.88, Math.max(0.05, implied + 0.025));
-    return {
-      oddsQuoteId: quote.id,
-      market: quote.marketKey,
-      selection: quote.selectionKey,
-      ...(numberOrUndefined(quote.line) !== undefined && { line: numberOrUndefined(quote.line) }),
-      odds,
-      probability,
-      confidence: Math.min(0.7, Math.max(0.52, probability - 0.05)),
-      evidenceIds: input.evidenceGate.evidenceIds.slice(0, 5),
-      claimIds: input.claimIds.slice(0, 5),
-      rationale: 'Fallback analytical pick generated from persisted API-Football odds, fixture context, and the latest evidence bundle because agentic scoring did not return valid JSON.',
-      warnings: [input.warning],
-    };
-  });
-}
-
-function compareFallbackQuotes(a: OddsQuoteRecord, b: OddsQuoteRecord): number {
-  return marketPriority(a.marketKey) - marketPriority(b.marketKey)
-    || fallbackOddsBandPenalty(a) - fallbackOddsBandPenalty(b)
-    || linePriority(a) - linePriority(b)
-    || numberValue(a.price) - numberValue(b.price);
-}
-
-function fallbackOddsBandPenalty(quote: OddsQuoteRecord): number {
-  const odds = numberValue(quote.price);
-  if (!Number.isFinite(odds)) return 10_000;
-  if (odds >= 1.2 && odds <= 1.95) return 0;
-  if (odds > 1.05 && odds < 1.2) return 1;
-  if (odds > 1.95 && odds <= 2.4) return 2;
-  return Math.abs(odds - 1.6) + 10;
 }
 
 function comparePromptQuotes(a: OddsQuoteRecord, b: OddsQuoteRecord): number {
@@ -1037,9 +1032,10 @@ function metadataBool(metadata: unknown, key: string): boolean | undefined {
 }
 
 function isParlayEligibleResearch(researchBundle: ResearchBundleRecord | undefined, warnings: string[]): boolean {
-  return researchBundleVerdict(researchBundle) === 'promotable'
+  return !!researchBundle
+    && researchBundleVerdict(researchBundle) !== 'blocked'
     && !warnings.some((warning) =>
-      /fallback research|research is not promotable|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+      /fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
     );
 }
 

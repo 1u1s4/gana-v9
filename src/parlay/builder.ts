@@ -118,7 +118,6 @@ function evaluatePrediction(
 
   if (prediction.status === 'blocked') reasons.push('excluded-blocked-prediction');
   if (prediction.status === 'draft') reasons.push('excluded-draft-prediction');
-  if (prediction.status === 'review-required') reasons.push('excluded-review-required-prediction');
   if (!isMarketKey(prediction.market)) {
     reasons.push('excluded-invalid-market');
   } else {
@@ -159,7 +158,7 @@ function evaluatePrediction(
 
 function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {
   return (prediction.warnings ?? []).some((warning) =>
-    /research is not promotable|fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+    /fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
   );
 }
 

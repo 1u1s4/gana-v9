@@ -85,6 +85,35 @@ describe('prediction scoring', () => {
     assert.match(result.reasons.join('\n'), /line forbidden/i);
   });
 
+  it('keeps low-liquidity and low-confidence as warnings instead of hard blockers', () => {
+    const prediction = buildAtomicPrediction({
+      runId: 'run-1',
+      fixtureId: 'fixture-1',
+      providerFixtureId: '1001',
+      oddsSnapshotId: 'odds-snapshot-1',
+      oddsQuoteId: 'odds-quote-1',
+      market: 'corners_over_under',
+      selection: 'under',
+      line: 9.5,
+      odds: 1.8,
+      marketFairProbability: 0.5,
+      estimatedProbability: 0.6,
+      evidenceIds: ['evidence-1'],
+      claimIds: ['claim-1'],
+      status: 'promotable',
+      confidence: 0.34,
+      rationale: 'Corners under is a thin but valid LLM prediction.',
+      lowLiquidity: true,
+      generatedAt: '2026-05-06T20:00:00.000Z',
+    });
+
+    assert.equal(prediction.status, 'promotable');
+    assert.equal(prediction.promotable, true);
+    assert.deepEqual(prediction.blockers, []);
+    assert.match(prediction.warnings.join('\n'), /low-liquidity/);
+    assert.match(prediction.warnings.join('\n'), /low-confidence/);
+  });
+
   it('keeps lineup-pending as a non-blocking warning for otherwise promotable predictions', () => {
     const prediction = buildAtomicPrediction({
       runId: 'run-1',

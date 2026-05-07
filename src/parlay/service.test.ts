@@ -154,7 +154,7 @@ describe('runParlayBuild', () => {
           list: async () => [
             prediction({ id: 'prediction-1', runId: 'current-run-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8, metadata: { parlayEligible: false } }),
             prediction({ id: 'prediction-2', runId: 'current-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, warnings: ['research is not promotable'] }),
-            prediction({ id: 'prediction-3', runId: 'current-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.8 }),
+            prediction({ id: 'prediction-3', runId: 'current-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.8, warnings: ['stale news source'] }),
             prediction({ id: 'prediction-4', runId: 'current-run-1', fixtureId: 'fixture-4', odds: 1.5, confidence: 0.8 }),
           ] as any[],
           listForFixtureDate: async () => [],
@@ -166,13 +166,17 @@ describe('runParlayBuild', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['prediction-3', 'prediction-4']);
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['prediction-2', 'prediction-4']);
     assert.deepEqual(
       result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-1')?.excludedReasons,
       ['excluded-parlay-ineligible'],
     );
     assert.deepEqual(
-      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.excludedReasons,
+      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.includedReasons,
+      ['included-eligible-prediction'],
+    );
+    assert.deepEqual(
+      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-3')?.excludedReasons,
       ['excluded-research-not-promotable'],
     );
   });
