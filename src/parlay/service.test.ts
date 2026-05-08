@@ -461,6 +461,18 @@ describe('runParlayBuild', () => {
             rationale: 'Two weak but high-edge review legs remain analytical only.',
             riskNotes: ['Draw exposure and research warnings keep this review-required.'],
           },
+          {
+            title: 'Review-only home favorites',
+            predictionIds: ['prediction-3', 'prediction-4'],
+            rationale: 'Two independent review legs stay within the review profile bounds.',
+            riskNotes: ['Research warnings keep this review-required.'],
+          },
+          {
+            title: 'Review-only goals mix',
+            predictionIds: ['prediction-5', 'prediction-6'],
+            rationale: 'Two independent totals legs with enough confidence for review.',
+            riskNotes: ['Low-liquidity warnings keep this review-required.'],
+          },
         ] }) } as any;
       },
       writeArtifact: (_runId, name) => `/tmp/${name}`,
@@ -493,6 +505,60 @@ describe('runParlayBuild', () => {
               edge: 0.4,
               warnings: ['research is not promotable'],
             }),
+            prediction({
+              id: 'prediction-3',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-3',
+              marketKey: 'h2h',
+              selectionKey: 'home',
+              odds: 1.34,
+              confidence: 0.71,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.04,
+              warnings: ['research is not promotable'],
+            }),
+            prediction({
+              id: 'prediction-4',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-4',
+              marketKey: 'h2h',
+              selectionKey: 'home',
+              odds: 1.28,
+              confidence: 0.72,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.04,
+              warnings: ['research is not promotable'],
+            }),
+            prediction({
+              id: 'prediction-5',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-5',
+              marketKey: 'goals_over_under',
+              selectionKey: 'over',
+              line: 2.5,
+              odds: 1.42,
+              confidence: 0.73,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.04,
+              warnings: ['low-liquidity'],
+            }),
+            prediction({
+              id: 'prediction-6',
+              runId: 'source-run-1',
+              fixtureId: 'fixture-6',
+              marketKey: 'goals_over_under',
+              selectionKey: 'over',
+              line: 1.5,
+              odds: 1.29,
+              confidence: 0.72,
+              quality: 'medium',
+              status: 'review-required',
+              edge: 0.04,
+              warnings: ['low-liquidity'],
+            }),
           ] as any[],
           listForFixtureDate: async () => [],
         },
@@ -508,14 +574,17 @@ describe('runParlayBuild', () => {
     });
 
     assert.match(reviewPrompt, /Review profile/);
+    assert.match(reviewPrompt, /Create up to 3 parlays/);
     assert.match(reviewPrompt, /Minimum leg confidence for this profile: 0.7/);
     assert.equal(result.ok, true);
     assert.equal(result.gateResult.verdict, 'review-required');
-    assert.equal(result.portfolio?.parlays.length, 1);
+    assert.equal(result.portfolio?.parlays.length, 3);
     assert.equal(result.portfolio?.parlays[0].profile, 'review');
+    assert.equal(result.portfolio?.parlays[1].profile, 'review');
+    assert.equal(result.portfolio?.parlays[2].profile, 'review');
     assert.equal(result.portfolio?.parlays[0].build.parlay.status, 'review-required');
     assert.equal(result.portfolio?.parlays[0].build.config.minPredictionConfidence, 0.7);
-    assert.equal(persisted.length, 1);
+    assert.equal(persisted.length, 3);
   });
 
   it('rejects LLM portfolio parlays that duplicate a fixture without justification', async () => {

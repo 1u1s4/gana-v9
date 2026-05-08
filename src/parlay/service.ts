@@ -48,7 +48,7 @@ const BALANCED_MIN_AGGREGATE_CONFIDENCE = 0.55;
 const PORTFOLIO_PROFILES = [
   { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
   { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 1, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
-  { key: 'review', label: 'Revision', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.2, targetParlays: 1, minConfidence: PORTFOLIO_REVIEW_MIN_CONFIDENCE, maxReviewOrWarningLegs: 99, allowDrawExposure: true, reviewOnly: true },
+  { key: 'review', label: 'Revision', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.2, targetParlays: 3, minConfidence: PORTFOLIO_REVIEW_MIN_CONFIDENCE, maxReviewOrWarningLegs: 99, allowDrawExposure: true, reviewOnly: true },
 ] as const;
 
 type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'];
