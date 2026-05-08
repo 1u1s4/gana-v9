@@ -302,6 +302,39 @@ export function dashboardHtml(): string {
       vertical-align: 1px;
     }
     .filter-actions { display: flex; align-items: center; gap: 4px; }
+    .quick-explore {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-dim);
+      display: grid;
+      gap: 6px;
+    }
+    .quick-explore h3 {
+      margin: 0;
+      color: var(--muted-foreground);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+    .entity-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px; }
+    .json-card {
+      max-height: 180px;
+      overflow: auto;
+      margin: 0;
+      padding: 7px;
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
     .filters-body { min-height: 0; overflow: auto; padding: 8px; }
     .filters-grid {
       display: grid;
@@ -655,6 +688,7 @@ export function dashboardHtml(): string {
         <div class="filters-panel-head">
           <h2>Filtros</h2>
           <div class="filter-actions">
+            <button class="icon-btn" data-date-preset="yesterday" title="Filtrar ayer" type="button">Ayer</button>
             <button class="icon-btn" data-date-preset="today" title="Filtrar hoy" type="button">Hoy</button>
             <button class="icon-btn" data-date-preset="tomorrow" title="Filtrar mañana" type="button">Mañana</button>
             <button class="icon-btn primary" title="Actualizar" type="submit">Actualizar</button>
@@ -710,6 +744,15 @@ export function dashboardHtml(): string {
                 <option value="asc">Asc</option>
               </select>
             </label>
+          </div>
+          <div class="quick-explore" id="quick-explore" aria-label="Exploración rápida">
+            <h3>Explorar rápido</h3>
+            <div class="quick-grid">
+              <button class="icon-btn" data-quick-tab="predictions" type="button">Predicciones</button>
+              <button class="icon-btn" data-quick-tab="parlays" type="button">Parlays</button>
+              <button class="icon-btn" data-quick-tab="validations" type="button">Validaciones</button>
+              <button class="icon-btn" data-quick-tab="runs" type="button">Runs</button>
+            </div>
           </div>
         </div>
       </form>
@@ -887,7 +930,8 @@ export function dashboardHtml(): string {
       }
 
       function applyDatePreset(preset) {
-        const date = preset === 'tomorrow' ? localDateString(1) : localDateString(0);
+        const offset = preset === 'tomorrow' ? 1 : preset === 'yesterday' ? -1 : 0;
+        const date = localDateString(offset);
         state.page = 1;
         state.selectedKind = null;
         state.selectedId = null;
@@ -1408,6 +1452,66 @@ export function dashboardHtml(): string {
           '</span><span class="crosslink mono" data-kind="validation" data-id="' + esc(row.id) + '">' + esc(row.id) + '</span></div>';
       }
 
+      function formatJsonBlock(value) {
+        if (value == null || value === '') return '';
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch {
+          return String(value);
+        }
+      }
+
+      function normalizeWarnings(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.filter(Boolean).map((item) => typeof item === 'string' ? item : formatJsonBlock(item));
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (!trimmed || trimmed === '[]') return [];
+          try {
+            const parsed = JSON.parse(trimmed);
+            return normalizeWarnings(parsed);
+          } catch {
+            return [trimmed];
+          }
+        }
+        if (typeof value === 'object') return [formatJsonBlock(value)];
+        return [String(value)];
+      }
+
+      function renderWarningsCard(data) {
+        const warnings = normalizeWarnings(data?.warnings);
+        if (!warnings.length) return '';
+        return '<div class="detail-card"><h4>Warnings auditados</h4><div class="detail-list">' + warnings.map((warning) =>
+          '<div class="detail-line"><span class="sub">' + esc(warning) + '</span></div>'
+        ).join('') + '</div></div>';
+      }
+
+      function renderOutcomeCard(data) {
+        if (!data?.outcome) return '';
+        return '<div class="detail-card"><h4>Outcome / settlement</h4><pre class="json-card">' + esc(formatJsonBlock(data.outcome)) + '</pre></div>';
+      }
+
+      function renderEntityActions(kind, data) {
+        if (!data) return '';
+        const actions = [];
+        if (data.runId) actions.push('<button class="chip-btn" data-scope-filter="run" data-run-id="' + esc(data.runId) + '" type="button">Filtrar run</button>');
+        if (kind === 'fixture') {
+          actions.push('<button class="chip-btn" data-scope-filter="fixture" data-kind="fixture" data-id="' + esc(data.id) + '" type="button">Explorar partido</button>');
+        }
+        if (kind === 'prediction') {
+          if (data.fixture?.id) actions.push('<button class="chip-btn crosslink" data-kind="fixture" data-id="' + esc(data.fixture.id) + '" type="button">Ver partido</button>');
+          actions.push('<button class="chip-btn" data-open-validations-target="prediction" data-target-id="' + esc(data.id) + '" type="button">Validaciones</button>');
+        }
+        if (kind === 'parlay') {
+          actions.push('<button class="chip-btn" data-open-validations-target="parlay" data-target-id="' + esc(data.id) + '" type="button">Validaciones</button>');
+        }
+        if (kind === 'validation') {
+          const target = validationTargetForRow(data);
+          if (target.kind && target.id) actions.push('<button class="chip-btn crosslink" data-kind="' + esc(target.kind) + '" data-id="' + esc(target.id) + '" type="button">Ver ' + esc(target.label) + '</button>');
+        }
+        return actions.length ? '<div class="entity-actions">' + actions.join('') + '</div>' : '';
+      }
+
       function renderDetail(kind, data, links) {
         if (!data) {
           $('#detail').innerHTML = '<span class=\"muted\">Sin detalle disponible.</span>';
@@ -1418,6 +1522,7 @@ export function dashboardHtml(): string {
         const kv = (label, value) => '<div class=\"kv\"><span>' + esc(label) + '</span><span>' + value + '</span></div>';
         const validationTarget = kind === 'validation' ? validationTargetForRow(data) : null;
         sections.push('<h3>' + esc(title) + '</h3>');
+        sections.push(renderEntityActions(kind, data));
         sections.push(kv('Tipo', esc(kind === 'validation' ? (validationTarget?.label || 'Sin objetivo') : kind)));
         sections.push(kv('ID', '<span class=\"mono\">' + esc(data.id || '') + '</span>'));
         if (kind === 'fixture') {
@@ -1497,12 +1602,11 @@ export function dashboardHtml(): string {
             : '—'));
         }
         if (data.status) sections.push(kv('Estado', badge(data.status)));
+        sections.push(renderWarningsCard(data));
+        sections.push(renderOutcomeCard(data));
         if (data.runId) sections.push(kv('Run', '<span class=\"crosslink\" data-kind=\"run\" data-id=\"' + esc(data.runId) + '\">' + esc(data.runId) + '</span>'));
         if (links && links.length) {
           sections.push('<div class=\"muted\" style=\"margin-top:6px\">Relaciones</div>' + links);
-        }
-        if (kind === 'validation' && data.outcome) {
-          sections.push(kv('Outcome', esc(JSON.stringify(data.outcome))));
         }
         $('#detail').innerHTML = sections.join('');
       }
@@ -1559,6 +1663,41 @@ export function dashboardHtml(): string {
         }
         renderFiltersByTab();
         await load();
+      }
+
+      async function applyRunScopeFilter(runId) {
+        if (!runId) return;
+        state.filters.runId = runId;
+        state.page = 1;
+        state.selectedKind = null;
+        state.selectedId = null;
+        writeForm();
+        await load();
+      }
+
+      async function openValidationsForTarget(targetKind) {
+        state.tab = 'validations';
+        state.page = 1;
+        state.selectedKind = null;
+        state.selectedId = null;
+        state.filters.validationTarget = normalizeValidationTarget(targetKind);
+        state.sort = 'evaluatedAt';
+        state.direction = 'desc';
+        renderFiltersByTab();
+        await load();
+      }
+
+      async function openFixtureExploration(fixtureId) {
+        if (!fixtureId) return;
+        state.tab = 'predictions';
+        state.page = 1;
+        state.selectedKind = 'fixture';
+        state.selectedId = fixtureId;
+        state.sort = 'generatedAt';
+        state.direction = 'desc';
+        renderFiltersByTab();
+        await load();
+        await loadEntity('fixture', fixtureId).catch(() => {});
       }
 
       function applyFiltersFromForm() {
@@ -1648,6 +1787,11 @@ export function dashboardHtml(): string {
       });
 
       $('#filters').addEventListener('click', (event) => {
+        const quick = event.target.closest('[data-quick-tab]');
+        if (quick instanceof HTMLElement && quick.dataset.quickTab) {
+          setTab(quick.dataset.quickTab);
+          return;
+        }
         const button = event.target.closest('[data-date-preset]');
         if (!(button instanceof HTMLElement) || !button.dataset.datePreset) return;
         applyDatePreset(button.dataset.datePreset);
@@ -1682,6 +1826,20 @@ export function dashboardHtml(): string {
       });
 
       $('#detail').addEventListener('click', async (event) => {
+        const scoped = event.target.closest('[data-scope-filter]');
+        if (scoped instanceof HTMLElement && scoped.dataset.scopeFilter === 'run' && scoped.dataset.runId) {
+          await applyRunScopeFilter(scoped.dataset.runId);
+          return;
+        }
+        if (scoped instanceof HTMLElement && scoped.dataset.scopeFilter === 'fixture' && scoped.dataset.id) {
+          await openFixtureExploration(scoped.dataset.id);
+          return;
+        }
+        const validations = event.target.closest('[data-open-validations-target]');
+        if (validations instanceof HTMLElement && validations.dataset.openValidationsTarget) {
+          await openValidationsForTarget(validations.dataset.openValidationsTarget);
+          return;
+        }
         const link = event.target.closest('.crosslink[data-kind][data-id], .chip-btn[data-kind][data-id]');
         if (!(link instanceof HTMLElement) || !link.dataset.kind || !link.dataset.id) return;
         await openRelatedEntity(link.dataset.kind, link.dataset.id);
