@@ -158,7 +158,7 @@ function evaluatePrediction(
 
 function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {
   return (prediction.warnings ?? []).some((warning) =>
-    /fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+    /research is not promotable|fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
   );
 }
 

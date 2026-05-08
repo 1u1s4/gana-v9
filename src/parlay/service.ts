@@ -46,8 +46,8 @@ const PORTFOLIO_REVIEW_MIN_CONFIDENCE = 0.7;
 const CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE = 0.62;
 const BALANCED_MIN_AGGREGATE_CONFIDENCE = 0.55;
 const PORTFOLIO_PROFILES = [
-  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
-  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 1, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
+  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 5, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
+  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
   { key: 'review', label: 'Revision', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.2, targetParlays: 3, minConfidence: PORTFOLIO_REVIEW_MIN_CONFIDENCE, maxReviewOrWarningLegs: 99, allowDrawExposure: true, reviewOnly: true },
 ] as const;
 
@@ -416,13 +416,29 @@ async function runParlayPortfolio(
       builds.push({ profile: validation.profile, build: validation.build });
       included++;
     }
+    const deterministicFills = generateDeterministicPortfolioFills({
+      profile: profileSpec,
+      pool: output?.pool ?? [],
+      usedSignatures,
+      generatedAt,
+      sourceRunId,
+      needed: Math.max(0, profileSpec.targetParlays - included),
+    });
+    for (const validation of deterministicFills) {
+      usedSignatures.add(validation.signature);
+      builds.push({ profile: validation.profile, build: validation.build });
+      included++;
+    }
+    const fallbackWarning = deterministicFills.length
+      ? [`deterministic portfolio fallback filled ${deterministicFills.length} ${profileSpec.key} parlay(s)`]
+      : [];
     profileSummaries.push({
       profile: profileSpec.key,
       promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
       requested: profileSpec.targetParlays,
       included,
       rejected: rejectedCount,
-      warnings: output?.warnings ?? [],
+      warnings: [...(output?.warnings ?? []), ...fallbackWarning],
     });
   }
 
@@ -788,6 +804,75 @@ function validateParsedPortfolioParlay(
   };
 }
 
+function generateDeterministicPortfolioFills(input: {
+  profile: ParlayPortfolioProfileSpec;
+  pool: readonly ParlaySourcePrediction[];
+  usedSignatures: Set<string>;
+  generatedAt: string;
+  sourceRunId: string;
+  needed: number;
+}): Array<Extract<PortfolioValidationResult, { ok: true }>> {
+  if (input.needed <= 0 || input.profile.reviewOnly) return [];
+  const combinations: ParlaySourcePrediction[][] = [];
+  const sortedPool = [...input.pool].sort(comparePortfolioPredictions);
+  for (let size = input.profile.minLegs; size <= input.profile.maxLegs; size++) {
+    collectCombinations(sortedPool, size, 0, [], combinations, 500);
+  }
+  return combinations
+    .sort((a, b) => scorePortfolioCombination(b) - scorePortfolioCombination(a))
+    .map((combination) => validateParsedPortfolioParlay({
+      title: `Deterministic ${input.profile.label}`,
+      predictionIds: combination.map((prediction) => prediction.id),
+      rationale: 'Deterministic fallback selected independent high-confidence, positive-edge legs inside the profile odds range.',
+    }, input.profile, new Map(input.pool.map((prediction) => [prediction.id, prediction])), input.usedSignatures, input.generatedAt, input.sourceRunId))
+    .filter((validation): validation is Extract<PortfolioValidationResult, { ok: true }> => validation.ok)
+    .slice(0, input.needed);
+}
+
+function collectCombinations(
+  pool: readonly ParlaySourcePrediction[],
+  size: number,
+  start: number,
+  current: ParlaySourcePrediction[],
+  output: ParlaySourcePrediction[][],
+  limit: number,
+): void {
+  if (output.length >= limit) return;
+  if (current.length === size) {
+    output.push([...current]);
+    return;
+  }
+  for (let index = start; index < pool.length; index++) {
+    current.push(pool[index]);
+    collectCombinations(pool, size, index + 1, current, output, limit);
+    current.pop();
+    if (output.length >= limit) return;
+  }
+}
+
+function comparePortfolioPredictions(a: ParlaySourcePrediction, b: ParlaySourcePrediction): number {
+  return b.confidence - a.confidence
+    || (b.edge ?? -1) - (a.edge ?? -1)
+    || qualityRank(b.quality) - qualityRank(a.quality)
+    || a.odds - b.odds
+    || a.id.localeCompare(b.id);
+}
+
+function scorePortfolioCombination(predictions: readonly ParlaySourcePrediction[]): number {
+  const aggregateConfidence = calculateAggregateConfidence(predictions);
+  const avgEdge = predictions.reduce((sum, prediction) => sum + Math.max(0, prediction.edge ?? 0), 0) / predictions.length;
+  const avgQuality = calculateAggregateQuality(predictions);
+  const combinedOdds = calculateCombinedOdds(predictions) ?? 1;
+  const lowPricePenalty = predictions.filter((prediction) => prediction.odds < 1.15).length * 0.05;
+  return aggregateConfidence + avgEdge + avgQuality * 0.1 + Math.min(combinedOdds, 3.5) * 0.01 - lowPricePenalty;
+}
+
+function qualityRank(quality: PredictionQuality): number {
+  if (quality === 'high') return 3;
+  if (quality === 'medium') return 2;
+  return 1;
+}
+
 function validatePortfolioRisk(
   selected: readonly ParlaySourcePrediction[],
   profile: ParlayPortfolioProfileSpec,
@@ -961,6 +1046,17 @@ function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {
   );
 }
 
+function hasPortfolioHardOrResearchWarning(prediction: ParlaySourcePrediction): boolean {
+  return (prediction.warnings ?? []).some((warning) => {
+    if (isSoftPortfolioWarning(warning)) return false;
+    return /research|fallback|stale|timed out|insufficient evidence|conflict|mismatch|invalid/i.test(warning);
+  });
+}
+
+function isSoftPortfolioWarning(warning: string): boolean {
+  return /low[- ]liquidity|low liquidity|lineup pending|market liquidity warning/i.test(warning);
+}
+
 function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] {
   const tags: ParlayRiskTag[] = [];
   const edge = prediction.edge;
@@ -969,7 +1065,7 @@ function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] 
   if (edge !== undefined && edge < 0) tags.push('negative_edge');
   if (prediction.confidence < 0.75) tags.push('low_confidence');
   if (prediction.status === 'review-required') tags.push('review_required');
-  if ((prediction.warnings?.length ?? 0) > 0) tags.push('research_warning');
+  if (hasPortfolioHardOrResearchWarning(prediction)) tags.push('research_warning');
   if (prediction.market === 'goals_over_under' && prediction.selection === 'over' && (prediction.line ?? 0) <= 1.5 && prediction.odds <= 1.4) {
     tags.push('fragile_low_total_over');
   }

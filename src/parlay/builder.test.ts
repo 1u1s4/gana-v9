@@ -77,23 +77,24 @@ describe('parlay builder', () => {
         prediction({ id: 'prediction-2', fixtureId: 'fixture-2', status: 'promotable', warnings: ['research is not promotable'] }),
         prediction({ id: 'prediction-3', fixtureId: 'fixture-3', status: 'promotable', warnings: ['stale news source'] }),
         prediction({ id: 'prediction-4', fixtureId: 'fixture-4', status: 'promotable' }),
+        prediction({ id: 'prediction-5', fixtureId: 'fixture-5', status: 'promotable' }),
       ],
     });
 
-    assert.deepEqual(result.parlay.legs.map((leg) => leg.predictionId), ['prediction-2', 'prediction-4']);
+    assert.deepEqual(result.parlay.legs.map((leg) => leg.predictionId), ['prediction-4', 'prediction-5']);
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-1')?.excludedReasons,
       ['excluded-parlay-ineligible'],
     );
     assert.deepEqual(
-      result.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.includedReasons,
-      ['included-eligible-prediction'],
+      result.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.excludedReasons,
+      ['excluded-research-not-promotable'],
     );
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-3')?.excludedReasons,
       ['excluded-research-not-promotable'],
     );
-    assert.equal(result.parlay.status, 'review-required');
+    assert.equal(result.parlay.status, 'promotable');
   });
 
   it('excludes duplicate fixtures by default', () => {

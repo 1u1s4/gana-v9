@@ -156,6 +156,7 @@ describe('runParlayBuild', () => {
             prediction({ id: 'prediction-2', runId: 'current-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, warnings: ['research is not promotable'] }),
             prediction({ id: 'prediction-3', runId: 'current-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.8, warnings: ['stale news source'] }),
             prediction({ id: 'prediction-4', runId: 'current-run-1', fixtureId: 'fixture-4', odds: 1.5, confidence: 0.8 }),
+            prediction({ id: 'prediction-5', runId: 'current-run-1', fixtureId: 'fixture-5', odds: 1.5, confidence: 0.8 }),
           ] as any[],
           listForFixtureDate: async () => [],
         },
@@ -166,14 +167,14 @@ describe('runParlayBuild', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['prediction-2', 'prediction-4']);
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['prediction-4', 'prediction-5']);
     assert.deepEqual(
       result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-1')?.excludedReasons,
       ['excluded-parlay-ineligible'],
     );
     assert.deepEqual(
-      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.includedReasons,
-      ['included-eligible-prediction'],
+      result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-2')?.excludedReasons,
+      ['excluded-research-not-promotable'],
     );
     assert.deepEqual(
       result.build.evaluations.find((evaluation) => evaluation.predictionId === 'prediction-3')?.excludedReasons,
@@ -244,9 +245,9 @@ describe('runParlayBuild', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.sourceRunId, 'source-run-1');
-    assert.equal(result.portfolio?.parlays.length, 4);
-    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3', 'parlay-4']);
-    assert.equal(persisted.length, 4);
+    assert.equal(result.portfolio?.parlays.length, 8);
+    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3', 'parlay-4', 'parlay-5', 'parlay-6', 'parlay-7', 'parlay-8']);
+    assert.equal(persisted.length, 8);
     assert.equal(persisted[0].parlay.metadata.portfolioId, result.portfolio?.id);
     assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'conservative');
     assert.equal(persisted[0].legs.length, 2);
@@ -304,6 +305,49 @@ describe('runParlayBuild', () => {
     assert.equal(result.gateResult.verdict, 'promotable');
     assert.equal(result.portfolio?.parlays[0]?.build.parlay.status, 'promotable');
     assert.deepEqual(result.portfolio?.parlays[0]?.build.parlay.warnings, ['Normal match-state variance.']);
+  });
+
+  it('fills strict portfolio slots deterministically from soft-warning legs when the LLM returns too few parlays', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-1',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async () => ({ text: JSON.stringify({ parlays: [] }) }) as any,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.86, status: 'promotable', edge: 0.03, warnings: ['low-liquidity odds market'] }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.4, confidence: 0.85, status: 'promotable', edge: 0.03, warnings: ['low-liquidity odds market'] }),
+            prediction({ id: 'prediction-3', runId: 'source-run-1', fixtureId: 'fixture-3', odds: 1.45, confidence: 0.84, status: 'promotable', edge: 0.03, warnings: ['low-liquidity odds market'] }),
+            prediction({ id: 'prediction-4', runId: 'source-run-1', fixtureId: 'fixture-4', odds: 1.55, confidence: 0.83, status: 'promotable', edge: 0.03, warnings: ['lineup pending'] }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-portfolio-fallback' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    const conservative = result.portfolio?.profiles.find((profile) => profile.profile === 'conservative');
+    assert.equal(result.ok, true);
+    assert.equal(conservative?.included, 5);
+    assert.match(conservative?.warnings.join('\n') ?? '', /deterministic portfolio fallback filled 5 conservative parlay/);
+    assert.equal(result.portfolio?.parlays.filter((entry) => entry.profile === 'conservative').length, 5);
+    assert.equal(result.portfolio?.parlays.some((entry) => entry.build.parlay.status === 'review-required'), false);
+    assert.equal(persisted.length >= 3, true);
   });
 
   it('blocks with diagnostics when portfolio LLM prompts fail', async () => {
