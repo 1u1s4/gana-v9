@@ -156,7 +156,7 @@ export function settleCornersOverUnder(
     || !Number.isFinite(cornersHome)
     || !Number.isFinite(cornersAway)
   ) {
-    return outcome('blocked', evaluatedAt, 'corners-statistics-unavailable');
+    return outcome('voided', evaluatedAt, 'corners-statistics-unavailable');
   }
 
   return outcome(settleOverUnder(selection, line, cornersHome + cornersAway), evaluatedAt);

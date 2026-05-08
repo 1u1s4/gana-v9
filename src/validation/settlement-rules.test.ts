@@ -138,7 +138,7 @@ describe('settlement rules', () => {
     }).status, 'push');
   });
 
-  it('settles corners over-under and blocks missing statistics', () => {
+  it('settles corners over-under and voids missing statistics', () => {
     assert.equal(settleMarket({
       fixture: fixture(),
       selection: selection({ market: 'corners_over_under', selection: 'over', line: 8.5 }),
@@ -152,14 +152,14 @@ describe('settlement rules', () => {
       evaluatedAt,
     }).status, 'push');
 
-    const blocked = settleMarket({
+    const voided = settleMarket({
       fixture: fixture(),
       selection: selection({ market: 'corners_over_under', selection: 'under', line: 9.5 }),
       evaluatedAt,
     });
 
-    assert.equal(blocked.status, 'blocked');
-    assert.equal(blocked.reason, 'corners-statistics-unavailable');
+    assert.equal(voided.status, 'voided');
+    assert.equal(voided.reason, 'corners-statistics-unavailable');
   });
 
   it('settles btts yes and no', () => {

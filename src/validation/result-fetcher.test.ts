@@ -60,7 +60,7 @@ describe('validation result fetcher', () => {
     assert.equal(result.providerSnapshotId, 'snapshot-statistics-1');
   });
 
-  it('lets settlement block when provider corners are unavailable', async () => {
+  it('lets settlement void corners when provider corners are unavailable', async () => {
     const result = await fetchValidationResult({
       getFixture: async () => fixture,
       getFixtureStatistics: async () => ({
@@ -87,7 +87,7 @@ describe('validation result fetcher', () => {
       evaluatedAt: '2026-04-25T20:00:00.000Z',
     });
 
-    assert.equal(outcome.status, 'blocked');
+    assert.equal(outcome.status, 'voided');
     assert.equal(outcome.reason, 'corners-statistics-unavailable');
   });
 });

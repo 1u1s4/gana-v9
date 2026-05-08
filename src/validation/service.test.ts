@@ -204,7 +204,7 @@ describe('runValidation prediction targets', () => {
     });
   }
 
-  it('blocks corners validation when provider statistics omit corners', async () => {
+  it('voids corners validation when provider statistics omit corners', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
 
@@ -221,7 +221,7 @@ describe('runValidation prediction targets', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.validations[0]?.status, 'blocked');
+    assert.equal(result.validations[0]?.status, 'voided');
     assert.equal(result.validations[0]?.reason, 'corners-statistics-unavailable');
   });
 
