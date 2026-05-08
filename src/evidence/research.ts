@@ -173,12 +173,9 @@ export async function runFixtureResearch(
 
   const repaired = repairResearchReferences(parsed.value);
   const baseSources = apiFootballSources(fixture, createdAt, providerContext);
-  const bundleInput = {
-    id: randomUUID(),
-    runId,
-    fixtureId: fixture.id,
-    providerFixtureId: fixture.providerFixtureId,
-    sources: normalizeSourceRecords(ensureNativeWebSearchSource(
+  const repairedSources = repairMissingEvidenceSources(
+    repaired.value.evidenceItems,
+    normalizeSourceRecords(ensureNativeWebSearchSource(
       prependMissingSources(repaired.value.sources, baseSources),
       input.web,
       createdAt,
@@ -186,18 +183,30 @@ export async function runFixtureResearch(
       config.provider,
       runId,
     )),
-    evidenceItems: repaired.value.evidenceItems,
+    input.web,
+    createdAt,
+    runId,
+  );
+  const evidenceSourceRepairs = repairEvidenceSourceReferences(repaired.value.evidenceItems, repairedSources.sources);
+  const repairWarnings = uniqueStrings([...repaired.warnings, ...repairedSources.warnings, ...evidenceSourceRepairs.warnings]);
+  const bundleInput = {
+    id: randomUUID(),
+    runId,
+    fixtureId: fixture.id,
+    providerFixtureId: fixture.providerFixtureId,
+    sources: repairedSources.sources,
+    evidenceItems: evidenceSourceRepairs.evidenceItems,
     claims: repaired.value.claims,
     gateResult: repaired.value.gateResult,
     providerAgentic: config.provider,
     model: config.model,
     promptVersion: RESEARCH_FIXTURE_PROMPT_VERSION,
     createdAt,
-    warnings: uniqueStrings([...(repaired.value.warnings ?? []), ...repaired.warnings, ...providerContext.warnings]),
+    warnings: uniqueStrings([...(repaired.value.warnings ?? []), ...repairWarnings, ...providerContext.warnings]),
     metadata: {
       ...(repaired.value.metadata ?? {}),
       providerContextWarnings: providerContext.warnings,
-      ...(repaired.warnings.length ? { referenceRepairs: repaired.warnings } : {}),
+      ...(repairWarnings.length ? { referenceRepairs: repairWarnings } : {}),
     },
   };
 
@@ -860,6 +869,76 @@ function prependMissingSources(sources: SourceRecord[] | undefined, requiredSour
   const existing = Array.isArray(sources) ? sources : [];
   const missing = requiredSources.filter((source) => !existing.some((item) => item.id === source.id));
   return [...missing, ...existing];
+}
+
+function repairMissingEvidenceSources(
+  evidenceItems: any[],
+  sources: SourceRecord[],
+  web: ResearchWebMode,
+  capturedAt: string,
+  runId: string,
+): { sources: SourceRecord[]; warnings: string[] } {
+  const warnings: string[] = [];
+  const sourceIds = new Set(sources.map((source) => source.id));
+  const repairedSources = [...sources];
+
+  for (const evidence of evidenceItems) {
+    if (typeof evidence?.sourceId !== 'string' || sourceIds.has(evidence.sourceId)) continue;
+    if (!shouldSynthesizeWebSearchSource(evidence, web)) continue;
+    const source: SourceRecord = {
+      id: evidence.sourceId,
+      type: 'web-search',
+      externalId: `repaired-missing-web-source:${runId}:${evidence.sourceId}`,
+      title: `Repaired omitted web-search source ${evidence.sourceId}`,
+      capturedAt,
+      metadata: {
+        repaired: true,
+        reason: 'LLM output cited a web-search source id in evidence but omitted the matching source record.',
+        evidenceId: typeof evidence.id === 'string' ? evidence.id : undefined,
+      },
+    };
+    repairedSources.push(source);
+    sourceIds.add(source.id);
+    warnings.push(`synthesized omitted web-search source "${evidence.sourceId}" for evidence item "${evidence.id ?? 'unknown'}"`);
+  }
+
+  return { sources: repairedSources, warnings: uniqueStrings(warnings) };
+}
+
+function repairEvidenceSourceReferences(
+  evidenceItems: any[],
+  sources: SourceRecord[],
+): { evidenceItems: any[]; warnings: string[] } {
+  const warnings: string[] = [];
+  const sourceIds = new Set(sources.map((source) => source.id));
+  const repairedEvidenceItems = evidenceItems.map((evidence) => {
+    if (typeof evidence?.sourceId !== 'string' || sourceIds.has(evidence.sourceId)) return evidence;
+    const inferredSourceId = inferEvidenceSourceId(evidence, sources);
+    if (!inferredSourceId) return evidence;
+    warnings.push(`mapped unknown evidence source "${evidence.sourceId}" to "${inferredSourceId}" on evidence item "${evidence.id ?? 'unknown'}"`);
+    return { ...evidence, sourceId: inferredSourceId };
+  });
+  return { evidenceItems: repairedEvidenceItems, warnings: uniqueStrings(warnings) };
+}
+
+function shouldSynthesizeWebSearchSource(evidence: any, web: ResearchWebMode): boolean {
+  if (web === 'off') return false;
+  const text = `${evidence?.summary ?? ''} ${evidence?.snippet ?? ''}`.toLowerCase();
+  return /\b(web|search|result|report|news|article|site|source)\b/.test(text);
+}
+
+function inferEvidenceSourceId(evidence: any, sources: SourceRecord[]): string | undefined {
+  const text = `${evidence?.summary ?? ''} ${evidence?.snippet ?? ''}`.toLowerCase();
+  if (/\b(odds?|priced?|price|bookmaker|market|line)\b/.test(text) && sources.some((source) => source.id === 'source_api_football_odds_snapshot')) {
+    return 'source_api_football_odds_snapshot';
+  }
+  if (/\b(statistics?|corners?|shots?|possession|cards?)\b/.test(text) && sources.some((source) => source.id === 'source_api_football_fixture_statistics')) {
+    return 'source_api_football_fixture_statistics';
+  }
+  if (/\b(api-football|fixture|score|result|kickoff|status)\b/.test(text) && sources.some((source) => source.id === 'source_api_football_fixture')) {
+    return 'source_api_football_fixture';
+  }
+  return undefined;
 }
 
 function ensureNativeWebSearchSource(

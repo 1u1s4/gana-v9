@@ -284,6 +284,94 @@ describe('runFixtureResearch', () => {
     assert.equal(result.bundle?.claims.length, 1);
   });
 
+  it('repairs evidence source ids omitted from the structured source list', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      sources: [{
+        id: 'source_1',
+        type: 'api-football',
+        externalId: '1001',
+        title: 'API-Football fixture snapshot',
+        capturedAt: createdAt.toISOString(),
+      }],
+      evidenceItems: [
+        {
+          id: 'evidence_1',
+          sourceId: 'source_4',
+          claimIds: ['claim_1'],
+          summary: 'Web result corroborates the away win.',
+          confidence: 0.96,
+        },
+        {
+          id: 'evidence_2',
+          sourceId: 'source_2',
+          claimIds: ['claim_2'],
+          summary: 'Fixture statistics show a 10-2 corner split and 12 total corners.',
+          confidence: 0.99,
+        },
+        {
+          id: 'evidence_3',
+          sourceId: 'source_3',
+          claimIds: ['claim_3'],
+          summary: 'Odds priced Junior slightly shorter in h2h and over 8.5 corners favored.',
+          confidence: 0.93,
+        },
+      ],
+      claims: [
+        {
+          id: 'claim_1',
+          statement: 'The web result supports the fixture outcome.',
+          subject: { type: 'fixture', id: 'fixture-1' },
+          supportLevel: 'supported',
+          evidenceIds: ['evidence_1'],
+          conflictStatus: 'none',
+        },
+        {
+          id: 'claim_2',
+          statement: 'Fixture statistics list 12 total corners.',
+          subject: { type: 'fixture', id: 'fixture-1' },
+          supportLevel: 'supported',
+          evidenceIds: ['evidence_2'],
+          conflictStatus: 'none',
+        },
+        {
+          id: 'claim_3',
+          statement: 'Odds context supports h2h and corners market angles without material conflict.',
+          subject: { type: 'market', market: 'h2h' },
+          supportLevel: 'supported',
+          evidenceIds: ['evidence_3'],
+          conflictStatus: 'none',
+        },
+      ],
+      gateResult: {
+        verdict: 'review-required',
+        reasons: ['without material conflict'],
+        warnings: [],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: {
+        getFixture: async () => fixture,
+        getFixtureStatistics: async () => fixtureStatistics,
+        getCanonicalOddsSnapshot: async () => oddsSnapshot,
+      },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(result.bundle?.sources.some((source) => source.id === 'source_4' && source.type === 'web-search'), true);
+    assert.equal(result.bundle?.evidenceItems.find((item) => item.id === 'evidence_2')?.sourceId, 'source_api_football_fixture_statistics');
+    assert.equal(result.bundle?.evidenceItems.find((item) => item.id === 'evidence_3')?.sourceId, 'source_api_football_odds_snapshot');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /synthesized omitted web-search source "source_4"/);
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped unknown evidence source "source_2"/);
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped unknown evidence source "source_3"/);
+  });
+
   it('repairs source ids accidentally included in claim evidence references', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
