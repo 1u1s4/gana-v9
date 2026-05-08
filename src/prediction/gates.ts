@@ -102,6 +102,7 @@ export function evaluateEvidenceGate(input: EvidenceGateInput): EvidenceGateResu
 export function evaluatePredictionGates(input: EvaluatePredictionGatesInput): PredictionGateResult {
   const reasons: string[] = [];
   const warnings: string[] = [];
+  const reviewWarnings: string[] = [];
   const fixture = input.fixture;
 
   if (!fixture) {
@@ -117,30 +118,38 @@ export function evaluatePredictionGates(input: EvaluatePredictionGatesInput): Pr
   if (input.dbWritable === false) reasons.push('database write unavailable');
 
   const evidence = evaluateEvidenceGate(input);
-  if (!evidence.sufficient) warnings.push(...evidence.reasons);
+  if (!evidence.sufficient) {
+    warnings.push(...evidence.reasons);
+    reviewWarnings.push(...evidence.reasons);
+  }
   warnings.push(...evidence.warnings);
-  warnings.push(...(input.qualityWarnings ?? []));
+  reviewWarnings.push(...evidence.warnings);
+  const qualityWarnings = input.qualityWarnings ?? [];
+  warnings.push(...qualityWarnings);
+  reviewWarnings.push(...qualityWarnings.filter(isHardPredictionWarning));
 
   if (input.webResearchRequired && !input.hasWebResearch) {
-    warnings.push('web research required but no web-search source was linked');
+    const warning = 'web research required but no web-search source was linked';
+    warnings.push(warning);
+    reviewWarnings.push(warning);
   }
 
   if (reasons.length) {
-    return { verdict: 'blocked', reasons, warnings };
+    return { verdict: 'blocked', reasons, warnings: [...new Set(warnings)] };
   }
 
-  if (!evidence.sufficient || warnings.length) {
+  if (!evidence.sufficient || reviewWarnings.length) {
     return {
       verdict: 'review-required',
       reasons: evidence.sufficient ? ['prediction requires review'] : ['insufficient evidence'],
-      warnings,
+      warnings: [...new Set(warnings)],
     };
   }
 
   return {
     verdict: 'promotable',
     reasons: ['prediction gates passed'],
-    warnings: [],
+    warnings: [...new Set(warnings)],
   };
 }
 
@@ -171,15 +180,18 @@ export function aggregatePredictionGate(results: PredictionGateResult[]): Predic
       warnings,
     };
   }
-  if (warnings.length) {
+  if (warnings.some(isHardPredictionWarning)) {
     return {
       verdict: 'review-required',
       reasons: ['prediction requires review'],
       warnings,
     };
   }
+  return { verdict: 'promotable', reasons: ['prediction gates passed'], warnings };
+}
 
-  return { verdict: 'promotable', reasons: ['prediction gates passed'], warnings: [] };
+function isHardPredictionWarning(message: string): boolean {
+  return /research is not promotable|research bundle is blocked|missing research|insufficient evidence|web research required|no web-search|stale (news|source|odds) source|fallback research|timed out|canonicalized from persisted odds quote|mismatch|invalid|line movement|model disagreement|not included in the structured output/i.test(message);
 }
 
 function researchBundleStatus(bundle: EvidenceGateInput['researchBundle']): string | undefined {

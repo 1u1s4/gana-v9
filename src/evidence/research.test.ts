@@ -585,6 +585,85 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /mapped market subject id "h2h"/);
   });
 
+  it('promotes otherwise sufficient research when only the schedule claim has a kickoff-time conflict', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session-research-schedule-conflict');
+    const output = agentOutput({
+      sources: [{
+        id: 'source-web-1',
+        type: 'web-search',
+        url: 'https://example.com/orense-preview',
+        title: 'Orense preview',
+        capturedAt: createdAt.toISOString(),
+      }, {
+        id: 'source-web-2',
+        type: 'web-search',
+        url: 'https://example.com/orense-market',
+        title: 'Orense market preview',
+        capturedAt: createdAt.toISOString(),
+      }],
+      evidenceItems: [{
+        id: 'evidence-1',
+        sourceId: 'source-web-1',
+        claimIds: ['claim-1'],
+        summary: 'Current web preview identifies Orense as the home favorite.',
+        confidence: 0.88,
+      }, {
+        id: 'evidence-2',
+        sourceId: 'source-web-2',
+        claimIds: ['claim-2'],
+        summary: 'Current web and market context supports the Orense home side.',
+        confidence: 0.84,
+      }, {
+        id: 'evidence-3',
+        sourceId: 'source_api_football_fixture',
+        claimIds: ['claim-schedule'],
+        summary: 'Kickoff time differs across provider and web sources.',
+        confidence: 0.97,
+      }],
+      claims: [{
+        id: 'claim-1',
+        statement: 'Orense SC is the supported home favorite.',
+        subject: { type: 'market', market: 'h2h' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }, {
+        id: 'claim-2',
+        statement: 'The home-or-draw market angle is supported by current context.',
+        subject: { type: 'market', market: 'double_chance' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-2'],
+        conflictStatus: 'none',
+      }, {
+        id: 'claim-schedule',
+        statement: 'The kickoff timestamp differs across sources and should be treated as provisional.',
+        subject: { type: 'fixture', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-3'],
+        conflictStatus: 'conflict',
+      }],
+      gateResult: {
+        verdict: 'review-required',
+        reasons: ['Kickoff time differs across sources, so the schedule remains provisional.'],
+        warnings: ['Kickoff time differs across sources.'],
+      },
+      warnings: ['Kickoff time differs across sources.'],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /Kickoff time differs across sources/);
+    assert.match(result.bundle?.gateResult.reasons.join('\n') ?? '', /objective research gate passed/);
+  });
+
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

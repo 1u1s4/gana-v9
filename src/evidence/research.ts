@@ -668,7 +668,7 @@ function hasSufficientIndependentEvidence(bundle: ResearchBundle): boolean {
   let supportedClaimCount = 0;
 
   for (const claim of bundle.claims) {
-    if (claim.conflictStatus === 'conflict') return false;
+    if (claim.conflictStatus === 'conflict' && !isNonMaterialScheduleConflictClaim(claim, bundle)) return false;
     if (claim.supportLevel !== 'supported') continue;
     const claimStrongEvidence = claim.evidenceIds.filter((id) => strongEvidenceIds.has(id));
     if (!claimStrongEvidence.length) continue;
@@ -677,6 +677,22 @@ function hasSufficientIndependentEvidence(bundle: ResearchBundle): boolean {
   }
 
   return supportedClaimCount >= 2 && linkedStrongEvidenceIds.size >= 2;
+}
+
+function isNonMaterialScheduleConflictClaim(claim: ResearchBundle['claims'][number], bundle: ResearchBundle): boolean {
+  const subjectType = claim.subject?.type;
+  if (subjectType !== 'fixture') return false;
+  const claimText = claim.statement.toLowerCase();
+  const evidenceText = claim.evidenceIds
+    .map((id) => bundle.evidenceItems.find((evidence) => evidence.id === id)?.summary ?? '')
+    .join(' ')
+    .toLowerCase();
+  const combined = `${claimText} ${evidenceText}`;
+  const mentionsSchedule = /\b(kickoff|start\s*time|scheduled|schedule|timestamp|fixture\s*time|date)\b/.test(combined);
+  const mentionsMinorDisagreement = /\b(differs?|different|provisional|time\s+zone|timezone|rescheduled|postponed)\b/.test(combined);
+  const mentionsMarketOrAvailability = /\b(odds|market|price|line|injur|suspend|lineup|home|away|winner|draw|goals?|corners?|btts)\b/.test(combined);
+
+  return mentionsSchedule && mentionsMinorDisagreement && !mentionsMarketOrAvailability;
 }
 
 function evidenceConfidence(value: unknown): number {

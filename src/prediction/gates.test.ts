@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { evaluatePredictionGates } from './gates.js';
+import { aggregatePredictionGate, evaluatePredictionGates } from './gates.js';
 
 const fixture = {
   id: 'fixture-1',
@@ -57,6 +57,19 @@ describe('prediction gates', () => {
     assert.deepEqual(result.warnings, []);
   });
 
+  it('keeps otherwise sufficient predictions promotable when only soft research-quality warnings are present', () => {
+    const result = evaluatePredictionGates({
+      fixture,
+      oddsQuotes,
+      researchBundle,
+      qualityWarnings: ['low-liquidity', 'corners context is thin'],
+    });
+
+    assert.equal(result.verdict, 'promotable');
+    assert.deepEqual(result.reasons, ['prediction gates passed']);
+    assert.deepEqual(result.warnings, ['low-liquidity', 'corners context is thin']);
+  });
+
   it('blocks when fixture context is missing', () => {
     const result = evaluatePredictionGates({ fixture: undefined, oddsQuotes, researchBundle });
 
@@ -98,5 +111,20 @@ describe('prediction gates', () => {
 
     assert.equal(result.verdict, 'review-required');
     assert.match(result.warnings.join('\n'), /research.*not promotable/i);
+  });
+
+  it('keeps aggregate prediction gate promotable when every leg only has soft warnings', () => {
+    const result = aggregatePredictionGate([{
+      verdict: 'promotable',
+      reasons: ['prediction gates passed'],
+      warnings: ['corners context is thin'],
+    }, {
+      verdict: 'promotable',
+      reasons: ['prediction gates passed'],
+      warnings: ['low-liquidity'],
+    }]);
+
+    assert.equal(result.verdict, 'promotable');
+    assert.deepEqual(result.warnings, ['corners context is thin', 'low-liquidity']);
   });
 });
