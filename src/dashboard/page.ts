@@ -5,6 +5,9 @@ export function dashboardHtml(): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gana Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script>
     (function () {
       try {
@@ -19,110 +22,228 @@ export function dashboardHtml(): string {
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f6f8;
-      --panel: #ffffff;
-      --panel-soft: #fbfcfd;
-      --control: #ffffff;
-      --table-head: #fafbfc;
-      --table-line: #edf0f2;
-      --row-selected: #f0f9f8;
-      --row-hover: #f8fbfb;
-      --line: #d7dde3;
-      --text: #17202a;
-      --muted: #66717d;
-      --accent: #126b61;
-      --accent-2: #b53f2f;
-      --good: #137a4a;
-      --warn: #9a6500;
-      --bad: #b42318;
-      --chip: #eef3f2;
-      --good-bg: #eaf6ef;
-      --warn-bg: #fff4df;
-      --bad-bg: #fdeceb;
-      --tag-bg: #f1f5f9;
-      --tag-text: #334155;
+      --bg: #f4efe7;
+      --panel: rgba(255, 252, 247, 0.86);
+      --panel-soft: #fffdf8;
+      --control: rgba(255, 255, 255, 0.88);
+      --table-head: rgba(255, 252, 247, 0.6);
+      --table-line: rgba(37, 50, 61, 0.10);
+      --row-selected: rgba(191, 79, 44, 0.08);
+      --row-hover: rgba(244, 231, 216, 0.5);
+      --line: rgba(37, 50, 61, 0.12);
+      --text: #23323d;
+      --muted: #62727f;
+      --accent: #bf4f2c;
+      --accent-2: #8b3217;
+      --good: #1f7a54;
+      --warn: #b76b1c;
+      --bad: #a73929;
+      --chip: rgba(244, 231, 216, 0.6);
+      --good-bg: rgba(31, 122, 84, 0.1);
+      --warn-bg: rgba(183, 107, 28, 0.1);
+      --bad-bg: rgba(167, 57, 41, 0.1);
+      --tag-bg: rgba(239, 224, 204, 0.5);
+      --tag-text: #23323d;
+      --bg-accent: #efe0cc;
+      --shadow: 0 18px 50px rgba(35, 50, 61, 0.08);
+      --radius: 22px;
+      --font-sans: "IBM Plex Sans", "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
     html[data-theme="dark"] {
       color-scheme: dark;
-      --bg: #101418;
-      --panel: #171d23;
-      --panel-soft: #1d252d;
-      --control: #12181e;
-      --table-head: #141a20;
-      --table-line: #26313a;
-      --row-selected: #102924;
-      --row-hover: #1b252c;
-      --line: #2c3741;
-      --text: #e7edf2;
-      --muted: #98a7b3;
-      --accent: #2db7a3;
-      --accent-2: #ff8068;
-      --good: #55d08f;
-      --warn: #f0b759;
-      --bad: #ff7b72;
-      --chip: #19322f;
-      --good-bg: #113321;
-      --warn-bg: #352713;
-      --bad-bg: #3a1d1d;
-      --tag-bg: #222c35;
-      --tag-text: #cbd5df;
+      --bg: #1a1612;
+      --panel: rgba(42, 36, 28, 0.86);
+      --panel-soft: #2a2420;
+      --control: rgba(30, 26, 20, 0.88);
+      --table-head: rgba(42, 36, 28, 0.6);
+      --table-line: rgba(255, 248, 240, 0.08);
+      --row-selected: rgba(191, 79, 44, 0.15);
+      --row-hover: rgba(244, 231, 216, 0.06);
+      --line: rgba(255, 248, 240, 0.1);
+      --text: #ede5d8;
+      --muted: #a0937f;
+      --accent: #e0714e;
+      --accent-2: #ff9b70;
+      --good: #5cc88a;
+      --warn: #e0a040;
+      --bad: #e06050;
+      --chip: rgba(191, 79, 44, 0.12);
+      --good-bg: rgba(31, 122, 84, 0.15);
+      --warn-bg: rgba(183, 107, 28, 0.15);
+      --bad-bg: rgba(167, 57, 41, 0.15);
+      --tag-bg: rgba(239, 224, 204, 0.08);
+      --tag-text: #c8bfb0;
+      --bg-accent: #2a2218;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+      --radius: 22px;
+      --font-sans: "IBM Plex Sans", "Avenir Next", ui-sans-serif, system-ui, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: var(--bg);
+      min-height: 100vh;
       color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(191, 79, 44, 0.16), transparent 30%),
+        radial-gradient(circle at top right, rgba(51, 120, 94, 0.12), transparent 34%),
+        linear-gradient(180deg, #f7f1e8 0%, #f1e7d8 100%);
+      font-family: var(--font-sans);
       font-size: 14px;
     }
+    html[data-theme="dark"] body {
+      background:
+        radial-gradient(circle at top left, rgba(191, 79, 44, 0.10), transparent 30%),
+        radial-gradient(circle at top right, rgba(51, 120, 94, 0.07), transparent 34%),
+        linear-gradient(180deg, #1a1612 0%, #14110d 100%);
+    }
     button, input, select { font: inherit; }
-    .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+    .shell {
+      width: min(1400px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 48px;
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 18px;
+    }
     header {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 4px);
+      background: linear-gradient(135deg, rgba(255, 253, 248, 0.96), rgba(244, 231, 216, 0.92));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    html[data-theme="dark"] header {
+      background: linear-gradient(135deg, rgba(42, 36, 28, 0.96), rgba(30, 26, 20, 0.92));
+    }
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .brand { display: flex; flex-direction: column; min-width: 0; }
+    .brand h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.2rem); line-height: 0.95; }
+    .lede {
+      margin: 12px 0 0;
+      max-width: 520px;
+      font-size: 1rem;
+      color: var(--muted);
+    }
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+    .connection-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    html[data-theme="dark"] .connection-pill {
+      background: rgba(42, 36, 28, 0.72);
+    }
+    .connection-pill::before {
+      content: '';
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .connection-pill.ok { color: var(--good); }
+    .connection-pill.warn { color: var(--warn); }
+    .connection-pill.error { color: var(--bad); }
+    .filters-surface {
       background: var(--panel);
-      border-bottom: 1px solid var(--line);
-      padding: 14px 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .filters-panel-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      position: sticky;
-      top: 0;
-      z-index: 5;
+      gap: 12px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
     }
-    .brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-    .brand h1 { margin: 0; font-size: 20px; line-height: 1.2; letter-spacing: 0; }
-    .brand span { color: var(--muted); white-space: nowrap; }
-    .toolbar { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-    .toolbar label { color: var(--muted); display: grid; gap: 4px; font-size: 12px; }
+    .filters-panel-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+    .filter-actions { display: flex; align-items: center; gap: 12px; }
+    .filters-body { padding: 14px 18px; }
     label { color: var(--muted); display: grid; gap: 4px; font-size: 12px; }
-    input, select, .btn {
+    input, select {
       height: 34px;
       border: 1px solid var(--line);
       background: var(--control);
       color: var(--text);
-      border-radius: 6px;
+      border-radius: 12px;
       padding: 0 9px;
       min-width: 132px;
     }
     .btn {
+      height: 34px;
+      border: 1px solid var(--line);
+      background: var(--control);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0 14px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       text-decoration: none;
       cursor: pointer;
+      transition: all 0.15s ease;
     }
     .btn:hover { border-color: var(--accent); }
-    .icon-btn, .tab {
+    .icon-btn {
       height: 34px;
       border: 1px solid var(--line);
       background: var(--control);
       color: var(--text);
-      border-radius: 6px;
-      padding: 0 10px;
+      border-radius: 999px;
+      padding: 0 14px;
       cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab {
+      height: 34px;
+      border: 1px solid var(--line);
+      background: var(--control);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0 14px;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
     .icon-btn:hover, .tab:hover { border-color: var(--accent); }
-    .icon-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .icon-btn.primary {
+      background: var(--accent);
+      color: #fff8f3;
+      border-color: var(--accent);
+      box-shadow: 0 12px 26px rgba(191, 79, 44, 0.24);
+    }
+    .icon-btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
     .filters-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(130px, 1fr));
@@ -143,41 +264,71 @@ export function dashboardHtml(): string {
       grid-template-columns: 1fr 1fr;
       gap: 4px;
     }
-    .main { padding: 18px 20px 28px; display: grid; gap: 16px; }
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; }
+    .main { padding: 0; display: grid; gap: 16px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
     .stat {
-      background: var(--panel);
+      background: var(--panel-soft);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
+      border-radius: 18px;
+      padding: 18px;
       min-height: 82px;
       cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     }
-    .stat:hover { border-color: var(--accent); }
-    .stat b { display: block; font-size: 26px; line-height: 1.1; margin-top: 8px; }
+    .stat:hover {
+      border-color: rgba(191, 79, 44, 0.45);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(191, 79, 44, 0.12);
+    }
+    .stat .muted {
+      display: block;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .stat b { display: block; font-size: 1.9rem; line-height: 1.1; margin-top: 4px; }
     .muted { color: var(--muted); }
     .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-    .tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+    .tab.active {
+      background: var(--accent);
+      color: #fff8f3;
+      border-color: var(--accent);
+      box-shadow: 0 6px 16px rgba(191, 79, 44, 0.18);
+    }
     .content { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 14px; align-items: start; }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: var(--radius);
       min-width: 0;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
     .panel-head {
-      padding: 12px 14px;
+      padding: 14px 18px;
       border-bottom: 1px solid var(--line);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
     }
-    .panel-head h2 { margin: 0; font-size: 15px; letter-spacing: 0; }
+    .panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
     .table-wrap { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 940px; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--table-line); vertical-align: top; }
-    th { color: var(--muted); font-size: 12px; font-weight: 600; background: var(--table-head); position: relative; }
+    th {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: var(--table-head);
+      position: relative;
+    }
     th button { all: unset; cursor: pointer; display: inline-flex; width: 100%; align-items: center; gap: 6px; }
     th button:hover { color: var(--accent); }
     tbody tr { cursor: pointer; }
@@ -190,13 +341,14 @@ export function dashboardHtml(): string {
       align-items: center;
       max-width: 100%;
       min-height: 24px;
-      padding: 2px 8px;
+      padding: 3px 10px;
       border-radius: 999px;
       background: var(--chip);
       color: var(--accent);
       font-size: 12px;
       font-weight: 700;
       overflow-wrap: anywhere;
+      border: 1px solid var(--line);
     }
     .badge.good { color: var(--good); background: var(--good-bg); }
     .badge.warn { color: var(--warn); background: var(--warn-bg); }
@@ -205,51 +357,64 @@ export function dashboardHtml(): string {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 12px;
+      padding: 12px 14px;
       border-top: 1px solid var(--table-line);
       gap: 10px;
     }
     .pager-group { display: inline-flex; gap: 8px; }
-    .detail { padding: 14px; display: grid; gap: 12px; max-height: 80vh; overflow: auto; }
-    .detail h3 { margin: 0; font-size: 16px; line-height: 1.25; }
-    .detail h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0; }
+    .detail { padding: 18px; display: grid; gap: 14px; max-height: 80vh; overflow: auto; }
+    .detail h3 { margin: 0; font-size: 18px; line-height: 1.25; }
+    .detail h4 {
+      margin: 0 0 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
     .kv { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; }
     .kv span:first-child { color: var(--muted); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+    .mono { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
     .empty, .loading, .error { padding: 28px; color: var(--muted); text-align: center; }
     .error { color: var(--bad); }
     .section-title { display: flex; align-items: center; gap: 8px; }
     .tag { display: inline-block; padding: 2px 6px; border-radius: 999px; background: var(--tag-bg); color: var(--tag-text); font-size: 11px; margin-right: 6px; }
     .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-    .chip-btn { cursor: pointer; border: 1px solid var(--line); border-radius: 999px; padding: 3px 8px; font-size: 11px; background: var(--control); color: var(--text); }
+    .chip-btn { cursor: pointer; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 11px; background: var(--control); color: var(--text); transition: all 0.15s ease; }
     .chip-btn:hover { border-color: var(--accent); }
     .muted-inline { color: var(--muted); font-size: 12px; }
-    .crosslink { color: var(--accent); text-decoration: underline; cursor: pointer; }
+    .crosslink {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-color: rgba(191, 79, 44, 0.3);
+      text-underline-offset: 2px;
+      cursor: pointer;
+      transition: text-decoration-color 0.15s;
+    }
+    .crosslink:hover { text-decoration-color: var(--accent); }
     .scoreline { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
-    .scoreline span { min-width: 22px; text-align: center; padding: 2px 6px; border-radius: 4px; background: var(--chip); }
+    .scoreline span { min-width: 22px; text-align: center; padding: 2px 6px; border-radius: 8px; background: var(--chip); }
     .insight-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .insight { border: 1px solid var(--table-line); border-radius: 6px; padding: 8px; min-width: 0; background: var(--panel-soft); }
+    .insight { border: 1px solid var(--table-line); border-radius: 14px; padding: 10px; min-width: 0; background: var(--panel-soft); }
     .insight span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
-    .insight b { display: block; font-size: 16px; overflow-wrap: anywhere; }
-    .detail-card { border: 1px solid var(--table-line); border-radius: 6px; padding: 10px; background: var(--control); display: grid; gap: 8px; }
+    .insight b { display: block; font-size: 1.3rem; overflow-wrap: anywhere; }
+    .detail-card { border: 1px solid var(--table-line); border-radius: 16px; padding: 14px; background: var(--control); display: grid; gap: 8px; }
     .detail-list { display: grid; gap: 8px; }
-    .detail-line { display: grid; gap: 3px; padding: 8px; border: 1px solid var(--table-line); border-radius: 6px; background: var(--panel-soft); }
+    .detail-line { display: grid; gap: 3px; padding: 10px; border: 1px solid var(--table-line); border-radius: 14px; background: var(--panel-soft); }
     .rationale { white-space: pre-wrap; line-height: 1.45; }
     @media (max-width: 980px) {
       header { align-items: stretch; flex-direction: column; }
-      .toolbar { justify-content: flex-start; }
+      .hero-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .content { grid-template-columns: 1fr; }
       aside { position: static; }
       .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 620px) {
-      .main { padding: 12px; }
+      .shell { padding: 12px 0 32px; }
+      .main { gap: 12px; }
       .stats { grid-template-columns: 1fr; }
       .filters-grid { grid-template-columns: 1fr; }
       input, select { width: 100%; min-width: 0; }
-      .toolbar { align-items: stretch; }
-      .icon-btn { flex: 1 1 80px; }
     }
   </style>
 </head>
@@ -257,65 +422,77 @@ export function dashboardHtml(): string {
   <div class="shell">
     <header>
       <div class="brand">
+        <p class="eyebrow">Harness de Predicciones</p>
         <h1>Gana Dashboard</h1>
-        <span id="updated">Cargando</span>
+        <p class="lede">Partidos, predicciones, parlays, validaciones y runs en un solo lugar.</p>
       </div>
-      <form class="toolbar" id="filters">
-        <div class="filters-grid">
-          <label>Fecha desde <input type="date" name="dateFrom"></label>
-          <label>Fecha hasta <input type="date" name="dateTo"></label>
-          <label>Run ID <input name="runId" placeholder="run id"></label>
-          <label class="validation-target-filter">Tipo
-            <select name="validationTarget">
-              <option value="all">Todas</option>
-              <option value="prediction">Atómicas</option>
-              <option value="parlay">Parlays</option>
-            </select>
-          </label>
-          <label class="filter-multi">Status
-            <select name="status" multiple size="2"></select>
-          </label>
-          <label>Mercado <select name="market"><option value="">Todos</option></select></label>
-          <label>Equipo <select name="team"><option value="">Todos</option></select></label>
-          <label>Competencia <select name="competition"><option value="">Todas</option></select></label>
-          <label class="filter-multi">Calidad
-            <select name="quality" multiple size="2"></select>
-          </label>
-          <label class="filter-number">Confianza
-            <div class="range">
-              <input name="minConfidence" placeholder="min">
-              <input name="maxConfidence" placeholder="max">
-            </div>
-          </label>
-          <label class="filter-number">Edge
-            <div class="range">
-              <input name="minEdge" placeholder="min">
-              <input name="maxEdge" placeholder="max">
-            </div>
-          </label>
-          <label>Límite
-            <select name="take">
-              <option>25</option>
-              <option>50</option>
-              <option>100</option>
-              <option>200</option>
-            </select>
-          </label>
-          <label>Orden
-            <select name="sort"></select>
-          </label>
-          <label>Dir.
-            <select name="direction">
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
-            </select>
-          </label>
-        </div>
+      <div class="hero-actions">
+        <span class="connection-pill" id="connection-status">Conectando...</span>
+        <span id="updated" class="muted">Cargando</span>
         <button class="icon-btn" id="theme-toggle" title="Cambiar modo oscuro" type="button">Oscuro</button>
-        <button class="icon-btn primary" title="Actualizar" type="submit">Actualizar</button>
-      </form>
+      </div>
     </header>
     <main class="main">
+      <form class="filters-surface" id="filters">
+        <div class="filters-panel-head">
+          <h2>Filtros</h2>
+          <div class="filter-actions">
+            <button class="icon-btn primary" title="Actualizar" type="submit">Actualizar</button>
+          </div>
+        </div>
+        <div class="filters-body">
+          <div class="filters-grid">
+            <label>Fecha desde <input type="date" name="dateFrom"></label>
+            <label>Fecha hasta <input type="date" name="dateTo"></label>
+            <label>Run ID <input name="runId" placeholder="run id"></label>
+            <label class="validation-target-filter">Tipo
+              <select name="validationTarget">
+                <option value="all">Todas</option>
+                <option value="prediction">Atómicas</option>
+                <option value="parlay">Parlays</option>
+              </select>
+            </label>
+            <label class="filter-multi">Status
+              <select name="status" multiple size="2"></select>
+            </label>
+            <label>Mercado <select name="market"><option value="">Todos</option></select></label>
+            <label>Equipo <select name="team"><option value="">Todos</option></select></label>
+            <label>Competencia <select name="competition"><option value="">Todas</option></select></label>
+            <label class="filter-multi">Calidad
+              <select name="quality" multiple size="2"></select>
+            </label>
+            <label class="filter-number">Confianza
+              <div class="range">
+                <input name="minConfidence" placeholder="min">
+                <input name="maxConfidence" placeholder="max">
+              </div>
+            </label>
+            <label class="filter-number">Edge
+              <div class="range">
+                <input name="minEdge" placeholder="min">
+                <input name="maxEdge" placeholder="max">
+              </div>
+            </label>
+            <label>Límite
+              <select name="take">
+                <option>25</option>
+                <option>50</option>
+                <option>100</option>
+                <option>200</option>
+              </select>
+            </label>
+            <label>Orden
+              <select name="sort"></select>
+            </label>
+            <label>Dir.
+              <select name="direction">
+                <option value="desc">Desc</option>
+                <option value="asc">Asc</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </form>
       <section class="stats" id="stats"></section>
       <nav class="tabs" id="tabs">
         <button class="tab active" data-tab="fixtures">Partidos</button>
@@ -491,6 +668,13 @@ export function dashboardHtml(): string {
         try {
           localStorage.setItem('gana-dashboard-theme', state.theme);
         } catch {}
+      }
+
+      function setConnectionStatus(text, tone) {
+        const pill = $('#connection-status');
+        if (!pill) return;
+        pill.textContent = text;
+        pill.className = 'connection-pill' + (tone ? ' ' + tone : '');
       }
 
       const badgeClass = (status) => {
@@ -721,9 +905,10 @@ export function dashboardHtml(): string {
       async function load() {
         if (state.loading) return;
         state.loading = true;
-        $('#list').innerHTML = '<div class="loading">Cargando…</div>';
-        $('#detail').innerHTML = '<span class="muted">Cargando…</span>';
-        $('#updated').textContent = 'Actualizando…';
+        setConnectionStatus('Actualizando\u2026', 'warn');
+        $('#list').innerHTML = '<div class="loading">Cargando\u2026</div>';
+        $('#detail').innerHTML = '<span class="muted">Cargando\u2026</span>';
+        $('#updated').textContent = 'Actualizando\u2026';
         syncUrl();
         const pagerPrev = $('#page-prev');
         const pagerNext = $('#page-next');
@@ -746,7 +931,9 @@ export function dashboardHtml(): string {
           }
           state.data = body;
           render();
+          setConnectionStatus('Conectado', 'ok');
         } catch (err) {
+          setConnectionStatus('Error de conexi\u00f3n', 'error');
           $('#list').innerHTML = '<div class="error">' + esc(err.message) + '</div>';
           $('#detail').innerHTML = '<span class="error">No se pudo cargar la vista principal.</span>';
         } finally {
@@ -1078,7 +1265,7 @@ export function dashboardHtml(): string {
         const body = payload || {};
         state.selectedKind = kind;
         state.selectedId = id;
-        $('#detail').innerHTML = '<span class=\"muted\">Cargando…</span>';
+        $('#detail').innerHTML = '<span class=\"muted\">Cargando\u2026</span>';
 
         const entity = body.entity || body;
         let links = '';
@@ -1321,6 +1508,9 @@ export function dashboardHtml(): string {
         if (state.selectedKind && state.selectedId) {
           await loadEntity(state.selectedKind, state.selectedId).catch(() => {});
         }
+        window.setInterval(function() {
+          if (!state.loading) load().catch(function() {});
+        }, 30000);
       }
 
       boot().catch(() => {});

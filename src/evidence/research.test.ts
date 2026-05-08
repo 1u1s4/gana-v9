@@ -432,6 +432,71 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /odds-led lean/);
   });
 
+  it('promotes live research with positive no-conflict reasons and reference repair warnings', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session-research-no-conflict');
+    const output = agentOutput({
+      sources: [{
+        id: 'source-web-1',
+        type: 'web-search',
+        url: 'https://example.com/team-news',
+        title: 'Team news',
+        capturedAt: createdAt.toISOString(),
+      }, {
+        id: 'source-web-2',
+        type: 'web-search',
+        url: 'https://example.com/match-preview',
+        title: 'Match preview',
+        capturedAt: createdAt.toISOString(),
+      }],
+      evidenceItems: [{
+        id: 'evidence-1',
+        sourceId: 'source-web-1',
+        claimIds: ['claim-1'],
+        summary: 'Current fixture context is confirmed.',
+        confidence: 0.9,
+      }, {
+        id: 'evidence-2',
+        sourceId: 'source-web-2',
+        claimIds: ['claim-2'],
+        summary: 'Current market context is confirmed.',
+        confidence: 0.88,
+      }],
+      claims: [{
+        id: 'claim-1',
+        statement: 'Fixture context is confirmed.',
+        subject: { type: 'fixture', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }, {
+        id: 'claim-2',
+        statement: 'The h2h market context is confirmed.',
+        subject: { type: 'market', id: 'h2h' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-2'],
+        conflictStatus: 'none',
+      }],
+      gateResult: {
+        verdict: 'review-required',
+        reasons: ['API-Football provider odds are present and support the main market angles without material conflict.'],
+        warnings: [],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.match(result.bundle?.gateResult.reasons.join('\n') ?? '', /objective research gate passed/);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /mapped market subject id "h2h"/);
+  });
+
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

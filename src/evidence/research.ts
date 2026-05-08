@@ -680,7 +680,9 @@ function evidenceConfidence(value: unknown): number {
 }
 
 function isHardResearchWarning(message: string): boolean {
-  return /fallback research|agentic research failed|research agent timed out|no web-search source|not included in the structured output|missing web-search|web-search evidence was required but not included|interrupted|insufficient evidence|conflict|contradict|mismatch|stale/i.test(message);
+  const normalized = message.toLowerCase();
+  if (/\b(without|no)\s+(material\s+)?conflicts?\b/.test(normalized)) return false;
+  return /fallback research|agentic research failed|research agent timed out|no web-search source|not included in the structured output|missing web-search|web-search evidence was required but not included|interrupted|insufficient evidence|contradict|mismatch|stale|\bconflict(?:ing|ed|s)?\b/i.test(message);
 }
 
 async function createDefaultSportsProvider(

@@ -545,8 +545,20 @@ function aggregateParlayStatus(statuses: ValidationStatus[]): ValidationStatus {
   return 'error';
 }
 
+function aggregateValidationGateStatus(statuses: ValidationStatus[]): ValidationStatus {
+  if (statuses.length === 0) return 'blocked';
+  if (statuses.includes('pending')) return 'pending';
+  if (statuses.includes('blocked')) return 'blocked';
+  if (statuses.includes('error')) return 'error';
+  if (statuses.includes('lost')) return 'lost';
+  if (statuses.every((status) => status === 'won')) return 'won';
+  if (statuses.every((status) => status === 'voided')) return 'voided';
+  if (statuses.every((status) => status === 'won' || status === 'push' || status === 'voided')) return 'push';
+  return 'error';
+}
+
 function gateFromValidations(validations: ValidationArtifactView[]): ValidationGateResult {
-  const verdict = aggregateParlayStatus(validations.map((item) => item.status));
+  const verdict = aggregateValidationGateStatus(validations.map((item) => item.status));
   return {
     verdict,
     reasons: validations.length

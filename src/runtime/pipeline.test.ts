@@ -105,6 +105,7 @@ function successfulPipelineDeps(input: {
   now?: string;
   scoreFixture?: RunPipelineDependencies['scoreFixture'];
   validateRun?: RunPipelineDependencies['validateRun'];
+  buildParlay?: RunPipelineDependencies['buildParlay'];
 }): RunPipelineDependencies {
   const evaluatedAt = input.now ?? '2026-04-29T12:00:00.000Z';
   return {
@@ -159,7 +160,7 @@ function successfulPipelineDeps(input: {
         })],
       };
     }),
-    buildParlay: async () => {
+    buildParlay: input.buildParlay ?? (async () => {
       input.calls.push('parlay');
       return {
         ok: true,
@@ -187,7 +188,7 @@ function successfulPipelineDeps(input: {
           },
         },
       };
-    },
+    }),
     validateRun: input.validateRun ?? (async () => {
       input.calls.push('validate');
       return {
@@ -361,6 +362,62 @@ describe('executeRunPipeline', () => {
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'input.json'));
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'handoff.md'));
     assert.match(readFileSync(result.handoffPath, 'utf-8'), /handoff\.parlay: no-parlay-today/);
+  });
+
+  it('exports review-required parlays with real legs as analytical review candidates in handoff', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const calls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-review-parlay-handoff',
+      date: '2026-04-29',
+      buildParlay: async () => {
+        calls.push('parlay');
+        return {
+          ok: true,
+          runId: 'run-review-parlay-handoff',
+          date: '2026-04-29',
+          gateResult: { verdict: 'review-required', reasons: ['soft warnings require review'], warnings: ['low-liquidity'] },
+          build: {
+            parlay: {
+              id: 'parlay-review-1',
+              sourceRunId: 'run-review-parlay-handoff',
+              legs: [{
+                parlayId: 'parlay-review-1',
+                predictionId: 'prediction-1',
+                fixtureId: target.id,
+                market: 'h2h',
+                selection: 'home',
+                odds: 1.8,
+                status: 'review-required',
+                index: 0,
+                inclusionReason: 'included-eligible-prediction',
+              }],
+              aggregateConfidence: 0.61,
+              aggregateQuality: 0.55,
+              rationale: 'review candidate with real persisted legs',
+              warnings: ['low-liquidity'],
+              status: 'review-required',
+              generatedAt: '2026-04-29T12:00:00.000Z',
+            },
+            evaluations: [],
+            config: { minLegs: 1, maxLegs: 4, allowMultipleLegsPerFixture: false, minPredictionConfidence: 0 },
+          },
+        };
+      },
+    }));
+
+    assert.equal(result.verdict, 'review-required');
+    const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
+    assert.equal(manifest.handoff.parlay, 'analytical-review-candidate');
+    assert.match(readFileSync(result.handoffPath, 'utf-8'), /handoff\.parlay: analytical-review-candidate/);
   });
 
   it('resumes a run from completed HarnessTask checkpoints without reexecuting completed steps', async () => {

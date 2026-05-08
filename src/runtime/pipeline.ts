@@ -934,6 +934,10 @@ function readPath(value: unknown, path: string): unknown {
   }, value);
 }
 
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 function buildGovernanceScorecard(evaluation: unknown, artifactDir: string): Record<string, boolean | number> {
   const steps = Array.isArray((evaluation as any)?.steps) ? (evaluation as any).steps : [];
   const manifestReady = existsSync(artifactDir);
@@ -953,19 +957,29 @@ function buildGovernanceScorecard(evaluation: unknown, artifactDir: string): Rec
 function buildRunHandoffGate(evaluation: unknown): Record<string, unknown> {
   const verdict = String((evaluation as any)?.verdict ?? 'unknown');
   const steps = Array.isArray((evaluation as any)?.steps) ? (evaluation as any).steps : [];
+  const counts = objectRecord((evaluation as any)?.counts);
+  const parlayLegs = typeof counts.parlayLegs === 'number' ? counts.parlayLegs : 0;
   const warnings = steps.flatMap((step: any) => Array.isArray(step.warnings) ? step.warnings : []);
   const parlayStep = steps.find((step: any) => step?.name === 'build parlay');
   const parlayWarnings = Array.isArray(parlayStep?.warnings) ? parlayStep.warnings : [];
-  const parlayPromotable = parlayStep?.verdict === 'promotable' && parlayWarnings.length === 0;
+  const parlayPromotable = parlayLegs > 0 && parlayStep?.verdict === 'promotable' && parlayWarnings.length === 0;
+  const parlayReview = parlayLegs > 0 && parlayStep?.verdict === 'review-required';
   return {
-    parlay: parlayPromotable ? 'analytical-candidate' : 'no-parlay-today',
+    parlay: parlayPromotable ? 'analytical-candidate' : parlayReview ? 'analytical-review-candidate' : 'no-parlay-today',
     reasons: parlayPromotable
       ? ['all run-level gates promotable']
-      : [
-          `run verdict is ${verdict}`,
-          ...(parlayStep?.verdict ? [`parlay step verdict is ${parlayStep.verdict}`] : []),
-          ...warnings.slice(0, 20),
-        ],
+      : parlayReview
+        ? [
+            `parlay has ${parlayLegs} analytical leg(s) but requires review`,
+            `run verdict is ${verdict}`,
+            ...(parlayStep?.verdict ? [`parlay step verdict is ${parlayStep.verdict}`] : []),
+            ...parlayWarnings.slice(0, 20),
+          ]
+        : [
+            `run verdict is ${verdict}`,
+            ...(parlayStep?.verdict ? [`parlay step verdict is ${parlayStep.verdict}`] : []),
+            ...warnings.slice(0, 20),
+          ],
     analyticalOnly: true,
     disclaimer: 'uso analitico, no constituye recomendacion de apuesta, no garantiza resultado',
   };

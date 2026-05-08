@@ -352,6 +352,56 @@ describe('runValidation parlay and date targets', () => {
     assert.equal(parlayQueries[0].timezone, 'America/Guatemala');
   });
 
+  it('keeps date validation pending when unsettled fixtures exist alongside already lost settled targets', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const pendingFixtureRecord = {
+      ...fixtureRecord,
+      id: 'fixture-pending',
+      providerFixtureId: '2002',
+      status: 'scheduled',
+      scoreHome: null,
+      scoreAway: null,
+    };
+    const pendingFixture = {
+      ...finalFixture,
+      id: 'fixture-pending',
+      providerFixtureId: '2002',
+      status: 'scheduled' as const,
+      scoreHome: undefined,
+      scoreAway: undefined,
+    } satisfies Fixture;
+
+    const result = await runValidation(cfg, { date: '2026-04-25' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: {
+        fetch: async (input: any) => ({
+          fixture: input.fixtureId === 'fixture-pending' ? pendingFixture : finalFixture,
+          providerSnapshotId: input.fixtureId === 'fixture-pending' ? 'snapshot-pending' : 'snapshot-result-1',
+          resultProviderSnapshotId: input.fixtureId === 'fixture-pending' ? 'snapshot-pending' : 'snapshot-result-1',
+        }),
+      },
+      repositories: repositories({
+        predictions: {
+          ...repositories().predictions,
+          listForFixtureDate: async () => [
+            prediction({ id: 'prediction-pending', fixtureId: 'fixture-pending', selectionKey: 'home' }),
+            prediction({ id: 'prediction-lost', fixtureId: 'fixture-1', selectionKey: 'away' }),
+          ],
+        },
+        fixtures: {
+          findById: async (id: string) => id === 'fixture-pending' ? pendingFixtureRecord : fixtureRecord,
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.validations.map((item) => item.status), ['pending', 'lost']);
+    assert.equal(result.gateResult.verdict, 'pending');
+    assert.match(result.gateResult.reasons.join('\n'), /fixture-not-completed/);
+  });
+
   it('validates all prediction pages and reuses fetched fixture results', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

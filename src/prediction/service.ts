@@ -268,6 +268,7 @@ export async function runFixtureScoring(
   }
 
   const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
+  llmOutput = canonicalizePicksFromOddsQuotes(llmOutput, quoteById);
   const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes);
   if (topPickIssues.length) {
     const result = blockedResult(runId, artifactWriter, {
@@ -625,6 +626,35 @@ function idSuffix(id: string): string {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function canonicalizePicksFromOddsQuotes(
+  picks: ParsedTopPick[],
+  quoteById: Map<string, OddsQuoteRecord>,
+): ParsedTopPick[] {
+  return picks.map((pick) => {
+    const quote = quoteById.get(pick.oddsQuoteId);
+    if (!quote) return pick;
+    const canonicalLine = numberOrUndefined(quote.line);
+    const canonicalOdds = numberValue(quote.price);
+    const changes: string[] = [];
+    if (pick.market !== quote.marketKey) changes.push(`market ${pick.market}->${quote.marketKey}`);
+    if (pick.selection !== quote.selectionKey) changes.push(`selection ${pick.selection}->${quote.selectionKey}`);
+    if (!sameOptionalNumber(pick.line, canonicalLine)) changes.push(`line ${pick.line ?? 'null'}->${canonicalLine ?? 'null'}`);
+    if (!sameNumber(pick.odds, canonicalOdds)) changes.push(`odds ${pick.odds}->${canonicalOdds}`);
+    if (!changes.length) return pick;
+    return {
+      ...pick,
+      market: quote.marketKey,
+      selection: quote.selectionKey,
+      line: canonicalLine,
+      odds: canonicalOdds,
+      warnings: uniqueStrings([
+        ...pick.warnings,
+        `canonicalized from persisted odds quote (${changes.join(', ')})`,
+      ]),
+    };
+  });
 }
 
 function validateTopPicks(

@@ -335,6 +335,60 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].warnings.includes('evidence-thin'), false);
   });
 
+  it('canonicalizes LLM pick fields from a valid persisted oddsQuoteId instead of blocking quote mismatches', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const canonicalQuote = {
+      ...oddsQuote,
+      id: 'odds-quote-canonical',
+      marketKey: 'goals_over_under',
+      selectionKey: 'under',
+      line: 2.5,
+      price: 1.76,
+    };
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => [canonicalQuote] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-canonical',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.61,
+            confidence: 0.68,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'The persisted quote id is valid, but copied quote fields are stale from another allowed quote.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(persisted[0].oddsQuoteId, 'odds-quote-canonical');
+    assert.equal(persisted[0].marketKey, 'goals_over_under');
+    assert.equal(persisted[0].selectionKey, 'under');
+    assert.equal(persisted[0].line, 2.5);
+    assert.equal(persisted[0].odds, 1.76);
+    assert.equal(persisted[0].warnings.some((warning: string) => warning.includes('canonicalized from persisted odds quote')), true);
+  });
+
   it('keeps scoring prompts compact by trimming representative allowed quotes', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
