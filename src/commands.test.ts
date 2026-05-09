@@ -319,6 +319,7 @@ describe('league preset command surface', () => {
     const file = JSON.parse(readFileSync(ctx.config.apiFootball.leaguePresetsPath, 'utf-8'));
     assert.equal(file.leagues[0].id, '339');
     assert.equal(file.leagues[0].priority, 110);
+    assert.equal('season' in file.leagues[0], false);
   });
 });
 

@@ -54,7 +54,7 @@ export async function discoverFixtures(
       fixtures: await listApiFootballFixtures(config, {
         date: filters.date,
         timezone: filters.timezone,
-        season: request.season ?? config.apiFootball.defaultSeason,
+        ...(request.season !== undefined ? { season: request.season } : {}),
         league: request.league,
         team: request.team,
         maxFixtures: filters.maxFixturesPerRun,
@@ -165,7 +165,6 @@ export function buildFixtureDiscoveryRequests(
   for (const league of leaguePresets) {
     requests.push({
       league: Number(league.providerCompetitionId),
-      season: league.season ?? undefined,
       reason: 'included-by-default-league',
     });
   }

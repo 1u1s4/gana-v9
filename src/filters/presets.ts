@@ -57,7 +57,7 @@ export async function addLeaguePreset(
     id: input.id,
     name: input.name,
     country: input.country,
-    season: input.season ?? config.apiFootball.defaultSeason,
+    season: input.season,
     priority: input.priority ?? nextLeaguePriority(leagues),
     enabled: true,
   };
@@ -109,7 +109,7 @@ export async function addLeaguePresetToDatabase(
     return repositories.leaguePresets.update(existing.id, {
       name: input.name,
       country: input.country,
-      season: input.season ?? config.apiFootball.defaultSeason,
+      season: input.season,
       enabled: true,
     });
   }
@@ -118,7 +118,7 @@ export async function addLeaguePresetToDatabase(
     providerCompetitionId: input.id,
     name: input.name,
     country: input.country,
-    season: input.season ?? config.apiFootball.defaultSeason,
+    season: input.season,
     presetKey: input.presetKey ?? DEFAULT_PRESET_KEY,
     enabled: true,
   });

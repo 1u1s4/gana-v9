@@ -22,7 +22,7 @@ function configWithPresetFile(initial?: unknown) {
 }
 
 describe('league preset file', () => {
-  it('keeps default coverage for requested tier-one and LATAM leagues with provider seasons', async () => {
+  it('keeps default coverage for requested tier-one and LATAM leagues without provider seasons', async () => {
     const config = loadConfig({
       apiFootball: {
         defaultSeason: 2026,
@@ -39,17 +39,17 @@ describe('league preset file', () => {
           id: preset.providerCompetitionId,
           name: preset.name,
           country: preset.country,
-          season: preset.season,
+          seasonless: preset.season === null,
         };
       }),
       [
-        { id: '39', name: 'Premier League', country: 'England', season: 2025 },
-        { id: '135', name: 'Serie A', country: 'Italy', season: 2025 },
-        { id: '140', name: 'La Liga', country: 'Spain', season: 2025 },
-        { id: '78', name: 'Bundesliga', country: 'Germany', season: 2025 },
-        { id: '128', name: 'Liga Profesional Argentina', country: 'Argentina', season: 2026 },
-        { id: '339', name: 'Liga Nacional', country: 'Guatemala', season: 2025 },
-        { id: '262', name: 'Liga MX', country: 'Mexico', season: 2025 },
+        { id: '39', name: 'Premier League', country: 'England', seasonless: true },
+        { id: '135', name: 'Serie A', country: 'Italy', seasonless: true },
+        { id: '140', name: 'La Liga', country: 'Spain', seasonless: true },
+        { id: '78', name: 'Bundesliga', country: 'Germany', seasonless: true },
+        { id: '128', name: 'Liga Profesional Argentina', country: 'Argentina', seasonless: true },
+        { id: '339', name: 'Liga Nacional', country: 'Guatemala', seasonless: true },
+        { id: '262', name: 'Liga MX', country: 'Mexico', seasonless: true },
       ],
     );
   });
@@ -87,7 +87,7 @@ describe('league preset file', () => {
     const file = JSON.parse(readFileSync(path, 'utf-8'));
     assert.equal(file.presetKey, 'default');
     assert.deepEqual(file.leagues, [
-      { id: '339', name: 'Liga Nacional', country: 'Guatemala', season: 2026, priority: 110, enabled: true },
+      { id: '339', name: 'Liga Nacional', country: 'Guatemala', priority: 110, enabled: true },
     ]);
   });
 

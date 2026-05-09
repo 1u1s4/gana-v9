@@ -34,6 +34,24 @@ describe('api-football provider', () => {
     );
   });
 
+  it('omits season from fixture requests when discovery is seasonless', async () => {
+    const requests: URL[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      requests.push(url);
+      return jsonResponse({ response: [] });
+    }) as typeof fetch;
+
+    const provider = createApiFootballProvider(testConfig());
+    await provider.listFixtures({ date: '2026-05-01', league: 39 });
+
+    const fixtureRequest = requests.find((request) => request.pathname === '/fixtures');
+    assert.ok(fixtureRequest);
+    assert.equal(fixtureRequest.searchParams.get('date'), '2026-05-01');
+    assert.equal(fixtureRequest.searchParams.get('league'), '39');
+    assert.equal(fixtureRequest.searchParams.has('season'), false);
+  });
+
   it('scans fixtures for a date and returns persisted canonical odds snapshots', async () => {
     const requests: URL[] = [];
     const fixturesByProviderId = new Map<string, Fixture>();

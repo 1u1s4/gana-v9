@@ -40,15 +40,15 @@ const config: Pick<AgentConfig, 'apiFootball'> = {
 };
 
 describe('filter engine', () => {
-  it('uses league preset seasons when building default league requests', () => {
+  it('does not bind default league discovery requests to preset seasons', () => {
     const requests = buildFixtureDiscoveryRequests([
       { providerCompetitionId: '135', season: 2025 },
       { providerCompetitionId: '253', season: 2026 },
     ], []);
 
     assert.deepEqual(requests, [
-      { league: 135, season: 2025, reason: 'included-by-default-league' },
-      { league: 253, season: 2026, reason: 'included-by-default-league' },
+      { league: 135, reason: 'included-by-default-league' },
+      { league: 253, reason: 'included-by-default-league' },
     ]);
   });
 
