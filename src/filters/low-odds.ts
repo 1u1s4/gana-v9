@@ -1,5 +1,5 @@
 import type { AgentConfig } from '../config.js';
-import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
+import { getApiFootballDateOddsSlate } from '../providers/sports/api-football.js';
 import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import type { RuntimeContext } from '../runtime/context.js';
@@ -111,17 +111,30 @@ export async function scanLowOdds(
   let fixtureEvaluations: LowOddsScanView['fixtureEvaluations'] = [];
 
   try {
-    fixtureDiscovery = await discoverFixtures(config, {
-      date: filters.date,
-      leaguesDefault: input.leaguesDefault,
-      teamsDefault: input.teamsDefault,
-      combineMode: filters.combineMode,
-    }, runtime);
+    const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime);
+    fixtureDiscovery = {
+      fixtures: slate.fixtures,
+      evaluations: slate.fixtures.map((fixture) => ({
+        fixtureId: fixture.id,
+        providerFixtureId: fixture.providerFixtureId,
+        includedReasons: ['included-by-manual-query' as const],
+        excludedReasons: [],
+        eligible: true as const,
+      })),
+      requestedLeagues: [],
+      requestedTeams: [],
+    };
     fixtureEvaluations = [...fixtureDiscovery.evaluations];
+
+    const snapshotsByProviderFixtureId = new Map(slate.snapshots.map((snapshot) => [snapshot.providerFixtureId, snapshot]));
 
     for (const fixture of fixtureDiscovery.fixtures.slice(0, filters.maxFixturesPerRun)) {
       try {
-        const snapshot = await getApiFootballOddsSnapshot(config, fixture.providerFixtureId, runtime);
+        const snapshot = snapshotsByProviderFixtureId.get(fixture.providerFixtureId);
+        if (!snapshot) {
+          addEvaluationReason(fixtureEvaluations, fixture.providerFixtureId, 'excluded-missing-odds');
+          continue;
+        }
         const marketQuotes = snapshot.quotes.filter(isLowOddsFixtureSelectorQuote);
         const bookmakerQuotes = filters.bookmakerAllowlist?.length
           ? marketQuotes.filter((quote) => quote.bookmaker && filters.bookmakerAllowlist?.includes(quote.bookmaker))

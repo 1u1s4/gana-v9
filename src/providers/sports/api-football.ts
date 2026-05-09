@@ -14,6 +14,7 @@ import type { JsonValue, StoragePrismaClient } from '../../storage/types.js';
 import type { ServiceStatusReport } from '../../filters/status.js';
 import { ApiFootballProviderError, isApiFootballProviderError, mapHttpStatusToProviderError } from './api-football-errors.js';
 import {
+  extractApiFootballResponseArray,
   mapApiFootballFixtureStatistics,
   mapApiFootballFixtures,
   mapApiFootballOdds,
@@ -43,6 +44,11 @@ import {
   type QuotaStatus,
   type SportsDataProvider,
 } from './types.js';
+
+export interface ApiFootballDateOddsSlate {
+  fixtures: Fixture[];
+  snapshots: CanonicalOddsSnapshot[];
+}
 
 interface ApiFootballResponse<T = unknown> {
   payload: T;
@@ -204,21 +210,77 @@ export class ApiFootballProvider implements SportsDataProvider {
       providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
       capturedAt: page.capturedAt,
     }));
-    const dedupedQuotes = dedupeQuotes(mappedQuotes);
+    return this.buildAndPersistOddsSnapshot({
+      fixture,
+      providerFixtureId: input.fixtureId,
+      pages,
+      mappedQuotes,
+      extraMetadata: {},
+    });
+  }
+
+  async getCanonicalOddsSnapshotsForDate(input: { date: string; fixtures?: Fixture[] }): Promise<CanonicalOddsSnapshot[]> {
+    return (await this.getCanonicalOddsSlateForDate(input)).snapshots;
+  }
+
+  async getCanonicalOddsSlateForDate(input: { date: string; fixtures?: Fixture[] }): Promise<ApiFootballDateOddsSlate> {
+    const pages = await this.requestPagedDateOdds(input.date);
+    const fixtureIds = uniqueStrings(pages.flatMap((page) => extractApiFootballResponseArray(page.payload, 'odds')
+      .map((fixtureOdds) => stringifyFixtureProviderId((fixtureOdds as any)?.fixture?.id))
+      .filter((value): value is string => Boolean(value))));
+    const fixtures = input.fixtures?.length
+      ? input.fixtures
+      : await this.resolveFixturesByProviderIds(fixtureIds);
+    const fixturesByProviderId = new Map(fixtures.map((fixture) => [fixture.providerFixtureId, fixture]));
+    const snapshots: CanonicalOddsSnapshot[] = [];
+
+    for (const page of pages) {
+      for (const fixtureOdds of extractApiFootballResponseArray(page.payload, 'odds')) {
+        const providerFixtureId = stringifyFixtureProviderId((fixtureOdds as any)?.fixture?.id);
+        if (!providerFixtureId) continue;
+        const fixture = fixturesByProviderId.get(providerFixtureId);
+        if (!fixture) continue;
+        const mappedQuotes = mapApiFootballOdds({ response: [fixtureOdds] }, {
+          fixtureId: fixture.id,
+          providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
+          capturedAt: page.capturedAt,
+        });
+        snapshots.push(await this.buildAndPersistOddsSnapshot({
+          fixture,
+          providerFixtureId,
+          pages: [page],
+          mappedQuotes,
+          extraMetadata: { source: 'api-football.odds.date', date: input.date },
+        }));
+      }
+    }
+
+    return { fixtures, snapshots };
+  }
+
+  private async buildAndPersistOddsSnapshot(input: {
+    fixture: Fixture;
+    providerFixtureId: string;
+    pages: Array<ApiFootballResponse<unknown>>;
+    mappedQuotes: OddsQuote[];
+    extraMetadata?: Record<string, JsonValue>;
+  }): Promise<CanonicalOddsSnapshot> {
+    const dedupedQuotes = dedupeQuotes(input.mappedQuotes);
     const quotes = filterQuotesByBookmakerAllowlistWithFallback(
       dedupedQuotes,
       this.config.apiFootball.bookmakerAllowlist,
     );
-    const firstPage = pages[0];
+    const firstPage = input.pages[0];
     const snapshot: CanonicalOddsSnapshot = {
-      fixtureId: fixture.id,
-      providerFixtureId: input.fixtureId,
+      fixtureId: input.fixture.id,
+      providerFixtureId: input.providerFixtureId,
       providerSnapshotId: firstPage?.providerSnapshotId ?? `provider-snapshot:${firstPage?.payloadHash ?? 'unknown'}`,
       capturedAt: firstPage?.capturedAt.toISOString() ?? new Date().toISOString(),
       bookmakerCount: countBookmakersFromQuotes(quotes),
       payloadHash: firstPage?.payloadHash ?? 'unknown',
       quotes,
       metadata: {
+        ...input.extraMetadata,
         bookmakerAllowlist: this.config.apiFootball.bookmakerAllowlist ?? [],
         bookmakerAllowlistFallback: quotes.length > 0 && dedupedQuotes.length > 0 && quotes.length === dedupedQuotes.length
           && normalizeBookmakerAllowlist(this.config.apiFootball.bookmakerAllowlist).size > 0
@@ -259,12 +321,40 @@ export class ApiFootballProvider implements SportsDataProvider {
     return this.getFixture({ providerFixtureId });
   }
 
+  private async resolveFixturesByProviderIds(providerFixtureIds: string[]): Promise<Fixture[]> {
+    const uniqueIds = uniqueStrings(providerFixtureIds);
+    const fixtures: Fixture[] = [];
+    const missingIds: string[] = [];
+    for (const providerFixtureId of uniqueIds) {
+      const existing = await this.persistence.resolveFixtureByProviderFixtureId?.(providerFixtureId);
+      if (existing) fixtures.push(existing);
+      else missingIds.push(providerFixtureId);
+    }
+    for (const chunk of chunkStrings(missingIds, 20)) {
+      const response = await this.request('fixtures', '/fixtures', { ids: chunk.join('-') });
+      const normalized = mapApiFootballFixtures(response.payload, response.capturedAt);
+      const persisted = await this.persistence.upsertFixtures?.(normalized);
+      fixtures.push(...(persisted?.map((item) => item.fixture) ?? normalized.map(fallbackFixtureFromNormalized)));
+    }
+    return fixtures;
+  }
+
   private async requestPagedOdds(providerFixtureId: string): Promise<Array<ApiFootballResponse<unknown>>> {
     const first = await this.request('odds', '/odds', { fixture: providerFixtureId });
     const pages = [first];
     const total = readPagingTotal(first.payload);
     for (let page = 2; page <= total; page++) {
       pages.push(await this.request('odds', '/odds', { fixture: providerFixtureId, page }));
+    }
+    return pages;
+  }
+
+  private async requestPagedDateOdds(date: string): Promise<Array<ApiFootballResponse<unknown>>> {
+    const first = await this.request('odds', '/odds', { date });
+    const pages = [first];
+    const total = readPagingTotal(first.payload);
+    for (let page = 2; page <= total; page++) {
+      pages.push(await this.request('odds', '/odds', { date, page }));
     }
     return pages;
   }
@@ -410,6 +500,24 @@ export class ApiFootballProvider implements SportsDataProvider {
   }
 }
 
+function stringifyFixtureProviderId(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return undefined;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function chunkStrings(values: string[], size: number): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function apiFootballRequestSignal(): AbortSignal | undefined {
   if (typeof AbortSignal === 'undefined') return undefined;
   const timeout = (AbortSignal as any).timeout;
@@ -525,6 +633,32 @@ export async function getApiFootballOddsSnapshot(
   }
   const provider = createApiFootballProvider(config, persistence) as ApiFootballProvider;
   return provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId });
+}
+
+export async function getApiFootballDateOddsSnapshots(
+  config: AgentConfig,
+  date: string,
+  fixtures?: Fixture[],
+  runtime?: RuntimeContext,
+): Promise<CanonicalOddsSnapshot[]> {
+  return (await getApiFootballDateOddsSlate(config, date, runtime, fixtures)).snapshots;
+}
+
+export async function getApiFootballDateOddsSlate(
+  config: AgentConfig,
+  date: string,
+  runtime?: RuntimeContext,
+  fixtures?: Fixture[],
+): Promise<ApiFootballDateOddsSlate> {
+  if (!config.databaseUrl) {
+    throw new Error('DATABASE_URL is required to persist odds snapshots and quotes.');
+  }
+  const persistence = await createApiFootballPersistence(config, runtime);
+  if (!persistence.providerId || !persistence.persistOddsSnapshot) {
+    throw new Error('Database persistence is required to store odds snapshots and quotes.');
+  }
+  const provider = createApiFootballProvider(config, persistence) as ApiFootballProvider;
+  return provider.getCanonicalOddsSlateForDate({ date, fixtures });
 }
 
 export async function createApiFootballPersistence(

@@ -106,6 +106,8 @@ function successfulPipelineDeps(input: {
   scoreFixture?: RunPipelineDependencies['scoreFixture'];
   validateRun?: RunPipelineDependencies['validateRun'];
   buildParlay?: RunPipelineDependencies['buildParlay'];
+  discoverLowOddsFixtures?: RunPipelineDependencies['discoverLowOddsFixtures'];
+  fetchLowOddsSnapshot?: RunPipelineDependencies['fetchLowOddsSnapshot'];
 }): RunPipelineDependencies {
   const evaluatedAt = input.now ?? '2026-04-29T12:00:00.000Z';
   return {
@@ -140,6 +142,29 @@ function successfulPipelineDeps(input: {
         quotes: [lowOddsQuote(input.target)],
       };
     },
+    discoverLowOddsFixtures: input.discoverLowOddsFixtures ?? (async () => ({
+      fixtures: [input.target],
+      evaluations: [{
+        fixtureId: input.target.id,
+        providerFixtureId: input.target.providerFixtureId,
+        includedReasons: ['included-by-manual-query'],
+        excludedReasons: [],
+        eligible: true,
+      }],
+      requestedLeagues: [],
+      requestedTeams: [],
+    })),
+    fetchLowOddsSnapshot: input.fetchLowOddsSnapshot ?? (async () => ({
+      fixtureId: input.target.id,
+      providerFixtureId: input.target.providerFixtureId,
+      oddsSnapshotId: 'odds-snapshot-1',
+      providerSnapshotId: 'provider-snapshot-1',
+      quoteRecordIds: { 'test-book|h2h|home|': 'odds-quote-1' },
+      capturedAt: evaluatedAt,
+      bookmakerCount: 1,
+      payloadHash: 'hash',
+      quotes: [lowOddsQuote(input.target)],
+    })),
     researchFixture: async () => {
       input.calls.push('research');
       return {
@@ -249,6 +274,29 @@ describe('executeRunPipeline', () => {
           quotes: [lowOddsQuote(target)],
         };
       },
+      discoverLowOddsFixtures: async () => ({
+        fixtures: [target],
+        evaluations: [{
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        }],
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchLowOddsSnapshot: async () => ({
+        fixtureId: target.id,
+        providerFixtureId: target.providerFixtureId,
+        oddsSnapshotId: 'odds-snapshot-1',
+        providerSnapshotId: 'provider-snapshot-1',
+        quoteRecordIds: { 'test-book|h2h|home|': 'odds-quote-1' },
+        capturedAt: '2026-04-29T12:00:00.000Z',
+        bookmakerCount: 1,
+        payloadHash: 'hash',
+        quotes: [lowOddsQuote(target)],
+      }),
       researchFixture: async () => {
         calls.push('research');
         return {
@@ -454,6 +502,90 @@ describe('executeRunPipeline', () => {
     assert.equal(second.parlay?.runId, 'run-resume-checkpoint');
   });
 
+  it('scans low odds across the full date slate instead of only default league fixtures', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const calls: string[] = [];
+    const defaultTarget = fixture({
+      id: 'default-fixture',
+      providerFixtureId: '1001',
+    });
+    const fijiTarget = fixture({
+      id: 'fiji-fixture',
+      providerFixtureId: '9001',
+      homeTeamName: 'Tailevu Naitasiri',
+      awayTeamName: 'Ba',
+      leagueId: 359,
+      competitionId: '359',
+    });
+    const discoveryQueries: Array<{ leaguesDefault?: boolean; teamsDefault?: boolean }> = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, successfulPipelineDeps({
+      target: defaultTarget,
+      calls,
+      runId: 'run-global-low-odds-slate',
+      date: '2026-04-29',
+      discoverLowOddsFixtures: async (_config, query) => {
+        discoveryQueries.push(query);
+        calls.push('low-odds-fixtures');
+        return {
+          fixtures: [defaultTarget, fijiTarget],
+          evaluations: [defaultTarget, fijiTarget].map((item) => ({
+            fixtureId: item.id,
+            providerFixtureId: item.providerFixtureId,
+            includedReasons: ['included-by-manual-query'],
+            excludedReasons: [],
+            eligible: true,
+          })),
+          requestedLeagues: [],
+          requestedTeams: [],
+        };
+      },
+      fetchLowOddsSnapshot: async (_config, providerFixtureId) => {
+        calls.push(`low-odds:${providerFixtureId}`);
+        const isFijiTarget = providerFixtureId === fijiTarget.providerFixtureId;
+        const target = isFijiTarget ? fijiTarget : defaultTarget;
+        return {
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          oddsSnapshotId: `low-odds-snapshot-${target.providerFixtureId}`,
+          providerSnapshotId: `provider-snapshot-${target.providerFixtureId}`,
+          quoteRecordIds: isFijiTarget ? { 'test-book|h2h|away|': 'odds-quote-fiji-ba' } : undefined,
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: `hash-${target.providerFixtureId}`,
+          quotes: isFijiTarget
+            ? [lowOddsQuoteFor(fijiTarget, { selection: 'away', price: 1.14, impliedProbability: 1 / 1.14 })]
+            : [lowOddsQuoteFor(defaultTarget, { price: 1.8, impliedProbability: 1 / 1.8 })],
+        };
+      },
+      scoreFixture: async () => {
+        calls.push('score');
+        return {
+          ok: true,
+          runId: 'run-global-low-odds-slate',
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          predictions: [],
+        };
+      },
+    }));
+
+    assert.equal(result.verdict, 'review-required');
+    assert.deepEqual(discoveryQueries, [{ date: '2026-04-29' }]);
+    assert.equal(result.lowOddsScan.fixtureCount, 2);
+    assert.equal(result.lowOddsScan.hitCount, 1);
+    assert.equal(result.lowOddsScan.hits[0]?.providerFixtureId, '9001');
+    assert.equal(result.lowOddsScan.hits[0]?.oddsQuoteId, 'odds-quote-fiji-ba');
+
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(evaluation.lowOddsPredictionCoverage.hits, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.complete, false);
+  });
+
   it('flags incomplete low-odds prediction coverage in the run evaluation', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
@@ -541,6 +673,35 @@ describe('executeRunPipeline', () => {
           ],
         };
       },
+      discoverLowOddsFixtures: async () => ({
+        fixtures: [target],
+        evaluations: [{
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        }],
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchLowOddsSnapshot: async () => ({
+        fixtureId: target.id,
+        providerFixtureId: target.providerFixtureId,
+        oddsSnapshotId: 'odds-snapshot-1',
+        providerSnapshotId: 'provider-snapshot-1',
+        quoteRecordIds: {
+          'test-book|h2h|draw|': 'odds-quote-draw',
+          'test-book|double_chance|home_or_draw|': 'odds-quote-double',
+        },
+        capturedAt: '2026-04-29T12:00:00.000Z',
+        bookmakerCount: 1,
+        payloadHash: 'hash',
+        quotes: [
+          lowOddsQuoteFor(target, { selection: 'draw', price: 1.1, impliedProbability: 1 / 1.1 }),
+          lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+        ],
+      }),
       researchFixture: async () => {
         calls.push('research');
         return {

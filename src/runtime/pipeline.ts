@@ -10,7 +10,7 @@ import type { LowOddsHitView, LowOddsScanView } from '../filters/types.js';
 import { runFixtureResearch, type FixtureResearchResult } from '../evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from '../prediction/service.js';
 import type { ResearchWebMode } from '../prediction/prompts.js';
-import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
+import { getApiFootballDateOddsSlate, getApiFootballDateOddsSnapshots, getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import { runParlayBuild, type ParlayBuildRunResult } from '../parlay/service.js';
 import { runValidation, type ValidationRunResult } from '../validation/service.js';
@@ -154,6 +154,10 @@ export interface RunPipelineDependencies {
   repositories?: PipelineRepositories;
   discoverFixtures?: typeof discoverFixtures;
   fetchOddsSnapshot?: typeof getApiFootballOddsSnapshot;
+  discoverLowOddsFixtures?: typeof discoverFixtures;
+  fetchLowOddsSnapshot?: typeof getApiFootballOddsSnapshot;
+  fetchLowOddsSnapshotsForDate?: typeof getApiFootballDateOddsSnapshots;
+  fetchLowOddsSlate?: typeof getApiFootballDateOddsSlate;
   researchFixture?: typeof runFixtureResearch;
   scoreFixture?: typeof runFixtureScoring;
   buildParlay?: typeof runParlayBuild;
@@ -185,6 +189,8 @@ const STORAGE_RETRY_ATTEMPTS = 3;
 const STORAGE_RETRY_DELAY_MS = 2_000;
 const RESEARCH_CONCURRENCY = 4;
 const SCORING_CONCURRENCY = 4;
+const ODDS_SCAN_CONCURRENCY = 6;
+const LOW_ODDS_GLOBAL_MAX_FIXTURES = Number.MAX_SAFE_INTEGER;
 const AGENT_FIXTURE_TIMEOUT_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_TIMEOUT_MS) ?? 420_000;
 const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_ABORT_GRACE_MS) ?? 30_000;
 
@@ -347,7 +353,58 @@ export async function executeRunPipeline(
   writeStepSpan(config, runtime, 'odds.fetch', 'provider', quoteCount > 0 ? 'ok' : 'blocked', { quoteCount, oddsErrors });
 
   const lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
-    const scan = buildLowOddsScan(input.date, config, fixtureDiscovery, oddsSnapshots);
+    const useProviderDateSlate = !deps.discoverLowOddsFixtures
+      && !deps.fetchLowOddsSnapshot
+      && !deps.fetchOddsSnapshot
+      && !deps.fetchLowOddsSnapshotsForDate;
+    const providerDateSlate = useProviderDateSlate
+      ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime))
+      : undefined;
+    const lowOddsDiscovery = providerDateSlate
+      ? {
+        fixtures: providerDateSlate.fixtures,
+        evaluations: providerDateSlate.fixtures.map((fixture) => ({
+          fixtureId: fixture.id,
+          providerFixtureId: fixture.providerFixtureId,
+          includedReasons: ['included-by-manual-query' as const],
+          excludedReasons: [],
+          eligible: true as const,
+        })),
+        requestedLeagues: [],
+        requestedTeams: [],
+      }
+      : await (deps.discoverLowOddsFixtures ?? deps.discoverFixtures ?? discoverFixtures)(lowOddsGlobalDiscoveryConfig(config), {
+        date: input.date,
+      }, runtime);
+    const fetchLowOddsSnapshotsForDate = deps.fetchLowOddsSnapshotsForDate;
+    const rawLowOddsSnapshots = providerDateSlate
+      ? providerDateSlate.snapshots
+      : fetchLowOddsSnapshotsForDate
+        ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime))
+        : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
+          try {
+            return await retryStorageConnection(() => (
+              deps.fetchLowOddsSnapshot ?? deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
+            )(config, fixture.providerFixtureId, runtime));
+          } catch (err: any) {
+            return {
+              fixtureId: fixture.id,
+              providerFixtureId: fixture.providerFixtureId,
+              quotes: [],
+              error: err?.message ?? String(err),
+            };
+          }
+        });
+    const lowOddsSnapshots = rawLowOddsSnapshots.map((snapshot) => ({
+      fixtureId: snapshot.fixtureId,
+      providerFixtureId: snapshot.providerFixtureId,
+      oddsSnapshotId: 'oddsSnapshotId' in snapshot ? snapshot.oddsSnapshotId : undefined,
+      providerSnapshotId: 'providerSnapshotId' in snapshot ? snapshot.providerSnapshotId : undefined,
+      quoteRecordIds: 'quoteRecordIds' in snapshot ? snapshot.quoteRecordIds : undefined,
+      quotes: snapshot.quotes,
+      ...('error' in snapshot && typeof snapshot.error === 'string' ? { error: snapshot.error } : {}),
+    }));
+    const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots);
     if (repositories.lowOddsScans && repositories.lowOddsHits) {
       try {
         scan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
@@ -356,11 +413,11 @@ export async function executeRunPipeline(
           threshold: config.apiFootball.lowOddsThreshold,
           markets: config.apiFootball.defaultMarkets,
           bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
-          fixtureCount: fixtureDiscovery.fixtures.length,
+          fixtureCount: lowOddsDiscovery.fixtures.length,
           hits: scan.hits,
           fixtureEvaluations: scan.fixtureEvaluations,
-          requestedLeagues: fixtureDiscovery.requestedLeagues,
-          requestedTeams: fixtureDiscovery.requestedTeams,
+          requestedLeagues: lowOddsDiscovery.requestedLeagues,
+          requestedTeams: lowOddsDiscovery.requestedTeams,
         });
       } catch (err) {
         if (config.databaseUrl) throw err;
@@ -1047,6 +1104,16 @@ async function finishBlocked(
     research: input.research,
     scoring: input.scoring,
     error: input.error,
+  };
+}
+
+function lowOddsGlobalDiscoveryConfig(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    apiFootball: {
+      ...config.apiFootball,
+      maxFixturesPerRun: LOW_ODDS_GLOBAL_MAX_FIXTURES,
+    },
   };
 }
 
