@@ -361,6 +361,32 @@ describe('dashboard api queries', () => {
     assert.equal(parlayClause, null);
   });
 
+  it('applies validation target id in overview filters', async () => {
+    let validationWhere: Record<string, unknown> = {};
+    const baseDb = createDashboardDb();
+    const db = {
+      ...baseDb,
+      validationArtifact: {
+        ...baseDb.validationArtifact,
+        count: async ({ where }: { where: Record<string, unknown> }) => {
+          validationWhere = where;
+          return 1;
+        },
+        findMany: async () => [VALIDATION],
+      },
+    } as any;
+
+    const overview = await readOverview(
+      db,
+      config,
+      new URLSearchParams('tab=validations&validationTarget=prediction&targetId=prediction-1'),
+    );
+    assert.equal(overview.filters.validationTarget, 'prediction');
+    assert.equal(overview.filters.targetId, 'prediction-1');
+    assert.equal(validationWhere.predictionId, 'prediction-1');
+    assert.equal(validationWhere.parlayId, null);
+  });
+
   it('applies validationTarget=parlay in overview filters', async () => {
     let validationWhere: Record<string, unknown> = {};
     const baseDb = createDashboardDb();

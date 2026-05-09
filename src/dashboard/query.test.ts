@@ -58,8 +58,9 @@ describe('parseOverviewQuery', () => {
   });
 
   it('parses validationTarget with valid values and defaults to all', () => {
-    const withPrediction = parse('validationTarget=prediction');
+    const withPrediction = parse('validationTarget=prediction&targetId=prediction-1');
     assert.equal(withPrediction.validationTarget, 'prediction');
+    assert.equal(withPrediction.targetId, 'prediction-1');
     const withParlay = parse('validationTarget=parlay');
     assert.equal(withParlay.validationTarget, 'parlay');
     const withInvalid = parse('validationTarget=invalid');

@@ -194,6 +194,7 @@ export async function readOverview(
     direction: normalized.direction,
     filters: {
       validationTarget: query.validationTarget,
+      targetId: query.targetId,
       date: query.date,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
@@ -546,11 +547,11 @@ function buildValidationWhere(
   if (dateWindow) where.evaluatedAt = dateRangeFilter(dateWindow);
   if (fixtureFilter) where.fixture = fixtureFilter;
   if (query.validationTarget === 'prediction') {
-    where.predictionId = { not: null };
+    where.predictionId = query.targetId ? query.targetId : { not: null };
     where.parlayId = null;
   }
   if (query.validationTarget === 'parlay') {
-    where.parlayId = { not: null };
+    where.parlayId = query.targetId ? query.targetId : { not: null };
     where.predictionId = null;
   }
   return where;

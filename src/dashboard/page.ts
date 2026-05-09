@@ -34,6 +34,7 @@ export function dashboardHtml(): string {
       --positive: oklch(0.68 0.17 155);
       --negative: oklch(0.58 0.2 25);
       --warning: oklch(0.75 0.14 75);
+      --info: oklch(0.68 0.13 235);
       --accent-purple: oklch(0.6 0.2 300);
       --border: oklch(0.25 0.01 260);
       --border-dim: oklch(0.18 0.005 260);
@@ -58,6 +59,7 @@ export function dashboardHtml(): string {
       --accent-2: var(--accent-purple);
       --good: var(--positive);
       --warn: var(--warning);
+      --info-line: var(--info);
       --bad: var(--negative);
       --chip: var(--secondary);
       --good-bg: color-mix(in oklab, var(--positive) 13%, transparent);
@@ -83,6 +85,7 @@ export function dashboardHtml(): string {
       --positive: oklch(0.68 0.17 155);
       --negative: oklch(0.58 0.2 25);
       --warning: oklch(0.75 0.14 75);
+      --info: oklch(0.68 0.13 235);
       --accent-purple: oklch(0.6 0.2 300);
       --border: oklch(0.25 0.01 260);
       --border-dim: oklch(0.18 0.005 260);
@@ -102,6 +105,7 @@ export function dashboardHtml(): string {
       --accent-2: var(--accent-purple);
       --good: var(--positive);
       --warn: var(--warning);
+      --info-line: var(--info);
       --bad: var(--negative);
       --chip: var(--secondary);
       --good-bg: color-mix(in oklab, var(--positive) 13%, transparent);
@@ -301,7 +305,7 @@ export function dashboardHtml(): string {
       opacity: 0.6;
       vertical-align: 1px;
     }
-    .filter-actions { display: flex; align-items: center; gap: 4px; }
+    .filter-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
     .quick-explore {
       margin-top: 8px;
       padding-top: 8px;
@@ -319,6 +323,7 @@ export function dashboardHtml(): string {
       text-transform: uppercase;
     }
     .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+    .quick-grid.wide { grid-template-columns: 1fr; }
     .entity-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px; }
     .json-card {
       max-height: 180px;
@@ -397,7 +402,9 @@ export function dashboardHtml(): string {
       background: var(--card);
       cursor: pointer;
     }
-    .stat:hover { background: color-mix(in oklab, var(--secondary) 58%, transparent); border-color: var(--border); }
+    .stat:hover,
+    .stat.active { background: color-mix(in oklab, var(--secondary) 58%, transparent); border-color: var(--border); }
+    .stat.active { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 34%, transparent); }
     .stat .muted {
       display: block;
       margin: 0 0 6px;
@@ -463,7 +470,63 @@ export function dashboardHtml(): string {
       flex-direction: column;
       border-radius: var(--radius);
     }
+    .exploration-strip {
+      min-height: 38px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-dim);
+      background:
+        linear-gradient(90deg, color-mix(in oklab, var(--primary) 7%, transparent), transparent 46%),
+        var(--card);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+    .active-chips,
+    .explore-actions {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .explore-actions { justify-content: flex-end; }
+    .context-chip {
+      min-height: 20px;
+      max-width: 100%;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 1px 7px;
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      background: color-mix(in oklab, var(--secondary) 64%, transparent);
+      color: var(--muted-foreground);
+      overflow-wrap: anywhere;
+    }
+    .context-chip strong {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+    .context-chip button {
+      width: 14px;
+      height: 14px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      border: 0;
+      color: var(--muted-foreground);
+      line-height: 1;
+    }
     .table-wrap { min-height: 0; overflow: auto; flex: 1; }
+    .table-host {
+      min-height: 0;
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
     table {
       width: 100%;
       min-width: 860px;
@@ -605,6 +668,7 @@ export function dashboardHtml(): string {
     }
     .badge.good { color: var(--positive); background: var(--good-bg); }
     .badge.warn { color: var(--warning); background: var(--warn-bg); }
+    .badge.info { color: var(--info-line); background: color-mix(in oklab, var(--info-line) 13%, transparent); }
     .badge.bad { color: var(--negative); background: var(--bad-bg); }
     .chips { display: flex; flex-wrap: wrap; gap: 4px; }
     .chip-btn { min-height: 18px; padding: 1px 6px; color: var(--muted-foreground); }
@@ -626,6 +690,7 @@ export function dashboardHtml(): string {
       display: grid;
       place-items: center;
       min-height: 120px;
+      flex: 1;
       padding: 16px;
       color: var(--muted-foreground);
       font-family: var(--font-mono);
@@ -654,6 +719,8 @@ export function dashboardHtml(): string {
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .tabs { align-self: auto; }
       .content { padding-top: 0; grid-template-columns: 1fr; overflow: visible; }
+      .exploration-strip { grid-template-columns: 1fr; align-items: stretch; }
+      .explore-actions { justify-content: flex-start; }
       .panel { min-height: 320px; }
     }
     @media (max-width: 680px) {
@@ -673,7 +740,7 @@ export function dashboardHtml(): string {
   <div class="shell">
     <header class="module-shell ops-topbar">
       <div class="brand">
-        <p class="eyebrow">GANA V7</p>
+        <p class="eyebrow">GANA V9</p>
         <h1>Ops Console</h1>
         <p class="lede">Fixtures · predicciones · parlays · validación · runs</p>
       </div>
@@ -753,6 +820,12 @@ export function dashboardHtml(): string {
               <button class="icon-btn" data-quick-tab="validations" type="button">Validaciones</button>
               <button class="icon-btn" data-quick-tab="runs" type="button">Runs</button>
             </div>
+            <div class="quick-grid wide">
+              <button class="icon-btn" data-quick-view="top-edge" type="button">Top edge</button>
+              <button class="icon-btn" data-quick-view="high-confidence" type="button">Alta confianza</button>
+              <button class="icon-btn" data-quick-view="parlay-ready" type="button">Parlays listos</button>
+              <button class="icon-btn" data-quick-view="validation-watch" type="button">Validaciones abiertas</button>
+            </div>
           </div>
         </div>
       </form>
@@ -770,6 +843,7 @@ export function dashboardHtml(): string {
             <h2 id="section-title">Partidos</h2>
             <span class="muted" id="section-count"></span>
           </div>
+          <div class="exploration-strip" id="exploration-strip"></div>
           <div id="list" class="empty">Cargando…</div>
           <div class="pager">
             <div class="pager-group">
@@ -858,6 +932,7 @@ export function dashboardHtml(): string {
         loading: false,
         filters: {
           validationTarget: 'all',
+          targetId: '',
           dateFrom: '',
           dateTo: '',
           runId: '',
@@ -966,6 +1041,7 @@ export function dashboardHtml(): string {
         if (['promotable', 'succeeded', 'won'].includes(normalized)) return 'good';
         if (['blocked', 'failed', 'lost', 'error'].includes(normalized)) return 'bad';
         if (['review-required', 'pending', 'running'].includes(normalized)) return 'warn';
+        if (['scheduled', 'live', 'candidate', 'draft', 'created', 'queued'].includes(normalized)) return 'info';
         return '';
       };
       const badge = (value) => '<span class="badge ' + badgeClass(value) + '">' + esc(value ?? 'none') + '</span>';
@@ -1007,6 +1083,7 @@ export function dashboardHtml(): string {
         if (state.filters.validationTarget && state.filters.validationTarget !== 'all') {
           params.set('validationTarget', state.filters.validationTarget);
         }
+        if (state.filters.targetId) params.set('targetId', state.filters.targetId);
         if (state.filters.dateFrom) params.set('dateFrom', state.filters.dateFrom);
         if (state.filters.dateTo) params.set('dateTo', state.filters.dateTo);
         if (state.filters.runId) params.set('runId', state.filters.runId);
@@ -1068,6 +1145,7 @@ export function dashboardHtml(): string {
         state.filters.dateFrom = params.get('dateFrom') || '';
         state.filters.dateTo = params.get('dateTo') || '';
         state.filters.validationTarget = normalizeValidationTarget(params.get('validationTarget'));
+        state.filters.targetId = sanitizeText(params.get('targetId'));
         state.filters.runId = sanitizeText(params.get('runId'));
         state.filters.market = sanitizeText(params.get('market'));
         state.filters.team = sanitizeText(params.get('team'));
@@ -1192,6 +1270,7 @@ export function dashboardHtml(): string {
         if (state.loading) return;
         state.loading = true;
         setConnectionStatus('Actualizando\u2026', 'warn');
+        $('#list').className = 'table-host';
         $('#list').innerHTML = '<div class="loading">Cargando\u2026</div>';
         $('#detail').innerHTML = '<span class="muted">Cargando\u2026</span>';
         $('#updated').textContent = 'Actualizando\u2026';
@@ -1228,6 +1307,7 @@ export function dashboardHtml(): string {
           setConnectionStatus('Conectado', 'ok');
         } catch (err) {
           setConnectionStatus('Error de conexi\u00f3n', 'error');
+          $('#list').className = 'empty';
           $('#list').innerHTML = '<div class="error">' + esc(err.message) + '</div>';
           $('#detail').innerHTML = '<span class="error">No se pudo cargar la vista principal.</span>';
         } finally {
@@ -1253,6 +1333,7 @@ export function dashboardHtml(): string {
         renderTabs();
         renderStats();
         renderFiltersByTab();
+        renderExplorationStrip();
         renderList();
         renderPager();
         if (state.selectedKind && state.selectedId) {
@@ -1272,17 +1353,174 @@ export function dashboardHtml(): string {
         const cards = [];
         if (totalByStatus.length > 0) {
           cards.push(...totalByStatus.slice(0, 4).map(({ status, count }) => {
-            return '<article class="stat" data-metric-kind="status" data-metric-value="' + esc(status) + '">' +
+            const active = state.filters.status.includes(status) ? ' active' : '';
+            return '<article class="stat' + active + '" data-metric-kind="status" data-metric-value="' + esc(status) + '">' +
               '<span class="muted">' + esc(status) + '</span><b>' + count + '</b></article>';
           }));
         } else {
-          cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="fixtures"><span class="muted">Partidos</span><b>' + state.data.counts.fixtures + '</b></article>');
-          cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="predictions"><span class="muted">Predicciones</span><b>' + state.data.counts.predictions + '</b></article>');
-          cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="parlays"><span class="muted">Parlays</span><b>' + state.data.counts.parlays + '</b></article>');
-          cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="validations"><span class="muted">Validaciones</span><b>' + state.data.counts.validations + '</b></article>');
-          cards.push('<article class="stat" data-metric-kind="tab" data-metric-value="runs"><span class="muted">Runs</span><b>' + state.data.counts.runs + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'fixtures' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="fixtures"><span class="muted">Partidos</span><b>' + state.data.counts.fixtures + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'predictions' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="predictions"><span class="muted">Predicciones</span><b>' + state.data.counts.predictions + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'parlays' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="parlays"><span class="muted">Parlays</span><b>' + state.data.counts.parlays + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'validations' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="validations"><span class="muted">Validaciones</span><b>' + state.data.counts.validations + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'runs' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="runs"><span class="muted">Runs</span><b>' + state.data.counts.runs + '</b></article>');
         }
         $('#stats').innerHTML = cards.join('');
+      }
+
+      function optionLabel(name, value) {
+        if (!value) return '';
+        const input = document.querySelector('[name=' + JSON.stringify(name) + ']');
+        if (input instanceof HTMLSelectElement) {
+          const option = [...input.options].find((item) => item.value === value);
+          return option?.textContent || value;
+        }
+        return value;
+      }
+
+      function compactId(id) {
+        const text = String(id || '');
+        return text.length > 18 ? text.slice(0, 8) + '…' + text.slice(-6) : text;
+      }
+
+      function activeFilterChips() {
+        const chips = [];
+        const chip = (key, label, value) => {
+          if (!hasText(value)) return;
+          chips.push('<span class="context-chip" data-filter-key="' + esc(key) + '">' +
+            esc(label) + ': <strong>' + esc(value) + '</strong><button title="Quitar filtro" data-clear-filter="' + esc(key) + '" type="button">×</button></span>');
+        };
+        if (state.filters.dateFrom || state.filters.dateTo) {
+          chip('date', 'Fecha', (state.filters.dateFrom || '…') + ' → ' + (state.filters.dateTo || '…'));
+        }
+        chip('run', 'Run', compactId(state.filters.runId));
+        if (state.filters.status.length) chip('status', 'Status', state.filters.status.join(', '));
+        chip('market', 'Mercado', optionLabel('market', state.filters.market));
+        chip('team', 'Equipo', optionLabel('team', state.filters.team));
+        chip('competition', 'Competencia', optionLabel('competition', state.filters.competition));
+        if (state.filters.quality.length) chip('quality', 'Calidad', state.filters.quality.join(', '));
+        if (state.filters.minConfidence || state.filters.maxConfidence) {
+          chip('confidence', 'Conf.', (state.filters.minConfidence || '0') + ' - ' + (state.filters.maxConfidence || '1'));
+        }
+        if (state.filters.minEdge || state.filters.maxEdge) {
+          chip('edge', 'Edge', (state.filters.minEdge || 'min') + ' - ' + (state.filters.maxEdge || 'max'));
+        }
+        if (state.filters.validationTarget !== 'all') {
+          const target = state.filters.validationTarget === 'prediction' ? 'Atómica' : 'Parlay';
+          chip('target', 'Objetivo', state.filters.targetId ? target + ' ' + compactId(state.filters.targetId) : target);
+        }
+        return chips;
+      }
+
+      function renderExplorationStrip() {
+        const container = $('#exploration-strip');
+        if (!container) return;
+        const chips = activeFilterChips();
+        const chipHtml = chips.length
+          ? chips.join('')
+          : '<span class="context-chip">Vista <strong>' + esc(TAB_LABELS[state.tab] || state.tab) + '</strong></span>';
+        container.innerHTML = '<div class="active-chips">' + chipHtml + '</div>' +
+          '<div class="explore-actions">' +
+            '<button class="icon-btn" data-quick-view="top-edge" type="button">Top edge</button>' +
+            '<button class="icon-btn" data-quick-view="high-confidence" type="button">Alta confianza</button>' +
+            '<button class="icon-btn" data-quick-view="validation-watch" type="button">Validar</button>' +
+            '<button class="icon-btn" data-clear-filter="all" type="button">Limpiar</button>' +
+          '</div>';
+      }
+
+      function clearFilter(key) {
+        if (key === 'all') {
+          state.filters = {
+            validationTarget: 'all',
+            targetId: '',
+            dateFrom: '',
+            dateTo: '',
+            runId: '',
+            status: [],
+            market: '',
+            team: '',
+            competition: '',
+            quality: [],
+            minConfidence: '',
+            maxConfidence: '',
+            minEdge: '',
+            maxEdge: '',
+          };
+        }
+        if (key === 'date') {
+          state.filters.dateFrom = '';
+          state.filters.dateTo = '';
+        }
+        if (key === 'run') state.filters.runId = '';
+        if (key === 'status') state.filters.status = [];
+        if (key === 'market') state.filters.market = '';
+        if (key === 'team') state.filters.team = '';
+        if (key === 'competition') state.filters.competition = '';
+        if (key === 'quality') state.filters.quality = [];
+        if (key === 'confidence') {
+          state.filters.minConfidence = '';
+          state.filters.maxConfidence = '';
+        }
+        if (key === 'edge') {
+          state.filters.minEdge = '';
+          state.filters.maxEdge = '';
+        }
+        if (key === 'target') {
+          state.filters.validationTarget = 'all';
+          state.filters.targetId = '';
+        }
+        state.page = 1;
+        state.selectedKind = null;
+        state.selectedId = null;
+        writeForm();
+        renderExplorationStrip();
+        load();
+      }
+
+      function setScopedStatuses(tab, candidates) {
+        const allowed = state.metadata?.statuses?.[tab] || [];
+        state.filters.status = candidates.filter((status) => allowed.includes(status));
+      }
+
+      function applyQuickView(view) {
+        state.page = 1;
+        state.selectedKind = null;
+        state.selectedId = null;
+        state.filters.targetId = '';
+        if (view === 'top-edge') {
+          state.tab = 'predictions';
+          state.sort = 'edge';
+          state.direction = 'desc';
+          state.filters.status = [];
+          state.filters.minEdge = '0.03';
+          state.filters.minConfidence = '';
+          state.filters.validationTarget = 'all';
+        }
+        if (view === 'high-confidence') {
+          state.tab = 'predictions';
+          state.sort = 'confidence';
+          state.direction = 'desc';
+          state.filters.status = [];
+          state.filters.minConfidence = '0.75';
+          state.filters.minEdge = '';
+          state.filters.validationTarget = 'all';
+        }
+        if (view === 'parlay-ready') {
+          state.tab = 'parlays';
+          state.sort = 'aggregateQuality';
+          state.direction = 'desc';
+          setScopedStatuses('parlays', ['promotable', 'candidate', 'review-required']);
+          state.filters.validationTarget = 'all';
+        }
+        if (view === 'validation-watch') {
+          state.tab = 'validations';
+          state.sort = 'evaluatedAt';
+          state.direction = 'desc';
+          state.filters.validationTarget = 'all';
+          setScopedStatuses('validations', ['pending', 'error', 'blocked', 'lost']);
+        }
+        renderFiltersByTab();
+        writeForm();
+        load();
       }
 
       function renderFiltersByTab() {
@@ -1295,11 +1533,18 @@ export function dashboardHtml(): string {
         if (!(statusInput instanceof HTMLSelectElement)) return;
         const options = state.metadata.statuses[state.tab] || [];
         statusInput.innerHTML = '<option value=\"\">Todos</option>' + options.map((value) => '<option value="' + esc(value) + '">' + esc(value) + '</option>').join('');
+        const sortInput = $('[name="sort"]');
+        if (sortInput instanceof HTMLSelectElement) {
+          const sortOptions = state.metadata.sortOptions[state.tab] || [];
+          sortInput.innerHTML = sortOptions.map((value) => '<option value="' + esc(value) + '">' + esc(value) + '</option>').join('');
+          if (!sortOptions.includes(state.sort)) state.sort = sortOptions[0] || DEFAULT_SORT_BY[state.tab];
+        }
         writeForm();
       }
 
       function renderList() {
         if (!state.data) {
+          $('#list').className = 'empty';
           $('#list').innerHTML = '<div class="empty">Sin datos para mostrar</div>';
           return;
         }
@@ -1308,9 +1553,11 @@ export function dashboardHtml(): string {
         const total = state.data.pagination?.total || 0;
         $('#section-count').textContent = rows.length + ' visibles de ' + total;
         if (!rows.length) {
+          $('#list').className = 'empty';
           $('#list').innerHTML = '<div class="empty">No hay datos para los filtros actuales.</div>';
           return;
         }
+        $('#list').className = 'table-host';
         if (state.tab === 'fixtures') return renderFixtureRows(rows);
         if (state.tab === 'predictions') return renderPredictionRows(rows);
         if (state.tab === 'parlays') return renderParlayRows(rows);
@@ -1554,6 +1801,9 @@ export function dashboardHtml(): string {
           sections.push(kv('Probabilidad', esc('impl. ' + fmtPct(data.impliedProbability, 1) + ' · modelo ' + fmtPct(data.estimatedProbability, 1))));
           if (data.fixture) sections.push(kv('Partido', '<span class="crosslink" data-kind="fixture" data-id="' + esc(data.fixture.id) + '">' + esc(matchName(data.fixture)) + '</span>'));
           if (data.latestValidation) sections.push(kv('Última validación', badge(data.latestValidation.status) + ' ' + esc(data.latestValidation.reason || '')));
+          if (Array.isArray(data.validationHistory) && data.validationHistory.length) {
+            sections.push('<div class="detail-card"><h4>Historial de validación</h4><div class="detail-list">' + data.validationHistory.map(renderMiniValidation).join('') + '</div></div>');
+          }
           if (data.rationale) sections.push('<div class="detail-card"><h4>Rationale</h4><div class="rationale">' + esc(data.rationale) + '</div></div>');
         }
         if (kind === 'parlay') {
@@ -1563,6 +1813,9 @@ export function dashboardHtml(): string {
             '<div class="insight"><span>Calidad</span><b>' + esc(fmtPct(data.aggregateQuality, 1)) + '</b></div>' +
             '</div>');
           if (data.latestValidation) sections.push(kv('Última validación', badge(data.latestValidation.status) + ' ' + esc(data.latestValidation.reason || '')));
+          if (Array.isArray(data.validationHistory) && data.validationHistory.length) {
+            sections.push('<div class="detail-card"><h4>Historial de validación</h4><div class="detail-list">' + data.validationHistory.map(renderMiniValidation).join('') + '</div></div>');
+          }
           if (Array.isArray(data.legs) && data.legs.length) {
             sections.push('<div class="detail-card"><h4>Legs</h4><div class="detail-list">' + data.legs.map((leg) =>
               '<div class="detail-line"><b>' + esc(matchName(leg.fixture)) + '</b><span class="sub">' + esc(marketLabel(leg)) +
@@ -1622,6 +1875,9 @@ export function dashboardHtml(): string {
         $('#detail').innerHTML = '<span class=\"muted\">Cargando\u2026</span>';
 
         const entity = body.entity || body;
+        if (Array.isArray(body.validationHistory)) {
+          entity.validationHistory = body.validationHistory;
+        }
         let links = '';
         if (kind === 'parlay' && Array.isArray(entity.legs)) {
           const items = entity.legs
@@ -1675,12 +1931,19 @@ export function dashboardHtml(): string {
         await load();
       }
 
-      async function openValidationsForTarget(targetKind) {
+      async function openValidationsForTarget(targetKind, targetId) {
         state.tab = 'validations';
         state.page = 1;
         state.selectedKind = null;
         state.selectedId = null;
         state.filters.validationTarget = normalizeValidationTarget(targetKind);
+        state.filters.targetId = sanitizeText(targetId);
+        state.filters.market = '';
+        state.filters.quality = [];
+        state.filters.minConfidence = '';
+        state.filters.maxConfidence = '';
+        state.filters.minEdge = '';
+        state.filters.maxEdge = '';
         state.sort = 'evaluatedAt';
         state.direction = 'desc';
         renderFiltersByTab();
@@ -1709,6 +1972,7 @@ export function dashboardHtml(): string {
         state.filters.team = sanitizeText(readText('team'));
         state.filters.competition = sanitizeText(readText('competition'));
         state.filters.validationTarget = normalizeValidationTarget(readText('validationTarget'));
+        if (state.filters.validationTarget === 'all') state.filters.targetId = '';
         state.filters.status = readSelectValues('status');
         state.filters.quality = readSelectValues('quality');
         state.filters.minConfidence = sanitizeText(readText('minConfidence'));
@@ -1739,6 +2003,8 @@ export function dashboardHtml(): string {
         state.page = 1;
         state.selectedKind = null;
         state.selectedId = null;
+        state.filters.targetId = '';
+        if (tab !== 'validations') state.filters.validationTarget = 'all';
         const defaults = state.metadata?.sortOptions?.[tab];
         if (defaults?.length) state.sort = defaults[0] || DEFAULT_SORT_BY[tab];
         state.direction = 'desc';
@@ -1792,9 +2058,26 @@ export function dashboardHtml(): string {
           setTab(quick.dataset.quickTab);
           return;
         }
+        const quickView = event.target.closest('[data-quick-view]');
+        if (quickView instanceof HTMLElement && quickView.dataset.quickView) {
+          applyQuickView(quickView.dataset.quickView);
+          return;
+        }
         const button = event.target.closest('[data-date-preset]');
         if (!(button instanceof HTMLElement) || !button.dataset.datePreset) return;
         applyDatePreset(button.dataset.datePreset);
+      });
+
+      $('#exploration-strip').addEventListener('click', (event) => {
+        const quickView = event.target.closest('[data-quick-view]');
+        if (quickView instanceof HTMLElement && quickView.dataset.quickView) {
+          applyQuickView(quickView.dataset.quickView);
+          return;
+        }
+        const clear = event.target.closest('[data-clear-filter]');
+        if (clear instanceof HTMLElement && clear.dataset.clearFilter) {
+          clearFilter(clear.dataset.clearFilter);
+        }
       });
 
       $('#list').addEventListener('click', async (event) => {
@@ -1837,7 +2120,7 @@ export function dashboardHtml(): string {
         }
         const validations = event.target.closest('[data-open-validations-target]');
         if (validations instanceof HTMLElement && validations.dataset.openValidationsTarget) {
-          await openValidationsForTarget(validations.dataset.openValidationsTarget);
+          await openValidationsForTarget(validations.dataset.openValidationsTarget, validations.dataset.targetId);
           return;
         }
         const link = event.target.closest('.crosslink[data-kind][data-id], .chip-btn[data-kind][data-id]');

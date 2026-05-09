@@ -13,6 +13,7 @@ export interface ParsedOverviewQuery {
   sort: string;
   direction: DashboardDirection;
   validationTarget: 'all' | 'prediction' | 'parlay';
+  targetId?: string;
   date?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -81,6 +82,7 @@ const VALID_VALIDATION_TARGETS = ['all', 'prediction', 'parlay'] as const;
 export function parseOverviewQuery(params: URLSearchParams, options: DashboardQueryOptions): ParsedOverviewQuery {
   const tab = normalizeTab(params.get('tab'), options.defaultTab);
   const validationTarget = normalizeValidationTarget(params.get('validationTarget'));
+  const targetId = cleanText(params.get('targetId')) ?? undefined;
   const page = normalizePositiveInt(params.get('page'), 1);
   const take = normalizePositiveInt(params.get('take'), DEFAULT_TAKE, 1, MAX_TAKE);
 
@@ -114,6 +116,7 @@ export function parseOverviewQuery(params: URLSearchParams, options: DashboardQu
   return {
     tab,
     validationTarget,
+    targetId,
     page,
     take,
     sort,
@@ -140,7 +143,7 @@ export function createMetadata(): DashboardMetadata {
     tabs: DASHBOARD_TABS,
     statuses: {
       fixtures: ['scheduled', 'live', 'completed', 'cancelled', 'unknown'],
-      predictions: VALID_PREDICTION_STATUSES,
+      predictions: [...new Set(VALID_PREDICTION_STATUSES)],
       parlays: [...new Set(['draft', 'candidate', 'review-required', 'promotable', 'blocked'])],
       validations: ['pending', 'won', 'lost', 'push', 'voided', 'error', 'blocked'],
       runs: ['created', 'queued', 'running', 'succeeded', 'failed', 'cancelled'],

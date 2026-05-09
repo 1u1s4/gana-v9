@@ -193,6 +193,7 @@ export interface DashboardOverviewResponse {
   direction: 'asc' | 'desc';
   filters: {
     validationTarget?: 'all' | 'prediction' | 'parlay';
+    targetId?: string;
     date?: string;
     dateFrom?: string;
     dateTo?: string;
