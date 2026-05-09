@@ -376,7 +376,48 @@ function cursorToolOutput(toolCall: Record<string, any> | undefined): string {
   return result ? JSON.stringify(result) : '';
 }
 
+function codexModelAttempts(config: AgentConfig): string[] {
+  return [config.model, ...config.codexFallbackModels]
+    .map((model) => model.trim())
+    .filter((model, index, models) => Boolean(model) && models.indexOf(model) === index);
+}
+
+function isCodexQuotaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(429|quota|rate limit|rate-limit|usage limit|limit exceeded|too many requests|insufficient quota)\b/i.test(message);
+}
+
 async function runCodexAgent(
+  config: AgentConfig,
+  input: string | ChatMessage[],
+  options?: RunAgentOptions,
+) {
+  const originalModel = config.model;
+  const models = codexModelAttempts(config);
+  let lastError: unknown;
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    config.model = model;
+    try {
+      return await runCodexAgentAttempt(config, input, options);
+    } catch (error) {
+      lastError = error;
+      const nextModel = models[index + 1];
+      if (!nextModel || !isCodexQuotaError(error)) {
+        config.model = model;
+        throw error;
+      }
+      options?.onEvent?.({
+        type: 'text',
+        delta: `\n[guardrail] Codex quota reached for ${model}; retrying with ${nextModel}.\n`,
+      });
+    }
+  }
+  config.model = originalModel;
+  throw lastError;
+}
+
+async function runCodexAgentAttempt(
   config: AgentConfig,
   input: string | ChatMessage[],
   options?: RunAgentOptions,

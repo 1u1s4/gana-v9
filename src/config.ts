@@ -78,6 +78,7 @@ export interface AgentConfig extends GanaConfigExtension {
   codexHome: string;
   codexModelListPath: string;
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
+  codexFallbackModels: string[];
   codexThreadId?: string;
   geminiHome: string;
   geminiModelListPath: string;
@@ -270,6 +271,7 @@ const DEFAULTS: AgentConfig = {
   codexHome: join(process.env.HOME ?? '', '.codex'),
   codexModelListPath: 'config/codex-models.json',
   codexSandbox: 'workspace-write',
+  codexFallbackModels: ['gpt-5.4-mini'],
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
   geminiApprovalMode: 'default',
@@ -362,6 +364,7 @@ export function loadConfig(
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
   if (process.env.CODEX_MODEL_LIST_PATH) config.codexModelListPath = process.env.CODEX_MODEL_LIST_PATH;
   if (isCodexSandbox(process.env.AGENT_CODEX_SANDBOX)) config.codexSandbox = process.env.AGENT_CODEX_SANDBOX;
+  if (process.env.AGENT_CODEX_FALLBACK_MODELS) config.codexFallbackModels = parseStringList(process.env.AGENT_CODEX_FALLBACK_MODELS) ?? [];
   if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
   if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
   if (isGeminiApprovalMode(process.env.AGENT_GEMINI_APPROVAL_MODE)) {
