@@ -52,5 +52,6 @@ describe('research prompts', () => {
 
     assert.match(prompt, /Monetary safety/);
     assert.match(prompt, /analytical artifacts only/);
+    assert.match(prompt, /starting with "\{" as the first character/);
   });
 });

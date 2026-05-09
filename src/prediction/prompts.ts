@@ -147,7 +147,7 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
 
   return [
     'Score football prediction candidates for the provided fixture context.',
-    'Return only valid JSON. Do not wrap it in markdown. Do not include prose outside JSON.',
+    'Return only valid JSON starting with "{" as the first character. Do not wrap it in markdown. Do not include prose outside JSON.',
     NO_MONETARY_ACTIONS_PROMPT,
     '',
     `Prompt version: ${SCORE_PREDICTION_PROMPT_VERSION}.`,

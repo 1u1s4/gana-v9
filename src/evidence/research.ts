@@ -83,8 +83,8 @@ const BLOCKED_GATE: ResearchGateResult = {
   reasons: ['research failed'],
   warnings: [],
 };
-const RESEARCH_AGENT_TIMEOUT_MS = 300_000;
-const RESEARCH_AGENT_JSON_ATTEMPTS = 2;
+const RESEARCH_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_RESEARCH_AGENT_TIMEOUT_MS', positiveIntegerFromEnv('GANA_AGENT_TIMEOUT_MS', 300_000));
+const RESEARCH_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_RESEARCH_AGENT_JSON_ATTEMPTS', 2);
 const RESEARCH_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/research-fixture-v2/output.schema.json');
 
 export async function runFixtureResearch(
@@ -371,6 +371,13 @@ async function runResearchAgent(
     options?.signal?.removeEventListener('abort', abort);
     clearTimeout(timeout);
   }
+}
+
+function positiveIntegerFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function repairResearchReferences(value: any): { value: any; warnings: string[] } {

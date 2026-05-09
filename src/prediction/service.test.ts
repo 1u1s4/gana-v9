@@ -335,6 +335,98 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].warnings.includes('evidence-thin'), false);
   });
 
+  it('fills empty LLM evidenceIds from persisted evidence when the gate is review-only instead of blocking the fixture', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const thinEvidence = evidenceItems.map((item) => ({ ...item, confidence: 0.4 }));
+    const thinClaims = [{
+      ...claims[0],
+      evidenceIds: ['evidence-1'],
+    }];
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        evidenceItems: { list: async () => thinEvidence },
+        claims: { list: async () => thinClaims },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: [],
+            claimIds: ['claim-1'],
+            rationale: 'The LLM selected a persisted quote but omitted evidence IDs despite persisted research evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.deepEqual(persisted[0].evidenceIds, ['evidence-1', 'evidence-2']);
+    assert.match(persisted[0].warnings.join('\n'), /insufficient evidence/);
+  });
+
+  it('retries scoring once with a stricter prompt when the agent returns prose instead of JSON', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    let retryPrompt = '';
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async (_config, input) => {
+        attempts += 1;
+        retryPrompt = String(input);
+        if (attempts === 1) {
+          return { text: 'Estoy verificando el partido antes de responder.', usage: {}, output: '' };
+        }
+        return {
+          text: JSON.stringify({
+            predictions: [{
+              oddsQuoteId: 'odds-quote-1',
+              market: 'h2h',
+              selection: 'home',
+              line: null,
+              odds: 2.1,
+              probability: 0.56,
+              confidence: 0.75,
+              evidenceIds: ['evidence-1', 'evidence-2'],
+              claimIds: ['claim-1'],
+              rationale: 'Home selection is supported by the supplied evidence.',
+              warnings: [],
+            }],
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistPredictions: async (records: any[]) => records,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(attempts, 2);
+    assert.match(retryPrompt, /minimal-scoring-retry/);
+  });
+
   it('canonicalizes LLM pick fields from a valid persisted oddsQuoteId instead of blocking quote mismatches', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

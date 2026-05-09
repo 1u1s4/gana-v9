@@ -32,7 +32,8 @@ import { buildAtomicPrediction, scorePredictionCandidate } from './scoring.js';
 import { SCORE_PREDICTION_PROMPT_VERSION, buildScorePredictionPrompt, type ResearchWebMode } from './prompts.js';
 import { SCORING_RULE_VERSION, type PredictionRecordView } from './types.js';
 
-const SCORING_AGENT_TIMEOUT_MS = 300_000;
+const SCORING_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_SCORING_AGENT_TIMEOUT_MS', positiveIntegerFromEnv('GANA_AGENT_TIMEOUT_MS', 300_000));
+const SCORING_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_SCORING_AGENT_JSON_ATTEMPTS', 2);
 const SCORING_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/score-prediction-v1/output.schema.json');
 const MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT = 80;
 
@@ -239,25 +240,45 @@ export async function runFixtureScoring(
     ],
   });
 
-  let llmOutput: ParsedTopPick[];
+  let llmOutput: ParsedTopPick[] | undefined;
   let rawOutput = '';
-  try {
-    const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, {
-      runtime,
-      signal: input.signal,
-    });
-    rawOutput = result.text;
-    llmOutput = completeGateEvidence(repairTopPickReferences(
-      parseTopPickOutput(rawOutput),
-      evidenceGate,
-      research.claims,
-      research.evidenceItems,
-      research.sources,
-    ), evidenceGate);
-  } catch (err: any) {
-    const error = err?.message ?? String(err);
+  let scoringError = '';
+  for (let attempt = 1; attempt <= SCORING_AGENT_JSON_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, config, scoringPromptForAttempt(prompt, attempt), {
+        runtime,
+        signal: input.signal,
+      });
+      rawOutput = result.text;
+      llmOutput = completeGateEvidence(repairTopPickReferences(
+        parseTopPickOutput(rawOutput),
+        evidenceGate,
+        research.claims,
+        research.evidenceItems,
+        research.sources,
+      ), evidenceGate, research.evidenceItems);
+      break;
+    } catch (err: any) {
+      scoringError = err?.message ?? String(err);
+      if (attempt < SCORING_AGENT_JSON_ATTEMPTS && isRetryableScoringAgentError(scoringError)) {
+        rawOutput = '';
+        continue;
+      }
+      const result = blockedResult(runId, artifactWriter, {
+        error: scoringError,
+        reasons: ['prediction LLM scoring failed'],
+        fixtureId: fixture.id,
+        providerFixtureId: fixture.providerFixtureId,
+        oddsSnapshotId: oddsSnapshot.id,
+      });
+      await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
+      return result;
+    }
+  }
+
+  if (!llmOutput) {
     const result = blockedResult(runId, artifactWriter, {
-      error,
+      error: scoringError || 'Prediction LLM scoring failed without output.',
       reasons: ['prediction LLM scoring failed'],
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
@@ -269,7 +290,7 @@ export async function runFixtureScoring(
 
   const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
   llmOutput = canonicalizePicksFromOddsQuotes(llmOutput, quoteById);
-  const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes);
+  const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes, research.evidenceItems);
   if (topPickIssues.length) {
     const result = blockedResult(runId, artifactWriter, {
       error: `Prediction LLM output failed validation: ${topPickIssues.join('; ')}`,
@@ -303,7 +324,7 @@ export async function runFixtureScoring(
     });
     const selectedEvidenceIds = pick.evidenceIds.length >= 2
       ? pick.evidenceIds
-      : uniqueStrings([...pick.evidenceIds, ...evidenceGate.evidenceIds]);
+      : uniqueStrings([...pick.evidenceIds, ...allowedScoringEvidenceIds(evidenceGate, research.evidenceItems)]);
     const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
 
     const warnings = [...gate.warnings, ...retrievalWarnings, ...candidateScore.reasons, ...pick.warnings];
@@ -491,6 +512,23 @@ function parseTopPickOutput(rawOutput: string): ParsedTopPick[] {
   return predictions.map((item, index) => parseTopPick(item, index));
 }
 
+function scoringPromptForAttempt(prompt: string, attempt: number): string {
+  if (attempt <= 1) return prompt;
+  return [
+    prompt,
+    '',
+    'Retry instruction: the previous scoring response failed, timed out, or was not valid JSON. Use minimal-scoring-retry mode:',
+    '- return strict JSON only, starting with "{" as the first character',
+    '- do not include status/progress prose such as "Estoy verificando"',
+    '- include at least one persisted evidenceId from Input.evidenceItems for every prediction',
+    '- keep rationales concise and ground every pick in persisted oddsQuoteId plus persisted evidenceIds',
+  ].join('\n');
+}
+
+function isRetryableScoringAgentError(error: string): boolean {
+  return /timed out|timeout|aborted|strict JSON|Unexpected token|unterminated|not valid JSON|must include predictions array/i.test(error);
+}
+
 function parseJsonObject(rawOutput: string): any {
   const trimmed = rawOutput.trim();
   try {
@@ -607,17 +645,30 @@ function suffixMap(ids: string[]): Map<string, string> {
   return map;
 }
 
-function completeGateEvidence(picks: ParsedTopPick[], evidenceGate: ReturnType<typeof evaluateEvidenceGate>): ParsedTopPick[] {
-  const allowed = new Set(evidenceGate.evidenceIds);
+function completeGateEvidence(
+  picks: ParsedTopPick[],
+  evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
+  evidenceItems: EvidenceItemRecord[] = [],
+): ParsedTopPick[] {
+  const allowedEvidenceIds = allowedScoringEvidenceIds(evidenceGate, evidenceItems);
+  const allowed = new Set(allowedEvidenceIds);
   return picks.map((pick) => {
     const validEvidenceIds = uniqueStrings(pick.evidenceIds.filter((id) => allowed.has(id)));
     return {
       ...pick,
       evidenceIds: validEvidenceIds.length
         ? validEvidenceIds
-        : evidenceGate.evidenceIds.slice(0, Math.min(2, evidenceGate.evidenceIds.length)),
+        : allowedEvidenceIds.slice(0, Math.min(2, allowedEvidenceIds.length)),
     };
   });
+}
+
+function allowedScoringEvidenceIds(
+  evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
+  evidenceItems: EvidenceItemRecord[] = [],
+): string[] {
+  if (evidenceGate.evidenceIds.length) return evidenceGate.evidenceIds;
+  return uniqueStrings(evidenceItems.map((item) => item.id).filter(Boolean));
 }
 
 function idSuffix(id: string): string {
@@ -663,9 +714,10 @@ function validateTopPicks(
   evidenceGate: ReturnType<typeof evaluateEvidenceGate>,
   claims: ClaimRecord[],
   requiredCoverageQuotes: OddsQuoteRecord[] = [],
+  evidenceItems: EvidenceItemRecord[] = [],
 ): string[] {
   const issues: string[] = [];
-  const evidenceIds = new Set(evidenceGate.evidenceIds);
+  const allowedEvidenceIds = new Set(allowedScoringEvidenceIds(evidenceGate, evidenceItems));
   const claimIds = new Set(claims.map((claim) => claim.id));
   const seenQuoteIds = new Set<string>();
   const coveredMarkets = new Set(picks.map((pick) => pick.market));
@@ -690,7 +742,7 @@ function validateTopPicks(
     if (pick.confidence < 0 || pick.confidence > 1) issues.push(`predictions[${index}] confidence must be between 0 and 1`);
     if (!pick.evidenceIds.length) issues.push(`predictions[${index}] requires at least one evidenceId`);
     for (const evidenceId of pick.evidenceIds) {
-      if (!evidenceIds.has(evidenceId)) issues.push(`predictions[${index}] references unknown or insufficient evidenceId "${evidenceId}"`);
+      if (!allowedEvidenceIds.has(evidenceId)) issues.push(`predictions[${index}] references unknown evidenceId "${evidenceId}"`);
     }
     for (const claimId of pick.claimIds) {
       if (!claimIds.has(claimId)) issues.push(`predictions[${index}] references unknown claimId "${claimId}"`);
@@ -1035,6 +1087,13 @@ function blockedResult(
     artifactPath,
     error: input.error,
   };
+}
+
+function positiveIntegerFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function numberValue(value: unknown): number {
