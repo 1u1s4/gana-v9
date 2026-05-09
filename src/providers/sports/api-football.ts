@@ -12,7 +12,7 @@ import { createStorageRepositories } from '../../storage/repositories/index.js';
 import { getPrismaClient } from '../../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../../storage/types.js';
 import type { ServiceStatusReport } from '../../filters/status.js';
-import { ApiFootballProviderError, mapHttpStatusToProviderError } from './api-football-errors.js';
+import { ApiFootballProviderError, isApiFootballProviderError, mapHttpStatusToProviderError } from './api-football-errors.js';
 import {
   mapApiFootballFixtureStatistics,
   mapApiFootballFixtures,
@@ -98,8 +98,10 @@ export class ApiFootballProvider implements SportsDataProvider {
     if (input.team !== undefined) query.team = input.team;
     if (input.season !== undefined) query.season = input.season;
 
-    const response = await this.request('fixtures', '/fixtures', query);
-    const normalized = mapApiFootballFixtures(response.payload, response.capturedAt).slice(0, maxFixtures);
+    const responses = await this.requestFixtureDiscovery(input, query);
+    const normalized = dedupeNormalizedFixtures(responses
+      .flatMap((response) => mapApiFootballFixtures(response.payload, response.capturedAt)))
+      .slice(0, maxFixtures);
     const persisted = await this.persistence.upsertFixtures?.(normalized);
     return persisted?.map((item) => item.fixture) ?? normalized.map(fallbackFixtureFromNormalized);
   }
@@ -202,8 +204,9 @@ export class ApiFootballProvider implements SportsDataProvider {
       providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
       capturedAt: page.capturedAt,
     }));
-    const quotes = filterQuotesByBookmakerAllowlist(
-      dedupeQuotes(mappedQuotes),
+    const dedupedQuotes = dedupeQuotes(mappedQuotes);
+    const quotes = filterQuotesByBookmakerAllowlistWithFallback(
+      dedupedQuotes,
       this.config.apiFootball.bookmakerAllowlist,
     );
     const firstPage = pages[0];
@@ -215,9 +218,39 @@ export class ApiFootballProvider implements SportsDataProvider {
       bookmakerCount: countBookmakersFromQuotes(quotes),
       payloadHash: firstPage?.payloadHash ?? 'unknown',
       quotes,
+      metadata: {
+        bookmakerAllowlist: this.config.apiFootball.bookmakerAllowlist ?? [],
+        bookmakerAllowlistFallback: quotes.length > 0 && dedupedQuotes.length > 0 && quotes.length === dedupedQuotes.length
+          && normalizeBookmakerAllowlist(this.config.apiFootball.bookmakerAllowlist).size > 0
+          && filterQuotesByBookmakerAllowlist(dedupedQuotes, this.config.apiFootball.bookmakerAllowlist).length === 0,
+      } as unknown as JsonValue,
     };
 
     return await this.persistence.persistOddsSnapshot?.(snapshot) ?? snapshot;
+  }
+
+  private async requestFixtureDiscovery(
+    input: FixtureQuery,
+    query: Record<string, string | number>,
+  ): Promise<Array<ApiFootballResponse<unknown>>> {
+    try {
+      return [await this.request('fixtures', '/fixtures', query)];
+    } catch (err) {
+      if (!shouldRetryFixtureDiscoveryWithSeason(input, err)) throw err;
+      const responses: Array<ApiFootballResponse<unknown>> = [];
+      let lastError: unknown = err;
+      for (const season of inferFixtureDiscoverySeasons(input.date)) {
+        try {
+          const response = await this.request('fixtures', '/fixtures', { ...query, season });
+          responses.push(response);
+          if (apiFootballResponseHasRows(response.payload)) return responses;
+        } catch (seasonErr) {
+          lastError = seasonErr;
+        }
+      }
+      if (responses.length) return responses;
+      throw lastError;
+    }
   }
 
   private async resolveFixtureForOdds(providerFixtureId: string): Promise<Fixture> {
@@ -536,6 +569,9 @@ export async function createApiFootballPersistence(
             metadata: {
               provider: API_FOOTBALL_PROVIDER,
               quoteCount: snapshot.quotes.length,
+              ...(snapshot.metadata && typeof snapshot.metadata === 'object' && !Array.isArray(snapshot.metadata)
+                ? snapshot.metadata as Record<string, JsonValue>
+                : {}),
             },
           },
           quotes: snapshot.quotes.map((quote) => {
@@ -659,10 +695,46 @@ function countBookmakersFromQuotes(quotes: OddsQuote[]): number {
   return new Set(quotes.map((quote) => normalizeBookmakerName(quote.bookmaker ?? 'unknown'))).size;
 }
 
+function filterQuotesByBookmakerAllowlistWithFallback(quotes: OddsQuote[], allowlist: string[] | undefined): OddsQuote[] {
+  const filtered = filterQuotesByBookmakerAllowlist(quotes, allowlist);
+  if (filtered.length || !quotes.length || !normalizeBookmakerAllowlist(allowlist).size) return filtered;
+  return quotes;
+}
+
 function filterQuotesByBookmakerAllowlist(quotes: OddsQuote[], allowlist: string[] | undefined): OddsQuote[] {
   const normalizedAllowlist = normalizeBookmakerAllowlist(allowlist);
   if (!normalizedAllowlist.size) return quotes;
   return quotes.filter((quote) => isAllowedBookmaker(quote.bookmaker, normalizedAllowlist));
+}
+
+function dedupeNormalizedFixtures(fixtures: NormalizedFixture[]): NormalizedFixture[] {
+  const byProviderFixtureId = new Map<string, NormalizedFixture>();
+  for (const fixture of fixtures) byProviderFixtureId.set(fixture.providerFixtureId, fixture);
+  return [...byProviderFixtureId.values()];
+}
+
+function apiFootballResponseHasRows(payload: unknown): boolean {
+  return Boolean(payload && typeof payload === 'object' && Array.isArray((payload as { response?: unknown }).response)
+    && ((payload as { response: unknown[] }).response.length > 0));
+}
+
+function shouldRetryFixtureDiscoveryWithSeason(input: FixtureQuery, err: unknown): boolean {
+  if (input.season !== undefined || input.league === undefined) return false;
+  const text = [
+    err instanceof Error ? err.message : String(err),
+    isApiFootballProviderError(err) ? JSON.stringify(err.received) : '',
+  ].join(' ');
+  return /season/i.test(text) && /(required|require|missing|obligat)/i.test(text);
+}
+
+function inferFixtureDiscoverySeasons(date: string): number[] {
+  const year = Number(date.slice(0, 4));
+  if (!Number.isInteger(year) || year < 1900) return [];
+  return uniqueNumbers([year, year - 1, year + 1]);
+}
+
+function uniqueNumbers(values: number[]): number[] {
+  return [...new Set(values.filter((value) => Number.isInteger(value)))];
 }
 
 function normalizeBookmakerAllowlist(allowlist: string[] | undefined): Set<string> {

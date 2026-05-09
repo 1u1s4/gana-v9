@@ -455,14 +455,27 @@ function repairClaimSubject(subject: any, claimId: unknown, statement: unknown, 
     return { ...subject, market: subject.id };
   }
   if (typeof statement === 'string') {
-    const inferredMarket = ['h2h', 'double_chance', 'goals_over_under', 'corners_over_under', 'btts']
-      .find((market) => statement.includes(market));
+    const inferredMarket = inferMarketSubjectFromText(statement);
     if (isMarketKey(inferredMarket)) {
       warnings.push(`inferred market subject "${inferredMarket}" from statement on claim "${String(claimId ?? 'unknown')}"`);
       return { ...subject, market: inferredMarket };
     }
   }
   return subject;
+}
+
+function inferMarketSubjectFromText(statement: string): string | undefined {
+  const normalized = statement.toLowerCase();
+  const explicit = ['h2h', 'double_chance', 'goals_over_under', 'corners_over_under', 'btts']
+    .find((market) => normalized.includes(market));
+  if (explicit) return explicit;
+  if (/\b(match\s*winner|moneyline|home\s*win|away\s*win|draw|1x2|h2h)\b/.test(normalized)) return 'h2h';
+  if (/\b(double\s*chance|1x|x2|12)\b/.test(normalized)) return 'double_chance';
+  if (/\b(goals?|over\s*under|total\s*goals|o\/u)\b/.test(normalized)) return 'goals_over_under';
+  if (/\b(corners?|corner\s*total)\b/.test(normalized)) return 'corners_over_under';
+  if (/\b(btts|both\s+teams\s+to\s+score)\b/.test(normalized)) return 'btts';
+  if (/\b(bookmaker|odds?|market|price|implied)\b/.test(normalized)) return 'h2h';
+  return undefined;
 }
 
 async function buildAndPersistAgentFailureFallback(

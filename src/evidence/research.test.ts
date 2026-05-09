@@ -455,6 +455,32 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped conflictStatus "minor" to "potential"/);
   });
 
+  it('repairs human market subject labels such as match winner before validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      claims: [{
+        id: 'claim-1',
+        statement: 'Match winner odds show Talleres home win is priced near the market midpoint.',
+        subject: { type: 'market', market: 'match winner' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.claims[0]?.subject.market, 'h2h');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /inferred market subject "h2h"/);
+  });
+
   it('promotes objectively sufficient live research despite soft LLM review warnings', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

@@ -240,6 +240,7 @@ export async function runFixtureScoring(
     ],
   });
 
+  const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
   let llmOutput: ParsedTopPick[] | undefined;
   let rawOutput = '';
   let scoringError = '';
@@ -250,13 +251,32 @@ export async function runFixtureScoring(
         signal: input.signal,
       });
       rawOutput = result.text;
-      llmOutput = completeGateEvidence(repairTopPickReferences(
+      const repairedOutput = completeGateEvidence(repairTopPickReferences(
         parseTopPickOutput(rawOutput),
         evidenceGate,
         research.claims,
         research.evidenceItems,
         research.sources,
       ), evidenceGate, research.evidenceItems);
+      const canonicalOutput = canonicalizePicksFromOddsQuotes(repairedOutput, quoteById);
+      const topPickIssues = validateTopPicks(canonicalOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes, research.evidenceItems);
+      if (topPickIssues.length) {
+        scoringError = `Prediction LLM output failed validation: ${topPickIssues.join('; ')}`;
+        if (attempt < SCORING_AGENT_JSON_ATTEMPTS && isRetryableTopPickValidationIssue(topPickIssues)) {
+          rawOutput = '';
+          continue;
+        }
+        const blocked = blockedResult(runId, artifactWriter, {
+          error: scoringError,
+          reasons: ['invalid prediction LLM output'],
+          fixtureId: fixture.id,
+          providerFixtureId: fixture.providerFixtureId,
+          oddsSnapshotId: oddsSnapshot.id,
+        });
+        await upsertRun(config, runtime, repositories, runId, blocked.gateResult.verdict, 'failed', now());
+        return blocked;
+      }
+      llmOutput = canonicalOutput;
       break;
     } catch (err: any) {
       scoringError = err?.message ?? String(err);
@@ -288,20 +308,6 @@ export async function runFixtureScoring(
     return result;
   }
 
-  const quoteById = new Map(oddsQuotes.map((quote) => [quote.id, quote]));
-  llmOutput = canonicalizePicksFromOddsQuotes(llmOutput, quoteById);
-  const topPickIssues = validateTopPicks(llmOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes, research.evidenceItems);
-  if (topPickIssues.length) {
-    const result = blockedResult(runId, artifactWriter, {
-      error: `Prediction LLM output failed validation: ${topPickIssues.join('; ')}`,
-      reasons: ['invalid prediction LLM output'],
-      fixtureId: fixture.id,
-      providerFixtureId: fixture.providerFixtureId,
-      oddsSnapshotId: oddsSnapshot.id,
-    });
-    await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
-    return result;
-  }
   const predictions = llmOutput.map((pick) => {
     const quote = quoteById.get(pick.oddsQuoteId);
     const candidateScore = validateTopPick({
@@ -521,12 +527,17 @@ function scoringPromptForAttempt(prompt: string, attempt: number): string {
     '- return strict JSON only, starting with "{" as the first character',
     '- do not include status/progress prose such as "Estoy verificando"',
     '- include at least one persisted evidenceId from Input.evidenceItems for every prediction',
+    '- cover every market represented in Input.allowedQuotes; if a market is available, include one grounded pick for it',
     '- keep rationales concise and ground every pick in persisted oddsQuoteId plus persisted evidenceIds',
   ].join('\n');
 }
 
 function isRetryableScoringAgentError(error: string): boolean {
   return /timed out|timeout|aborted|strict JSON|Unexpected token|unterminated|not valid JSON|must include predictions array/i.test(error);
+}
+
+function isRetryableTopPickValidationIssue(issues: string[]): boolean {
+  return issues.some((issue) => /requires at least one evidenceId|omitted required market/i.test(issue));
 }
 
 function parseJsonObject(rawOutput: string): any {

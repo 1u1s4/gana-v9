@@ -608,6 +608,45 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted, false);
   });
 
+  it('repairs empty LLM evidenceIds from persisted gate evidence instead of blocking a grounded quote', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: [],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied research bundle.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'promotable');
+    assert.deepEqual(persisted[0].evidenceIds, ['evidence-1', 'evidence-2']);
+  });
+
   it('blocks invalid LLM picks that reference quotes outside the persisted odds snapshot', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

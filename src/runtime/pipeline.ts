@@ -185,8 +185,8 @@ const STORAGE_RETRY_ATTEMPTS = 3;
 const STORAGE_RETRY_DELAY_MS = 2_000;
 const RESEARCH_CONCURRENCY = 4;
 const SCORING_CONCURRENCY = 4;
-const AGENT_FIXTURE_TIMEOUT_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_TIMEOUT_MS) ?? 180_000;
-const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_ABORT_GRACE_MS) ?? 15_000;
+const AGENT_FIXTURE_TIMEOUT_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_TIMEOUT_MS) ?? 420_000;
+const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_ABORT_GRACE_MS) ?? 30_000;
 
 export async function executeRunPipeline(
   config: AgentConfig,

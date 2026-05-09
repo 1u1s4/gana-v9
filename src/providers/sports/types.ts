@@ -98,6 +98,7 @@ export interface CanonicalOddsSnapshot {
   bookmakerCount: number;
   payloadHash: string;
   quotes: OddsQuote[];
+  metadata?: JsonValue;
   quoteRecordIds?: Record<string, string>;
 }
 

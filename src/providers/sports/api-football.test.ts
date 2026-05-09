@@ -52,6 +52,31 @@ describe('api-football provider', () => {
     assert.equal(fixtureRequest.searchParams.has('season'), false);
   });
 
+  it('retries seasonless league fixture discovery with date-derived seasons when provider requires season', async () => {
+    const requests: URL[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      requests.push(url);
+      if (url.pathname === '/fixtures' && !url.searchParams.has('season')) {
+        return jsonResponse({ errors: { season: 'The season field is required.' }, response: [] });
+      }
+      if (url.pathname === '/fixtures' && url.searchParams.get('season') === '2026') {
+        return jsonResponse({ response: [apiFixture({ providerFixtureId: 1001 })] });
+      }
+      return jsonResponse({ response: [] });
+    }) as typeof fetch;
+
+    const provider = createApiFootballProvider(testConfig());
+    const fixtures = await provider.listFixtures({ date: '2026-05-01', league: 128 });
+
+    assert.equal(fixtures.length, 1);
+    assert.equal(fixtures[0].providerFixtureId, '1001');
+    assert.deepEqual(
+      requests.filter((request) => request.pathname === '/fixtures').map((request) => request.searchParams.get('season') ?? 'seasonless'),
+      ['seasonless', '2026'],
+    );
+  });
+
   it('scans fixtures for a date and returns persisted canonical odds snapshots', async () => {
     const requests: URL[] = [];
     const fixturesByProviderId = new Map<string, Fixture>();
@@ -158,6 +183,56 @@ describe('api-football provider', () => {
       ['1001'],
     );
     assert.deepEqual(capturedEndpointNames, ['fixtures', 'odds']);
+  });
+
+  it('falls back to all persisted odds quotes when the bookmaker allowlist filters a real fixture to zero quotes', async () => {
+    const fixturesByProviderId = new Map<string, Fixture>();
+    const persistedSnapshots: CanonicalOddsSnapshot[] = [];
+
+    globalThis.fetch = (async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname === '/fixtures') {
+        return jsonResponse({ response: [apiFixture({ providerFixtureId: 1001 })] });
+      }
+      if (url.pathname === '/odds') {
+        return jsonResponse({
+          paging: { current: 1, total: 1 },
+          response: [{
+            bookmakers: [{
+              id: 42,
+              name: 'Regional Book',
+              bets: [{
+                id: 1,
+                name: 'Match Winner',
+                values: [{ value: 'Home', odd: '1.80' }],
+              }],
+            }],
+          }],
+        });
+      }
+      throw new Error(`Unexpected API-Football request: ${url.toString()}`);
+    }) as typeof fetch;
+
+    const persistence: ApiFootballPersistence = {
+      upsertFixtures: async (fixtures) => fixtures.map((normalized) => {
+        const fixture = fixtureFromNormalized(normalized);
+        fixturesByProviderId.set(normalized.providerFixtureId, fixture);
+        return { normalized, fixture };
+      }),
+      resolveFixtureByProviderFixtureId: async (providerFixtureId) => fixturesByProviderId.get(providerFixtureId) ?? null,
+      persistOddsSnapshot: async (snapshot) => {
+        persistedSnapshots.push(snapshot);
+        return { ...snapshot, oddsSnapshotId: 'odds-snapshot-1' };
+      },
+    };
+
+    const provider = createApiFootballProvider(testConfig({ bookmakerAllowlist: ['Bet365'] }), persistence);
+    const results = await provider.scanOdds({ date: '2026-05-01', league: 39, maxFixtures: 1 });
+
+    assert.equal(results[0].quotes.length, 1);
+    assert.equal(results[0].quotes[0].bookmaker, 'Regional Book');
+    assert.equal(persistedSnapshots[0].bookmakerCount, 1);
+    assert.equal((persistedSnapshots[0].metadata as any).bookmakerAllowlistFallback, true);
   });
 });
 
