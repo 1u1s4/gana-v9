@@ -537,7 +537,7 @@ function isRetryableScoringAgentError(error: string): boolean {
 }
 
 function isRetryableTopPickValidationIssue(issues: string[]): boolean {
-  return issues.some((issue) => /requires at least one evidenceId|omitted required market/i.test(issue));
+  return issues.some((issue) => /requires at least one evidenceId|omitted required market|references unknown oddsQuoteId/i.test(issue));
 }
 
 function parseJsonObject(rawOutput: string): any {
@@ -751,7 +751,6 @@ function validateTopPicks(
     if (!sameNumber(pick.odds, numberValue(quote.price))) issues.push(`predictions[${index}] odds does not match odds quote`);
     if (pick.probability !== undefined && (pick.probability < 0 || pick.probability > 1)) issues.push(`predictions[${index}] probability must be between 0 and 1`);
     if (pick.confidence < 0 || pick.confidence > 1) issues.push(`predictions[${index}] confidence must be between 0 and 1`);
-    if (!pick.evidenceIds.length) issues.push(`predictions[${index}] requires at least one evidenceId`);
     for (const evidenceId of pick.evidenceIds) {
       if (!allowedEvidenceIds.has(evidenceId)) issues.push(`predictions[${index}] references unknown evidenceId "${evidenceId}"`);
     }

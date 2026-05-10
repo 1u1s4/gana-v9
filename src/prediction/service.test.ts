@@ -647,6 +647,118 @@ describe('runFixtureScoring', () => {
     assert.deepEqual(persisted[0].evidenceIds, ['evidence-1', 'evidence-2']);
   });
 
+  it('persists blocked market-covering predictions when research has no usable evidence instead of dropping the fixture', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+    const bttsQuote = {
+      ...oddsQuote,
+      id: 'odds-quote-btts',
+      marketKey: 'btts',
+      selectionKey: 'yes',
+      line: null,
+      price: 1.8,
+      impliedProbability: 0.5555555556,
+    };
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => [oddsQuote, bttsQuote] },
+        evidenceItems: { list: async () => [] },
+        claims: { list: async () => [] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.72,
+            evidenceIds: [],
+            claimIds: [],
+            rationale: 'Home selection is the best h2h angle, but evidence is unavailable.',
+            warnings: ['evidence unavailable'],
+          }, {
+            oddsQuoteId: 'odds-quote-btts',
+            market: 'btts',
+            selection: 'yes',
+            line: null,
+            odds: 1.8,
+            probability: 0.6,
+            confidence: 0.7,
+            evidenceIds: [],
+            claimIds: [],
+            rationale: 'BTTS yes is the best market angle, but evidence is unavailable.',
+            warnings: ['evidence unavailable'],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.equal(result.predictions.length, 2);
+    assert.equal(persisted.length, 2);
+    assert.deepEqual(persisted.map((prediction) => prediction.marketKey), ['h2h', 'btts']);
+    assert.deepEqual(persisted.map((prediction) => prediction.status), ['blocked', 'blocked']);
+    assert.deepEqual(persisted.map((prediction) => prediction.evidenceIds), [[], []]);
+  });
+
+  it('retries LLM picks that reference unknown oddsQuoteIds before blocking a fixture', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => {
+        attempts += 1;
+        return {
+          text: JSON.stringify({
+            predictions: [{
+              oddsQuoteId: attempts === 1 ? 'missing-quote' : 'odds-quote-1',
+              market: 'h2h',
+              selection: 'home',
+              line: null,
+              odds: 2.1,
+              probability: 0.56,
+              confidence: 0.75,
+              evidenceIds: ['evidence-1'],
+              claimIds: ['claim-1'],
+              rationale: 'Home selection is supported by the supplied evidence.',
+              warnings: [],
+            }],
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(attempts, 2);
+    assert.equal(result.ok, true);
+    assert.equal(result.predictions.length, 1);
+    assert.equal(persisted[0].oddsQuoteId, 'odds-quote-1');
+  });
+
   it('blocks invalid LLM picks that reference quotes outside the persisted odds snapshot', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
