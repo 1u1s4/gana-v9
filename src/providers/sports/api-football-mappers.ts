@@ -385,9 +385,9 @@ function mapSelection(market: MarketKey, value: string): string {
     if (normalized === 'away' || normalized === '2') return 'away';
   }
   if (market === 'double_chance') {
-    if (['home draw', 'home or draw', 'home/draw', '1x'].includes(normalized)) return 'home_or_draw';
-    if (['home away', 'home or away', 'home/away', '12'].includes(normalized)) return 'home_or_away';
-    if (['draw away', 'draw or away', 'draw/away', 'x2'].includes(normalized)) return 'draw_or_away';
+    if (['home draw', 'draw home', 'home or draw', 'draw or home', 'home/draw', 'draw/home', '1x'].includes(normalized)) return 'home_or_draw';
+    if (['home away', 'away home', 'home or away', 'away or home', 'home/away', 'away/home', '12'].includes(normalized)) return 'home_or_away';
+    if (['draw away', 'away draw', 'draw or away', 'away or draw', 'draw/away', 'away/draw', 'x2'].includes(normalized)) return 'draw_or_away';
   }
   if (market === 'goals_over_under' || market === 'corners_over_under') {
     if (normalized.startsWith('over')) return 'over';

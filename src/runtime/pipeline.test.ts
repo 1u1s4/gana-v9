@@ -73,6 +73,9 @@ function predictionRecord(input: {
   fixtureId?: string;
   providerFixtureId?: string;
   oddsQuoteId?: string;
+  market?: string;
+  selection?: string;
+  line?: number;
 }): any {
   const oddsQuoteId = input.oddsQuoteId ?? 'odds-quote-1';
   return {
@@ -80,8 +83,9 @@ function predictionRecord(input: {
     runId: input.runId,
     fixtureId: input.fixtureId ?? 'fixture-1',
     providerFixtureId: input.providerFixtureId ?? '1001',
-    market: 'h2h',
-    selection: 'home',
+    market: input.market ?? 'h2h',
+    selection: input.selection ?? 'home',
+    line: input.line,
     odds: 1.18,
     impliedProbability: 1 / 1.18,
     oddsSnapshotId: 'odds-snapshot-1',
@@ -562,13 +566,25 @@ describe('executeRunPipeline', () => {
             : [lowOddsQuoteFor(defaultTarget, { price: 1.8, impliedProbability: 1 / 1.8 })],
         };
       },
-      scoreFixture: async () => {
-        calls.push('score');
+      scoreFixture: async (_cfg, input) => {
+        calls.push(`score:${input.fixtureId}`);
+        const target = input.fixtureId === fijiTarget.providerFixtureId ? fijiTarget : defaultTarget;
+        const isFijiTarget = target.providerFixtureId === fijiTarget.providerFixtureId;
         return {
           ok: true,
           runId: 'run-global-low-odds-slate',
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
           gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
-          predictions: [],
+          predictions: isFijiTarget
+            ? [predictionRecord({
+              runId: 'run-global-low-odds-slate',
+              fixtureId: target.id,
+              providerFixtureId: target.providerFixtureId,
+              oddsQuoteId: 'odds-quote-fiji-ba',
+              selection: 'away',
+            })]
+            : [],
         };
       },
     }));
@@ -582,8 +598,10 @@ describe('executeRunPipeline', () => {
 
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
     assert.equal(evaluation.lowOddsPredictionCoverage.hits, 1);
-    assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 1);
-    assert.equal(evaluation.lowOddsPredictionCoverage.complete, false);
+    assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 0);
+    assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
+    assert.ok(calls.includes('score:1001'));
+    assert.ok(calls.includes('score:9001'));
   });
 
   it('flags incomplete low-odds prediction coverage in the run evaluation', async () => {

@@ -352,6 +352,7 @@ export async function executeRunPipeline(
   });
   writeStepSpan(config, runtime, 'odds.fetch', 'provider', quoteCount > 0 ? 'ok' : 'blocked', { quoteCount, oddsErrors });
 
+  let lowOddsCandidateFixtures: Fixture[] = [];
   const lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
     const useProviderDateSlate = !deps.discoverLowOddsFixtures
       && !deps.fetchLowOddsSnapshot
@@ -376,6 +377,7 @@ export async function executeRunPipeline(
       : await (deps.discoverLowOddsFixtures ?? deps.discoverFixtures ?? discoverFixtures)(lowOddsGlobalDiscoveryConfig(config), {
         date: input.date,
       }, runtime);
+    lowOddsCandidateFixtures = lowOddsDiscovery.fixtures;
     const fetchLowOddsSnapshotsForDate = deps.fetchLowOddsSnapshotsForDate;
     const rawLowOddsSnapshots = providerDateSlate
       ? providerDateSlate.snapshots
@@ -434,7 +436,10 @@ export async function executeRunPipeline(
   });
   writeStepSpan(config, runtime, 'low_odds.scan', 'gate', 'ok', lowOddsScan);
 
-  const selectedFixtures = fixtureDiscovery.fixtures;
+  const selectedFixtures = mergeFixtureSlates(
+    fixtureDiscovery.fixtures,
+    selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan),
+  );
 
   const researchPayload = await runDurableTask('research.fixture', 'research-results.json', async () => {
     const results = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
@@ -1162,6 +1167,18 @@ function buildLowOddsScan(
 
 function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }): boolean {
   return quote.market === 'h2h' && (quote.selection === 'home' || quote.selection === 'away');
+}
+
+function selectLowOddsHitFixtures(fixtures: Fixture[], lowOddsScan: LowOddsScanView): Fixture[] {
+  if (!fixtures.length || !lowOddsScan.hits.length) return [];
+  const hitProviderFixtureIds = new Set(lowOddsScan.hits.map((hit) => hit.providerFixtureId));
+  return fixtures.filter((fixture) => hitProviderFixtureIds.has(fixture.providerFixtureId));
+}
+
+function mergeFixtureSlates(primary: Fixture[], secondary: Fixture[]): Fixture[] {
+  const merged = new Map<string, Fixture>();
+  for (const fixture of [...primary, ...secondary]) merged.set(fixture.providerFixtureId, fixture);
+  return [...merged.values()];
 }
 
 function summarizeResultStep(

@@ -167,7 +167,7 @@ describe('api-football mappers', () => {
           name: 'Bet365',
           bets: [
             { id: 1, name: 'Match Winner', values: [{ value: 'Home', odd: '2.00' }, { value: 'Draw', odd: '3.20' }, { value: 'Away', odd: '3.80' }] },
-            { id: 12, name: 'Double Chance', values: [{ value: 'Home or Draw', odd: '1.20' }, { value: 'Home/Away', odd: '1.30' }, { value: 'Draw/Away', odd: '1.70' }] },
+            { id: 12, name: 'Double Chance', values: [{ value: 'Draw/Home', odd: '1.20' }, { value: 'Away/Home', odd: '1.30' }, { value: 'Away/Draw', odd: '1.70' }] },
             { id: 5, name: 'Goals Over/Under', values: [{ value: 'Over 2.5', odd: '1.91' }, { value: 'Under 2.5', odd: '1.95' }] },
             { name: 'Corners Over Under', values: [{ value: 'Over 9.5', odd: '1.85' }, { value: 'Under 9.5', odd: '1.85' }] },
             { id: 8, name: 'Both Teams Score', values: [{ value: 'Yes', odd: '1.75' }, { value: 'No', odd: '2.05' }] },
