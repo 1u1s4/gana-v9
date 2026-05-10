@@ -254,6 +254,69 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames, ['parlay-portfolio.json', 'parlays.json']);
   });
 
+  it('builds a low-odds-top portfolio from the highest-confidence low-priced predictions', async () => {
+    const cfg = config({ apiFootball: { lowOddsThreshold: 1.2 } });
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    let artifactPayload: any;
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-10',
+      sourceRunId: 'source-run-low-odds',
+      portfolio: 'low-odds-top',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name, payload) => {
+        if (name === 'parlay-low-odds-top.json') artifactPayload = payload;
+        return `/tmp/${name}`;
+      },
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-low-odds');
+            assert.deepEqual(query.status, ['candidate', 'review-required', 'promotable']);
+            return [
+              prediction({ id: 'top-1', runId: 'source-run-low-odds', fixtureId: 'fixture-1', odds: 1.16, confidence: 0.91, status: 'promotable', edge: 0.04 }),
+              prediction({ id: 'top-2', runId: 'source-run-low-odds', fixtureId: 'fixture-2', odds: 1.18, confidence: 0.9, status: 'candidate', edge: 0.03 }),
+              prediction({ id: 'top-3', runId: 'source-run-low-odds', fixtureId: 'fixture-3', odds: 1.19, confidence: 0.89, status: 'promotable', edge: 0.03 }),
+              prediction({ id: 'top-4', runId: 'source-run-low-odds', fixtureId: 'fixture-4', odds: 1.12, confidence: 0.88, status: 'promotable', edge: 0.03 }),
+              prediction({ id: 'top-5', runId: 'source-run-low-odds', fixtureId: 'fixture-5', odds: 1.15, confidence: 0.87, status: 'candidate', edge: 0.03 }),
+              prediction({ id: 'not-low-odds', runId: 'source-run-low-odds', fixtureId: 'fixture-6', odds: 1.35, confidence: 0.99, status: 'promotable', edge: 0.2 }),
+              prediction({ id: 'hard-warning', runId: 'source-run-low-odds', fixtureId: 'fixture-7', odds: 1.14, confidence: 0.99, status: 'review-required', edge: 0.05, warnings: ['research is not promotable'] }),
+              prediction({ id: 'negative-edge', runId: 'source-run-low-odds', fixtureId: 'fixture-8', odds: 1.1, confidence: 0.98, status: 'promotable', edge: -0.01 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => {
+            throw new Error('low-odds-top portfolio builds must be source-run scoped');
+          },
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-low-odds-top' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.profiles[0]?.profile, 'low-odds-top');
+    assert.equal(result.portfolio?.profiles[0]?.included, 6);
+    assert.equal(result.portfolio?.parlays.length, 6);
+    assert.deepEqual(
+      result.portfolio?.parlays[0]?.build.parlay.legs.map((leg) => leg.predictionId),
+      ['top-1', 'top-2'],
+    );
+    assert.equal(result.portfolio?.parlays.some((entry) => entry.build.parlay.legs.some((leg) => leg.predictionId === 'not-low-odds')), false);
+    assert.equal(result.portfolio?.parlays.some((entry) => entry.build.parlay.legs.some((leg) => leg.predictionId === 'hard-warning')), false);
+    assert.equal(result.portfolio?.parlays.some((entry) => entry.build.parlay.legs.some((leg) => leg.predictionId === 'negative-edge')), false);
+    assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'low-odds-top');
+    assert.equal(persisted[0].parlay.metadata.lowOddsThreshold, 1.2);
+    assert.equal(artifactPayload.portfolio.profiles[0].profile, 'low-odds-top');
+  });
+
   it('keeps LLM portfolio risk notes informational when legs are promotable', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

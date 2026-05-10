@@ -50,9 +50,22 @@ const PORTFOLIO_PROFILES = [
   { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
   { key: 'review', label: 'Revision', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.2, targetParlays: 3, minConfidence: PORTFOLIO_REVIEW_MIN_CONFIDENCE, maxReviewOrWarningLegs: 99, allowDrawExposure: true, reviewOnly: true },
 ] as const;
+const LOW_ODDS_TOP_PROFILE = {
+  key: 'low-odds-top',
+  label: 'Low odds top',
+  minLegs: 2,
+  maxLegs: 5,
+  minOdds: 1.25,
+  maxOdds: 3.5,
+  targetParlays: 6,
+  minConfidence: 0.7,
+  maxReviewOrWarningLegs: 1,
+  allowDrawExposure: false,
+  reviewOnly: false,
+} as const;
 
-type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'];
-type ParlayPortfolioProfileSpec = typeof PORTFOLIO_PROFILES[number];
+type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'] | typeof LOW_ODDS_TOP_PROFILE['key'];
+type ParlayPortfolioProfileSpec = typeof PORTFOLIO_PROFILES[number] | typeof LOW_ODDS_TOP_PROFILE;
 
 interface ParsedPortfolioParlay {
   title?: string;
@@ -79,7 +92,7 @@ type PortfolioValidationResult =
 export interface RunParlayBuildInput {
   date: string;
   sourceRunId?: string;
-  portfolio?: 'llm';
+  portfolio?: 'llm' | 'low-odds-top';
   configOverrides?: ParlayConfig;
 }
 
@@ -222,6 +235,9 @@ export async function runParlayBuild(
   const repositories = deps.repositories ?? defaultRepositories();
   if (input.portfolio === 'llm') {
     return runParlayPortfolio(config, input, runtime, repositories, artifactWriter, deps, now);
+  }
+  if (input.portfolio === 'low-odds-top') {
+    return runLowOddsTopPortfolio(config, input, runtime, repositories, artifactWriter, deps, now);
   }
 
   const predictionQuery = {
@@ -520,6 +536,158 @@ async function runParlayPortfolio(
     const result = blockedResult(runId, input, artifactWriter, generatedAt, {
       error,
       reasons: ['parlay portfolio persistence failed'],
+    });
+    await upsertRun(config, runtime, repositories, runId, 'blocked', 'failed', now(), date).catch(() => undefined);
+    return { ...result, portfolio, error };
+  }
+}
+
+async function runLowOddsTopPortfolio(
+  config: AgentConfig,
+  input: RunParlayBuildInput,
+  runtime: RuntimeContext,
+  repositories: ParlayServiceRepositories,
+  artifactWriter: (runId: string, name: string, payload: unknown) => string,
+  deps: ParlayBuildDependencies,
+  now: () => Date,
+): Promise<ParlayBuildRunResult> {
+  const runId = runtime.runId ?? randomUUID();
+  runtime.runId = runId;
+  const sourceRunId = input.sourceRunId;
+  const generatedAt = now().toISOString();
+  const date = input.date;
+  if (!sourceRunId) {
+    return blockedResult(runId, input, artifactWriter, generatedAt, {
+      error: '--run-id is required when --portfolio low-odds-top is used.',
+      reasons: ['missing source run id'],
+    });
+  }
+
+  const threshold = config.apiFootball.lowOddsThreshold;
+  const records = await repositories.predictions.list({
+    runId: sourceRunId,
+    status: PORTFOLIO_PREDICTION_STATUSES,
+    take: 500,
+  });
+  const sourcePredictions = records.map(toSourcePrediction);
+  const decoratedPredictions = sourcePredictions.map(decoratePortfolioPrediction);
+  const excludedReasons = decoratedPredictions
+    .map((prediction) => ({ predictionId: prediction.id, reasons: lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold) }))
+    .filter((item) => item.reasons.length > 0);
+  const pool = decoratedPredictions.filter((prediction) => lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold).length === 0);
+  const portfolioId = randomUUID();
+  const usedSignatures = new Set<string>();
+  const fills = generateDeterministicPortfolioFills({
+    profile: LOW_ODDS_TOP_PROFILE,
+    pool,
+    usedSignatures,
+    generatedAt,
+    sourceRunId,
+    needed: LOW_ODDS_TOP_PROFILE.targetParlays,
+  });
+  const builds: PortfolioBuild[] = [];
+  for (const validation of fills) {
+    usedSignatures.add(validation.signature);
+    builds.push({ profile: validation.profile, build: validation.build });
+  }
+  const warnings = builds.length
+    ? [`deterministic low-odds-top selected ${builds.length} parlay(s) from predictions with odds <= ${threshold}`]
+    : [`low-odds-top pool has ${pool.length} eligible prediction(s); ${LOW_ODDS_TOP_PROFILE.minLegs} required`];
+  const portfolio: ParlayPortfolio = {
+    id: portfolioId,
+    sourceRunId,
+    promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
+    profiles: [{
+      profile: LOW_ODDS_TOP_PROFILE.key,
+      promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
+      requested: LOW_ODDS_TOP_PROFILE.targetParlays,
+      included: builds.length,
+      rejected: 0,
+      warnings,
+    }],
+    parlays: builds,
+    rejected: [],
+    diagnostics: {
+      sourcePredictions: sourcePredictions.length,
+      pool: [{
+        profile: LOW_ODDS_TOP_PROFILE.key,
+        eligible: pool.length,
+        excluded: excludedReasons.length,
+        excludedReasons,
+      }],
+      agentOutputs: [{
+        profile: LOW_ODDS_TOP_PROFILE.key,
+        rawOutput: '',
+        noParlayReason: builds.length ? undefined : warnings[0],
+        warnings,
+      }],
+    },
+  };
+  const gateResult = gateFromPortfolio(portfolio);
+  const representativeBuild = builds[0]?.build ?? buildParlay({
+    id: randomUUID(),
+    sourceRunId,
+    generatedAt,
+    predictions: [],
+    config: {
+      minLegs: LOW_ODDS_TOP_PROFILE.minLegs,
+      maxLegs: LOW_ODDS_TOP_PROFILE.maxLegs,
+      minPredictionConfidence: LOW_ODDS_TOP_PROFILE.minConfidence,
+    },
+  });
+  const artifactPayload = portfolioArtifactPayloadFor(runId, date, generatedAt, portfolio, gateResult);
+  const artifactPath = artifactWriter(
+    runId,
+    builds.length ? 'parlay-low-odds-top.json' : 'parlay-low-odds-top-blocked.json',
+    artifactPayload,
+  );
+  if (builds.length) {
+    artifactWriter(
+      runId,
+      'parlays.json',
+      artifactPayloadFor(runId, date, generatedAt, representativeBuild, gateFromBuild(representativeBuild)),
+    );
+  }
+
+  try {
+    await upsertRun(config, runtime, repositories, runId, gateResult.verdict, gateResult.verdict === 'blocked' ? 'failed' : 'succeeded', now(), date);
+    const artifact = await (deps.persistArtifact ?? defaultPersistArtifact(repositories))({
+      runId,
+      path: artifactPath,
+      payload: artifactPayload,
+      date,
+    });
+    const persistedParlayIds: string[] = [];
+    for (const entry of builds) {
+      const persisted = await (deps.persistParlay ?? defaultPersistParlay(repositories))({
+        parlay: toParlayInput(entry.build, runId, artifact?.id ?? null, date, {
+          portfolioId,
+          portfolioProfile: entry.profile,
+          sourceRunId,
+          promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
+          lowOddsThreshold: threshold,
+        }),
+        legs: entry.build.parlay.legs.map(toParlayLegInput),
+      });
+      if (persisted?.id) persistedParlayIds.push(persisted.id);
+    }
+
+    return {
+      ok: gateResult.verdict !== 'blocked',
+      runId,
+      date,
+      gateResult,
+      build: representativeBuild,
+      portfolio,
+      persistedParlayId: persistedParlayIds[0],
+      persistedParlayIds,
+      artifactPath,
+    };
+  } catch (err: any) {
+    const error = err?.message ?? String(err);
+    const result = blockedResult(runId, input, artifactWriter, generatedAt, {
+      error,
+      reasons: ['low-odds-top portfolio persistence failed'],
     });
     await upsertRun(config, runtime, repositories, runId, 'blocked', 'failed', now(), date).catch(() => undefined);
     return { ...result, portfolio, error };
@@ -1038,6 +1206,18 @@ function portfolioPoolExclusionReasons(
     reasons.push('fragile low-price double chance with low edge');
   }
   return reasons;
+}
+
+function lowOddsTopPoolExclusionReasons(
+  prediction: ParlaySourcePrediction,
+  profile: ParlayPortfolioProfileSpec,
+  threshold: number,
+): string[] {
+  const reasons = portfolioPoolExclusionReasons(prediction, profile);
+  if (prediction.odds > threshold) reasons.push(`above low-odds threshold ${threshold}`);
+  if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
+  if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
+  return [...new Set(reasons)];
 }
 
 function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {

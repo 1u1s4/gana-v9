@@ -150,6 +150,7 @@ describe('headless parlay command', () => {
 
     assert.match(output, /pnpm gana parlay --date YYYY-MM-DD/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio llm/);
+    assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top/);
   });
 });
 

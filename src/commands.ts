@@ -543,12 +543,13 @@ async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags:
 
 async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
   const portfolio = optionalStringFlag(flags, 'portfolio');
-  if (portfolio !== undefined && portfolio !== 'llm') throw new Error('--portfolio must be llm when provided.');
-  if (portfolio === 'llm') {
+  if (portfolio !== undefined && portfolio !== 'llm' && portfolio !== 'low-odds-top') throw new Error('--portfolio must be llm or low-odds-top when provided.');
+  if (portfolio === 'llm' || portfolio === 'low-odds-top') {
+    const selectedPortfolio: 'llm' | 'low-odds-top' = portfolio;
     const input = {
       date: typeof flags.date === 'string' ? requireDateFlag(flags) : formatLocalDate(new Date()),
       sourceRunId: requireStringFlag(flags, 'run-id'),
-      portfolio: 'llm' as const,
+      portfolio: selectedPortfolio,
       configOverrides: optionalParlayConfig(flags),
     };
     const service = await loadOptionalRunService();
@@ -1921,6 +1922,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana score --fixture-id ID --web live${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
