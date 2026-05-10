@@ -353,88 +353,101 @@ export async function executeRunPipeline(
   writeStepSpan(config, runtime, 'odds.fetch', 'provider', quoteCount > 0 ? 'ok' : 'blocked', { quoteCount, oddsErrors });
 
   let lowOddsCandidateFixtures: Fixture[] = [];
-  const lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
-    const useProviderDateSlate = !deps.discoverLowOddsFixtures
-      && !deps.fetchLowOddsSnapshot
-      && !deps.fetchOddsSnapshot
-      && !deps.fetchLowOddsSnapshotsForDate;
-    const providerDateSlate = useProviderDateSlate
-      ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime))
-      : undefined;
-    const lowOddsDiscovery = providerDateSlate
-      ? {
-        fixtures: providerDateSlate.fixtures,
-        evaluations: providerDateSlate.fixtures.map((fixture) => ({
-          fixtureId: fixture.id,
-          providerFixtureId: fixture.providerFixtureId,
-          includedReasons: ['included-by-manual-query' as const],
-          excludedReasons: [],
-          eligible: true as const,
-        })),
-        requestedLeagues: [],
-        requestedTeams: [],
-      }
-      : await (deps.discoverLowOddsFixtures ?? deps.discoverFixtures ?? discoverFixtures)(lowOddsGlobalDiscoveryConfig(config), {
-        date: input.date,
-      }, runtime);
-    lowOddsCandidateFixtures = lowOddsDiscovery.fixtures;
-    const fetchLowOddsSnapshotsForDate = deps.fetchLowOddsSnapshotsForDate;
-    const rawLowOddsSnapshots = providerDateSlate
-      ? providerDateSlate.snapshots
-      : fetchLowOddsSnapshotsForDate
-        ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime))
-        : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
-          try {
-            return await retryStorageConnection(() => (
-              deps.fetchLowOddsSnapshot ?? deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
-            )(config, fixture.providerFixtureId, runtime));
-          } catch (err: any) {
-            return {
-              fixtureId: fixture.id,
-              providerFixtureId: fixture.providerFixtureId,
-              quotes: [],
-              error: err?.message ?? String(err),
-            };
-          }
-        });
-    const lowOddsSnapshots = rawLowOddsSnapshots.map((snapshot) => ({
-      fixtureId: snapshot.fixtureId,
-      providerFixtureId: snapshot.providerFixtureId,
-      oddsSnapshotId: 'oddsSnapshotId' in snapshot ? snapshot.oddsSnapshotId : undefined,
-      providerSnapshotId: 'providerSnapshotId' in snapshot ? snapshot.providerSnapshotId : undefined,
-      quoteRecordIds: 'quoteRecordIds' in snapshot ? snapshot.quoteRecordIds : undefined,
-      quotes: snapshot.quotes,
-      ...('error' in snapshot && typeof snapshot.error === 'string' ? { error: snapshot.error } : {}),
-    }));
-    const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots);
-    if (repositories.lowOddsScans && repositories.lowOddsHits) {
-      try {
-        scan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
-          runId,
+  let lowOddsScanStepWarning: string | undefined;
+  let lowOddsScan: LowOddsScanView;
+  try {
+    lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
+      const useProviderDateSlate = !deps.discoverLowOddsFixtures
+        && !deps.fetchLowOddsSnapshot
+        && !deps.fetchOddsSnapshot
+        && !deps.fetchLowOddsSnapshotsForDate;
+      const providerDateSlate = useProviderDateSlate
+        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime))
+        : undefined;
+      const lowOddsDiscovery = providerDateSlate
+        ? {
+          fixtures: providerDateSlate.fixtures,
+          evaluations: providerDateSlate.fixtures.map((fixture) => ({
+            fixtureId: fixture.id,
+            providerFixtureId: fixture.providerFixtureId,
+            includedReasons: ['included-by-manual-query' as const],
+            excludedReasons: [],
+            eligible: true as const,
+          })),
+          requestedLeagues: [],
+          requestedTeams: [],
+        }
+        : await (deps.discoverLowOddsFixtures ?? deps.discoverFixtures ?? discoverFixtures)(lowOddsGlobalDiscoveryConfig(config), {
           date: input.date,
-          threshold: config.apiFootball.lowOddsThreshold,
-          markets: config.apiFootball.defaultMarkets,
-          bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
-          fixtureCount: lowOddsDiscovery.fixtures.length,
-          hits: scan.hits,
-          fixtureEvaluations: scan.fixtureEvaluations,
-          requestedLeagues: lowOddsDiscovery.requestedLeagues,
-          requestedTeams: lowOddsDiscovery.requestedTeams,
-        });
-      } catch (err) {
-        if (config.databaseUrl) throw err;
+        }, runtime);
+      lowOddsCandidateFixtures = lowOddsDiscovery.fixtures;
+      const fetchLowOddsSnapshotsForDate = deps.fetchLowOddsSnapshotsForDate;
+      const rawLowOddsSnapshots = providerDateSlate
+        ? providerDateSlate.snapshots
+        : fetchLowOddsSnapshotsForDate
+          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime))
+          : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
+            try {
+              return await retryStorageConnection(() => (
+                deps.fetchLowOddsSnapshot ?? deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
+              )(config, fixture.providerFixtureId, runtime));
+            } catch (err: any) {
+              return {
+                fixtureId: fixture.id,
+                providerFixtureId: fixture.providerFixtureId,
+                quotes: [],
+                error: err?.message ?? String(err),
+              };
+            }
+          });
+      const lowOddsSnapshots = rawLowOddsSnapshots.map((snapshot) => ({
+        fixtureId: snapshot.fixtureId,
+        providerFixtureId: snapshot.providerFixtureId,
+        oddsSnapshotId: 'oddsSnapshotId' in snapshot ? snapshot.oddsSnapshotId : undefined,
+        providerSnapshotId: 'providerSnapshotId' in snapshot ? snapshot.providerSnapshotId : undefined,
+        quoteRecordIds: 'quoteRecordIds' in snapshot ? snapshot.quoteRecordIds : undefined,
+        quotes: snapshot.quotes,
+        ...('error' in snapshot && typeof snapshot.error === 'string' ? { error: snapshot.error } : {}),
+      }));
+      const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots);
+      if (repositories.lowOddsScans && repositories.lowOddsHits) {
+        try {
+          scan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
+            runId,
+            date: input.date,
+            threshold: config.apiFootball.lowOddsThreshold,
+            markets: config.apiFootball.defaultMarkets,
+            bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
+            fixtureCount: lowOddsDiscovery.fixtures.length,
+            hits: scan.hits,
+            fixtureEvaluations: scan.fixtureEvaluations,
+            requestedLeagues: lowOddsDiscovery.requestedLeagues,
+            requestedTeams: lowOddsDiscovery.requestedTeams,
+          });
+        } catch (err) {
+          if (config.databaseUrl) throw err;
+        }
       }
-    }
-    writeJsonArtifact(config, runId, 'low-odds-scan.json', scan);
-    return scan;
-  });
+      writeJsonArtifact(config, runId, 'low-odds-scan.json', scan);
+      return scan;
+    });
+  } catch (err: any) {
+    lowOddsScanStepWarning = errorMessage(err);
+    lowOddsCandidateFixtures = fixtureDiscovery.fixtures;
+    lowOddsScan = emptyLowOddsScan(input.date, config.apiFootball.lowOddsThreshold);
+    writeJsonArtifact(config, runId, 'low-odds-scan.json', {
+      ...lowOddsScan,
+      status: 'blocked',
+      error: lowOddsScanStepWarning,
+    });
+  }
   steps.push({
     name: 'scan low odds',
-    ok: true,
-    verdict: 'promotable',
-    warnings: [],
+    ok: !lowOddsScanStepWarning,
+    verdict: lowOddsScanStepWarning ? 'review-required' : 'promotable',
+    warnings: lowOddsScanStepWarning ? [lowOddsScanStepWarning] : [],
   });
-  writeStepSpan(config, runtime, 'low_odds.scan', 'gate', 'ok', lowOddsScan);
+  writeStepSpan(config, runtime, 'low_odds.scan', 'gate', lowOddsScanStepWarning ? 'blocked' : 'ok', lowOddsScanStepWarning ? { ...lowOddsScan, error: lowOddsScanStepWarning } : lowOddsScan);
 
   const selectedFixtures = mergeFixtureSlates(
     fixtureDiscovery.fixtures,
@@ -563,6 +576,8 @@ export async function executeRunPipeline(
     } catch (err: any) {
       validation = blockedValidationResult(config, runId, input.date, err);
     }
+  } else {
+    await markDurableTaskSkipped(config, runId, durableTasks, repositories, 'validation.run', validationSkipReason);
   }
   if (validation) {
     steps.push({
@@ -637,7 +652,7 @@ export async function executeRunPipeline(
   }).catch(() => undefined);
 
   const exported = await runDurableTask('evidence_pack.export', undefined, async () => (
-    exportRunArtifacts(config, { runId }, runtime, { ...deps, repositories })
+    (deps.exportArtifacts ?? exportRunArtifacts)(config, { runId }, runtime, { ...deps, repositories })
   ));
   writeStepSpan(config, runtime, 'evidence_pack.export', 'gate', exported.ok ? 'ok' : 'error', exported);
   return {
@@ -766,8 +781,12 @@ function createPipelineTaskRunner(
     if (!task) return handler();
     const checkpointPath = checkpointName ? join(createRunArtifactDir(config, runId), checkpointName) : undefined;
     if (task.status === 'succeeded' && checkpointPath && existsSync(checkpointPath)) {
-      const checkpoint = readJsonIfExists(checkpointPath);
+      const checkpoint = readJsonCheckpoint(checkpointPath);
       if (checkpoint !== undefined) return checkpoint as T;
+      task.status = 'queued';
+      task.outputArtifactId = undefined;
+      task.gateResult = { verdict: 'review-required', reason: `checkpoint ${checkpointName} is unreadable; rerunning task` };
+      writeDurableTasks(config, runId, tasks);
     }
 
     const previousTaskId = runtime.taskId;
@@ -825,6 +844,37 @@ function pipelineTaskPath(config: AgentConfig, runId: string): string {
 
 function writeDurableTasks(config: AgentConfig, runId: string, tasks: DurableTask[]): void {
   writeArtifact(config, runId, 'tasks.json', tasks);
+}
+
+async function markDurableTaskSkipped(
+  config: AgentConfig,
+  runId: string,
+  tasks: DurableTask[],
+  repositories: PipelineRepositories,
+  type: CanonicalTaskType,
+  reason: string | undefined,
+): Promise<void> {
+  const task = tasks.find((candidate) => candidate.type === type);
+  if (!task || task.status === 'succeeded') return;
+  task.status = 'succeeded';
+  task.leaseExpiresAt = undefined;
+  task.lastErrorRedacted = undefined;
+  task.gateResult = { verdict: 'promotable', reason: `skipped:${reason ?? 'not-run'}` };
+  writeDurableTasks(config, runId, tasks);
+  await repositories.harnessTasks?.updateStatus?.(task.taskId, {
+    status: 'succeeded',
+    leaseExpiresAt: null,
+    attempts: task.attempts,
+    lastErrorRedacted: null,
+  }).catch(() => undefined);
+}
+
+function readJsonCheckpoint(path: string): unknown | undefined {
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return undefined;
+  }
 }
 
 export async function exportRunArtifacts(

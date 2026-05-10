@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -416,6 +416,74 @@ describe('executeRunPipeline', () => {
     assert.match(readFileSync(result.handoffPath, 'utf-8'), /handoff\.parlay: no-parlay-today/);
   });
 
+  it('uses injected artifact exporter on successful runs', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const calls: string[] = [];
+    const exportCalls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, {
+      ...successfulPipelineDeps({
+        target,
+        calls,
+        runId: 'run-injected-exporter',
+        date: '2026-04-29',
+      }),
+      exportArtifacts: async (_config, input) => {
+        exportCalls.push(input.runId);
+        return {
+          ok: true,
+          runId: input.runId,
+          artifactDir: '/tmp/custom-artifact-dir',
+          evidencePackPath: '/tmp/custom-evidence-pack.json',
+          handoffPath: '/tmp/custom-handoff.md',
+          manifestPath: '/tmp/custom-evidence-pack.json',
+        };
+      },
+    });
+
+    assert.deepEqual(exportCalls, ['run-injected-exporter']);
+    assert.equal(result.evidencePackPath, '/tmp/custom-evidence-pack.json');
+    assert.equal(result.handoffPath, '/tmp/custom-handoff.md');
+  });
+
+  it('continues with primary slate when low-odds scan fails', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const calls: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-low-odds-degraded',
+      date: '2026-04-29',
+      discoverLowOddsFixtures: async () => {
+        throw new Error('low odds provider unavailable');
+      },
+    }));
+
+    assert.equal(result.status, 'succeeded');
+    assert.equal(result.verdict, 'review-required');
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
+    assert.equal(result.fixtures.length, 1);
+    assert.equal(result.lowOddsScan.hitCount, 0);
+
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    const lowOddsStep = evaluation.steps.find((step: any) => step.name === 'scan low odds');
+    assert.equal(lowOddsStep.ok, false);
+    assert.equal(lowOddsStep.verdict, 'review-required');
+    assert.match(lowOddsStep.warnings.join('\n'), /low odds provider unavailable/);
+    assert.ok(existsSync(result.handoffPath));
+  });
+
   it('exports review-required parlays with real legs as analytical review candidates in handoff', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
@@ -504,6 +572,38 @@ describe('executeRunPipeline', () => {
     assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
     assert.equal(second.scoring.length, 1);
     assert.equal(second.parlay?.runId, 'run-resume-checkpoint');
+  });
+
+  it('reruns completed tasks when their checkpoint JSON is corrupt', async () => {
+    const config = testConfig();
+    const target = fixture();
+    const calls: string[] = [];
+    const deps = successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-corrupt-checkpoint',
+      date: '2026-04-29',
+    });
+
+    const firstRuntime = createRuntimeContext(config, 'session.jsonl');
+    const first = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, firstRuntime, deps);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
+
+    writeFileSync(join(first.artifactDir, 'fixtures.json'), '{not valid json');
+
+    const secondRuntime = createRuntimeContext(config, 'session-2.jsonl');
+    const second = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      runId: 'run-corrupt-checkpoint',
+      validate: false,
+    }, secondRuntime, deps);
+
+    assert.equal(second.runId, first.runId);
+    assert.equal(second.fixtures.length, 1);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay', 'fixtures']);
   });
 
   it('scans low odds across the full date slate instead of only default league fixtures', async () => {
@@ -941,11 +1041,15 @@ describe('executeRunPipeline', () => {
     assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
 
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    const tasks = JSON.parse(readFileSync(join(result.artifactDir, 'tasks.json'), 'utf-8'));
+    const validationTask = tasks.find((task: any) => task.type === 'validation.run');
     assert.equal(evaluation.counts.validations, 0);
     assert.equal(evaluation.validation.mode, 'auto');
     assert.equal(evaluation.validation.status, 'skipped');
     assert.equal(evaluation.validation.reason, 'future-date');
     assert.equal(evaluation.validation.validations, 0);
+    assert.equal(validationTask.status, 'succeeded');
+    assert.equal(validationTask.gateResult.reason, 'skipped:future-date');
 
     const handoff = readFileSync(result.handoffPath, 'utf-8');
     assert.match(handoff, /validationStatus: skipped \(future-date\)/);

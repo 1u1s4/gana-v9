@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import {
   predictionCandidateSchema,
@@ -86,5 +87,13 @@ describe('prediction schemas', () => {
     });
 
     assert.equal(result.success, true);
+  });
+
+  it('keeps LLM output schema permissive for blocked picks without usable evidence', () => {
+    const schema = JSON.parse(readFileSync('skills/score-prediction-v1/output.schema.json', 'utf-8'));
+    const evidenceIds = schema.properties.predictions.items.properties.evidenceIds;
+
+    assert.equal(evidenceIds.type, 'array');
+    assert.equal('minItems' in evidenceIds, false);
   });
 });

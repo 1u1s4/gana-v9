@@ -138,22 +138,28 @@ function redactParlayLegInput(input: Omit<ParlayLegInput, 'parlayId' | 'legIndex
 export function createParlayLegRepository(db: Pick<StoragePrismaClient, 'parlayLeg'>) {
   return {
     create(input: ParlayLegInput): Promise<ParlayLegRecord> {
+      const { parlayId, legIndex, ...data } = input;
       return db.parlayLeg.create({
         data: compactData({
           status: 'pending',
-          ...input,
+          ...redactParlayLegInput(data),
+          parlayId,
+          legIndex,
         }),
       });
     },
 
     createMany(inputs: ParlayLegInput[], skipDuplicates = true): Promise<PrismaBatchPayload> {
       return db.parlayLeg.createMany({
-        data: inputs.map((input) =>
-          compactData({
+        data: inputs.map((input) => {
+          const { parlayId, legIndex, ...data } = input;
+          return compactData({
             status: 'pending',
-            ...input,
-          }),
-        ),
+            ...redactParlayLegInput(data),
+            parlayId,
+            legIndex,
+          });
+        }),
         skipDuplicates,
       });
     },

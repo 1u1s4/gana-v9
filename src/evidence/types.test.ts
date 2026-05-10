@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import {
   evidenceItemSchema,
@@ -64,5 +65,13 @@ describe('research evidence schemas', () => {
     });
 
     assert.equal(result.success, true);
+  });
+
+  it('allows market subject keys in the LLM output schema', () => {
+    const schema = JSON.parse(readFileSync('skills/research-fixture-v2/output.schema.json', 'utf-8'));
+    const subject = schema.properties.claims.items.properties.subject;
+
+    assert.equal(subject.additionalProperties, false);
+    assert.deepEqual(subject.properties.market.enum, ['h2h', 'double_chance', 'goals_over_under', 'corners_over_under', 'btts']);
   });
 });

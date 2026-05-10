@@ -1,7 +1,7 @@
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { Prisma, PrismaClient } from '@prisma/client';
-import { fixtureDateRange } from '../storage/repositories/helpers.js';
+import { fixtureDateRange, redactText } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
 import type { AgentConfig } from '../config.js';
 import { dashboardHtml } from './page.js';
@@ -127,7 +127,7 @@ export async function startDashboardServer(
     } catch (err: unknown) {
       return sendJson(res, 500, {
         error: 'dashboard_error',
-        message: err instanceof Error ? err.message : String(err),
+        message: redactText(err instanceof Error ? err.message : String(err)) ?? 'dashboard request failed',
       });
     }
   });

@@ -495,6 +495,33 @@ describe('dashboard endpoints', () => {
     });
   });
 
+  it('redacts raw dashboard error messages before returning JSON', async () => {
+    const db = {
+      ...createDashboardDb(),
+      $queryRaw: async () => {
+        throw new Error('connect failed mysql://user:secret-dashboard-pass@example.test/db Authorization: Bearer secret-dashboard-token');
+      },
+    } as any;
+    const server = await startDashboardServer(config, { host: '127.0.0.1', port: 0 }, db);
+    const address = server.server.address();
+    const port = typeof address === 'object' && address ? address.port : 4317;
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/health`);
+      assert.equal(response.status, 500);
+      const payload = await response.json();
+      assert.equal(payload.error, 'dashboard_error');
+      assert.match(payload.message, /\[REDACTED\]/);
+      assert.doesNotMatch(payload.message, /secret-dashboard-pass|secret-dashboard-token/);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
+  });
+
   it('serves overview and entity routes', async () => {
     await withServer(async (base) => {
       const overview = await fetch(`${base}/api/overview?tab=parlays&page=1&take=10&sort=combinedOdds&direction=desc`);

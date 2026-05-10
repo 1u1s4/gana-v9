@@ -541,7 +541,8 @@ function aggregateParlayStatus(statuses: ValidationStatus[]): ValidationStatus {
   if (statuses.includes('pending')) return 'pending';
   if (statuses.every((status) => status === 'won')) return 'won';
   if (statuses.every((status) => status === 'voided')) return 'voided';
-  if (statuses.every((status) => status === 'won' || status === 'push' || status === 'voided')) return 'push';
+  if (statuses.some((status) => status === 'won') && statuses.every((status) => status === 'won' || status === 'push' || status === 'voided')) return 'won';
+  if (statuses.every((status) => status === 'push' || status === 'voided')) return 'push';
   return 'error';
 }
 

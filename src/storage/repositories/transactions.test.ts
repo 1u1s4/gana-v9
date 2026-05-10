@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createResearchBundleRepository } from './evidence.js';
-import { createParlayRepository } from './parlays.js';
+import { createParlayLegRepository, createParlayRepository } from './parlays.js';
 import { createPredictionRepository } from './predictions.js';
 import { createOddsSnapshotRepository } from './snapshots.js';
 import { createValidationArtifactRepository } from './validation.js';
@@ -131,6 +131,10 @@ describe('compound storage writes', () => {
         persisted.push(args.data);
         return { id: args.data.id ?? 'created-1', ...args.data, createdAt: now, updatedAt: now };
       },
+      createMany: async (args: any) => {
+        persisted.push(...args.data);
+        return { count: args.data.length };
+      },
     };
 
     await createPredictionRepository({ prediction: redactingDelegate as any }).create({
@@ -153,12 +157,36 @@ describe('compound storage writes', () => {
       status: 'blocked',
       reason: 'x-apisports-key secret-key',
       resultInput: { cookie: 'session=secret-cookie' },
-      outcome: { reason: 'OPENAI_API_KEY=sk-1234567890abcdef' },
-      metadata: { databaseUrl: 'mysql://user:secret-pass@example.test/db' },
+      outcome: { reason: 'OPENAI_API_KEY=sk-123...cdef' },
+      metadata: { databaseUrl: 'mysql://user:***@example.test/db' },
     });
+
+    await createParlayLegRepository({ parlayLeg: redactingDelegate as any }).create({
+      parlayId: 'parlay-1',
+      predictionId: 'prediction-1',
+      fixtureId: 'fixture-1',
+      marketKey: 'h2h',
+      selectionKey: 'home',
+      odds: 1.8,
+      legIndex: 0,
+      inclusionReason: 'Authorization: Bearer secret...en',
+      metadata: { apiKey: 'secret-parlay-key' },
+    });
+
+    await createParlayLegRepository({ parlayLeg: redactingDelegate as any }).createMany([{
+      parlayId: 'parlay-1',
+      predictionId: 'prediction-2',
+      fixtureId: 'fixture-1',
+      marketKey: 'btts',
+      selectionKey: 'yes',
+      odds: 1.9,
+      legIndex: 1,
+      inclusionReason: 'DATABASE_URL=mysql://secret-parlay-pass@example.test/db',
+      metadata: { authorization: 'Bearer secret-parlay-batch-token' },
+    }]);
 
     const body = JSON.stringify(persisted);
     assert.match(body, /\[REDACTED\]/);
-    assert.doesNotMatch(body, /secret-pass|secret-token|secret-key|secret-cookie|sk-1234567890abcdef/);
+    assert.doesNotMatch(body, /secret-pass|secret-token|secret-key|secret-cookie|sk-123...cdef|secret-parlay-token|secret-parlay-key|secret-parlay-pass|secret-parlay-batch-token/);
   });
 });

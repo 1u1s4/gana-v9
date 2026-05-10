@@ -289,6 +289,64 @@ describe('runValidation parlay and date targets', () => {
     assert.deepEqual(statuses, ['won', 'lost']);
   });
 
+  it('settles parlays with won legs and voided/push legs as won', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const statuses: string[] = [];
+
+    const result = await runValidation(cfg, { parlayId: 'parlay-1' }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: fetcher(),
+      repositories: repositories({
+        parlayLegs: {
+          list: async () => [
+            {
+              id: 'leg-won',
+              parlayId: 'parlay-1',
+              predictionId: 'prediction-1',
+              fixtureId: 'fixture-1',
+              marketKey: 'h2h',
+              selectionKey: 'home',
+              line: null,
+              odds: 2,
+              status: 'candidate',
+              legIndex: 0,
+              inclusionReason: 'included-eligible-prediction',
+              metadata: null,
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: 'leg-voided',
+              parlayId: 'parlay-1',
+              predictionId: 'prediction-2',
+              fixtureId: 'fixture-1',
+              marketKey: 'corners_over_under',
+              selectionKey: 'over',
+              line: 9.5,
+              odds: 2,
+              status: 'candidate',
+              legIndex: 1,
+              inclusionReason: 'included-eligible-prediction',
+              metadata: null,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          updateStatus: async (_id: string, status: string) => {
+            statuses.push(status);
+            return {} as any;
+          },
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations[0]?.status, 'won');
+    assert.deepEqual(statuses, ['won', 'voided']);
+  });
+
   it('validates predictions and parlays by configured fixture date', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
