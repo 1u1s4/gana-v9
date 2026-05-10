@@ -327,7 +327,7 @@ describe('league preset command surface', () => {
 describe('low-odds command surface', () => {
   it('wires headless scan low-odds with threshold and markets flags', async () => {
     let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
-    await captureConsole(async () => {
+    const output = await captureConsole(async () => {
       result = await dispatchHeadless([
         'scan',
         'low-odds',
@@ -343,6 +343,8 @@ describe('low-odds command surface', () => {
     assert.equal(result?.ok, false);
     assert.equal(result?.exitCode, 1);
     assert.match(result?.message ?? '', /DATABASE_URL is required/);
+    assert.match(output, /can take several minutes on full slates/);
+    assert.match(output, /quiet output is normal/);
   });
 
   it('rejects unsupported headless scan markets before running the scan', async () => {

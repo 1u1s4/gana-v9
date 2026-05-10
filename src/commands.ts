@@ -646,7 +646,12 @@ async function runLowOddsScan(ctx: HeadlessCommandContext | CommandContext, flag
     combineMode: optionalCombineModeFlag(flags),
   };
   const markets = optionalMarketsFlag(flags);
+  printLongRunningLowOddsNotice(input.date);
   return scanLowOdds(configWithMarketOverride(ctx.config, markets), input, ctx.runtime);
+}
+
+function printLongRunningLowOddsNotice(date: string): void {
+  console.log(`  ${YELLOW}!${RESET} ${DIM}low-odds scan for ${date} can take several minutes on full slates; quiet output is normal. Wait and verify child processes/artifacts before killing it.${RESET}`);
 }
 
 async function printPresetCounts(config: AgentConfig): Promise<void> {
