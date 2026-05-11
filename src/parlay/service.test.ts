@@ -545,6 +545,49 @@ describe('runParlayBuild', () => {
     assert.match(result.gateResult.warnings.join('\n'), /No compatible legs inside target odds/);
   });
 
+  it('fills review portfolio parlays deterministically when review-required predictions are available', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-11',
+      sourceRunId: 'source-run-review',
+      portfolio: 'llm',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async () => ({ text: JSON.stringify({ parlays: [], noParlayReason: 'Model declined despite compatible review legs.' }) }) as any,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'review-1', runId: 'source-run-review', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.2, confidence: 0.72, quality: 'medium', status: 'review-required', edge: 0.43, warnings: ['research is not promotable'] }),
+            prediction({ id: 'review-2', runId: 'source-run-review', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'home', odds: 1.85, confidence: 0.71, quality: 'medium', status: 'review-required', edge: 0.08, warnings: ['research is not promotable'] }),
+            prediction({ id: 'review-3', runId: 'source-run-review', fixtureId: 'fixture-3', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.7, quality: 'medium', status: 'review-required', edge: 0.4, warnings: ['web research required but no web-search source was linked'] }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-review-fallback' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    const review = result.portfolio?.profiles.find((profile) => profile.profile === 'review');
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(review?.included, 3);
+    assert.match(review?.warnings.join('\n') ?? '', /deterministic portfolio fallback filled 3 review parlay/);
+    assert.equal(result.portfolio?.parlays.every((entry) => entry.profile === 'review'), true);
+    assert.equal(result.portfolio?.parlays.every((entry) => entry.build.parlay.status === 'review-required'), true);
+    assert.equal(persisted.length, 3);
+  });
+
   it('lets the review profile use weaker warning legs as review-required LLM output', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

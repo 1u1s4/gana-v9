@@ -100,7 +100,15 @@ function agentOutput(overrides: Record<string, unknown> = {}) {
 }
 
 describe('runFixtureResearch', () => {
-  it('builds, validates, persists, and writes a research bundle', async () => {
+  it('keeps the Codex response schema strict-compatible for claim subjects', () => {
+    const schema = JSON.parse(readFileSync('skills/research-fixture-v2/output.schema.json', 'utf8'));
+    const subject = schema.properties.claims.items.properties.subject;
+
+    assert.deepEqual(subject.required, ['type', 'id', 'market']);
+    assert.deepEqual(subject.properties.market.type, ['string', 'null']);
+  });
+
+  it('persists a promotable research bundle from strict agent JSON', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const persisted: string[] = [];

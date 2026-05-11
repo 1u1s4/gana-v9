@@ -72,6 +72,8 @@ describe('research evidence schemas', () => {
     const subject = schema.properties.claims.items.properties.subject;
 
     assert.equal(subject.additionalProperties, false);
-    assert.deepEqual(subject.properties.market.enum, ['h2h', 'double_chance', 'goals_over_under', 'corners_over_under', 'btts']);
+    assert.deepEqual(subject.required, ['type', 'id', 'market']);
+    assert.deepEqual(subject.properties.market.type, ['string', 'null']);
+    assert.deepEqual(subject.properties.market.enum, ['h2h', 'double_chance', 'goals_over_under', 'corners_over_under', 'btts', null]);
   });
 });

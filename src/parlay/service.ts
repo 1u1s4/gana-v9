@@ -432,14 +432,20 @@ async function runParlayPortfolio(
       builds.push({ profile: validation.profile, build: validation.build });
       included++;
     }
-    const deterministicFills = generateDeterministicPortfolioFills({
+    const deterministicFills = shouldGenerateDeterministicPortfolioFills({
+      profile: profileSpec,
+      priorBuilds: builds.length,
+      outputWarnings: output?.warnings ?? [],
+      outputNoParlayReason: output?.output.noParlayReason,
+      pool: output?.pool ?? [],
+    }) ? generateDeterministicPortfolioFills({
       profile: profileSpec,
       pool: output?.pool ?? [],
       usedSignatures,
       generatedAt,
       sourceRunId,
       needed: Math.max(0, profileSpec.targetParlays - included),
-    });
+    }) : [];
     for (const validation of deterministicFills) {
       usedSignatures.add(validation.signature);
       builds.push({ profile: validation.profile, build: validation.build });
@@ -980,7 +986,7 @@ function generateDeterministicPortfolioFills(input: {
   sourceRunId: string;
   needed: number;
 }): Array<Extract<PortfolioValidationResult, { ok: true }>> {
-  if (input.needed <= 0 || input.profile.reviewOnly) return [];
+  if (input.needed <= 0) return [];
   const combinations: ParlaySourcePrediction[][] = [];
   const sortedPool = [...input.pool].sort(comparePortfolioPredictions);
   for (let size = input.profile.minLegs; size <= input.profile.maxLegs; size++) {
@@ -995,6 +1001,20 @@ function generateDeterministicPortfolioFills(input: {
     }, input.profile, new Map(input.pool.map((prediction) => [prediction.id, prediction])), input.usedSignatures, input.generatedAt, input.sourceRunId))
     .filter((validation): validation is Extract<PortfolioValidationResult, { ok: true }> => validation.ok)
     .slice(0, input.needed);
+}
+
+function shouldGenerateDeterministicPortfolioFills(input: {
+  profile: ParlayPortfolioProfileSpec;
+  priorBuilds: number;
+  outputWarnings: readonly string[];
+  outputNoParlayReason?: string;
+  pool: readonly ParlaySourcePrediction[];
+}): boolean {
+  if (!input.profile.reviewOnly) return true;
+  if (input.priorBuilds > 0) return false;
+  if (!input.outputNoParlayReason) return false;
+  if (input.outputWarnings.some((warning) => /prompt failed/i.test(warning))) return false;
+  return input.pool.some((prediction) => hasHardResearchWarning(prediction));
 }
 
 function collectCombinations(
