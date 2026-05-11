@@ -90,10 +90,29 @@ describe('prediction schemas', () => {
   });
 
   it('keeps LLM output schema permissive for blocked picks without usable evidence', () => {
-    const schema = JSON.parse(readFileSync('skills/score-prediction-v1/output.schema.json', 'utf-8'));
+    const schema = JSON.parse(readFileSync('skills/score-prediction-v2/output.schema.json', 'utf-8'));
     const evidenceIds = schema.properties.predictions.items.properties.evidenceIds;
 
     assert.equal(evidenceIds.type, 'array');
     assert.equal('minItems' in evidenceIds, false);
+    assert.deepEqual(schema.properties.predictions.items.required, [
+      'oddsQuoteId',
+      'market',
+      'selection',
+      'line',
+      'odds',
+      'probability',
+      'modelProbability',
+      'marketFairProbability',
+      'edge',
+      'confidence',
+      'confidenceBand',
+      'blockers',
+      'promotable',
+      'evidenceIds',
+      'claimIds',
+      'rationale',
+      'warnings',
+    ]);
   });
 });

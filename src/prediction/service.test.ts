@@ -75,6 +75,10 @@ const claims = [
     bundleId: 'research-bundle-1',
     fixtureId: 'fixture-1',
     statement: 'Research supports home selection.',
+    marketKey: 'h2h',
+    selectionKey: 'home',
+    line: null,
+    sourceId: 'source-1',
     supportLevel: 'supported',
     evidenceIds: ['evidence-1', 'evidence-2'],
     conflictStatus: 'none',
@@ -178,12 +182,148 @@ describe('runFixtureScoring', () => {
     assert.deepEqual(persisted[0].evidenceIds, ['evidence-1', 'evidence-2']);
     assert.equal(persisted[0].providerAgentic, 'codex');
     assert.equal(persisted[0].model, 'gpt-5.5');
-    assert.equal(persisted[0].promptVersion, 'score-prediction-v1');
-    assert.equal(persisted[0].scoringRuleVersion, 'scoring-v1');
+    assert.equal(persisted[0].promptVersion, 'score-prediction-v2');
+    assert.equal(persisted[0].scoringRuleVersion, 'scoring-v2');
     assert.equal(persisted[0].impliedProbability, 1 / 2.1);
     assert.equal(persisted[0].estimatedProbability, 0.56);
     assert.equal(persisted[0].edge, 0.56 - (1 / 2.1));
     assert.equal(persisted[0].metadata.parlayEligible, true);
+  });
+
+  it('blocks score --web live when no fresh real web research is available', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let agentCalled = false;
+    let persisted = false;
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001', web: 'live', markets: ['h2h'] }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions-blocked.json',
+      agentRunner: async () => {
+        agentCalled = true;
+        return { text: '{}', usage: {}, output: '' };
+      },
+      persistPredictions: async () => {
+        persisted = true;
+        return [];
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.gateResult.verdict, 'blocked');
+    assert.match(result.error ?? '', /score --web live requires a fresh research bundle with real web-search evidence/);
+    assert.match(result.error ?? '', /pnpm gana research --fixture-id 1001 --web live --markets h2h/);
+    assert.equal(agentCalled, false);
+    assert.equal(persisted, false);
+  });
+
+  it('applies market/model calibration when enough historical samples exist', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+    let artifactPayload: any;
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001', markets: ['h2h'] }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: (_runId, _name, payload) => {
+        artifactPayload = payload;
+        return '/tmp/predictions.json';
+      },
+      calibrationHistory: {
+        getCalibrationPoints: async () => Array.from({ length: 50 }, () => ({ predicted: 0.56, observed: 0.62 })),
+      },
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            modelProbability: 0.56,
+            marketFairProbability: 1 / 2.1,
+            edge: 0.56 - (1 / 2.1),
+            confidence: 0.75,
+            confidenceBand: 'high',
+            blockers: [],
+            promotable: true,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by h2h-specific evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(persisted[0].estimatedProbability, 0.62);
+    assert.equal(persisted[0].metadata.calibration.applied, true);
+    assert.equal(persisted[0].metadata.calibration.sampleSize, 50);
+    assert.equal(artifactPayload.calibrationSummary.applied, 1);
+    assert.deepEqual(artifactPayload.marketCoverage.requestedMarkets, ['h2h']);
+    assert.equal(artifactPayload.webSearchCoverage.mode, 'off');
+  });
+
+  it('degrades confidence when calibration history has a low sample size', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001', markets: ['h2h'] }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      calibrationHistory: {
+        getCalibrationPoints: async () => [
+          { predicted: 0.55, observed: 1 },
+          { predicted: 0.6, observed: 0 },
+        ],
+      },
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            modelProbability: 0.56,
+            marketFairProbability: 1 / 2.1,
+            edge: 0.56 - (1 / 2.1),
+            confidence: 0.78,
+            confidenceBand: 'high',
+            blockers: [],
+            promotable: true,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by h2h-specific evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(persisted[0].confidence, 0.49);
+    assert.equal(persisted[0].metadata.calibration.applied, false);
+    assert.match(persisted[0].warnings.join('\n'), /calibration degraded: sample 2\/50/);
   });
 
   it('repairs LLM evidence and claim references that omit persisted bundle prefixes', async () => {
@@ -861,6 +1001,56 @@ describe('runFixtureScoring', () => {
     assert.deepEqual(result.predictions[0].blockers.sort(), ['model-disagreement', 'stale-pick']);
     assert.match(result.predictions[0].warnings.join('\n'), /lineup-pending/);
     assert.deepEqual(persisted[0].metadata.blockers.sort(), ['model-disagreement', 'stale-pick']);
+  });
+
+  it('requires market-specific evidence or an explicit fallback before promoting a pick', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const fixtureLevelClaims = claims.map(({ marketKey: _marketKey, selectionKey: _selectionKey, line: _line, ...claim }) => claim);
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001', markets: ['h2h'] }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        claims: { list: async () => fixtureLevelClaims },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            modelProbability: 0.56,
+            marketFairProbability: 1 / 2.1,
+            edge: 0.56 - (1 / 2.1),
+            confidence: 0.75,
+            confidenceBand: 'high',
+            blockers: [],
+            promotable: true,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by general evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(persisted[0].status, 'review-required');
+    assert.equal(persisted[0].metadata.promotable, false);
+    assert.match(persisted[0].warnings.join('\n'), /market-specific evidence missing for h2h:home/);
   });
 
   it('downgrades predictions when linked research sources are stale', async () => {

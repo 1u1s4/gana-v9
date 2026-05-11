@@ -9,6 +9,7 @@ export interface ProbabilisticPredictionInput {
   stalePick?: boolean;
   lineupPending?: boolean;
   modelDisagreement?: boolean;
+  minEdge?: number;
 }
 
 export interface EdgeGateResult {
@@ -20,7 +21,9 @@ export interface EdgeGateResult {
 export function evaluateEdgeGate(input: ProbabilisticPredictionInput): EdgeGateResult {
   const blockers: string[] = [];
   const edge = input.modelProbability - input.marketFairProbability;
+  const minEdge = input.minEdge ?? 0;
   if (edge <= 0) blockers.push('no-edge');
+  else if (edge < minEdge) blockers.push('below-min-edge');
   // Confidence, evidence coverage, and liquidity are soft risk signals for analytical review.
   // They should not hard-block an otherwise positive-edge LLM prediction; callers surface
   // them as warnings so parlays can still be generated as review-required artifacts.

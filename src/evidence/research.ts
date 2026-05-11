@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
-import { isMarketKey } from '../domain/markets.js';
+import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { runAgentWithRetry } from '../agent.js';
@@ -10,7 +10,7 @@ import { redactSecrets } from '../permissions/redaction.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import { getPrismaClient } from '../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
-import { deriveNativeWebSearchRequirement } from '../providers/agentic/helpers.js';
+import { deriveNativeWebSearchRequirement, displayNativeWebToolName } from '../providers/agentic/helpers.js';
 import type { AgentEvent } from '../providers/agentic/types.js';
 import {
   createApiFootballPersistence,
@@ -37,6 +37,7 @@ import { mergeGateWarnings, validateResearchBundle } from './claims.js';
 export interface RunFixtureResearchInput {
   fixtureId: string;
   web: ResearchWebMode;
+  markets?: MarketKey[];
   oddsSnapshot?: CanonicalOddsSnapshot;
   signal?: AbortSignal;
 }
@@ -70,6 +71,7 @@ interface ResearchProviderContext {
 
 interface NativeWebSearchTrace {
   used: boolean;
+  browserFallbackUsed: boolean;
   calls: Array<{
     callId: string;
     name: string;
@@ -98,6 +100,7 @@ export async function runFixtureResearch(
   const now = deps.now ?? (() => new Date());
   const createdAt = now().toISOString();
   const provider = deps.provider ?? await createDefaultSportsProvider(config, runtime);
+  const marketScope = normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets);
 
   let fixture: Fixture;
   try {
@@ -109,10 +112,12 @@ export async function runFixtureResearch(
     });
   }
 
-  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot);
+  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot, marketScope);
   const prompt = buildResearchFixturePrompt({
     fixture,
     web: input.web,
+    requiredMarkets: marketScope,
+    marketFocus: marketScope,
     oddsSnapshot: providerContext.oddsSnapshot,
     fixtureStatistics: providerContext.fixtureStatistics,
     providerContextWarnings: providerContext.warnings,
@@ -206,7 +211,15 @@ export async function runFixtureResearch(
     runId,
   );
   const evidenceSourceRepairs = repairEvidenceSourceReferences(repaired.value.evidenceItems, repairedSources.sources);
-  const repairWarnings = uniqueStrings([...repaired.warnings, ...repairedSources.warnings, ...evidenceSourceRepairs.warnings]);
+  const webEnforcement = evaluateResearchWebCoverage(input.web, config, nativeWebSearchTrace, repairedSources.sources);
+  const marketCoverage = buildResearchMarketCoverage(marketScope, providerContext.oddsSnapshot, evidenceSourceRepairs.evidenceItems, repaired.value.claims);
+  const repairWarnings = uniqueStrings([
+    ...repaired.warnings,
+    ...repairedSources.warnings,
+    ...evidenceSourceRepairs.warnings,
+    ...webEnforcement.warnings,
+    ...marketCoverage.warnings,
+  ]);
   const bundleInput = {
     id: randomUUID(),
     runId,
@@ -224,6 +237,18 @@ export async function runFixtureResearch(
     metadata: {
       ...(repaired.value.metadata ?? {}),
       providerContextWarnings: providerContext.warnings,
+      marketScope,
+      marketCoverage,
+      webSearchCoverage: {
+        mode: input.web,
+        provider: config.provider,
+        nativeSupported: webEnforcement.nativeSupported,
+        nativeToolUsed: nativeWebSearchTrace.used,
+        browserFallbackUsed: nativeWebSearchTrace.browserFallbackUsed,
+        realWebSearchSourceCount: webEnforcement.realWebSearchSourceCount,
+        syntheticWebSearchSourceCount: webEnforcement.syntheticWebSearchSourceCount,
+        required: input.web === 'live',
+      },
       ...(repairWarnings.length ? { referenceRepairs: repairWarnings } : {}),
     },
   };
@@ -328,12 +353,13 @@ function isIncompleteLiveResearchPayload(value: any, web: ResearchWebMode): bool
 }
 
 function createNativeWebSearchTrace(): NativeWebSearchTrace {
-  return { used: false, calls: [] };
+  return { used: false, browserFallbackUsed: false, calls: [] };
 }
 
 function recordNativeWebSearchEvent(trace: NativeWebSearchTrace, event: AgentEvent): void {
   if ((event.type !== 'tool_call' && event.type !== 'tool_result') || !isWebSearchToolName(event.name)) return;
-  trace.used = true;
+  if (event.name === 'browser') trace.browserFallbackUsed = true;
+  else trace.used = true;
   const existing = trace.calls.find((call) => call.callId === event.callId);
   const call = existing ?? {
     callId: event.callId,
@@ -353,7 +379,7 @@ function recordNativeWebSearchEvent(trace: NativeWebSearchTrace, event: AgentEve
 }
 
 function isWebSearchToolName(name: string): boolean {
-  return name === 'web_search' || name === 'google_web_search' || name.toLowerCase().includes('web_search');
+  return name === 'browser' || name === 'web_search' || name === 'google_web_search' || name.toLowerCase().includes('web_search');
 }
 
 function webSearchQueryFromArgs(args: Record<string, unknown>): string | undefined {
@@ -635,9 +661,92 @@ function buildAgentFailureFallbackBundle(
       fallback: true,
       fallbackReason: 'agent-runner-error',
       webMode: input.web,
+      marketScope: normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets),
       agentError: error,
       providerContextWarnings: providerContext.warnings,
     },
+  };
+}
+
+function evaluateResearchWebCoverage(
+  web: ResearchWebMode,
+  config: AgentConfig,
+  trace: NativeWebSearchTrace,
+  sources: SourceRecord[],
+): {
+  nativeSupported: boolean;
+  realWebSearchSourceCount: number;
+  syntheticWebSearchSourceCount: number;
+  warnings: string[];
+} {
+  if (web === 'off') {
+    return { nativeSupported: false, realWebSearchSourceCount: 0, syntheticWebSearchSourceCount: 0, warnings: [] };
+  }
+  const nativeRequirement = deriveNativeWebSearchRequirement(config, { required: web === 'live', reason: 'research fixture' });
+  const realWebSearchSourceCount = sources.filter(isRealWebSearchSource).length;
+  const syntheticWebSearchSourceCount = sources.filter((source) => source.type === 'web-search' && !isRealWebSearchSource(source)).length;
+  const hasRealWebSearchSignal = realWebSearchSourceCount > 0 || trace.used || trace.browserFallbackUsed;
+  const warnings: string[] = [];
+
+  if (web === 'live' && nativeRequirement.supported && !trace.used) {
+    warnings.push(
+      `web live requested for provider ${config.provider}, but no real ${displayNativeWebToolName(config.provider) ?? 'native web search'} tool call was observed. Retry research with --web live and a provider/model that can use native web search, or use --web off for local-only scoring.`,
+    );
+  }
+  if (web === 'live' && !nativeRequirement.supported && !trace.browserFallbackUsed) {
+    warnings.push(
+      `web live requested for provider ${config.provider}, which has no native web-search tool in this harness. Use OpenRouter/browser fallback with BROWSER_USE_API_KEY or switch to codex/gemini/cursor native web before promoting research.`,
+    );
+  }
+  if (!hasRealWebSearchSignal) {
+    warnings.push('web research requested but no real web-search source was linked; synthetic/repaired web sources do not count as sufficient evidence');
+  }
+  return {
+    nativeSupported: nativeRequirement.supported,
+    realWebSearchSourceCount,
+    syntheticWebSearchSourceCount,
+    warnings,
+  };
+}
+
+function isRealWebSearchSource(source: SourceRecord): boolean {
+  if (source.type !== 'web-search') return false;
+  const metadata = source.metadata && typeof source.metadata === 'object' ? source.metadata as Record<string, unknown> : {};
+  if (metadata.synthesized === true || metadata.repaired === true) return false;
+  return Boolean(source.url || source.externalId);
+}
+
+function buildResearchMarketCoverage(
+  requiredMarkets: readonly MarketKey[],
+  oddsSnapshot: CanonicalOddsSnapshot | undefined,
+  evidenceItems: Array<{ id?: unknown }>,
+  claims: any[],
+): {
+  requiredMarkets: MarketKey[];
+  quotedMarkets: MarketKey[];
+  evidenceMarkets: MarketKey[];
+  skippedMarkets: Array<{ market: MarketKey; reason: string }>;
+  warnings: string[];
+} {
+  const quotedMarkets = [...new Set((oddsSnapshot?.quotes ?? []).map((quote) => quote.market).filter(isMarketKey))].sort();
+  const evidenceIds = new Set(evidenceItems.map((item) => typeof item.id === 'string' ? item.id : '').filter(Boolean));
+  const evidenceMarkets = [...new Set(claims.flatMap((claim) => {
+    const market = claim?.subject?.type === 'market' ? claim.subject.market : claim?.metadata?.market;
+    const ids = Array.isArray(claim?.evidenceIds) ? claim.evidenceIds : [];
+    return isMarketKey(market) && ids.some((id: unknown) => typeof id === 'string' && evidenceIds.has(id)) ? [market] : [];
+  }))].sort();
+  const skippedMarkets = requiredMarkets.flatMap((market) => {
+    if (!quotedMarkets.includes(market)) return [{ market, reason: 'missing odds quotes for requested market' }];
+    if (!evidenceMarkets.includes(market)) return [{ market, reason: 'missing market-specific research evidence' }];
+    return [];
+  });
+  const warnings = skippedMarkets.map((item) => `market ${item.market} skipped/review-required: ${item.reason}`);
+  return {
+    requiredMarkets: [...requiredMarkets],
+    quotedMarkets,
+    evidenceMarkets,
+    skippedMarkets,
+    warnings,
   };
 }
 
@@ -649,8 +758,8 @@ async function writeAndPersistResearchBundle(
   web: ResearchWebMode,
   validatedBundle: ResearchBundle,
 ): Promise<FixtureResearchResult> {
-  const webWarnings = web !== 'off' && !validatedBundle.sources.some((source) => source.type === 'web-search')
-    ? [`web ${web} requested but no web-search source was included`]
+  const webWarnings = web !== 'off' && !bundleHasWebSearchCoverage(validatedBundle)
+    ? [`web ${web} requested but no real web-search source was included`]
     : [];
   const bundle = normalizeResearchGateResult(mergeGateWarnings(validatedBundle, webWarnings), web);
   const artifactPath = writeArtifact(config, runId, 'research-bundle.json', bundle);
@@ -688,7 +797,7 @@ function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMod
 
   const warnings = uniqueStrings([...bundle.warnings, ...bundle.gateResult.warnings]);
   const reasons = uniqueStrings(bundle.gateResult.reasons);
-  const hasLiveWebEvidence = web === 'off' || bundle.sources.some((source) => source.type === 'web-search');
+  const hasLiveWebEvidence = web === 'off' || bundleHasWebSearchCoverage(bundle);
   const fallback = bundle.metadata?.fallback === true || warnings.some(isHardResearchWarning) || reasons.some(isHardResearchWarning);
   const sufficientEvidence = hasSufficientIndependentEvidence(bundle);
   const agentPromotable = bundle.gateResult.verdict === 'promotable';
@@ -707,6 +816,14 @@ function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMod
       warnings,
     },
   };
+}
+
+function bundleHasWebSearchCoverage(bundle: ResearchBundle): boolean {
+  if (bundle.sources.some(isRealWebSearchSource)) return true;
+  const coverage = bundle.metadata?.webSearchCoverage;
+  if (!coverage || typeof coverage !== 'object') return false;
+  const record = coverage as Record<string, unknown>;
+  return record.nativeToolUsed === true || record.browserFallbackUsed === true;
 }
 
 function hasSufficientIndependentEvidence(bundle: ResearchBundle): boolean {
@@ -756,7 +873,7 @@ function evidenceConfidence(value: unknown): number {
 function isHardResearchWarning(message: string): boolean {
   const normalized = message.toLowerCase();
   if (/\b(without|no)\s+(material\s+)?conflicts?\b/.test(normalized)) return false;
-  return /fallback research|agentic research failed|research agent timed out|no web-search source|not included in the structured output|missing web-search|web-search evidence was required but not included|interrupted|insufficient evidence|contradict|mismatch|stale|\bconflict(?:ing|ed|s)?\b/i.test(message);
+  return /fallback research|agentic research failed|research agent timed out|no web[-_ ]search source|no real .*web[-_ ]search|no native web[-_ ]search|browser fallback.*(?:missing|required|unavailable)|not included in the structured output|missing web[-_ ]search|web[-_ ]search evidence was required but not included|interrupted|insufficient evidence|contradict|mismatch|stale|\bconflict(?:ing|ed|s)?\b/i.test(message);
 }
 
 async function createDefaultSportsProvider(
@@ -771,11 +888,12 @@ async function buildResearchProviderContext(
   provider: ResearchSportsProvider,
   fixture: Fixture,
   inputOddsSnapshot?: CanonicalOddsSnapshot,
+  markets?: MarketKey[],
 ): Promise<ResearchProviderContext> {
   const warnings: string[] = [];
   const fixtureStatistics = await fetchFixtureStatistics(provider, fixture.providerFixtureId, warnings);
   const oddsSnapshot = inputOddsSnapshot
-    ?? await fetchCanonicalOddsSnapshot(provider, fixture.providerFixtureId, warnings);
+    ?? await fetchCanonicalOddsSnapshot(provider, fixture.providerFixtureId, warnings, markets);
 
   return {
     ...(fixtureStatistics && { fixtureStatistics }),
@@ -802,10 +920,11 @@ async function fetchCanonicalOddsSnapshot(
   provider: ResearchSportsProvider,
   providerFixtureId: string,
   warnings: string[],
+  markets?: MarketKey[],
 ): Promise<CanonicalOddsSnapshot | undefined> {
   if (!provider.getCanonicalOddsSnapshot) return undefined;
   try {
-    return await provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId });
+    return await provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId, markets });
   } catch (err: any) {
     warnings.push(`API-Football odds snapshot unavailable: ${err?.message ?? String(err)}`);
     return undefined;

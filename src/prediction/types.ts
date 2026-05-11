@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { MARKET_KEYS } from '../domain/markets.js';
 import { AGENT_PROVIDER_COMPAT_VALUES, researchGateResultSchema } from '../evidence/types.js';
 
-export const SCORING_RULE_VERSION = 'scoring-v1';
+export const SCORING_RULE_VERSION = 'scoring-v2';
 
 export const PREDICTION_STATUSES = [
   'draft',
@@ -37,6 +37,15 @@ export const predictionCandidateSchema = z.object({
   confidenceBand: z.enum(PREDICTION_QUALITIES).optional(),
   blockers: z.array(z.string().min(1)).default([]),
   promotable: z.boolean().optional(),
+  calibration: z.object({
+    applied: z.boolean(),
+    sampleSize: z.number().int().min(0),
+    minSample: z.number().int().min(1),
+    method: z.string().min(1),
+    rawProbability: z.number().min(0).max(1).optional(),
+    calibratedProbability: z.number().min(0).max(1).optional(),
+    warnings: z.array(z.string().min(1)).default([]),
+  }).optional(),
   oddsSnapshotId: z.string().min(1).optional(),
   oddsQuoteId: z.string().min(1),
   evidenceIds: z.array(z.string().min(1)),
@@ -63,7 +72,7 @@ export const predictionRecordSchema = predictionCandidateSchema.safeExtend({
   researchBundleId: z.string().min(1).optional(),
   providerAgentic: z.enum(AGENT_PROVIDER_COMPAT_VALUES).optional(),
   model: z.string().min(1).optional(),
-  promptVersion: z.string().min(1).default('score-prediction-v1'),
+  promptVersion: z.string().min(1).default('score-prediction-v2'),
   scoringRuleVersion: z.string().min(1).default(SCORING_RULE_VERSION),
   confidence: z.number().min(0).max(1).default(0),
   quality: z.enum(PREDICTION_QUALITIES).default('low'),

@@ -73,6 +73,13 @@ export interface LowOddsScanView {
   scanId?: string;
   date: string;
   threshold: number;
+  marketScope?: string[];
+  marketCoverage?: {
+    requestedMarkets: string[];
+    quotedMarkets: string[];
+    hitMarkets: string[];
+    missingMarkets: string[];
+  };
   fixtureCount: number;
   hitCount: number;
   hits: LowOddsHitView[];

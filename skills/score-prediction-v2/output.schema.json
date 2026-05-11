@@ -15,7 +15,13 @@
           "line",
           "odds",
           "probability",
+          "modelProbability",
+          "marketFairProbability",
+          "edge",
           "confidence",
+          "confidenceBand",
+          "blockers",
+          "promotable",
           "evidenceIds",
           "claimIds",
           "rationale",
@@ -31,7 +37,16 @@
           "line": { "type": ["number", "null"] },
           "odds": { "type": "number", "exclusiveMinimum": 1 },
           "probability": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "modelProbability": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "marketFairProbability": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "edge": { "type": ["number", "null"] },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "confidenceBand": { "type": "string", "enum": ["low", "medium", "high"] },
+          "blockers": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "promotable": { "type": "boolean" },
           "evidenceIds": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }

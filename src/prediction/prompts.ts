@@ -1,15 +1,18 @@
 import type { Fixture } from '../domain/fixtures.js';
+import type { MarketKey } from '../domain/markets.js';
 import type { CanonicalOddsSnapshot, FixtureStatistics } from '../providers/sports/types.js';
 import { NO_MONETARY_ACTIONS_PROMPT } from '../security/no-monetary-actions.js';
 
 export const RESEARCH_FIXTURE_PROMPT_VERSION = 'research-fixture-v2';
-export const SCORE_PREDICTION_PROMPT_VERSION = 'score-prediction-v1';
+export const SCORE_PREDICTION_PROMPT_VERSION = 'score-prediction-v2';
 
 export type ResearchWebMode = 'off' | 'cached' | 'live';
 
 export interface BuildResearchFixturePromptInput {
   fixture: Fixture;
   web: ResearchWebMode;
+  requiredMarkets?: MarketKey[];
+  marketFocus?: MarketKey[];
   oddsSnapshot?: CanonicalOddsSnapshot;
   fixtureStatistics?: FixtureStatistics;
   providerContextWarnings?: string[];
@@ -21,6 +24,8 @@ export interface BuildScorePredictionPromptInput {
   runId: string;
   createdAt: string;
   web: ResearchWebMode;
+  requiredMarkets?: MarketKey[];
+  marketFocus?: MarketKey[];
   fixture: unknown;
   fixtureStatistics?: FixtureStatistics | null;
   oddsSnapshot: unknown;
@@ -51,6 +56,8 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
     runId: input.runId,
     createdAt: input.createdAt,
     webMode: input.web,
+    requiredMarkets: input.requiredMarkets ?? [],
+    marketFocus: input.marketFocus ?? input.requiredMarkets ?? [],
     fixture: input.fixture,
     fixtureStatistics: input.fixtureStatistics ?? null,
     oddsSnapshot: input.oddsSnapshot
@@ -79,6 +86,7 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
     'Every EvidenceItem.sourceId must reference a SourceRecord.id.',
     'Every Claim.evidenceIds entry must reference an EvidenceItem.id.',
     'Claims with subject.type "market" must use one canonical market key: h2h, double_chance, goals_over_under, corners_over_under, btts.',
+    'Market focus: prioritize claims and evidence for every market listed in Input.requiredMarkets. If a requested market lacks odds quotes or evidence, report it in metadata.marketCoverage.skippedMarkets and downgrade gateResult to review-required.',
     'Set gateResult.verdict to "promotable" only when the research is supported by sufficient evidence, no material conflicts are present, and web-search evidence is included when webMode is live or cached.',
     'Set gateResult.verdict to "review-required" when evidence is partial, required web-search evidence is missing, or factual uncertainty remains.',
     'Set gateResult.verdict to "blocked" only when the research cannot be structured from the available data.',
@@ -106,7 +114,7 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
       claims: [{
         id: 'claim_1',
         statement: 'specific factual claim',
-        subject: { type: 'fixture', id: payload.fixture.id },
+        subject: { type: 'market', id: payload.fixture.id, market: 'h2h' },
         supportLevel: 'supported',
         evidenceIds: ['evidence_1'],
         conflictStatus: 'none',
@@ -133,6 +141,8 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
       runId: input.runId,
       createdAt: input.createdAt,
       webMode: input.web,
+      requiredMarkets: input.requiredMarkets ?? [],
+      marketFocus: input.marketFocus ?? input.requiredMarkets ?? [],
       fixture: input.fixture,
       fixtureStatistics: input.fixtureStatistics ?? null,
       oddsSnapshot: input.oddsSnapshot,
@@ -151,13 +161,15 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
     NO_MONETARY_ACTIONS_PROMPT,
     '',
     `Prompt version: ${SCORE_PREDICTION_PROMPT_VERSION}.`,
-    'Select analytical picks across every canonical market that has an available allowedQuote for this fixture.',
-    'Emit at least one prediction per available market when evidence is sufficient; if a market is thin or uncertain, still emit the best analytical candidate with explicit warnings instead of silently omitting it.',
+    'Select analytical picks across every requested market that has an available allowedQuote for this fixture.',
+    'Emit at least one prediction per requested available market when evidence is sufficient; if a market is thin or uncertain, still emit the best analytical candidate with explicit warnings instead of silently omitting it.',
     'Every prediction must reference persisted oddsQuoteId values and evidenceIds from the supplied research bundle.',
     'Use canonical markets only: h2h, double_chance, goals_over_under, corners_over_under, btts.',
     'Do not invent odds, fixtures, evidence, providers, models, prompt versions, or scoring rule versions.',
     'Only select quotes listed in allowedQuotes. The market, selection, line, and odds must match that quote exactly.',
     'Use API-Football statistics and web-search evidence when present, especially for injuries, news, rotations, goals, BTTS, and corners context.',
+    'Use modelProbability as your calibrated model estimate before service-side calibration; use marketFairProbability from allowedQuotes when available; compute edge against fair probability, not raw implied probability.',
+    'A promotable pick requires market-specific evidenceIds/claimIds for the same market/selection/line, or an explicit fallback warning explaining why fixture-level evidence is the best available support.',
     '',
     'Required JSON shape:',
     JSON.stringify({
@@ -168,7 +180,13 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
         line: null,
         odds: 1.85,
         probability: 0.61,
+        modelProbability: 0.61,
+        marketFairProbability: 0.54,
+        edge: 0.07,
         confidence: 0.72,
+        confidenceBand: 'medium',
+        blockers: [],
+        promotable: true,
         evidenceIds: ['persisted-evidence-id'],
         claimIds: ['persisted-claim-id'],
         rationale: 'brief redacted rationale grounded in the supplied context',

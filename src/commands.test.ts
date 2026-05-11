@@ -201,7 +201,7 @@ describe('headless run command', () => {
   it('prints run usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
-    assert.match(output, /pnpm gana run --date YYYY-MM-DD --web live --validate auto\|force\|off/);
+    assert.match(output, /pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto\|force\|off/);
   });
 
   it('validates run validation mode before executing the pipeline', async () => {

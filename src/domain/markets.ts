@@ -42,6 +42,12 @@ export function isMarketKey(value: unknown): value is MarketKey {
   return typeof value === 'string' && MARKET_KEYS.includes(value as MarketKey);
 }
 
+export function normalizeMarketScope(markets: readonly unknown[] | undefined, fallback: readonly MarketKey[] = DEFAULT_MARKETS): MarketKey[] {
+  const values = (markets ?? []).filter(isMarketKey);
+  const unique = [...new Set(values)];
+  return unique.length ? unique : [...fallback];
+}
+
 export function getMarketSelections(market: MarketKey): readonly string[] {
   return MARKET_SELECTIONS[market];
 }
@@ -56,4 +62,11 @@ export function isOverUnderMarket(market: MarketKey): boolean {
 
 export function marketRequiresLine(market: MarketKey): boolean {
   return isOverUnderMarket(market);
+}
+
+export function marketFamily(market: MarketKey | string): 'winner' | 'totals' | 'team-scoring' | 'unknown' {
+  if (market === 'h2h' || market === 'double_chance') return 'winner';
+  if (market === 'goals_over_under' || market === 'corners_over_under') return 'totals';
+  if (market === 'btts') return 'team-scoring';
+  return 'unknown';
 }

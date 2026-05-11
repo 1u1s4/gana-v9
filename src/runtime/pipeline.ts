@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { basename, join, resolve } from 'path';
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
+import { isMarketKey, isValidMarketSelection, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import type { OddsQuote } from '../domain/odds.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { persistLowOddsScanResult, type LowOddsPersistenceRepositories } from '../filters/low-odds.js';
@@ -39,6 +40,7 @@ export interface RunPipelineInput {
   runId?: string;
   web?: ResearchWebMode;
   validate?: PipelineValidationMode;
+  markets?: MarketKey[];
 }
 
 export interface OddsSnapshotView {
@@ -225,11 +227,13 @@ export async function executeRunPipeline(
   const writeJsonArtifact = deps.writeArtifact ?? writeArtifact;
   const writeRun = deps.writeRunJson ?? writeRunJson;
   const startedAt = now();
+  const marketScope = normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets);
   const steps: PipelineStepResult[] = [];
   const durableTasks = await initializeDurableTasks(config, runId, {
     date: input.date,
     web: input.web ?? defaultWebMode(config),
     validate: input.validate ?? 'auto',
+    markets: marketScope,
   }, repositories);
   const runDurableTask = createPipelineTaskRunner(config, runtime, runId, durableTasks, repositories);
 
@@ -244,7 +248,7 @@ export async function executeRunPipeline(
     verdict: null,
     artifactDir,
     startedAt,
-    metadata: toJsonValue({ date: input.date, validate: input.validate ?? 'auto' }),
+    metadata: toJsonValue({ date: input.date, validate: input.validate ?? 'auto', marketScope }),
   }).catch(() => undefined);
 
   writeRun(config, runId, {
@@ -256,6 +260,7 @@ export async function executeRunPipeline(
     model: config.model,
     status: 'running',
     date: input.date,
+    marketScope,
     startedAt: startedAt.toISOString(),
     artifactDir,
   });
@@ -263,13 +268,16 @@ export async function executeRunPipeline(
     date: input.date,
     web: input.web ?? defaultWebMode(config),
     validate: input.validate ?? 'auto',
+    markets: [...marketScope],
+    marketScope: [...marketScope],
   });
 
   const filtersPayload = {
     date: input.date,
     season: config.apiFootball.defaultSeason,
     timezone: config.apiFootball.timezone,
-    markets: config.apiFootball.defaultMarkets,
+    markets: [...marketScope],
+    marketScope: [...marketScope],
     defaultLeagues: config.apiFootball.defaultLeagues,
     defaultTeams: config.apiFootball.defaultTeams,
     threshold: config.apiFootball.lowOddsThreshold,
@@ -310,7 +318,7 @@ export async function executeRunPipeline(
     writeStepSpan(config, runtime, 'fixtures.fetch', 'provider', fixtureDiscovery.fixtures.length > 0 ? 'ok' : 'blocked', fixtureDiscovery);
   } catch (err: any) {
     const error = err?.message ?? String(err);
-    const lowOddsScan = emptyLowOddsScan(input.date, config.apiFootball.lowOddsThreshold);
+    const lowOddsScan = emptyLowOddsScan(input.date, config.apiFootball.lowOddsThreshold, marketScope);
     return finishBlocked(config, runtime, repositories, {
       runId,
       date: input.date,
@@ -335,7 +343,7 @@ export async function executeRunPipeline(
       try {
         const snapshot = await retryStorageConnection(() => (
           deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
-        )(config, fixture.providerFixtureId, runtime));
+        )(config, fixture.providerFixtureId, runtime, marketScope));
         snapshots.push({
           fixtureId: fixture.id,
           providerFixtureId: fixture.providerFixtureId,
@@ -378,7 +386,7 @@ export async function executeRunPipeline(
         && !deps.fetchOddsSnapshot
         && !deps.fetchLowOddsSnapshotsForDate;
       const providerDateSlate = useProviderDateSlate
-        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime))
+        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime, undefined, marketScope))
         : undefined;
       const lowOddsDiscovery = providerDateSlate
         ? {
@@ -401,12 +409,12 @@ export async function executeRunPipeline(
       const rawLowOddsSnapshots = providerDateSlate
         ? providerDateSlate.snapshots
         : fetchLowOddsSnapshotsForDate
-          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime))
+          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime, marketScope))
           : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
             try {
               return await retryStorageConnection(() => (
                 deps.fetchLowOddsSnapshot ?? deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
-              )(config, fixture.providerFixtureId, runtime));
+              )(config, fixture.providerFixtureId, runtime, marketScope));
             } catch (err: any) {
               return {
                 fixtureId: fixture.id,
@@ -425,14 +433,14 @@ export async function executeRunPipeline(
         quotes: snapshot.quotes,
         ...('error' in snapshot && typeof snapshot.error === 'string' ? { error: snapshot.error } : {}),
       }));
-      const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots);
+      const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots, marketScope);
       if (repositories.lowOddsScans && repositories.lowOddsHits) {
         try {
           scan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
             runId,
             date: input.date,
             threshold: config.apiFootball.lowOddsThreshold,
-            markets: config.apiFootball.defaultMarkets,
+            markets: marketScope,
             bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
             fixtureCount: lowOddsDiscovery.fixtures.length,
             hits: scan.hits,
@@ -450,7 +458,7 @@ export async function executeRunPipeline(
   } catch (err: any) {
     lowOddsScanStepWarning = errorMessage(err);
     lowOddsCandidateFixtures = fixtureDiscovery.fixtures;
-    lowOddsScan = emptyLowOddsScan(input.date, config.apiFootball.lowOddsThreshold);
+    lowOddsScan = emptyLowOddsScan(input.date, config.apiFootball.lowOddsThreshold, marketScope);
     writeJsonArtifact(config, runId, 'low-odds-scan.json', {
       ...lowOddsScan,
       status: 'blocked',
@@ -485,6 +493,7 @@ export async function executeRunPipeline(
           (signal) => retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(isolatedAgentConfig(config), {
             fixtureId: fixture.providerFixtureId,
             web: webMode,
+            markets: marketScope,
             signal,
           }, runtime)),
           researchFixtureTimeoutMs,
@@ -506,7 +515,7 @@ export async function executeRunPipeline(
     artifactPath: result.artifactPath,
   })), selectedFixtures.length));
   const webSearch = summarizeResearchWebSearch(research, input.web ?? defaultWebMode(config));
-  writeStepSpan(config, runtime, 'research.web_search', 'retrieval', webSearch.required && webSearch.webSourceCount === 0 ? 'blocked' : 'ok', webSearch);
+  writeStepSpan(config, runtime, 'research.web_search', 'retrieval', webSearch.required && webSearch.realWebSourceCount === 0 ? 'blocked' : 'ok', webSearch);
   writeStepSpan(config, runtime, 'research.agent_call', 'llm', research.some((item) => item.ok) ? 'ok' : 'blocked', research);
 
   const scoringPayload = await runDurableTask('score.fixture', 'scoring-results.json', async () => {
@@ -516,6 +525,7 @@ export async function executeRunPipeline(
           (signal) => retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(isolatedAgentConfig(config), {
             fixtureId: fixture.providerFixtureId,
             web: input.web ?? defaultWebMode(config),
+            markets: marketScope,
             signal,
           }, runtime)),
           AGENT_FIXTURE_TIMEOUT_MS,
@@ -551,6 +561,8 @@ export async function executeRunPipeline(
   }
   steps.push(scoreStep);
   const retrievalQuality = summarizeRetrievalQuality(scoring);
+  const marketCoverage = summarizePipelineMarketCoverage(marketScope, oddsSnapshots, lowOddsScan, research, scoring);
+  const calibrationSummary = summarizePipelineCalibration(scoring);
   writeStepSpan(
     config,
     runtime,
@@ -642,6 +654,11 @@ export async function executeRunPipeline(
       validations: validation?.validations.length ?? 0,
     },
     lowOddsPredictionCoverage,
+    webSearchCoverage: webSearch,
+    marketCoverage,
+    calibrationSummary,
+    parlayPortfolioDiagnostics: parlay.portfolio?.diagnostics ?? null,
+    noParlayReasons: parlay.gateResult.verdict === 'blocked' ? parlay.gateResult.reasons : [],
     validation: validationEvaluation,
     lowOddsScanId: lowOddsScan.scanId ?? null,
   };
@@ -659,6 +676,7 @@ export async function executeRunPipeline(
     startedAt: startedAt.toISOString(),
     completedAt: completedAt.toISOString(),
     artifactDir,
+    marketScope,
   });
   await repositories.harnessRuns?.upsertForRun?.({
     id: runId,
@@ -739,6 +757,13 @@ function summarizeRetrievalQuality(scoring: FixtureScoringResult[]): unknown {
 }
 
 function summarizeResearchWebSearch(research: FixtureResearchResult[], mode: string) {
+  const webSources = research.flatMap((result) => result.bundle?.sources ?? []).filter((source) => source.type === 'web-search');
+  const realWebSources = webSources.filter((source) => {
+    const metadata = source.metadata && typeof source.metadata === 'object' && !Array.isArray(source.metadata)
+      ? source.metadata as Record<string, unknown>
+      : {};
+    return metadata.synthesized !== true && metadata.repaired !== true && Boolean(source.url || source.externalId);
+  });
   const webSourceCount = research.reduce(
     (sum, result) => sum + (result.bundle?.sources ?? []).filter((source) => source.type === 'web-search').length,
     0,
@@ -750,7 +775,55 @@ function summarizeResearchWebSearch(research: FixtureResearchResult[], mode: str
     fixturesWithWebSearchSources: research.filter((result) => (
       result.bundle?.sources ?? []
     ).some((source) => source.type === 'web-search')).length,
+    fixturesWithRealWebSearchSources: research.filter((result) => (
+      result.bundle?.sources ?? []
+    ).some((source) => realWebSources.includes(source))).length,
     webSourceCount,
+    realWebSourceCount: realWebSources.length,
+    syntheticWebSourceCount: webSources.length - realWebSources.length,
+  };
+}
+
+function summarizePipelineMarketCoverage(
+  requestedMarkets: readonly MarketKey[],
+  oddsSnapshots: OddsSnapshotView[],
+  lowOddsScan: LowOddsScanView,
+  research: FixtureResearchResult[],
+  scoring: FixtureScoringResult[],
+) {
+  const oddsMarkets = [...new Set(oddsSnapshots.flatMap((snapshot) => snapshot.quotes.map((quote) => quote.market)).filter(isMarketKey))].sort();
+  const lowOddsMarkets = [...new Set(lowOddsScan.hits.map((hit) => hit.market).filter(isMarketKey))].sort();
+  const researchEvidenceMarkets = [...new Set(research.flatMap((result) => {
+    const coverage = result.bundle?.metadata?.marketCoverage;
+    if (!coverage || typeof coverage !== 'object' || Array.isArray(coverage)) return [];
+    const markets = (coverage as { evidenceMarkets?: unknown }).evidenceMarkets;
+    return Array.isArray(markets) ? markets.filter(isMarketKey) : [];
+  }))].sort();
+  const predictionMarkets = [...new Set(scoring.flatMap((result) => result.predictions.map((prediction) => prediction.market)).filter(isMarketKey))].sort();
+  return {
+    requestedMarkets: [...requestedMarkets],
+    oddsMarkets,
+    lowOddsMarkets,
+    researchEvidenceMarkets,
+    predictionMarkets,
+    skippedMarkets: requestedMarkets.flatMap((market) => {
+      if (!oddsMarkets.includes(market)) return [{ market, reason: 'missing odds quotes' }];
+      if (!predictionMarkets.includes(market)) return [{ market, reason: 'missing prediction' }];
+      if (scoring.some((result) => result.marketCoverage?.skippedMarkets.some((item) => item.market === market))) {
+        return [{ market, reason: 'scoring marked market review-required or skipped' }];
+      }
+      return [];
+    }),
+  };
+}
+
+function summarizePipelineCalibration(scoring: FixtureScoringResult[]) {
+  const summaries = scoring.map((result) => result.calibrationSummary).filter((item): item is NonNullable<FixtureScoringResult['calibrationSummary']> => Boolean(item));
+  return {
+    applied: summaries.reduce((sum, item) => sum + item.applied, 0),
+    degraded: summaries.reduce((sum, item) => sum + item.degraded, 0),
+    unavailable: summaries.reduce((sum, item) => sum + item.unavailable, 0),
+    warnings: [...new Set(summaries.flatMap((item) => item.warnings))],
   };
 }
 
@@ -970,6 +1043,11 @@ export async function exportRunArtifacts(
       profile: 'ci-smoke',
     },
     lowOddsCoverageAudit: readJsonIfExists(join(artifactDir, 'low-odds-coverage-audit.json')),
+    webSearchCoverage: (evaluationPayload as any)?.webSearchCoverage ?? null,
+    marketCoverage: (evaluationPayload as any)?.marketCoverage ?? null,
+    calibrationSummary: (evaluationPayload as any)?.calibrationSummary ?? null,
+    parlayPortfolioDiagnostics: (evaluationPayload as any)?.parlayPortfolioDiagnostics ?? null,
+    noParlayReasons: (evaluationPayload as any)?.noParlayReasons ?? [],
     handoff: buildRunHandoffGate(evaluationPayload),
     governanceScorecard: buildGovernanceScorecard(evaluationPayload, artifactDir),
     evaluation: evaluationPayload,
@@ -1201,14 +1279,16 @@ function buildLowOddsScan(
   config: AgentConfig,
   discovery: FixtureDiscoveryResult,
   snapshots: OddsSnapshotView[],
+  requestedMarkets?: readonly MarketKey[],
 ): LowOddsScanView {
   const hits: LowOddsHitView[] = [];
+  const marketScope = normalizeMarketScope(requestedMarkets, config.apiFootball.defaultMarkets);
   const fixturesByProviderId = new Map(discovery.fixtures.map((fixture) => [fixture.providerFixtureId, fixture]));
   for (const snapshot of snapshots) {
     const fixture = fixturesByProviderId.get(snapshot.providerFixtureId);
     if (!fixture) continue;
     for (const quote of snapshot.quotes) {
-      if (!isLowOddsFixtureSelectorQuote(quote)) continue;
+      if (!isLowOddsFixtureSelectorQuote(quote, marketScope)) continue;
       if (quote.price > config.apiFootball.lowOddsThreshold) continue;
       if (config.apiFootball.bookmakerAllowlist?.length && quote.bookmaker && !config.apiFootball.bookmakerAllowlist.includes(quote.bookmaker)) continue;
       hits.push({
@@ -1230,6 +1310,8 @@ function buildLowOddsScan(
     scanId: undefined,
     date,
     threshold: config.apiFootball.lowOddsThreshold,
+    marketScope,
+    marketCoverage: buildLowOddsMarketCoverage(marketScope, snapshots, hits),
     fixtureCount: discovery.fixtures.length,
     hitCount: hits.length,
     hits,
@@ -1239,8 +1321,30 @@ function buildLowOddsScan(
   };
 }
 
-function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }): boolean {
-  return quote.market === 'h2h' && (quote.selection === 'home' || quote.selection === 'away');
+function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }, markets: readonly MarketKey[]): boolean {
+  return isMarketKey(quote.market)
+    && markets.includes(quote.market)
+    && isLowOddsFixtureSelection(quote.market, quote.selection);
+}
+
+function isLowOddsFixtureSelection(market: MarketKey, selection: string): boolean {
+  if (market === 'h2h') return selection === 'home' || selection === 'away';
+  return isValidMarketSelection(market, selection);
+}
+
+function buildLowOddsMarketCoverage(
+  requestedMarkets: readonly MarketKey[],
+  snapshots: OddsSnapshotView[],
+  hits: LowOddsHitView[],
+): NonNullable<LowOddsScanView['marketCoverage']> {
+  const quotedMarkets = [...new Set(snapshots.flatMap((snapshot) => snapshot.quotes.map((quote) => quote.market)).filter(isMarketKey))].sort();
+  const hitMarkets = [...new Set(hits.map((hit) => hit.market).filter(isMarketKey))].sort();
+  return {
+    requestedMarkets: [...requestedMarkets],
+    quotedMarkets,
+    hitMarkets,
+    missingMarkets: requestedMarkets.filter((market) => !quotedMarkets.includes(market)),
+  };
 }
 
 function selectLowOddsHitFixtures(fixtures: Fixture[], lowOddsScan: LowOddsScanView): Fixture[] {
@@ -1561,11 +1665,18 @@ function lowOddsSemanticKey(hit: LowOddsHitView): string {
   ].join(':');
 }
 
-function emptyLowOddsScan(date: string, threshold: number): LowOddsScanView {
+function emptyLowOddsScan(date: string, threshold: number, marketScope: readonly MarketKey[] = []): LowOddsScanView {
   return {
     ...EMPTY_LOW_ODDS_SCAN,
     date,
     threshold,
+    marketScope: [...marketScope],
+    marketCoverage: {
+      requestedMarkets: [...marketScope],
+      quotedMarkets: [],
+      hitMarkets: [],
+      missingMarkets: [...marketScope],
+    },
   };
 }
 
@@ -1646,6 +1757,11 @@ function buildHandoffMarkdown(
   const handoffGate = manifest.handoff && typeof manifest.handoff === 'object' ? manifest.handoff : {};
   const handoffParlay = typeof handoffGate.parlay === 'string' ? handoffGate.parlay : 'unknown';
   const handoffReasons = Array.isArray(handoffGate.reasons) ? handoffGate.reasons : [];
+  const webSearchCoverage = manifest.webSearchCoverage && typeof manifest.webSearchCoverage === 'object' ? manifest.webSearchCoverage : {};
+  const marketCoverage = manifest.marketCoverage && typeof manifest.marketCoverage === 'object' ? manifest.marketCoverage : {};
+  const calibrationSummary = manifest.calibrationSummary && typeof manifest.calibrationSummary === 'object' ? manifest.calibrationSummary : {};
+  const requestedMarkets = Array.isArray(marketCoverage.requestedMarkets) ? marketCoverage.requestedMarkets.join(',') : 'unknown';
+  const predictedMarkets = Array.isArray(marketCoverage.predictionMarkets) ? marketCoverage.predictionMarkets.join(',') : 'unknown';
   const nextAction = verdict === 'promotable'
     ? 'Review the analytical parlay candidate and evidence pack before any human decision.'
     : verdict === 'review-required'
@@ -1673,6 +1789,9 @@ function buildHandoffMarkdown(
     `- parlayLegs: ${counts.parlayLegs ?? 'unknown'}`,
     `- validations: ${counts.validations ?? 'unknown'}`,
     `- lowOddsPredicted: ${lowOddsPredicted}`,
+    `- webSearchCoverage: real=${webSearchCoverage.realWebSourceCount ?? 'unknown'} synthetic=${webSearchCoverage.syntheticWebSourceCount ?? 'unknown'}`,
+    `- marketCoverage: requested=${requestedMarkets} predicted=${predictedMarkets}`,
+    `- calibrationSummary: applied=${calibrationSummary.applied ?? 0} degraded=${calibrationSummary.degraded ?? 0}`,
     `- validationStatus: ${validationStatus}${validationReason}`,
     `- validationMode: ${validationMode}`,
     `- handoff.parlay: ${handoffParlay}`,

@@ -20,3 +20,25 @@ export function correlationPenalty(legs: Array<{ fixtureId: string; market: Mark
   }
   return Math.min(0.75, penalty);
 }
+
+export function correlationBlockers(legs: Array<{
+  fixtureId: string;
+  market: MarketKey | string;
+  selection?: string;
+  line?: number;
+}>): string[] {
+  const blockers: string[] = [];
+  for (let i = 0; i < legs.length; i++) {
+    for (let j = i + 1; j < legs.length; j++) {
+      const left = legs[i];
+      const right = legs[j];
+      if (left.fixtureId !== right.fixtureId) continue;
+      const pair = [left.market, right.market].sort().join(':');
+      if (left.market === right.market) blockers.push(`same-fixture duplicate market: ${left.fixtureId}:${left.market}`);
+      if (pair === 'btts:goals_over_under') blockers.push(`same-fixture btts/totals correlation: ${left.fixtureId}`);
+      if (pair === 'goals_over_under:h2h') blockers.push(`same-fixture h2h/totals correlation: ${left.fixtureId}`);
+      if (pair === 'double_chance:goals_over_under') blockers.push(`same-fixture double_chance/totals correlation: ${left.fixtureId}`);
+    }
+  }
+  return [...new Set(blockers)];
+}

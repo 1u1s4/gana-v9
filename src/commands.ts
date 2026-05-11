@@ -113,7 +113,7 @@ type OptionalRunService = {
   runFixtureScoring?: typeof runFixtureScoring;
   runParlayBuild?: typeof runParlayBuild;
   runValidation?: typeof runValidation;
-  runPipeline?: (config: AgentConfig, input: { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
+  runPipeline?: (config: AgentConfig, input: { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
   exportRunArtifacts?: (config: AgentConfig, input: { runId: string }, runtime: RuntimeContext) => Promise<RunExportResult>;
 };
 
@@ -521,12 +521,13 @@ function optionalRunValidationMode(flags: Record<string, string | true>): 'auto'
   throw new Error('--validate must be auto, force, or off.');
 }
 
-function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode } {
+function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] } {
   return {
     date: requireDateFlag(flags),
     runId: optionalStringFlag(flags, 'run-id'),
     validate: optionalRunValidationMode(flags),
     web: optionalResearchWebModeFlag(flags),
+    markets: optionalMarketsFlag(flags),
   };
 }
 
@@ -538,14 +539,17 @@ async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags:
   const fixtureId = requireStringFlag(flags, 'fixture-id');
   const service = await loadOptionalRunService();
   const runner = service.runFixtureScoring ?? runFixtureScoring;
-  return runner(ctx.config, { fixtureId, web: optionalResearchWebMode(flags) }, ctx.runtime);
+  return runner(ctx.config, { fixtureId, web: optionalResearchWebMode(flags), markets: optionalMarketsFlag(flags) }, ctx.runtime);
 }
 
 async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
   const portfolio = optionalStringFlag(flags, 'portfolio');
-  if (portfolio !== undefined && portfolio !== 'llm' && portfolio !== 'low-odds-top') throw new Error('--portfolio must be llm or low-odds-top when provided.');
-  if (portfolio === 'llm' || portfolio === 'low-odds-top') {
-    const selectedPortfolio: 'llm' | 'low-odds-top' = portfolio;
+  const deterministicPortfolios = new Set(['low-variance', 'balanced', 'totals', 'high-conviction', 'market-diverse']);
+  if (portfolio !== undefined && portfolio !== 'llm' && portfolio !== 'low-odds-top' && !deterministicPortfolios.has(portfolio)) {
+    throw new Error('--portfolio must be llm, low-odds-top, low-variance, balanced, totals, high-conviction, or market-diverse when provided.');
+  }
+  if (portfolio === 'llm' || portfolio === 'low-odds-top' || deterministicPortfolios.has(portfolio ?? '')) {
+    const selectedPortfolio = portfolio as NonNullable<Parameters<typeof runParlayBuild>[1]['portfolio']>;
     const input = {
       date: typeof flags.date === 'string' ? requireDateFlag(flags) : formatLocalDate(new Date()),
       sourceRunId: requireStringFlag(flags, 'run-id'),
@@ -1442,7 +1446,7 @@ commands.push({
   description: 'Normalize odds for a provider fixture',
   execute: async (args, ctx) => {
     const flags = parseFlags(args.split(' ').filter(Boolean));
-    const snapshot = await getApiFootballOddsSnapshot(ctx.config, requireStringFlag(flags, 'fixture-id'), ctx.runtime);
+    const snapshot = await getApiFootballOddsSnapshot(ctx.config, requireStringFlag(flags, 'fixture-id'), ctx.runtime, optionalMarketsFlag(flags));
     printOdds(snapshot.quotes, {
       oddsSnapshotId: snapshot.oddsSnapshotId,
       providerSnapshotId: snapshot.providerSnapshotId,
@@ -1458,6 +1462,7 @@ commands.push({
     const result = await runFixtureResearch(ctx.config, {
       fixtureId: requireStringFlag(flags, 'fixture-id'),
       web: optionalResearchWebMode(flags),
+      markets: optionalMarketsFlag(flags),
     }, ctx.runtime);
     printResearchResult(result);
   },
@@ -1747,7 +1752,7 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
 
     if (area === 'odds') {
       const flags = parseFlags(argv.slice(1));
-      const snapshot = await getApiFootballOddsSnapshot(ctx.config, requireStringFlag(flags, 'fixture-id'), ctx.runtime);
+      const snapshot = await getApiFootballOddsSnapshot(ctx.config, requireStringFlag(flags, 'fixture-id'), ctx.runtime, optionalMarketsFlag(flags));
       printOdds(snapshot.quotes, {
         oddsSnapshotId: snapshot.oddsSnapshotId,
         providerSnapshotId: snapshot.providerSnapshotId,
@@ -1760,6 +1765,7 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       const result = await runFixtureResearch(ctx.config, {
         fixtureId: requireStringFlag(flags, 'fixture-id'),
         web: optionalResearchWebMode(flags),
+        markets: optionalMarketsFlag(flags),
       }, ctx.runtime);
       printResearchResult(result);
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
@@ -1922,16 +1928,17 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana approve APPROVAL_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana deny APPROVAL_ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana fixtures --date YYYY-MM-DD${RESET}`);
-  console.log(`  ${CYAN}pnpm gana odds --fixture-id ID${RESET}`);
-  console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live${RESET}`);
-  console.log(`  ${CYAN}pnpm gana score --fixture-id ID --web live${RESET}`);
+  console.log(`  ${CYAN}pnpm gana odds --fixture-id ID --markets h2h,btts${RESET}`);
+  console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live --markets h2h,btts${RESET}`);
+  console.log(`  ${CYAN}pnpm gana score --fixture-id ID --web live --markets h2h,btts${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
-  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --validate auto|force|off${RESET}`);
+  console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-smoke${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);
@@ -1940,6 +1947,6 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana dashboard --port 4317${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
-  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);
+  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20 --markets double_chance,btts${RESET}`);
   console.log(`  ${CYAN}pnpm gana filters show${RESET}`);
 }

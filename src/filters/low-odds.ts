@@ -1,4 +1,5 @@
 import type { AgentConfig } from '../config.js';
+import { isMarketKey, isValidMarketSelection, type MarketKey } from '../domain/markets.js';
 import { getApiFootballDateOddsSlate } from '../providers/sports/api-football.js';
 import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
@@ -95,8 +96,8 @@ export async function scanLowOdds(
     querySnapshot: toJsonValue({
       date: filters.date,
       threshold: filters.threshold,
-      markets: ['h2h'],
-      marketScope: 'h2h-home-away',
+      markets: filters.markets,
+      marketScope: filters.markets,
       bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
     }),
   });
@@ -111,7 +112,7 @@ export async function scanLowOdds(
   let fixtureEvaluations: LowOddsScanView['fixtureEvaluations'] = [];
 
   try {
-    const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime);
+    const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime, undefined, filters.markets);
     fixtureDiscovery = {
       fixtures: slate.fixtures,
       evaluations: slate.fixtures.map((fixture) => ({
@@ -135,7 +136,7 @@ export async function scanLowOdds(
           addEvaluationReason(fixtureEvaluations, fixture.providerFixtureId, 'excluded-missing-odds');
           continue;
         }
-        const marketQuotes = snapshot.quotes.filter(isLowOddsFixtureSelectorQuote);
+        const marketQuotes = snapshot.quotes.filter((quote) => isLowOddsFixtureSelectorQuote(quote, filters.markets));
         const bookmakerQuotes = filters.bookmakerAllowlist?.length
           ? marketQuotes.filter((quote) => quote.bookmaker && filters.bookmakerAllowlist?.includes(quote.bookmaker))
           : marketQuotes;
@@ -209,8 +210,8 @@ export async function scanLowOdds(
       querySnapshot: toJsonValue({
         date: filters.date,
         threshold: filters.threshold,
-        markets: ['h2h'],
-        marketScope: 'h2h-home-away',
+        markets: filters.markets,
+        marketScope: filters.markets,
         bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
         requestedLeagues: fixtureDiscovery.requestedLeagues,
         requestedTeams: fixtureDiscovery.requestedTeams,
@@ -232,6 +233,8 @@ export async function scanLowOdds(
     scanId: scan.id,
     date: filters.date,
     threshold: filters.threshold,
+    marketScope: filters.markets,
+    marketCoverage: buildLowOddsMarketCoverage(filters.markets, fixtureDiscovery.fixtures.length ? hits : [], fixtureDiscovery.fixtures.length ? fixtureEvaluations : []),
     fixtureCount: fixtureDiscovery.fixtures.length,
     hitCount: hits.length,
     hits,
@@ -241,8 +244,15 @@ export async function scanLowOdds(
   };
 }
 
-function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }): boolean {
-  return quote.market === 'h2h' && (quote.selection === 'home' || quote.selection === 'away');
+function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }, markets: readonly MarketKey[]): boolean {
+  return isMarketKey(quote.market)
+    && markets.includes(quote.market)
+    && isLowOddsFixtureSelection(quote.market, quote.selection);
+}
+
+function isLowOddsFixtureSelection(market: MarketKey, selection: string): boolean {
+  if (market === 'h2h') return selection === 'home' || selection === 'away';
+  return isValidMarketSelection(market, selection);
 }
 
 export async function persistLowOddsScanResult(
@@ -257,8 +267,8 @@ export async function persistLowOddsScanResult(
     querySnapshot: toJsonValue({
       date: input.date,
       threshold: input.threshold,
-      markets: ['h2h'],
-      marketScope: 'h2h-home-away',
+      markets: input.markets,
+      marketScope: input.markets,
       bookmakerAllowlist: input.bookmakerAllowlist ?? [],
     }),
   });
@@ -292,8 +302,8 @@ export async function persistLowOddsScanResult(
       querySnapshot: toJsonValue({
         date: input.date,
         threshold: input.threshold,
-        markets: ['h2h'],
-        marketScope: 'h2h-home-away',
+        markets: input.markets,
+        marketScope: input.markets,
         bookmakerAllowlist: input.bookmakerAllowlist ?? [],
         requestedLeagues: input.requestedLeagues ?? [],
         requestedTeams: input.requestedTeams ?? [],
@@ -312,6 +322,20 @@ export async function persistLowOddsScanResult(
   }
 
   return scan.id;
+}
+
+function buildLowOddsMarketCoverage(
+  requestedMarkets: readonly string[],
+  hits: LowOddsHitView[],
+  _evaluations: LowOddsScanView['fixtureEvaluations'],
+): NonNullable<LowOddsScanView['marketCoverage']> {
+  const hitMarkets = [...new Set(hits.map((hit) => hit.market))].sort();
+  return {
+    requestedMarkets: [...requestedMarkets],
+    quotedMarkets: hitMarkets,
+    hitMarkets,
+    missingMarkets: requestedMarkets.filter((market) => !hitMarkets.includes(market)),
+  };
 }
 
 function addEvaluationReason(

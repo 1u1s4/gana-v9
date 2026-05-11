@@ -99,6 +99,21 @@ function agentOutput(overrides: Record<string, unknown> = {}) {
   });
 }
 
+function emitNativeWebSearch(options: any, query = 'fixture 1001 team news injuries') {
+  options?.onEvent?.({
+    type: 'tool_call',
+    name: 'web_search',
+    callId: `web-${query}`,
+    args: { query },
+  });
+  options?.onEvent?.({
+    type: 'tool_result',
+    name: 'web_search',
+    callId: `web-${query}`,
+    output: `Search completed: ${query}`,
+  });
+}
+
 describe('runFixtureResearch', () => {
   it('keeps the Codex response schema strict-compatible for claim subjects', () => {
     const schema = JSON.parse(readFileSync('skills/research-fixture-v2/output.schema.json', 'utf8'));
@@ -119,6 +134,7 @@ describe('runFixtureResearch', () => {
       provider: { getFixture: async () => fixture },
       agentRunner: async (_config, _input, options) => {
         requiredWeb = options?.nativeWebSearchRequirement?.required ?? false;
+        emitNativeWebSearch(options);
         return { text: agentOutput(), usage: {}, output: agentOutput() };
       },
       persistBundle: async (bundle) => {
@@ -155,8 +171,9 @@ describe('runFixtureResearch', () => {
           return oddsSnapshot;
         },
       },
-      agentRunner: async (_config, input) => {
+      agentRunner: async (_config, input, options) => {
         prompt = typeof input === 'string' ? input : JSON.stringify(input);
+        emitNativeWebSearch(options);
         return { text: agentOutput(), usage: {}, output: agentOutput() };
       },
       persistBundle: async () => {},
@@ -201,7 +218,57 @@ describe('runFixtureResearch', () => {
 
     assert.equal(result.bundle?.gateResult.verdict, 'review-required');
     assert.equal(result.bundle?.sources.some((source) => source.type === 'web-search'), false);
-    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no real web-search source|no web-search source/);
+  });
+
+  it('requires a real native web-search tool call even when live output includes a web source', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      gateResult: {
+        verdict: 'promotable',
+        reasons: ['agent marked research promotable'],
+        warnings: [],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.equal(result.bundle?.sources.some((source) => source.type === 'web-search' && source.url), true);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no real Codex web_search tool call was observed/);
+  });
+
+  it('surfaces an explicit browser fallback warning for live web providers without native search', async () => {
+    const cfg = loadConfig({
+      artifactRoot: mkdtempSync(join(tmpdir(), 'gana-research-test-')),
+      provider: 'openrouter',
+      model: 'openai/gpt-5.5',
+      nativeWebSearch: false,
+    }, { skipApiKey: true });
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      gateResult: {
+        verdict: 'promotable',
+        reasons: ['agent marked research promotable'],
+        warnings: [],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: output, usage: {}, output }),
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /OpenRouter\/browser fallback|no native web-search tool|browser fallback/i);
   });
 
   it('normalizes web-search capturedAt offsets before schema validation', async () => {
@@ -220,7 +287,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -300,9 +370,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => {
+      agentRunner: async (_config, _input, options) => {
         attempts += 1;
         if (attempts === 1) return { text: emptyOutput, usage: {}, output: emptyOutput };
+        emitNativeWebSearch(options);
         const output = agentOutput({
           gateResult: {
             verdict: 'promotable',
@@ -329,7 +400,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -411,7 +485,10 @@ describe('runFixtureResearch', () => {
         getFixtureStatistics: async () => fixtureStatistics,
         getCanonicalOddsSnapshot: async () => oddsSnapshot,
       },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -445,6 +522,7 @@ describe('runFixtureResearch', () => {
       provider: { getFixture: async () => fixture },
       agentRunner: async (_config, _input, options) => {
         sawAbortSignal = options?.signal instanceof AbortSignal;
+        emitNativeWebSearch(options);
         return { text: output, usage: {}, output };
       },
       persistBundle: async () => {},
@@ -473,7 +551,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -499,7 +580,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -525,7 +609,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -590,7 +677,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -654,7 +744,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -733,7 +826,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async () => ({ text: output, usage: {}, output }),
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
       persistBundle: async () => {},
     });
 
@@ -768,7 +864,7 @@ describe('runFixtureResearch', () => {
     assert.equal(result.bundle?.claims[0]?.evidenceIds[0], result.bundle?.evidenceItems[0]?.id);
     assert.match(result.bundle?.gateResult.reasons.join('\n') ?? '', /insufficient for promotion/);
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /agentic research failed/);
-    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no real web-search source|no web-search source/);
     assert.doesNotMatch(JSON.stringify(result.bundle), /super-secret-token/);
     assert.match(JSON.stringify(result.bundle), /\[REDACTED\]/);
     assert.equal(persisted.length, 1);
@@ -789,9 +885,10 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async (_config, input) => {
+      agentRunner: async (_config, input, options) => {
         attempts += 1;
         retryPrompt = String(input);
+        if (attempts > 1) emitNativeWebSearch(options);
         return {
           text: attempts === 1 ? '{"sources":[' : agentOutput({
             gateResult: { verdict: 'promotable', reasons: ['retry returned valid JSON'], warnings: [] },
@@ -818,10 +915,11 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async (_config, input) => {
+      agentRunner: async (_config, input, options) => {
         attempts += 1;
         retryPrompt = String(input);
         if (attempts === 1) throw new Error('research agent timed out after 300s');
+        emitNativeWebSearch(options);
         return {
           text: agentOutput({
             gateResult: { verdict: 'promotable', reasons: ['minimal timeout retry returned valid JSON'], warnings: [] },

@@ -893,6 +893,60 @@ describe('runParlayBuild', () => {
     assert.equal(result.portfolio?.parlays.length, 0);
   });
 
+  it('builds deterministic market-diverse parlays with ranking, diversification, and correlation diagnostics', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    const artifactNames: string[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-diverse',
+      portfolio: 'market-diverse',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => {
+        artifactNames.push(name);
+        return `/tmp/${name}`;
+      },
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-diverse');
+            return [
+              prediction({ id: 'prediction-h2h', runId: 'source-run-diverse', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.35, confidence: 0.84, edge: 0.05, estimatedProbability: 0.82 }),
+              prediction({ id: 'prediction-btts', runId: 'source-run-diverse', fixtureId: 'fixture-2', marketKey: 'btts', selectionKey: 'yes', odds: 1.48, confidence: 0.8, edge: 0.04, estimatedProbability: 0.76 }),
+              prediction({ id: 'prediction-goals', runId: 'source-run-diverse', fixtureId: 'fixture-3', marketKey: 'goals_over_under', selectionKey: 'over', line: 2.5, odds: 1.55, confidence: 0.79, edge: 0.04, estimatedProbability: 0.74 }),
+              prediction({ id: 'prediction-corners', runId: 'source-run-diverse', fixtureId: 'fixture-4', marketKey: 'corners_over_under', selectionKey: 'under', line: 9.5, odds: 1.5, confidence: 0.78, edge: 0.04, estimatedProbability: 0.73 }),
+              prediction({ id: 'prediction-correlated-total', runId: 'source-run-diverse', fixtureId: 'fixture-1', marketKey: 'goals_over_under', selectionKey: 'over', line: 1.5, odds: 1.42, confidence: 0.79, edge: 0.04, estimatedProbability: 0.74 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-market-diverse' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    const markets = new Set(result.build.parlay.legs.map((leg) => leg.market));
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.profiles[0].profile, 'market-diverse');
+    assert.equal(result.portfolio?.promptVersion, 'deterministic-market-diverse-v1');
+    assert.equal(markets.size >= 3, true);
+    assert.match(result.build.parlay.rationale, /candidate-generator, ranker, diversifier, and correlation checks/);
+    assert.equal(result.portfolio?.rejected.some((entry) => entry.reasons.some((reason) => /same-fixture h2h\/totals correlation/.test(reason))), true);
+    assert.equal(persisted.length, result.portfolio?.parlays.length);
+    assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'market-diverse');
+    assert.equal(typeof persisted[0].parlay.metadata.candidateDiagnostics.expectedEdge, 'number');
+    assert.deepEqual(artifactNames.slice(0, 2), ['parlay-market-diverse.json', 'parlays.json']);
+  });
+
   it('writes a blocked artifact when database access is unavailable', async () => {
     const cfg = config({ databaseUrl: '' });
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

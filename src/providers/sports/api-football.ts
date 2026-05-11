@@ -6,6 +6,7 @@ import type { SportsProvider } from '../../domain/ids.js';
 import type { OddsQuote } from '../../domain/odds.js';
 import { consensusFairPrices } from '../../markets/fair-price.js';
 import { isLowLiquidity, marketEfficiencyScore } from '../../markets/efficiency.js';
+import type { MarketKey } from '../../domain/markets.js';
 import { redactSecrets } from '../../permissions/redaction.js';
 import type { RuntimeContext } from '../../runtime/context.js';
 import { createStorageRepositories } from '../../storage/repositories/index.js';
@@ -214,16 +215,16 @@ export class ApiFootballProvider implements SportsDataProvider {
       fixture,
       providerFixtureId: input.fixtureId,
       pages,
-      mappedQuotes,
+      mappedQuotes: filterQuotesByMarkets(mappedQuotes, input.markets ?? this.config.apiFootball.defaultMarkets),
       extraMetadata: {},
     });
   }
 
-  async getCanonicalOddsSnapshotsForDate(input: { date: string; fixtures?: Fixture[] }): Promise<CanonicalOddsSnapshot[]> {
+  async getCanonicalOddsSnapshotsForDate(input: { date: string; fixtures?: Fixture[]; markets?: MarketKey[] }): Promise<CanonicalOddsSnapshot[]> {
     return (await this.getCanonicalOddsSlateForDate(input)).snapshots;
   }
 
-  async getCanonicalOddsSlateForDate(input: { date: string; fixtures?: Fixture[] }): Promise<ApiFootballDateOddsSlate> {
+  async getCanonicalOddsSlateForDate(input: { date: string; fixtures?: Fixture[]; markets?: MarketKey[] }): Promise<ApiFootballDateOddsSlate> {
     const pages = await this.requestPagedDateOdds(input.date);
     const fixtureIds = uniqueStrings(pages.flatMap((page) => extractApiFootballResponseArray(page.payload, 'odds')
       .map((fixtureOdds) => stringifyFixtureProviderId((fixtureOdds as any)?.fixture?.id))
@@ -249,7 +250,7 @@ export class ApiFootballProvider implements SportsDataProvider {
           fixture,
           providerFixtureId,
           pages: [page],
-          mappedQuotes,
+          mappedQuotes: filterQuotesByMarkets(mappedQuotes, input.markets ?? this.config.apiFootball.defaultMarkets),
           extraMetadata: { source: 'api-football.odds.date', date: input.date },
         }));
       }
@@ -623,6 +624,7 @@ export async function getApiFootballOddsSnapshot(
   config: AgentConfig,
   providerFixtureId: string,
   runtime?: RuntimeContext,
+  markets?: MarketKey[],
 ): Promise<CanonicalOddsSnapshot> {
   if (!config.databaseUrl) {
     throw new Error('DATABASE_URL is required to persist odds snapshots and quotes.');
@@ -632,7 +634,7 @@ export async function getApiFootballOddsSnapshot(
     throw new Error('Database persistence is required to store odds snapshots and quotes.');
   }
   const provider = createApiFootballProvider(config, persistence) as ApiFootballProvider;
-  return provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId });
+  return provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId, markets });
 }
 
 export async function getApiFootballDateOddsSnapshots(
@@ -640,8 +642,9 @@ export async function getApiFootballDateOddsSnapshots(
   date: string,
   fixtures?: Fixture[],
   runtime?: RuntimeContext,
+  markets?: MarketKey[],
 ): Promise<CanonicalOddsSnapshot[]> {
-  return (await getApiFootballDateOddsSlate(config, date, runtime, fixtures)).snapshots;
+  return (await getApiFootballDateOddsSlate(config, date, runtime, fixtures, markets)).snapshots;
 }
 
 export async function getApiFootballDateOddsSlate(
@@ -649,6 +652,7 @@ export async function getApiFootballDateOddsSlate(
   date: string,
   runtime?: RuntimeContext,
   fixtures?: Fixture[],
+  markets?: MarketKey[],
 ): Promise<ApiFootballDateOddsSlate> {
   if (!config.databaseUrl) {
     throw new Error('DATABASE_URL is required to persist odds snapshots and quotes.');
@@ -658,7 +662,7 @@ export async function getApiFootballDateOddsSlate(
     throw new Error('Database persistence is required to store odds snapshots and quotes.');
   }
   const provider = createApiFootballProvider(config, persistence) as ApiFootballProvider;
-  return provider.getCanonicalOddsSlateForDate({ date, fixtures });
+  return provider.getCanonicalOddsSlateForDate({ date, fixtures, markets });
 }
 
 export async function createApiFootballPersistence(
@@ -839,6 +843,12 @@ function filterQuotesByBookmakerAllowlist(quotes: OddsQuote[], allowlist: string
   const normalizedAllowlist = normalizeBookmakerAllowlist(allowlist);
   if (!normalizedAllowlist.size) return quotes;
   return quotes.filter((quote) => isAllowedBookmaker(quote.bookmaker, normalizedAllowlist));
+}
+
+function filterQuotesByMarkets(quotes: OddsQuote[], markets: readonly MarketKey[] | undefined): OddsQuote[] {
+  if (!markets?.length) return quotes;
+  const allowed = new Set(markets);
+  return quotes.filter((quote) => allowed.has(quote.market));
 }
 
 function dedupeNormalizedFixtures(fixtures: NormalizedFixture[]): NormalizedFixture[] {

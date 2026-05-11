@@ -919,6 +919,163 @@ describe('executeRunPipeline', () => {
     assert.equal(evaluation.counts.predictions, 1);
   });
 
+  it('propagates requested markets through odds, low-odds, research, scoring, and artifacts', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const observed: Record<string, unknown[]> = {};
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      web: 'off',
+      validate: false,
+      markets: ['double_chance'],
+    }, runtime, {
+      createRunId: () => 'run-market-scope',
+      now: () => new Date('2026-04-29T12:00:00.000Z'),
+      discoverFixtures: async () => ({
+        fixtures: [target],
+        evaluations: [{
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        }],
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchOddsSnapshot: async (_config, _providerFixtureId, _runtime, markets) => {
+        observed.odds = markets ?? [];
+        return {
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          oddsSnapshotId: 'odds-snapshot-1',
+          providerSnapshotId: 'provider-snapshot-1',
+          quoteRecordIds: {
+            'test-book|double_chance|home_or_draw|': 'odds-quote-double',
+          },
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: 'hash',
+          quotes: [
+            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+          ],
+        };
+      },
+      discoverLowOddsFixtures: async () => ({
+        fixtures: [target],
+        evaluations: [{
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        }],
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchLowOddsSnapshot: async (_config, _providerFixtureId, _runtime, markets) => {
+        observed.lowOdds = markets ?? [];
+        return {
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          oddsSnapshotId: 'odds-snapshot-1',
+          providerSnapshotId: 'provider-snapshot-1',
+          quoteRecordIds: {
+            'test-book|double_chance|home_or_draw|': 'odds-quote-double',
+          },
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: 'hash',
+          quotes: [
+            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+          ],
+        };
+      },
+      researchFixture: async (_config, input) => {
+        observed.research = input.markets ?? [];
+        return {
+          ok: true,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          bundle: {
+            sources: [{ type: 'web-search', metadata: {}, url: 'https://example.com', capturedAt: '2026-04-29T12:00:00.000Z' }],
+            metadata: { marketCoverage: { requiredMarkets: ['double_chance'], quotedMarkets: ['double_chance'], evidenceMarkets: ['double_chance'], skippedMarkets: [] } },
+          },
+        } as any;
+      },
+      scoreFixture: async (_config, input) => {
+        observed.score = input.markets ?? [];
+        return {
+          ok: true,
+          runId: 'run-market-scope',
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          predictions: [predictionRecord({
+            runId: 'run-market-scope',
+            fixtureId: target.id,
+            providerFixtureId: target.providerFixtureId,
+            oddsQuoteId: 'odds-quote-double',
+            market: 'double_chance',
+            selection: 'home_or_draw',
+          })],
+          marketCoverage: {
+            requestedMarkets: ['double_chance'],
+            quotedMarkets: ['double_chance'],
+            predictedMarkets: ['double_chance'],
+            skippedMarkets: [],
+          },
+        } as any;
+      },
+      buildParlay: async () => ({
+        ok: false,
+        runId: 'run-market-scope',
+        date: '2026-04-29',
+        gateResult: { verdict: 'blocked', reasons: ['no predictions found'], warnings: [] },
+        build: {
+          parlay: {
+            id: 'parlay-1',
+            sourceRunId: 'run-market-scope',
+            legs: [],
+            aggregateConfidence: 0,
+            aggregateQuality: 0,
+            rationale: 'test',
+            warnings: [],
+            status: 'blocked',
+            generatedAt: '2026-04-29T12:00:00.000Z',
+          },
+          evaluations: [],
+          config: {
+            minLegs: 2,
+            maxLegs: 4,
+            allowMultipleLegsPerFixture: false,
+            minPredictionConfidence: 0,
+          },
+        },
+      }),
+    });
+
+    assert.deepEqual(observed.odds, ['double_chance']);
+    assert.deepEqual(observed.lowOdds, ['double_chance']);
+    assert.deepEqual(observed.research, ['double_chance']);
+    assert.deepEqual(observed.score, ['double_chance']);
+    assert.equal(result.lowOddsScan.hitCount, 1);
+    assert.equal(result.lowOddsScan.hits[0]?.market, 'double_chance');
+
+    const inputArtifact = JSON.parse(readFileSync(join(result.artifactDir, 'input.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
+    const handoff = readFileSync(result.handoffPath, 'utf-8');
+    assert.deepEqual(inputArtifact.marketScope, ['double_chance']);
+    assert.deepEqual(evaluation.marketCoverage.requestedMarkets, ['double_chance']);
+    assert.equal(evaluation.webSearchCoverage.required, false);
+    assert.deepEqual(manifest.marketCoverage.requestedMarkets, ['double_chance']);
+    assert.equal(manifest.webSearchCoverage.required, false);
+    assert.match(handoff, /marketCoverage:/);
+    assert.match(handoff, /webSearchCoverage:/);
+  });
+
   it('tracks low-odds prediction coverage across all requested league presets', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');

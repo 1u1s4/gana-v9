@@ -19,6 +19,10 @@ import type {
   StoragePrismaClient,
 } from '../storage/types.js';
 import { buildParlay } from './builder.js';
+import { generateParlayCandidates, type ParlayCandidate } from './candidate-generator.js';
+import { correlationBlockers, correlationPenalty } from './correlation.js';
+import { diversifyParlays } from './diversifier.js';
+import { rankParlayCandidates } from './ranker.js';
 import {
   calculateAggregateConfidence,
   calculateAggregateQuality,
@@ -35,6 +39,7 @@ import type {
   ParlaySourcePrediction,
   ResolvedParlayConfig,
 } from './types.js';
+import { marketFamily } from '../domain/markets.js';
 
 const MAIN_PARLAY_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'promotable'];
 const PORTFOLIO_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
@@ -64,7 +69,8 @@ const LOW_ODDS_TOP_PROFILE = {
   reviewOnly: false,
 } as const;
 
-type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'] | typeof LOW_ODDS_TOP_PROFILE['key'];
+type DeterministicParlayProfile = 'low-variance' | 'balanced' | 'totals' | 'high-conviction' | 'market-diverse';
+type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'] | typeof LOW_ODDS_TOP_PROFILE['key'] | DeterministicParlayProfile;
 type ParlayPortfolioProfileSpec = typeof PORTFOLIO_PROFILES[number] | typeof LOW_ODDS_TOP_PROFILE;
 
 interface ParsedPortfolioParlay {
@@ -92,7 +98,7 @@ type PortfolioValidationResult =
 export interface RunParlayBuildInput {
   date: string;
   sourceRunId?: string;
-  portfolio?: 'llm' | 'low-odds-top';
+  portfolio?: 'llm' | 'low-odds-top' | DeterministicParlayProfile;
   configOverrides?: ParlayConfig;
 }
 
@@ -238,6 +244,9 @@ export async function runParlayBuild(
   }
   if (input.portfolio === 'low-odds-top') {
     return runLowOddsTopPortfolio(config, input, runtime, repositories, artifactWriter, deps, now);
+  }
+  if (isDeterministicParlayProfile(input.portfolio)) {
+    return runDeterministicParlayProfile(config, input, runtime, repositories, artifactWriter, deps, now, input.portfolio);
   }
 
   const predictionQuery = {
@@ -698,6 +707,365 @@ async function runLowOddsTopPortfolio(
     await upsertRun(config, runtime, repositories, runId, 'blocked', 'failed', now(), date).catch(() => undefined);
     return { ...result, portfolio, error };
   }
+}
+
+function isDeterministicParlayProfile(value: unknown): value is DeterministicParlayProfile {
+  return value === 'low-variance'
+    || value === 'balanced'
+    || value === 'totals'
+    || value === 'high-conviction'
+    || value === 'market-diverse';
+}
+
+async function runDeterministicParlayProfile(
+  config: AgentConfig,
+  input: RunParlayBuildInput,
+  runtime: RuntimeContext,
+  repositories: ParlayServiceRepositories,
+  artifactWriter: (runId: string, name: string, payload: unknown) => string,
+  deps: ParlayBuildDependencies,
+  now: () => Date,
+  profile: DeterministicParlayProfile,
+): Promise<ParlayBuildRunResult> {
+  const runId = runtime.runId ?? randomUUID();
+  runtime.runId = runId;
+  const sourceRunId = input.sourceRunId;
+  const generatedAt = now().toISOString();
+  if (!sourceRunId) {
+    return blockedResult(runId, input, artifactWriter, generatedAt, {
+      error: `--run-id is required when --portfolio ${profile} is used.`,
+      reasons: ['missing source run id'],
+    });
+  }
+
+  const spec = deterministicProfileSpec(profile);
+  const records = await repositories.predictions.list({
+    runId: sourceRunId,
+    status: PORTFOLIO_PREDICTION_STATUSES,
+    take: 500,
+  });
+  const sourcePredictions = records.map(toSourcePrediction).map(decoratePortfolioPrediction);
+  const excludedReasons = sourcePredictions
+    .map((prediction) => ({ predictionId: prediction.id, reasons: deterministicProfileExclusionReasons(prediction, spec) }))
+    .filter((item) => item.reasons.length > 0);
+  const pool = sourcePredictions.filter((prediction) => deterministicProfileExclusionReasons(prediction, spec).length === 0);
+  const generatedCandidates = generateParlayCandidates(pool, spec.maxLegs)
+    .map((candidate) => ({
+      ...candidate,
+      blockers: uniqueStrings([
+        ...candidate.blockers,
+        ...deterministicCandidateBlockers(candidate, pool, spec),
+      ]),
+    }));
+  const ranked = rankParlayCandidates(generatedCandidates, spec.riskWeight);
+  const diversified = profile === 'market-diverse'
+    ? diversifyMarketDiverseCandidates(ranked, pool, spec.targetParlays)
+    : diversifyParlays(ranked).concat(ranked.filter((candidate) => !candidate.blockers.length)).slice(0, spec.targetParlays);
+  const accepted = uniqueCandidates(diversified).filter((candidate) => !candidate.blockers.length).slice(0, spec.targetParlays);
+  const builds = accepted.map((candidate) => ({
+    profile,
+    build: buildFromCandidate(candidate, pool, profile, sourceRunId, generatedAt, spec),
+  }));
+  const rejected = generatedCandidates
+    .filter((candidate) => candidate.blockers.length > 0)
+    .slice(0, 100)
+    .map((candidate, index) => ({
+      profile,
+      index,
+      reasons: candidate.blockers,
+    }));
+  const warnings = builds.length
+    ? [`deterministic ${profile} generated ${builds.length} analytical parlay(s)`]
+    : [`deterministic ${profile} pool has ${pool.length} eligible prediction(s); ${spec.minLegs} required`];
+  const portfolioId = randomUUID();
+  const portfolio: ParlayPortfolio = {
+    id: portfolioId,
+    sourceRunId,
+    promptVersion: `deterministic-${profile}-v1`,
+    profiles: [{
+      profile,
+      promptVersion: `deterministic-${profile}-v1`,
+      requested: spec.targetParlays,
+      included: builds.length,
+      rejected: rejected.length + excludedReasons.length,
+      warnings,
+    }],
+    parlays: builds,
+    rejected,
+    diagnostics: {
+      sourcePredictions: sourcePredictions.length,
+      pool: [{
+        profile,
+        eligible: pool.length,
+        excluded: excludedReasons.length,
+        excludedReasons,
+      }],
+      agentOutputs: [{
+        profile,
+        rawOutput: '',
+        noParlayReason: builds.length ? undefined : warnings[0],
+        warnings,
+      }],
+    },
+  };
+  const gateResult = gateFromPortfolio(portfolio);
+  const representativeBuild = builds[0]?.build ?? buildParlay({
+    id: randomUUID(),
+    sourceRunId,
+    generatedAt,
+    predictions: [],
+    config: {
+      minLegs: spec.minLegs,
+      maxLegs: spec.maxLegs,
+      minPredictionConfidence: spec.minConfidence,
+      maxCombinedOdds: spec.maxOdds,
+    },
+  });
+  const artifactPayload = portfolioArtifactPayloadFor(runId, input.date, generatedAt, portfolio, gateResult);
+  const artifactPath = artifactWriter(
+    runId,
+    builds.length ? `parlay-${profile}.json` : `parlay-${profile}-blocked.json`,
+    artifactPayload,
+  );
+  if (builds.length) {
+    artifactWriter(
+      runId,
+      'parlays.json',
+      artifactPayloadFor(runId, input.date, generatedAt, representativeBuild, gateFromBuild(representativeBuild)),
+    );
+  }
+
+  try {
+    await upsertRun(config, runtime, repositories, runId, gateResult.verdict, gateResult.verdict === 'blocked' ? 'failed' : 'succeeded', now(), input.date);
+    const artifact = await (deps.persistArtifact ?? defaultPersistArtifact(repositories))({
+      runId,
+      path: artifactPath,
+      payload: artifactPayload,
+      date: input.date,
+    });
+    const persistedParlayIds: string[] = [];
+    for (const entry of builds) {
+      const persisted = await (deps.persistParlay ?? defaultPersistParlay(repositories))({
+        parlay: toParlayInput(entry.build, runId, artifact?.id ?? null, input.date, {
+          portfolioId,
+          portfolioProfile: profile,
+          sourceRunId,
+          promptVersion: `deterministic-${profile}-v1`,
+          candidateDiagnostics: {
+            expectedEdge: candidateMetricForBuild(entry.build, accepted, 'expectedEdge'),
+            correlationPenalty: candidateMetricForBuild(entry.build, accepted, 'correlationPenalty'),
+          },
+        }),
+        legs: entry.build.parlay.legs.map(toParlayLegInput),
+      });
+      if (persisted?.id) persistedParlayIds.push(persisted.id);
+    }
+    return {
+      ok: gateResult.verdict !== 'blocked',
+      runId,
+      date: input.date,
+      gateResult,
+      build: representativeBuild,
+      portfolio,
+      persistedParlayId: persistedParlayIds[0],
+      persistedParlayIds,
+      artifactPath,
+    };
+  } catch (err: any) {
+    const error = err?.message ?? String(err);
+    const result = blockedResult(runId, input, artifactWriter, generatedAt, {
+      error,
+      reasons: [`${profile} portfolio persistence failed`],
+    });
+    await upsertRun(config, runtime, repositories, runId, 'blocked', 'failed', now(), input.date).catch(() => undefined);
+    return { ...result, portfolio, error };
+  }
+}
+
+interface DeterministicProfileSpec {
+  profile: DeterministicParlayProfile;
+  minLegs: number;
+  maxLegs: number;
+  minOdds: number;
+  maxOdds: number;
+  targetParlays: number;
+  minConfidence: number;
+  minEdge: number;
+  markets?: MarketKey[];
+  requireLine?: boolean;
+  avoidDrawExposure?: boolean;
+  requireMarketDiversity?: boolean;
+  riskWeight: number;
+}
+
+function deterministicProfileSpec(profile: DeterministicParlayProfile): DeterministicProfileSpec {
+  switch (profile) {
+    case 'low-variance':
+      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.25, maxOdds: 2.4, targetParlays: 6, minConfidence: 0.72, minEdge: 0.005, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, riskWeight: 0.7 };
+    case 'balanced':
+      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.8, maxOdds: 4.0, targetParlays: 6, minConfidence: 0.65, minEdge: 0.01, markets: ['h2h', 'btts', 'goals_over_under'], riskWeight: 0.55 };
+    case 'totals':
+      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.6, maxOdds: 4.5, targetParlays: 6, minConfidence: 0.62, minEdge: 0.01, markets: ['goals_over_under', 'corners_over_under'], requireLine: true, riskWeight: 0.6 };
+    case 'high-conviction':
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.8, targetParlays: 5, minConfidence: 0.72, minEdge: 0.035, riskWeight: 0.45 };
+    case 'market-diverse':
+      return { profile, minLegs: 3, maxLegs: 5, minOdds: 2.0, maxOdds: 5.5, targetParlays: 6, minConfidence: 0.65, minEdge: 0.01, requireMarketDiversity: true, riskWeight: 0.5 };
+  }
+}
+
+function deterministicProfileExclusionReasons(
+  prediction: ParlaySourcePrediction,
+  spec: DeterministicProfileSpec,
+): string[] {
+  const reasons: string[] = [];
+  if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
+  if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
+  if (prediction.confidence < spec.minConfidence) reasons.push(`below ${spec.profile} confidence floor`);
+  if (hasRiskTag(prediction, 'negative_edge')) reasons.push('negative edge');
+  if (hasRiskTag(prediction, 'draw_exposure') && spec.avoidDrawExposure) reasons.push('draw exposure');
+  if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) {
+    reasons.push('fragile low total over with low edge');
+  }
+  if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) {
+    reasons.push('fragile low-price double chance with low edge');
+  }
+  if (spec.markets && !spec.markets.includes(prediction.market)) reasons.push(`market not allowed for ${spec.profile}`);
+  if (spec.requireLine && !Number.isFinite(prediction.line)) reasons.push('line required for totals profile');
+  if ((prediction.edge ?? 0) < spec.minEdge) reasons.push(`edge below ${spec.profile} floor`);
+  if (spec.avoidDrawExposure && (prediction.market === 'h2h' && prediction.selection === 'draw')) reasons.push('draw exposure');
+  if (spec.avoidDrawExposure && (prediction.market === 'double_chance' && prediction.selection === 'home_or_away')) reasons.push('draw exposure');
+  return [...new Set(reasons)];
+}
+
+function deterministicCandidateBlockers(
+  candidate: ParlayCandidate,
+  pool: readonly ParlaySourcePrediction[],
+  spec: DeterministicProfileSpec,
+): string[] {
+  const legs = candidate.legs.flatMap((id) => {
+    const prediction = pool.find((item) => item.id === id);
+    return prediction ? [prediction] : [];
+  });
+  const combinedOdds = candidate.combinedMarketOdds;
+  const families = new Set(legs.map((prediction) => marketFamily(prediction.market)));
+  const markets = new Set(legs.map((prediction) => prediction.market));
+  const blockers = correlationBlockers(legs);
+  if (legs.length < spec.minLegs || legs.length > spec.maxLegs) blockers.push(`leg count outside ${spec.minLegs}-${spec.maxLegs}`);
+  if (combinedOdds < spec.minOdds || combinedOdds > spec.maxOdds) blockers.push(`combined odds outside ${spec.minOdds}-${spec.maxOdds}`);
+  if (spec.requireMarketDiversity && markets.size < Math.min(3, legs.length)) blockers.push('insufficient market diversity');
+  if (spec.requireMarketDiversity && families.size < Math.min(2, legs.length)) blockers.push('insufficient market-family diversity');
+  if (correlationPenalty(legs) >= 0.35) blockers.push('correlation penalty too high');
+  return [...new Set(blockers)];
+}
+
+function buildFromCandidate(
+  candidate: ParlayCandidate,
+  pool: readonly ParlaySourcePrediction[],
+  profile: DeterministicParlayProfile,
+  sourceRunId: string,
+  generatedAt: string,
+  spec: DeterministicProfileSpec,
+): BuildParlayResult {
+  const selected = candidate.legs.flatMap((id) => {
+    const prediction = pool.find((item) => item.id === id);
+    return prediction ? [prediction] : [];
+  });
+  const parlayId = candidate.parlayId;
+  const legs: ParlayLeg[] = selected.map((prediction, index) => ({
+    parlayId,
+    predictionId: prediction.id,
+    fixtureId: prediction.fixtureId,
+    market: prediction.market,
+    selection: prediction.selection,
+    line: prediction.line,
+    odds: prediction.odds,
+    status: prediction.status,
+    index,
+    inclusionReason: 'included-eligible-prediction',
+  }));
+  const warnings = uniqueStrings([
+    `included by deterministic ${profile}: ${candidate.reason}`,
+    ...(candidate.correlationPenalty > 0 ? [`correlation penalty ${round(candidate.correlationPenalty)}`] : []),
+  ]);
+  const status: PredictionStatus = selected.some((prediction) => prediction.status === 'review-required' || prediction.warnings?.length)
+    ? 'review-required'
+    : selected.every((prediction) => prediction.status === 'promotable')
+      ? 'promotable'
+      : 'candidate';
+  return {
+    parlay: {
+      id: parlayId,
+      sourceRunId,
+      legs,
+      combinedOdds: round(candidate.combinedMarketOdds),
+      aggregateConfidence: round(calculateAggregateConfidence(selected)),
+      aggregateQuality: round(calculateAggregateQuality(selected)),
+      rationale: [
+        `Deterministic ${profile} analytical parlay selected by candidate-generator, ranker, diversifier, and correlation checks.`,
+        `Expected edge ${round(candidate.expectedEdge)}; combined fair probability ${round(candidate.combinedFairProbability)}.`,
+      ].join(' '),
+      warnings,
+      status,
+      generatedAt,
+    },
+    evaluations: selected.map((prediction) => ({
+      predictionId: prediction.id,
+      fixtureId: prediction.fixtureId,
+      includedReasons: ['included-eligible-prediction'],
+      excludedReasons: [],
+      eligible: true,
+    })),
+    config: {
+      minLegs: spec.minLegs,
+      maxLegs: spec.maxLegs,
+      allowMultipleLegsPerFixture: false,
+      minPredictionConfidence: spec.minConfidence,
+      maxCombinedOdds: spec.maxOdds,
+    },
+  };
+}
+
+function diversifyMarketDiverseCandidates(
+  candidates: ParlayCandidate[],
+  pool: readonly ParlaySourcePrediction[],
+  take: number,
+): ParlayCandidate[] {
+  return candidates
+    .filter((candidate) => !candidate.blockers.length)
+    .sort((a, b) => marketDiversityScore(b, pool) - marketDiversityScore(a, pool) || b.expectedEdge - a.expectedEdge)
+    .slice(0, take);
+}
+
+function marketDiversityScore(candidate: ParlayCandidate, pool: readonly ParlaySourcePrediction[]): number {
+  const legs = candidate.legs.flatMap((id) => {
+    const prediction = pool.find((item) => item.id === id);
+    return prediction ? [prediction] : [];
+  });
+  const markets = new Set(legs.map((prediction) => prediction.market));
+  const families = new Set(legs.map((prediction) => marketFamily(prediction.market)));
+  return markets.size + families.size * 0.5 + candidate.diversityScore;
+}
+
+function uniqueCandidates(candidates: ParlayCandidate[]): ParlayCandidate[] {
+  const seen = new Set<string>();
+  const result: ParlayCandidate[] = [];
+  for (const candidate of candidates) {
+    const signature = candidate.legs.slice().sort().join('|');
+    if (!signature || seen.has(signature)) continue;
+    seen.add(signature);
+    result.push(candidate);
+  }
+  return result;
+}
+
+function candidateMetricForBuild(
+  build: BuildParlayResult,
+  candidates: readonly ParlayCandidate[],
+  key: 'expectedEdge' | 'correlationPenalty',
+): number | undefined {
+  const signature = build.parlay.legs.map((leg) => leg.predictionId).sort().join('|');
+  const candidate = candidates.find((item) => item.legs.slice().sort().join('|') === signature);
+  return candidate ? round(candidate[key]) : undefined;
 }
 
 function defaultPersistParlay(repositories: ParlayServiceRepositories) {
@@ -1486,6 +1854,10 @@ function truncateText(value: string, max: number): string {
 
 function round(value: number): number {
   return Number(value.toFixed(4));
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
 }
 
 function compactJson(value: Record<string, unknown>): JsonValue {

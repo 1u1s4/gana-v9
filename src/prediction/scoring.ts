@@ -52,6 +52,7 @@ export interface BuildAtomicPredictionInput {
   stalePick?: boolean;
   lineupPending?: boolean;
   modelDisagreement?: boolean;
+  minEdge?: number;
   line?: number;
   estimatedProbability?: number | null;
   evidenceIds: string[];
@@ -139,6 +140,7 @@ export function buildAtomicPrediction(input: BuildAtomicPredictionInput): Predic
       stalePick: input.stalePick,
       lineupPending: input.lineupPending,
       modelDisagreement: input.modelDisagreement,
+      minEdge: input.minEdge,
     });
 
   return {

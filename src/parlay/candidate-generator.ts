@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { ParlaySourcePrediction } from './types.js';
-import { correlationPenalty } from './correlation.js';
+import { correlationBlockers, correlationPenalty } from './correlation.js';
 
 export interface ParlayCandidate {
   parlayId: string;
@@ -17,13 +17,35 @@ export interface ParlayCandidate {
 }
 
 export function generateParlayCandidates(predictions: ParlaySourcePrediction[], maxLegs = 4): ParlayCandidate[] {
-  const eligible = predictions.filter((prediction: any) => prediction.status === 'promotable' && !(prediction.blockers?.length));
+  const eligible = predictions
+    .filter((prediction: any) => (prediction.status === 'promotable' || prediction.status === 'candidate') && !(prediction.blockers?.length))
+    .sort((a, b) => (b.edge ?? 0) - (a.edge ?? 0) || b.confidence - a.confidence || a.odds - b.odds);
   const candidates: ParlayCandidate[] = [];
   for (let size = 2; size <= Math.min(maxLegs, eligible.length); size++) {
-    const legs = eligible.slice(0, size);
-    candidates.push(buildCandidate(legs));
+    collectCombinations(eligible, size, 0, [], candidates, 300);
   }
   return candidates.length ? candidates : [buildRejectedCandidate(predictions)];
+}
+
+function collectCombinations(
+  pool: readonly ParlaySourcePrediction[],
+  size: number,
+  start: number,
+  current: ParlaySourcePrediction[],
+  output: ParlayCandidate[],
+  limit: number,
+): void {
+  if (output.length >= limit) return;
+  if (current.length === size) {
+    output.push(buildCandidate(current));
+    return;
+  }
+  for (let index = start; index < pool.length; index++) {
+    current.push(pool[index]);
+    collectCombinations(pool, size, index + 1, current, output, limit);
+    current.pop();
+    if (output.length >= limit) return;
+  }
 }
 
 function buildCandidate(predictions: ParlaySourcePrediction[]): ParlayCandidate {
@@ -37,6 +59,7 @@ function buildCandidate(predictions: ParlaySourcePrediction[]): ParlayCandidate 
   if (combinedFairProbability < 0.05) blockers.push('low-conviction');
   if (combinedMarketOdds > 50) blockers.push('lottery-ticket');
   if (teams.size < predictions.length) blockers.push('duplicate-team');
+  blockers.push(...correlationBlockers(predictions));
   return {
     parlayId: randomUUID(),
     legs: predictions.map((prediction) => prediction.id),

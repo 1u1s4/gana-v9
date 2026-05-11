@@ -2,12 +2,15 @@ import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { AgentConfig } from '../config.js';
 import { runAgentWithRetry } from '../agent.js';
+import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
+import { runFixtureResearch } from '../evidence/research.js';
 import { createApiFootballPersistence, createApiFootballProvider } from '../providers/sports/api-football.js';
 import { API_FOOTBALL_PROVIDER, type FixtureStatistics } from '../providers/sports/types.js';
 import { movedAgainstPick } from '../markets/line-movement.js';
 import { lineupGate } from '../markets/lineup-gate.js';
 import { evaluateFreshness } from '../retrieval/freshness.js';
 import { claimsHaveProvenance } from '../retrieval/provenance.js';
+import { isotonicCalibrate, type CalibrationPoint } from '../scoring/calibration.js';
 import { detectDisagreement } from '../scoring/disagreement.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
@@ -34,13 +37,36 @@ import { SCORING_RULE_VERSION, type PredictionRecordView } from './types.js';
 
 const SCORING_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_SCORING_AGENT_TIMEOUT_MS', positiveIntegerFromEnv('GANA_AGENT_TIMEOUT_MS', 300_000));
 const SCORING_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_SCORING_AGENT_JSON_ATTEMPTS', 2);
-const SCORING_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/score-prediction-v1/output.schema.json');
+const SCORING_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/score-prediction-v2/output.schema.json');
 const MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT = 80;
+const WEB_RESEARCH_MAX_AGE_MS = positiveIntegerFromEnv('GANA_WEB_RESEARCH_MAX_AGE_HOURS', 12) * 60 * 60 * 1000;
+const CALIBRATION_MIN_SAMPLE = positiveIntegerFromEnv('GANA_CALIBRATION_MIN_SAMPLE', 50);
+const MIN_EDGE = numberFromEnv('GANA_MIN_EDGE', 0);
+const MIN_CONFIDENCE = numberFromEnv('GANA_MIN_CONFIDENCE', 0.5);
+const MIN_EVIDENCE_ITEMS = positiveIntegerFromEnv('GANA_MIN_EVIDENCE_ITEMS', 1);
+const MIN_DISTINCT_SOURCES = positiveIntegerFromEnv('GANA_MIN_DISTINCT_SOURCES', 1);
+const MIN_MARKET_EFFICIENCY = numberFromEnv('GANA_MIN_MARKET_EFFICIENCY', 0);
 
 export interface RunFixtureScoringInput {
   fixtureId: string;
   web?: ResearchWebMode;
+  markets?: MarketKey[];
   signal?: AbortSignal;
+}
+
+export interface ScoringMarketCoverage {
+  requestedMarkets: MarketKey[];
+  quotedMarkets: MarketKey[];
+  predictedMarkets: MarketKey[];
+  skippedMarkets: Array<{ market: MarketKey; reason: string }>;
+}
+
+export interface ScoringCalibrationSummary {
+  applied: number;
+  degraded: number;
+  unavailable: number;
+  minSample: number;
+  warnings: string[];
 }
 
 export interface FixtureScoringResult {
@@ -51,6 +77,8 @@ export interface FixtureScoringResult {
   gateResult: ReturnType<typeof aggregatePredictionGate>;
   predictions: PredictionRecordView[];
   retrievalWarnings?: string[];
+  marketCoverage?: ScoringMarketCoverage;
+  calibrationSummary?: ScoringCalibrationSummary;
   artifactPath?: string;
   error?: string;
 }
@@ -67,6 +95,15 @@ export interface FixtureScoringDependencies {
   }) => Promise<Pick<ArtifactRecord, 'id'> | null>;
   persistPredictions?: (predictions: PredictionInput[]) => Promise<PredictionRecord[]>;
   agentRunner?: typeof runAgentWithRetry;
+  researchFixture?: typeof runFixtureResearch;
+  calibrationHistory?: {
+    getCalibrationPoints(input: {
+      market: string;
+      model: string;
+      promptVersion: string;
+      fixtureId: string;
+    }): Promise<CalibrationPoint[]>;
+  };
   fetchFixtureStatistics?: (providerFixtureId: string) => Promise<FixtureStatistics | undefined>;
 }
 
@@ -133,6 +170,12 @@ interface ParsedTopPick {
   line?: number;
   odds: number;
   probability?: number;
+  modelProbability?: number;
+  marketFairProbability?: number;
+  edge?: number;
+  confidenceBand?: 'low' | 'medium' | 'high';
+  blockers: string[];
+  promotable?: boolean;
   confidence: number;
   evidenceIds: string[];
   claimIds: string[];
@@ -151,6 +194,7 @@ export async function runFixtureScoring(
   const now = deps.now ?? (() => new Date());
   const generatedAt = now().toISOString();
   const artifactWriter = deps.writeArtifact ?? ((id, name, payload) => writeArtifact(config, id, name, payload));
+  const marketScope = normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets);
 
   if (!deps.repositories && !config.databaseUrl) {
     return blockedResult(runId, artifactWriter, {
@@ -184,25 +228,56 @@ export async function runFixtureScoring(
     return result;
   }
 
-  const oddsQuotes = await repositories.oddsQuotes.listLatest({
+  const allOddsQuotes = await repositories.oddsQuotes.listLatest({
     fixtureId: fixture.id,
     snapshotId: oddsSnapshot.id,
     take: 500,
   });
+  const oddsQuotes = allOddsQuotes.filter((quote) => marketScope.includes(quote.marketKey as MarketKey));
   if (!oddsQuotes.length) {
     const result = blockedResult(runId, artifactWriter, {
-      error: `Odds snapshot "${oddsSnapshot.id}" has no persisted quotes.`,
-      reasons: ['missing persisted odds quote'],
+      error: `Odds snapshot "${oddsSnapshot.id}" has no persisted quotes for requested markets: ${marketScope.join(', ')}.`,
+      reasons: ['missing persisted odds quote for requested markets'],
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
       oddsSnapshotId: oddsSnapshot.id,
+      marketScope,
     });
     await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
     return result;
   }
 
   const web = input.web ?? 'off';
-  const research = await latestResearchGraph(repositories, fixture.id);
+  let research = await latestResearchGraph(repositories, fixture.id);
+  let webSearchCoverage = buildScoringWebSearchCoverage(research.sources, web, now(), config.provider);
+  if (web === 'live' && !webSearchCoverage.ok) {
+    if (deps.researchFixture) {
+      await deps.researchFixture(config, {
+        fixtureId: fixture.providerFixtureId,
+        web: 'live',
+        markets: marketScope,
+        signal: input.signal,
+      }, runtime);
+      research = await latestResearchGraph(repositories, fixture.id);
+      webSearchCoverage = buildScoringWebSearchCoverage(research.sources, web, now(), config.provider);
+    }
+    if (!webSearchCoverage.ok) {
+      const result = blockedResult(runId, artifactWriter, {
+        error: [
+          `score --web live requires a fresh research bundle with real web-search evidence for fixture "${fixture.providerFixtureId}".`,
+          `Current coverage: ${webSearchCoverage.reason}.`,
+          `Action: run pnpm gana research --fixture-id ${fixture.providerFixtureId} --web live --markets ${marketScope.join(',')} and retry scoring, or use --web off for local-only scoring.`,
+        ].join(' '),
+        reasons: ['fresh live web research missing'],
+        fixtureId: fixture.id,
+        providerFixtureId: fixture.providerFixtureId,
+        oddsSnapshotId: oddsSnapshot.id,
+        marketScope,
+      });
+      await upsertRun(config, runtime, repositories, runId, result.gateResult.verdict, 'failed', now());
+      return result;
+    }
+  }
   const evidenceGate = evaluateEvidenceGate(research);
   const includedByFilters = stringArray(fixture.includedByFilters);
   const providerContextWarnings: string[] = [];
@@ -222,6 +297,8 @@ export async function runFixtureScoring(
     runId,
     createdAt: generatedAt,
     web,
+    requiredMarkets: marketScope,
+    marketFocus: marketScope,
     fixture: fixturePromptView(fixture),
     fixtureStatistics: fixtureStatistics ?? null,
     oddsSnapshot: oddsSnapshotPromptView(oddsSnapshot),
@@ -234,8 +311,9 @@ export async function runFixtureScoring(
       ...providerContextWarnings,
       ...quoteTrimWarnings,
       ...retrievalWarnings,
-      ...(web !== 'off' && !hasWebResearchSource(research.sources)
-        ? [`web ${web} requested but no persisted web-search source is linked to the latest research bundle`]
+      ...webSearchCoverage.warnings,
+      ...(web !== 'off' && !hasRealWebResearchSource(research.sources)
+        ? [`web ${web} requested but no real persisted web-search source is linked to the latest research bundle`]
         : []),
     ],
   });
@@ -308,7 +386,8 @@ export async function runFixtureScoring(
     return result;
   }
 
-  const predictions = llmOutput.map((pick) => {
+  const calibrationEvents: Array<NonNullable<PredictionRecordView['calibration']>> = [];
+  const predictions = await Promise.all(llmOutput.map(async (pick) => {
     const quote = quoteById.get(pick.oddsQuoteId);
     const candidateScore = validateTopPick({
       pick,
@@ -325,7 +404,7 @@ export async function runFixtureScoring(
       evidenceItems: research.evidenceItems,
       claims: research.claims,
       webResearchRequired: web !== 'off',
-      hasWebResearch: hasWebResearchSource(research.sources),
+      hasWebResearch: hasRealWebResearchSource(research.sources),
       qualityWarnings: retrievalWarnings,
     });
     const selectedEvidenceIds = pick.evidenceIds.length >= 2
@@ -333,9 +412,45 @@ export async function runFixtureScoring(
       : uniqueStrings([...pick.evidenceIds, ...allowedScoringEvidenceIds(evidenceGate, research.evidenceItems)]);
     const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
 
-    const warnings = [...gate.warnings, ...retrievalWarnings, ...candidateScore.reasons, ...pick.warnings];
+    const rawModelProbability = pick.modelProbability ?? pick.probability;
+    const calibration = await calibrateModelProbability(rawModelProbability, {
+      market: pick.market,
+      model: config.model,
+      promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
+      fixtureId: fixture.id,
+    }, deps);
+    calibrationEvents.push(calibration);
+    const marketSpecificEvidence = evaluateMarketSpecificEvidence({
+      pick,
+      selectedEvidenceIds,
+      selectedClaimIds,
+      claims: research.claims,
+      evidenceItems: research.evidenceItems,
+    });
+    const marketSpecificEvidenceMissing = marketSpecificEvidence.warnings.some((warning) => warning.startsWith('market-specific evidence missing'));
+    const fairProbability = fairProbabilityForQuote(quote, pick);
+    const configurableGateWarnings = evaluateConfigurablePredictionWarnings({
+      pick,
+      quote,
+      confidence: calibration.confidence ?? pick.confidence,
+      evidenceIds: selectedEvidenceIds,
+      evidenceItems: research.evidenceItems,
+      edge: calibration.probability !== undefined && fairProbability !== null
+        ? calibration.probability - fairProbability
+        : undefined,
+    });
+    const warnings = [
+      ...gate.warnings,
+      ...retrievalWarnings,
+      ...candidateScore.reasons,
+      ...pick.warnings,
+      ...pick.blockers,
+      ...calibration.warnings,
+      ...marketSpecificEvidence.warnings,
+      ...configurableGateWarnings,
+    ];
 
-    return buildAtomicPrediction({
+    const prediction = buildAtomicPrediction({
       runId,
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
@@ -346,16 +461,18 @@ export async function runFixtureScoring(
       line: pick.line,
       odds: pick.odds,
       marketImpliedProbability: numberOrNull(quote?.marketImpliedProbability),
-      marketFairProbability: numberOrNull(quote?.marketFairProbability),
+      marketFairProbability: fairProbability,
       lowLiquidity: metadataBool(quote?.metadata, 'lowLiquidity'),
       stalePick: stalePickFromQuote(quote, pick.odds),
       lineupPending: lineupPendingForFixture(fixture, pick.market, quote, now()),
       modelDisagreement: modelDisagreementFromMetadata(quote?.metadata),
-      estimatedProbability: pick.probability,
+      minEdge: MIN_EDGE,
+      estimatedProbability: calibration.probability ?? rawModelProbability,
       evidenceIds: selectedEvidenceIds,
       claimIds: selectedClaimIds,
       status: gate.verdict,
-      confidence: pick.confidence,
+      confidence: calibration.confidence ?? pick.confidence,
+      quality: pick.confidenceBand,
       rationale: pick.rationale,
       warnings,
       parlayEligible: isParlayEligibleResearch(research.researchBundle ?? undefined, warnings),
@@ -364,7 +481,20 @@ export async function runFixtureScoring(
       researchBundleId: research.researchBundle?.id,
       generatedAt,
     });
-  });
+    return {
+      ...prediction,
+      calibration,
+      blockers: uniqueStrings([...prediction.blockers, ...pick.blockers]),
+      promotable: prediction.promotable && pick.promotable !== false && !marketSpecificEvidenceMissing,
+      status: prediction.status === 'promotable' && (pick.promotable === false || marketSpecificEvidenceMissing) ? 'review-required' : prediction.status,
+      warnings: uniqueStrings([
+        ...prediction.warnings,
+        ...(pick.edge !== undefined && prediction.edge !== undefined && Math.abs(pick.edge - prediction.edge) > 0.02
+          ? ['model-reported edge differed from service fair-price edge']
+          : []),
+      ]),
+    };
+  }));
 
   const aggregate = aggregatePredictionGate(predictions.map((prediction) => ({
     verdict: prediction.status === 'candidate' || prediction.status === 'draft'
@@ -373,12 +503,18 @@ export async function runFixtureScoring(
     reasons: prediction.status === 'promotable' ? ['prediction gates passed'] : prediction.warnings,
     warnings: prediction.warnings,
   })));
+  const marketCoverage = buildScoringMarketCoverage(marketScope, oddsQuotes, predictions);
+  const calibrationSummary = summarizeCalibration(calibrationEvents);
   const artifactPayload = {
     runId,
     fixtureId: fixture.id,
     providerFixtureId: fixture.providerFixtureId,
     oddsSnapshotId: oddsSnapshot.id,
     researchBundleId: research.researchBundle?.id ?? null,
+    marketScope,
+    marketCoverage,
+    webSearchCoverage,
+    calibrationSummary,
     promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
     scoringRuleVersion: SCORING_RULE_VERSION,
     gateResult: aggregate,
@@ -409,6 +545,8 @@ export async function runFixtureScoring(
       gateResult: aggregate,
       predictions: persisted.length ? predictions : [],
       retrievalWarnings,
+      marketCoverage,
+      calibrationSummary,
       artifactPath,
     };
   } catch (err: any) {
@@ -481,6 +619,68 @@ async function latestResearchGraph(repositories: PredictionServiceRepositories, 
     repositories.claims.list({ bundleId: researchBundle.id, take: 500 }),
   ]);
   return { researchBundle, sources, evidenceItems, claims };
+}
+
+function buildScoringWebSearchCoverage(
+  sources: SourceRecordRecord[],
+  web: ResearchWebMode,
+  now: Date,
+  provider: AgentConfig['provider'],
+): {
+  ok: boolean;
+  mode: ResearchWebMode;
+  provider: AgentConfig['provider'];
+  realWebSearchSourceCount: number;
+  syntheticWebSearchSourceCount: number;
+  freshWebSearchSourceCount: number;
+  newestWebSearchAt?: string;
+  reason: string;
+  warnings: string[];
+} {
+  const realSources = sources.filter(isRealWebSourceRecord);
+  const syntheticSources = sources.filter((source) => source.sourceType === 'web-search' && !isRealWebSourceRecord(source));
+  const freshSources = realSources.filter((source) => {
+    const capturedAt = dateValue(source.capturedAt);
+    return capturedAt !== undefined && now.getTime() - capturedAt.getTime() <= WEB_RESEARCH_MAX_AGE_MS;
+  });
+  const newestWebSearchAt = realSources
+    .map((source) => dateValue(source.capturedAt)?.toISOString())
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1);
+  const required = web === 'live';
+  const ok = !required || freshSources.length > 0;
+  const reason = ok
+    ? 'fresh real web-search evidence is available'
+    : realSources.length
+      ? `latest real web-search evidence is stale; newest=${newestWebSearchAt ?? 'unknown'}`
+      : syntheticSources.length
+        ? 'only synthetic/repaired web-search sources are linked'
+        : 'no real web-search source is linked';
+  const warnings = ok
+    ? []
+    : [`web ${web} scoring requires fresh real web-search evidence: ${reason}`];
+  if (web === 'live' && provider === 'openrouter' && !realSources.length) {
+    warnings.push('OpenRouter has no native web-search enforcement in this harness; use the browser fallback or run research with a native provider before scoring live.');
+  }
+  return {
+    ok,
+    mode: web,
+    provider,
+    realWebSearchSourceCount: realSources.length,
+    syntheticWebSearchSourceCount: syntheticSources.length,
+    freshWebSearchSourceCount: freshSources.length,
+    newestWebSearchAt,
+    reason,
+    warnings,
+  };
+}
+
+function isRealWebSourceRecord(source: SourceRecordRecord): boolean {
+  if (source.sourceType !== 'web-search') return false;
+  const metadata = objectMetadata(source.metadata);
+  if (metadata.synthesized === true || metadata.repaired === true) return false;
+  return Boolean(source.url || source.externalId);
 }
 
 async function runScoringAgent(
@@ -569,7 +769,13 @@ function parseTopPick(value: unknown, index: number): ParsedTopPick {
   const line = nullableNumberField(item, 'line', index);
   const odds = numberField(item, 'odds', index);
   const probability = optionalNumberField(item, 'probability', index);
+  const modelProbability = optionalNumberField(item, 'modelProbability', index);
+  const marketFairProbability = optionalNumberField(item, 'marketFairProbability', index);
+  const edge = optionalNumberField(item, 'edge', index);
   const confidence = numberField(item, 'confidence', index);
+  const confidenceBand = optionalConfidenceBandField(item, 'confidenceBand', index);
+  const blockers = stringArrayField(item, 'blockers', index, true);
+  const promotable = optionalBooleanField(item, 'promotable', index);
   const evidenceIds = stringArrayField(item, 'evidenceIds', index);
   const claimIds = stringArrayField(item, 'claimIds', index, true);
   const rationale = stringField(item, 'rationale', index);
@@ -582,6 +788,12 @@ function parseTopPick(value: unknown, index: number): ParsedTopPick {
     ...(line !== undefined && { line }),
     odds,
     ...(probability !== undefined && { probability }),
+    ...(modelProbability !== undefined && { modelProbability }),
+    ...(marketFairProbability !== undefined && { marketFairProbability }),
+    ...(edge !== undefined && { edge }),
+    ...(confidenceBand !== undefined && { confidenceBand }),
+    blockers,
+    ...(promotable !== undefined && { promotable }),
     confidence,
     evidenceIds,
     claimIds,
@@ -750,6 +962,8 @@ function validateTopPicks(
     if (!sameOptionalNumber(pick.line, numberOrUndefined(quote.line))) issues.push(`predictions[${index}] line does not match odds quote`);
     if (!sameNumber(pick.odds, numberValue(quote.price))) issues.push(`predictions[${index}] odds does not match odds quote`);
     if (pick.probability !== undefined && (pick.probability < 0 || pick.probability > 1)) issues.push(`predictions[${index}] probability must be between 0 and 1`);
+    if (pick.modelProbability !== undefined && (pick.modelProbability < 0 || pick.modelProbability > 1)) issues.push(`predictions[${index}] modelProbability must be between 0 and 1`);
+    if (pick.marketFairProbability !== undefined && (pick.marketFairProbability < 0 || pick.marketFairProbability > 1)) issues.push(`predictions[${index}] marketFairProbability must be between 0 and 1`);
     if (pick.confidence < 0 || pick.confidence > 1) issues.push(`predictions[${index}] confidence must be between 0 and 1`);
     for (const evidenceId of pick.evidenceIds) {
       if (!allowedEvidenceIds.has(evidenceId)) issues.push(`predictions[${index}] references unknown evidenceId "${evidenceId}"`);
@@ -773,14 +987,162 @@ function validateTopPick(input: {
     market: input.pick.market,
     selection: input.pick.selection,
     line: input.pick.line,
-    probability: input.pick.probability,
+    probability: input.pick.modelProbability ?? input.pick.probability,
     odds: input.pick.odds,
+    marketFairProbability: numberOrNull(input.quote?.marketFairProbability) ?? input.pick.marketFairProbability,
     oddsQuoteId: input.pick.oddsQuoteId,
     evidenceIds: input.pick.evidenceIds,
     claimIds: input.pick.claimIds,
     rationale: input.pick.rationale,
     warnings: input.pick.warnings,
   });
+}
+
+async function calibrateModelProbability(
+  probability: number | undefined,
+  context: { market: string; model: string; promptVersion: string; fixtureId: string },
+  deps: FixtureScoringDependencies,
+): Promise<NonNullable<PredictionRecordView['calibration']> & { probability?: number; confidence?: number }> {
+  if (probability === undefined) {
+    return {
+      applied: false,
+      sampleSize: 0,
+      minSample: CALIBRATION_MIN_SAMPLE,
+      method: 'none',
+      warnings: ['calibration skipped: missing modelProbability'],
+    };
+  }
+  if (!deps.calibrationHistory) {
+    return {
+      applied: false,
+      sampleSize: 0,
+      minSample: CALIBRATION_MIN_SAMPLE,
+      method: 'unavailable',
+      rawProbability: probability,
+      calibratedProbability: probability,
+      warnings: [],
+      probability,
+    };
+  }
+  const points = await deps.calibrationHistory.getCalibrationPoints(context);
+  if (points.length < CALIBRATION_MIN_SAMPLE) {
+    return {
+      applied: false,
+      sampleSize: points.length,
+      minSample: CALIBRATION_MIN_SAMPLE,
+      method: 'isotonic',
+      rawProbability: probability,
+      calibratedProbability: probability,
+      warnings: [`calibration degraded: sample ${points.length}/${CALIBRATION_MIN_SAMPLE} for ${context.market}/${context.model}/${context.promptVersion}`],
+      probability,
+      confidence: 0.49,
+    };
+  }
+  const calibrate = isotonicCalibrate(points);
+  const calibratedProbability = calibrate(probability);
+  return {
+    applied: true,
+    sampleSize: points.length,
+    minSample: CALIBRATION_MIN_SAMPLE,
+    method: 'isotonic',
+    rawProbability: probability,
+    calibratedProbability,
+    warnings: [],
+    probability: calibratedProbability,
+  };
+}
+
+function evaluateMarketSpecificEvidence(input: {
+  pick: ParsedTopPick;
+  selectedEvidenceIds: string[];
+  selectedClaimIds: string[];
+  claims: ClaimRecord[];
+  evidenceItems: EvidenceItemRecord[];
+}): { warnings: string[] } {
+  const selectedEvidence = new Set(input.selectedEvidenceIds);
+  const selectedClaims = input.claims.filter((claim) => input.selectedClaimIds.includes(claim.id));
+  const marketSpecificClaims = selectedClaims.filter((claim) => {
+    if (claim.marketKey !== input.pick.market) return false;
+    if (claim.selectionKey && claim.selectionKey !== input.pick.selection) return false;
+    const claimLine = numberOrUndefined(claim.line);
+    if (claimLine !== undefined && !sameOptionalNumber(claimLine, input.pick.line)) return false;
+    return jsonStringArray(claim.evidenceIds).some((id) => selectedEvidence.has(id));
+  });
+  if (marketSpecificClaims.length) return { warnings: [] };
+  const fallbackText = `${input.pick.rationale} ${input.pick.warnings.join(' ')}`.toLowerCase();
+  if (/fallback|fixture-level|market evidence unavailable|market-specific evidence unavailable/.test(fallbackText)) {
+    return { warnings: [`market-specific evidence fallback declared for ${input.pick.market}:${input.pick.selection}`] };
+  }
+  const evidenceMarkets = new Set(input.evidenceItems
+    .filter((item) => selectedEvidence.has(item.id))
+    .flatMap((item) => {
+      const metadata = objectMetadata(item.metadata);
+      return typeof metadata.market === 'string' ? [metadata.market] : [];
+    }));
+  if (evidenceMarkets.has(input.pick.market)) return { warnings: [] };
+  return { warnings: [`market-specific evidence missing for ${input.pick.market}:${input.pick.selection}${input.pick.line !== undefined ? `:${input.pick.line}` : ''}`] };
+}
+
+function evaluateConfigurablePredictionWarnings(input: {
+  pick: ParsedTopPick;
+  quote?: OddsQuoteRecord;
+  confidence: number;
+  evidenceIds: string[];
+  evidenceItems: EvidenceItemRecord[];
+  edge?: number;
+}): string[] {
+  const warnings: string[] = [];
+  if (input.edge !== undefined && input.edge < MIN_EDGE) warnings.push(`edge below configured minimum ${MIN_EDGE}`);
+  if (input.confidence < MIN_CONFIDENCE) warnings.push(`confidence below configured minimum ${MIN_CONFIDENCE}`);
+  if (input.evidenceIds.length < MIN_EVIDENCE_ITEMS) warnings.push(`evidence items below configured minimum ${MIN_EVIDENCE_ITEMS}`);
+  const sourceIds = new Set(input.evidenceItems.filter((item) => input.evidenceIds.includes(item.id)).map((item) => item.sourceId));
+  if (sourceIds.size < MIN_DISTINCT_SOURCES) warnings.push(`distinct source count below configured minimum ${MIN_DISTINCT_SOURCES}`);
+  const marketEfficiency = numberOrUndefined(input.quote?.marketEfficiencyScore);
+  if (marketEfficiency !== undefined && marketEfficiency < MIN_MARKET_EFFICIENCY) {
+    warnings.push(`market efficiency below configured minimum ${MIN_MARKET_EFFICIENCY}`);
+  }
+  return warnings;
+}
+
+function fairProbabilityForQuote(quote: OddsQuoteRecord | undefined, pick: ParsedTopPick): number | null {
+  return numberOrNull(quote?.marketFairProbability)
+    ?? numberOrNull(pick.marketFairProbability)
+    ?? numberOrNull(quote?.marketImpliedProbability)
+    ?? (Number.isFinite(pick.odds) ? 1 / pick.odds : null);
+}
+
+function buildScoringMarketCoverage(
+  requestedMarkets: readonly MarketKey[],
+  quotes: OddsQuoteRecord[],
+  predictions: PredictionRecordView[],
+): ScoringMarketCoverage {
+  const quotedMarkets = [...new Set(quotes.map((quote) => quote.marketKey).filter(isMarketKey))].sort();
+  const predictedMarkets = [...new Set(predictions.map((prediction) => prediction.market).filter(isMarketKey))].sort();
+  const skippedMarkets = requestedMarkets.flatMap((market) => {
+    if (!quotedMarkets.includes(market)) return [{ market, reason: 'missing odds quotes for requested market' }];
+    if (!predictedMarkets.includes(market)) return [{ market, reason: 'missing scored prediction for requested market' }];
+    if (predictions.some((prediction) => prediction.market === market && prediction.status !== 'promotable')) {
+      return [{ market, reason: 'market prediction requires review or is blocked' }];
+    }
+    return [];
+  });
+  return {
+    requestedMarkets: [...requestedMarkets],
+    quotedMarkets,
+    predictedMarkets,
+    skippedMarkets,
+  };
+}
+
+function summarizeCalibration(events: Array<NonNullable<PredictionRecordView['calibration']>>): ScoringCalibrationSummary {
+  const warnings = uniqueStrings(events.flatMap((event) => event.warnings ?? []));
+  return {
+    applied: events.filter((event) => event.applied).length,
+    degraded: events.filter((event) => !event.applied && (event.sampleSize ?? 0) > 0 && event.sampleSize < event.minSample).length,
+    unavailable: events.filter((event) => event.method === 'unavailable').length,
+    minSample: CALIBRATION_MIN_SAMPLE,
+    warnings,
+  };
 }
 
 function toAllowedQuote(quote: OddsQuoteRecord) {
@@ -959,8 +1321,8 @@ function claimPromptView(claim: ClaimRecord) {
   };
 }
 
-function hasWebResearchSource(sources: SourceRecordRecord[]): boolean {
-  return sources.some((source) => source.sourceType === 'web-search');
+function hasRealWebResearchSource(sources: SourceRecordRecord[]): boolean {
+  return sources.some(isRealWebSourceRecord);
 }
 
 function defaultPersistArtifact(repositories: PredictionServiceRepositories) {
@@ -1035,6 +1397,7 @@ function toPredictionInput(
       blockers: prediction.blockers,
       promotable: prediction.promotable ?? prediction.status === 'promotable',
       parlayEligible: prediction.parlayEligible,
+      calibration: prediction.calibration,
     }),
   };
 }
@@ -1071,6 +1434,7 @@ function blockedResult(
     fixtureId?: string;
     providerFixtureId?: string;
     oddsSnapshotId?: string;
+    marketScope?: readonly MarketKey[];
   },
 ): FixtureScoringResult {
   const gateResult = {
@@ -1083,6 +1447,7 @@ function blockedResult(
     fixtureId: input.fixtureId,
     providerFixtureId: input.providerFixtureId,
     oddsSnapshotId: input.oddsSnapshotId,
+    marketScope: input.marketScope,
     gateResult,
     error: input.error,
   });
@@ -1104,6 +1469,13 @@ function positiveIntegerFromEnv(name: string, fallback: number): number {
   if (!raw) return fallback;
   const parsed = Number(raw);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function numberFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function numberValue(value: unknown): number {
@@ -1128,6 +1500,21 @@ function metadataBool(metadata: unknown, key: string): boolean | undefined {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
   const value = (metadata as Record<string, unknown>)[key];
   return typeof value === 'boolean' ? value : undefined;
+}
+
+function objectMetadata(metadata: unknown): Record<string, unknown> {
+  return metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+    ? metadata as Record<string, unknown>
+    : {};
+}
+
+function dateValue(value: unknown): Date | undefined {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function isParlayEligibleResearch(researchBundle: ResearchBundleRecord | undefined, warnings: string[]): boolean {
@@ -1251,6 +1638,22 @@ function optionalNumberField(item: Record<string, unknown>, key: string, index: 
 function nullableNumberField(item: Record<string, unknown>, key: string, index: number): number | undefined {
   if (item[key] === undefined || item[key] === null) return undefined;
   return numberField(item, key, index);
+}
+
+function optionalBooleanField(item: Record<string, unknown>, key: string, index: number): boolean | undefined {
+  if (item[key] === undefined || item[key] === null) return undefined;
+  if (typeof item[key] !== 'boolean') throw new Error(`predictions[${index}].${key} must be a boolean.`);
+  return item[key];
+}
+
+function optionalConfidenceBandField(
+  item: Record<string, unknown>,
+  key: string,
+  index: number,
+): 'low' | 'medium' | 'high' | undefined {
+  if (item[key] === undefined || item[key] === null) return undefined;
+  if (item[key] === 'low' || item[key] === 'medium' || item[key] === 'high') return item[key];
+  throw new Error(`predictions[${index}].${key} must be low, medium, or high.`);
 }
 
 function stringArrayField(item: Record<string, unknown>, key: string, index: number, optional = false): string[] {

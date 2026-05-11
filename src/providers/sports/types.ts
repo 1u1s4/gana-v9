@@ -1,6 +1,7 @@
 import type { AgentConfig } from '../../config.js';
 import type { Fixture, FixtureStatus } from '../../domain/fixtures.js';
 import type { SportsProvider } from '../../domain/ids.js';
+import type { MarketKey } from '../../domain/markets.js';
 import type { OddsQuote } from '../../domain/odds.js';
 import type { JsonValue, ProviderQuotaSampleInput, ProviderSnapshotInput } from '../../storage/types.js';
 
@@ -36,6 +37,7 @@ export interface FixtureByIdQuery {
 
 export interface OddsQuery {
   fixtureId: string;
+  markets?: MarketKey[];
 }
 
 export interface OddsScanQuery extends FixtureQuery {}

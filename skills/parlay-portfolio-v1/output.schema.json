@@ -8,7 +8,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "predictionIds", "rationale", "riskNotes", "duplicateFixtureJustification"],
+        "required": ["title", "predictionIds", "rationale"],
         "properties": {
           "title": { "type": ["string", "null"] },
           "predictionIds": {
