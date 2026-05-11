@@ -76,7 +76,7 @@ export interface ResearchBundleGraphClaim {
   subject?: {
     type?: string;
     id?: string;
-    market?: string;
+    market?: string | null;
   };
   supportLevel?: string;
   evidenceIds?: string[];

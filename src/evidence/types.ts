@@ -84,7 +84,7 @@ export const evidenceItemSchema = z.object({
 export const claimSubjectSchema = z.object({
   type: z.enum(CLAIM_SUBJECT_TYPES),
   id: z.string().min(1).optional(),
-  market: z.string().min(1).optional(),
+  market: z.string().min(1).nullable().optional(),
 });
 
 export const claimSchema = z.object({

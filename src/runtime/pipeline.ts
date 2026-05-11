@@ -193,6 +193,22 @@ const ODDS_SCAN_CONCURRENCY = 6;
 const LOW_ODDS_GLOBAL_MAX_FIXTURES = Number.MAX_SAFE_INTEGER;
 const AGENT_FIXTURE_TIMEOUT_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_TIMEOUT_MS) ?? 420_000;
 const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_ABORT_GRACE_MS) ?? 30_000;
+const RESEARCH_AGENT_TIMEOUT_MS = positiveInteger(process.env.GANA_RESEARCH_AGENT_TIMEOUT_MS)
+  ?? positiveInteger(process.env.GANA_AGENT_TIMEOUT_MS)
+  ?? 300_000;
+const RESEARCH_AGENT_JSON_ATTEMPTS = positiveInteger(process.env.GANA_RESEARCH_AGENT_JSON_ATTEMPTS) ?? 2;
+
+export function computeAgentFixtureTimeoutMs(input: {
+  baseTimeoutMs: number;
+  web: ResearchWebMode;
+  researchAgentTimeoutMs: number;
+  researchJsonAttempts: number;
+  abortGraceMs: number;
+}): number {
+  if (input.web !== 'live') return input.baseTimeoutMs;
+  const researchRetryBudget = input.researchAgentTimeoutMs * input.researchJsonAttempts + input.abortGraceMs;
+  return Math.max(input.baseTimeoutMs, researchRetryBudget);
+}
 
 export async function executeRunPipeline(
   config: AgentConfig,
@@ -453,6 +469,14 @@ export async function executeRunPipeline(
     fixtureDiscovery.fixtures,
     selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan),
   );
+  const webMode = input.web ?? defaultWebMode(config);
+  const researchFixtureTimeoutMs = computeAgentFixtureTimeoutMs({
+    baseTimeoutMs: AGENT_FIXTURE_TIMEOUT_MS,
+    web: webMode,
+    researchAgentTimeoutMs: RESEARCH_AGENT_TIMEOUT_MS,
+    researchJsonAttempts: RESEARCH_AGENT_JSON_ATTEMPTS,
+    abortGraceMs: AGENT_FIXTURE_ABORT_GRACE_MS,
+  });
 
   const researchPayload = await runDurableTask('research.fixture', 'research-results.json', async () => {
     const results = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
@@ -460,11 +484,11 @@ export async function executeRunPipeline(
         return await withAbortableTimeout(
           (signal) => retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(isolatedAgentConfig(config), {
             fixtureId: fixture.providerFixtureId,
-            web: input.web ?? defaultWebMode(config),
+            web: webMode,
             signal,
           }, runtime)),
-          AGENT_FIXTURE_TIMEOUT_MS,
-          `research fixture ${fixture.providerFixtureId} timed out after ${AGENT_FIXTURE_TIMEOUT_MS}ms`,
+          researchFixtureTimeoutMs,
+          `research fixture ${fixture.providerFixtureId} timed out after ${researchFixtureTimeoutMs}ms`,
         );
       } catch (err: any) {
         return blockedResearchResult(config, runId, fixture, err);

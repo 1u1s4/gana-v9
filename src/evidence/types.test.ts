@@ -5,6 +5,7 @@ import {
   evidenceItemSchema,
   researchBundleSchema,
   sourceRecordSchema,
+  claimSubjectSchema,
 } from './types.js';
 
 describe('research evidence schemas', () => {
@@ -62,6 +63,16 @@ describe('research evidence schemas', () => {
         warnings: [],
       },
       warnings: [],
+    });
+
+    assert.equal(result.success, true);
+  });
+
+  it('accepts nullable non-market claim subject market values from strict LLM schema output', () => {
+    const result = claimSubjectSchema.safeParse({
+      type: 'fixture',
+      id: 'fixture-1',
+      market: null,
     });
 
     assert.equal(result.success, true);

@@ -145,7 +145,25 @@ export async function runFixtureResearch(
     }
 
     parsed = parseResearchJson(rawOutput);
-    if (parsed.ok) break;
+    if (!parsed.ok) continue;
+    if (isIncompleteLiveResearchPayload(parsed.value, input.web)) {
+      if (attempt < RESEARCH_AGENT_JSON_ATTEMPTS) {
+        rawOutput = '';
+        continue;
+      }
+      return buildAndPersistAgentFailureFallback(
+        config,
+        input,
+        runtime,
+        deps,
+        runId,
+        fixture,
+        createdAt,
+        'Research web returned no usable claims or evidence after tool execution was requested',
+        providerContext,
+      );
+    }
+    break;
   }
   parsed ??= { ok: false, error: 'Research output must be strict JSON: no output returned' };
   if (!parsed.ok) {
@@ -296,6 +314,17 @@ function researchPromptForAttempt(prompt: string, attempt: number): string {
 
 function isResearchTimeoutError(error: string): boolean {
   return /timed out|timeout|aborted/i.test(error);
+}
+
+function isIncompleteLiveResearchPayload(value: any, web: ResearchWebMode): boolean {
+  if (web !== 'live') return false;
+  const claims = Array.isArray(value?.claims) ? value.claims : [];
+  const evidenceItems = Array.isArray(value?.evidenceItems) ? value.evidenceItems : [];
+  const reasons = Array.isArray(value?.gateResult?.reasons) ? value.gateResult.reasons : [];
+  const warnings = Array.isArray(value?.gateResult?.warnings) ? value.gateResult.warnings : [];
+  const text = [...reasons, ...warnings].filter((item): item is string => typeof item === 'string').join('\n');
+  return (claims.length === 0 || evidenceItems.length === 0)
+    && /tool call not yet performed|no valid external evidence gathered|no usable claims|no usable evidence/i.test(text);
 }
 
 function createNativeWebSearchTrace(): NativeWebSearchTrace {

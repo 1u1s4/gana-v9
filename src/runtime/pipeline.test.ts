@@ -7,7 +7,7 @@ import { loadConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { OddsQuote } from '../domain/odds.js';
 import { createRuntimeContext } from './context.js';
-import { executeRunPipeline, exportRunArtifacts, type RunPipelineDependencies } from './pipeline.js';
+import { computeAgentFixtureTimeoutMs, executeRunPipeline, exportRunArtifacts, type RunPipelineDependencies } from './pipeline.js';
 
 function testConfig() {
   return loadConfig({
@@ -235,6 +235,38 @@ function successfulPipelineDeps(input: {
     }),
   };
 }
+
+describe('computeAgentFixtureTimeoutMs', () => {
+  it('does not let live research timeout before JSON retries can finish', () => {
+    assert.equal(computeAgentFixtureTimeoutMs({
+      baseTimeoutMs: 180_000,
+      web: 'live',
+      researchAgentTimeoutMs: 300_000,
+      researchJsonAttempts: 2,
+      abortGraceMs: 30_000,
+    }), 630_000);
+  });
+
+  it('preserves longer explicit fixture timeout budgets', () => {
+    assert.equal(computeAgentFixtureTimeoutMs({
+      baseTimeoutMs: 900_000,
+      web: 'live',
+      researchAgentTimeoutMs: 300_000,
+      researchJsonAttempts: 2,
+      abortGraceMs: 30_000,
+    }), 900_000);
+  });
+
+  it('keeps non-live modes on the configured fixture timeout', () => {
+    assert.equal(computeAgentFixtureTimeoutMs({
+      baseTimeoutMs: 180_000,
+      web: 'off',
+      researchAgentTimeoutMs: 300_000,
+      researchJsonAttempts: 2,
+      abortGraceMs: 30_000,
+    }), 180_000);
+  });
+});
 
 describe('executeRunPipeline', () => {
   it('writes canonical run, evidence pack, and handoff artifacts with injected services', async () => {

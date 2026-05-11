@@ -276,6 +276,51 @@ describe('runFixtureResearch', () => {
     assert.doesNotMatch(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
   });
 
+  it('retries live web research when the agent returns an empty tool-not-performed payload', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    const emptyOutput = agentOutput({
+      sources: [{
+        id: 'local-note',
+        type: 'db',
+        externalId: 'noop',
+        title: 'No-op',
+        capturedAt: createdAt.toISOString(),
+      }],
+      evidenceItems: [],
+      claims: [],
+      gateResult: {
+        verdict: 'review-required',
+        reasons: ['Tool call not yet performed'],
+        warnings: ['No valid external evidence gathered'],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => {
+        attempts += 1;
+        if (attempts === 1) return { text: emptyOutput, usage: {}, output: emptyOutput };
+        const output = agentOutput({
+          gateResult: {
+            verdict: 'promotable',
+            reasons: ['web evidence gathered on retry'],
+            warnings: [],
+          },
+        });
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(attempts, 2);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(result.bundle?.claims.length, 1);
+    assert.doesNotMatch(result.bundle?.gateResult.reasons.join('\n') ?? '', /Tool call not yet performed/);
+  });
+
   it('accepts provider output with explanatory text around the JSON object', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
