@@ -1,5 +1,4 @@
 import type { AgentConfig } from '../config.js';
-import { isMarketKey, isValidMarketSelection, type MarketKey } from '../domain/markets.js';
 import { getApiFootballDateOddsSlate } from '../providers/sports/api-football.js';
 import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
@@ -17,6 +16,7 @@ import type {
   RequestedLeaguePresetView,
   RequestedTeamPresetView,
 } from './types.js';
+import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from './low-odds-selector.js';
 
 export interface LowOddsPersistenceRepositories {
   lowOddsScans: {
@@ -60,6 +60,8 @@ export interface PersistLowOddsScanInput {
   date: string;
   threshold: number;
   markets: string[];
+  selectorMarketScope?: string[];
+  analysisMarketScope?: string[];
   bookmakerAllowlist?: string[];
   fixtureCount: number;
   hits: LowOddsHitView[];
@@ -87,6 +89,7 @@ export async function scanLowOdds(
     teamsDefault: input.teamsDefault,
     combineMode: input.combineMode,
   });
+  const selectorMarketScope = lowOddsSelectorMarketScope();
   const db = getPrismaClient() as unknown as StoragePrismaClient;
   const repositories = createStorageRepositories(db);
   const scan = await repositories.lowOddsScans.create({
@@ -98,6 +101,8 @@ export async function scanLowOdds(
       threshold: filters.threshold,
       markets: filters.markets,
       marketScope: filters.markets,
+      selectorMarketScope,
+      analysisMarketScope: filters.markets,
       bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
     }),
   });
@@ -112,7 +117,7 @@ export async function scanLowOdds(
   let fixtureEvaluations: LowOddsScanView['fixtureEvaluations'] = [];
 
   try {
-    const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime, undefined, filters.markets);
+    const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime, undefined, selectorMarketScope);
     fixtureDiscovery = {
       fixtures: slate.fixtures,
       evaluations: slate.fixtures.map((fixture) => ({
@@ -136,7 +141,7 @@ export async function scanLowOdds(
           addEvaluationReason(fixtureEvaluations, fixture.providerFixtureId, 'excluded-missing-odds');
           continue;
         }
-        const marketQuotes = snapshot.quotes.filter((quote) => isLowOddsFixtureSelectorQuote(quote, filters.markets));
+        const marketQuotes = snapshot.quotes.filter(isLowOddsFixtureSelectorQuote);
         const bookmakerQuotes = filters.bookmakerAllowlist?.length
           ? marketQuotes.filter((quote) => quote.bookmaker && filters.bookmakerAllowlist?.includes(quote.bookmaker))
           : marketQuotes;
@@ -212,6 +217,8 @@ export async function scanLowOdds(
         threshold: filters.threshold,
         markets: filters.markets,
         marketScope: filters.markets,
+        selectorMarketScope,
+        analysisMarketScope: filters.markets,
         bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
         requestedLeagues: fixtureDiscovery.requestedLeagues,
         requestedTeams: fixtureDiscovery.requestedTeams,
@@ -233,26 +240,18 @@ export async function scanLowOdds(
     scanId: scan.id,
     date: filters.date,
     threshold: filters.threshold,
-    marketScope: filters.markets,
-    marketCoverage: buildLowOddsMarketCoverage(filters.markets, fixtureDiscovery.fixtures.length ? hits : [], fixtureDiscovery.fixtures.length ? fixtureEvaluations : []),
+    marketScope: [...filters.markets],
+    selectorMarketScope: [...selectorMarketScope],
+    analysisMarketScope: [...filters.markets],
+    marketCoverage: buildLowOddsMarketCoverage(filters.markets, selectorMarketScope, fixtureDiscovery.fixtures.length ? hits : []),
     fixtureCount: fixtureDiscovery.fixtures.length,
     hitCount: hits.length,
     hits,
+    candidateFixtures: fixtureDiscovery.fixtures,
     fixtureEvaluations,
     requestedLeagues: fixtureDiscovery.requestedLeagues,
     requestedTeams: fixtureDiscovery.requestedTeams,
   };
-}
-
-function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }, markets: readonly MarketKey[]): boolean {
-  return isMarketKey(quote.market)
-    && markets.includes(quote.market)
-    && isLowOddsFixtureSelection(quote.market, quote.selection);
-}
-
-function isLowOddsFixtureSelection(market: MarketKey, selection: string): boolean {
-  if (market === 'h2h') return selection === 'home' || selection === 'away';
-  return isValidMarketSelection(market, selection);
 }
 
 export async function persistLowOddsScanResult(
@@ -269,6 +268,8 @@ export async function persistLowOddsScanResult(
       threshold: input.threshold,
       markets: input.markets,
       marketScope: input.markets,
+      selectorMarketScope: input.selectorMarketScope ?? lowOddsSelectorMarketScope(),
+      analysisMarketScope: input.analysisMarketScope ?? input.markets,
       bookmakerAllowlist: input.bookmakerAllowlist ?? [],
     }),
   });
@@ -304,6 +305,8 @@ export async function persistLowOddsScanResult(
         threshold: input.threshold,
         markets: input.markets,
         marketScope: input.markets,
+        selectorMarketScope: input.selectorMarketScope ?? lowOddsSelectorMarketScope(),
+        analysisMarketScope: input.analysisMarketScope ?? input.markets,
         bookmakerAllowlist: input.bookmakerAllowlist ?? [],
         requestedLeagues: input.requestedLeagues ?? [],
         requestedTeams: input.requestedTeams ?? [],
@@ -325,16 +328,18 @@ export async function persistLowOddsScanResult(
 }
 
 function buildLowOddsMarketCoverage(
-  requestedMarkets: readonly string[],
+  analysisMarkets: readonly string[],
+  selectorMarkets: readonly string[],
   hits: LowOddsHitView[],
-  _evaluations: LowOddsScanView['fixtureEvaluations'],
 ): NonNullable<LowOddsScanView['marketCoverage']> {
   const hitMarkets = [...new Set(hits.map((hit) => hit.market))].sort();
   return {
-    requestedMarkets: [...requestedMarkets],
+    requestedMarkets: [...analysisMarkets],
     quotedMarkets: hitMarkets,
     hitMarkets,
-    missingMarkets: requestedMarkets.filter((market) => !hitMarkets.includes(market)),
+    missingMarkets: selectorMarkets.filter((market) => !hitMarkets.includes(market)),
+    selectorMarketScope: [...selectorMarkets],
+    analysisMarketScope: [...analysisMarkets],
   };
 }
 

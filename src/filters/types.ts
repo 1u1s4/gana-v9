@@ -74,16 +74,22 @@ export interface LowOddsScanView {
   date: string;
   threshold: number;
   marketScope?: string[];
+  selectorMarketScope?: string[];
+  analysisMarketScope?: string[];
   marketCoverage?: {
     requestedMarkets: string[];
     quotedMarkets: string[];
     hitMarkets: string[];
     missingMarkets: string[];
+    selectorMarketScope?: string[];
+    analysisMarketScope?: string[];
   };
   fixtureCount: number;
   hitCount: number;
   hits: LowOddsHitView[];
+  candidateFixtures?: Fixture[];
   fixtureEvaluations: FixtureFilterEvaluation[];
   requestedLeagues?: RequestedLeaguePresetView[];
   requestedTeams?: RequestedTeamPresetView[];
 }
+import type { Fixture } from '../domain/fixtures.js';

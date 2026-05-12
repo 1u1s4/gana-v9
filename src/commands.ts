@@ -707,6 +707,9 @@ function printOdds(quotes: OddsQuote[], details?: { oddsSnapshotId?: string; pro
 
 function printLowOddsScan(scan: LowOddsScanView): void {
   console.log(`  ${CYAN}low-odds${RESET} ${DIM}scan=${scan.scanId ?? 'none'} fixtures=${scan.fixtureCount} hits=${scan.hitCount} threshold=${scan.threshold}${RESET}`);
+  if (scan.selectorMarketScope?.length) {
+    console.log(`  ${DIM}selector=${scan.selectorMarketScope.join(',')} home/away favorite indicator${RESET}`);
+  }
   for (const hit of scan.hits) {
     const line = hit.line === undefined ? '' : ` ${hit.line}`;
     const bookmaker = hit.bookmaker ? ` ${DIM}${hit.bookmaker}${RESET}` : '';
@@ -1947,6 +1950,6 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana dashboard --port 4317${RESET}`);
   console.log(`  ${CYAN}pnpm gana leagues list|add|remove${RESET}`);
   console.log(`  ${CYAN}pnpm gana teams list|add|remove${RESET}`);
-  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20 --markets double_chance,btts${RESET}`);
+  console.log(`  ${CYAN}pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1.20${RESET}`);
   console.log(`  ${CYAN}pnpm gana filters show${RESET}`);
 }

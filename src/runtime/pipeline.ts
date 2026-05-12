@@ -3,10 +3,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { basename, join, resolve } from 'path';
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
-import { isMarketKey, isValidMarketSelection, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
+import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import type { OddsQuote } from '../domain/odds.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { persistLowOddsScanResult, type LowOddsPersistenceRepositories } from '../filters/low-odds.js';
+import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from '../filters/low-odds-selector.js';
 import type { LowOddsHitView, LowOddsScanView } from '../filters/types.js';
 import { runFixtureResearch, type FixtureResearchResult } from '../evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from '../prediction/service.js';
@@ -172,6 +173,12 @@ export interface RunPipelineDependencies {
 interface LowOddsPredictionCoverage {
   threshold: number;
   hits: number;
+  scopedHits: number;
+  indicatorFixtures: number;
+  excludedIndicatorFixtures: number;
+  scoredIndicatorFixtures: number;
+  missingIndicatorFixtureIds: string[];
+  excludedIndicatorFixtureIds: string[];
   hitsWithOddsQuoteId: number;
   uniqueHitOddsQuoteIds: number;
   predictedHitOddsQuoteIds: number;
@@ -228,6 +235,7 @@ export async function executeRunPipeline(
   const writeRun = deps.writeRunJson ?? writeRunJson;
   const startedAt = now();
   const marketScope = normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets);
+  const lowOddsSelectorMarkets = lowOddsSelectorMarketScope();
   const steps: PipelineStepResult[] = [];
   const durableTasks = await initializeDurableTasks(config, runId, {
     date: input.date,
@@ -386,7 +394,7 @@ export async function executeRunPipeline(
         && !deps.fetchOddsSnapshot
         && !deps.fetchLowOddsSnapshotsForDate;
       const providerDateSlate = useProviderDateSlate
-        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime, undefined, marketScope))
+        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime, undefined, lowOddsSelectorMarkets))
         : undefined;
       const lowOddsDiscovery = providerDateSlate
         ? {
@@ -409,12 +417,12 @@ export async function executeRunPipeline(
       const rawLowOddsSnapshots = providerDateSlate
         ? providerDateSlate.snapshots
         : fetchLowOddsSnapshotsForDate
-          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime, marketScope))
+          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime, lowOddsSelectorMarkets))
           : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
             try {
               return await retryStorageConnection(() => (
                 deps.fetchLowOddsSnapshot ?? deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
-              )(config, fixture.providerFixtureId, runtime, marketScope));
+              )(config, fixture.providerFixtureId, runtime, lowOddsSelectorMarkets));
             } catch (err: any) {
               return {
                 fixtureId: fixture.id,
@@ -441,6 +449,8 @@ export async function executeRunPipeline(
             date: input.date,
             threshold: config.apiFootball.lowOddsThreshold,
             markets: marketScope,
+            selectorMarketScope: scan.selectorMarketScope,
+            analysisMarketScope: scan.analysisMarketScope,
             bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
             fixtureCount: lowOddsDiscovery.fixtures.length,
             hits: scan.hits,
@@ -465,6 +475,9 @@ export async function executeRunPipeline(
       error: lowOddsScanStepWarning,
     });
   }
+  if (!lowOddsCandidateFixtures.length && lowOddsScan.candidateFixtures?.length) {
+    lowOddsCandidateFixtures = lowOddsScan.candidateFixtures;
+  }
   steps.push({
     name: 'scan low odds',
     ok: !lowOddsScanStepWarning,
@@ -477,18 +490,30 @@ export async function executeRunPipeline(
     fixtureDiscovery.fixtures,
     selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan),
   );
+  const localDateSelectedFixtures = mergedSelectedFixtures.filter((fixture) => (
+    fixtureLocalDateKey(fixture.scheduledAt, config.apiFootball.timezone) === input.date
+  ));
+  const localDateExcludedFixtures = mergedSelectedFixtures.length - localDateSelectedFixtures.length;
   const selectedFixtureLimit = Math.max(1, config.apiFootball.maxFixturesPerRun);
-  const selectedFixtures = mergedSelectedFixtures.slice(0, selectedFixtureLimit);
-  const selectedFixtureWarnings = mergedSelectedFixtures.length > selectedFixtures.length
-    ? [`selected fixtures capped from ${mergedSelectedFixtures.length} to ${selectedFixtures.length} by maxFixturesPerRun=${selectedFixtureLimit}`]
-    : [];
+  const selectedFixtures = localDateSelectedFixtures.slice(0, selectedFixtureLimit);
+  const selectionCapped = localDateSelectedFixtures.length > selectedFixtures.length;
+  const selectedFixtureWarnings = [
+    ...(localDateExcludedFixtures > 0
+      ? [`excluded ${localDateExcludedFixtures} fixtures outside local date ${input.date} in timezone ${config.apiFootball.timezone}`]
+      : []),
+    ...(selectionCapped
+      ? [`selected fixtures capped from ${localDateSelectedFixtures.length} to ${selectedFixtures.length} by maxFixturesPerRun=${selectedFixtureLimit}`]
+      : []),
+  ];
   const fixtureSelection = {
     primaryFixtures: fixtureDiscovery.fixtures.length,
     lowOddsUniqueFixtures: uniqueFixtureCount(selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan)),
     mergedFixtures: mergedSelectedFixtures.length,
+    localDateEligibleFixtures: localDateSelectedFixtures.length,
+    localDateExcludedFixtures,
     selectedFixtures: selectedFixtures.length,
     maxFixturesPerRun: selectedFixtureLimit,
-    capped: selectedFixtureWarnings.length > 0,
+    capped: selectionCapped,
     warnings: selectedFixtureWarnings,
   };
   writeJsonArtifact(config, runId, 'selected-fixtures.json', {
@@ -571,12 +596,15 @@ export async function executeRunPipeline(
     return payload;
   });
   const scoring: FixtureScoringResult[] = scoringPayload.results;
-  const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring);
+  const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring, selectedFixtures);
   writeJsonArtifact(config, runId, 'low-odds-coverage-audit.json', {
     ...lowOddsPredictionCoverage,
     semanticLowOddsTargets: lowOddsPredictionCoverage.uniqueHitOddsQuoteIds,
     coveredTargets: lowOddsPredictionCoverage.predictedHitOddsQuoteIds,
+    indicatorFixtureTargets: lowOddsPredictionCoverage.indicatorFixtures,
+    coveredIndicatorFixtures: lowOddsPredictionCoverage.scoredIndicatorFixtures,
     missingTargets: [...lowOddsPredictionCoverage.missingOddsQuoteIds],
+    missingIndicatorFixtureIds: [...lowOddsPredictionCoverage.missingIndicatorFixtureIds],
   });
   const scoreStep = summarizeResultStep('score', scoring.map((result) => ({
     ok: result.ok,
@@ -587,7 +615,7 @@ export async function executeRunPipeline(
   if (!lowOddsPredictionCoverage.complete) {
     scoreStep.verdict = scoreStep.verdict === 'blocked' ? 'blocked' : 'review-required';
     scoreStep.warnings.push(
-      `missing predictions for ${lowOddsPredictionCoverage.missingPredictionHits} low-odds hits and ${lowOddsPredictionCoverage.unlinkedHits} unlinked low-odds hits`,
+      `missing predictions for ${lowOddsPredictionCoverage.missingIndicatorFixtureIds.length} low-odds indicator fixture(s) and ${lowOddsPredictionCoverage.unlinkedHits} unlinked low-odds hits`,
     );
   }
   steps.push(scoreStep);
@@ -837,6 +865,8 @@ function summarizePipelineMarketCoverage(
     requestedMarkets: [...requestedMarkets],
     oddsMarkets,
     lowOddsMarkets,
+    lowOddsSelectorMarkets: lowOddsScan.selectorMarketScope ?? lowOddsSelectorMarketScope(),
+    lowOddsAnalysisMarkets: lowOddsScan.analysisMarketScope ?? lowOddsScan.marketScope ?? [...requestedMarkets],
     researchEvidenceMarkets,
     predictionMarkets,
     skippedMarkets: requestedMarkets.flatMap((market) => {
@@ -1315,13 +1345,14 @@ function buildLowOddsScan(
   requestedMarkets?: readonly MarketKey[],
 ): LowOddsScanView {
   const hits: LowOddsHitView[] = [];
-  const marketScope = normalizeMarketScope(requestedMarkets, config.apiFootball.defaultMarkets);
+  const analysisMarketScope = normalizeMarketScope(requestedMarkets, config.apiFootball.defaultMarkets);
+  const selectorMarketScope = lowOddsSelectorMarketScope();
   const fixturesByProviderId = new Map(discovery.fixtures.map((fixture) => [fixture.providerFixtureId, fixture]));
   for (const snapshot of snapshots) {
     const fixture = fixturesByProviderId.get(snapshot.providerFixtureId);
     if (!fixture) continue;
     for (const quote of snapshot.quotes) {
-      if (!isLowOddsFixtureSelectorQuote(quote, marketScope)) continue;
+      if (!isLowOddsFixtureSelectorQuote(quote)) continue;
       if (quote.price > config.apiFootball.lowOddsThreshold) continue;
       if (config.apiFootball.bookmakerAllowlist?.length && quote.bookmaker && !config.apiFootball.bookmakerAllowlist.includes(quote.bookmaker)) continue;
       hits.push({
@@ -1343,40 +1374,35 @@ function buildLowOddsScan(
     scanId: undefined,
     date,
     threshold: config.apiFootball.lowOddsThreshold,
-    marketScope,
-    marketCoverage: buildLowOddsMarketCoverage(marketScope, snapshots, hits),
+    marketScope: [...analysisMarketScope],
+    selectorMarketScope: [...selectorMarketScope],
+    analysisMarketScope: [...analysisMarketScope],
+    marketCoverage: buildLowOddsMarketCoverage(analysisMarketScope, selectorMarketScope, snapshots, hits),
     fixtureCount: discovery.fixtures.length,
     hitCount: hits.length,
     hits,
+    candidateFixtures: discovery.fixtures,
     fixtureEvaluations: discovery.evaluations,
     requestedLeagues: discovery.requestedLeagues,
     requestedTeams: discovery.requestedTeams,
   };
 }
 
-function isLowOddsFixtureSelectorQuote(quote: { market: string; selection: string }, markets: readonly MarketKey[]): boolean {
-  return isMarketKey(quote.market)
-    && markets.includes(quote.market)
-    && isLowOddsFixtureSelection(quote.market, quote.selection);
-}
-
-function isLowOddsFixtureSelection(market: MarketKey, selection: string): boolean {
-  if (market === 'h2h') return selection === 'home' || selection === 'away';
-  return isValidMarketSelection(market, selection);
-}
-
 function buildLowOddsMarketCoverage(
-  requestedMarkets: readonly MarketKey[],
+  analysisMarkets: readonly MarketKey[],
+  selectorMarkets: readonly MarketKey[],
   snapshots: OddsSnapshotView[],
   hits: LowOddsHitView[],
 ): NonNullable<LowOddsScanView['marketCoverage']> {
   const quotedMarkets = [...new Set(snapshots.flatMap((snapshot) => snapshot.quotes.map((quote) => quote.market)).filter(isMarketKey))].sort();
   const hitMarkets = [...new Set(hits.map((hit) => hit.market).filter(isMarketKey))].sort();
   return {
-    requestedMarkets: [...requestedMarkets],
+    requestedMarkets: [...analysisMarkets],
     quotedMarkets,
     hitMarkets,
-    missingMarkets: requestedMarkets.filter((market) => !quotedMarkets.includes(market)),
+    missingMarkets: selectorMarkets.filter((market) => !quotedMarkets.includes(market)),
+    selectorMarketScope: [...selectorMarkets],
+    analysisMarketScope: [...analysisMarkets],
   };
 }
 
@@ -1388,6 +1414,23 @@ function selectLowOddsHitFixtures(fixtures: Fixture[], lowOddsScan: LowOddsScanV
 
 function uniqueFixtureCount(fixtures: Fixture[]): number {
   return new Set(fixtures.map((fixture) => fixture.providerFixtureId)).size;
+}
+
+function fixtureLocalDateKey(scheduledAt: string, timezone: string): string {
+  const date = new Date(scheduledAt);
+  if (!Number.isFinite(date.getTime())) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const byType = new Map(parts.map((part) => [part.type, part.value]));
+    return `${byType.get('year')}-${byType.get('month')}-${byType.get('day')}`;
+  } catch {
+    return scheduledAt.slice(0, 10);
+  }
 }
 
 function mergeFixtureSlates(primary: Fixture[], secondary: Fixture[]): Fixture[] {
@@ -1666,29 +1709,48 @@ function isPastOrToday(date: string, referenceDate: Date): boolean {
 function buildLowOddsPredictionCoverage(
   scan: LowOddsScanView,
   scoring: FixtureScoringResult[],
+  selectedFixtures: Fixture[] = [],
 ): LowOddsPredictionCoverage {
-  const hitQuoteIds = scan.hits
-    .map(lowOddsSemanticKey);
-  const uniqueHitQuoteIds = [...new Set(hitQuoteIds)];
-  const predictedQuoteIds = new Set(
-    scoring.flatMap((result) => result.predictions.map((prediction) => [
-      prediction.fixtureId,
-      prediction.market,
-      prediction.selection,
-      prediction.line ?? 'null',
-    ].join(':'))),
-  );
-  const missingOddsQuoteIds = uniqueHitQuoteIds.filter((id) => !predictedQuoteIds.has(id));
+  const selectedFixtureIds = new Set(selectedFixtures.map((fixture) => fixture.id));
+  const scopedHits = selectedFixtureIds.size
+    ? scan.hits.filter((hit) => selectedFixtureIds.has(hit.fixtureId))
+    : scan.hits;
+  const excludedIndicatorFixtureIds = selectedFixtureIds.size
+    ? [...new Set(scan.hits.map((hit) => hit.fixtureId).filter((fixtureId) => !selectedFixtureIds.has(fixtureId)))]
+    : [];
+  const hitQuoteFixtures = new Map<string, string>();
+  for (const hit of scopedHits) hitQuoteFixtures.set(lowOddsSemanticKey(hit), hit.fixtureId);
+  const uniqueHitQuoteIds = [...hitQuoteFixtures.keys()];
+  const indicatorFixtureIds = [...new Set(scopedHits.map((hit) => hit.fixtureId))];
+  const scoredFixtureIds = new Set(scoring.flatMap((result) => {
+    if (!result.predictions.length) return [];
+    return [
+      ...(result.fixtureId ? [result.fixtureId] : []),
+      ...result.predictions.map((prediction) => prediction.fixtureId),
+    ].filter((fixtureId): fixtureId is string => typeof fixtureId === 'string' && fixtureId.length > 0);
+  }));
+  const missingIndicatorFixtureIds = indicatorFixtureIds.filter((fixtureId) => !scoredFixtureIds.has(fixtureId));
+  const missingIndicatorFixtureIdSet = new Set(missingIndicatorFixtureIds);
+  const missingOddsQuoteIds = uniqueHitQuoteIds.filter((id) => {
+    const fixtureId = hitQuoteFixtures.get(id);
+    return fixtureId ? missingIndicatorFixtureIdSet.has(fixtureId) : true;
+  });
   const unlinkedHits = 0;
   return {
     threshold: scan.threshold,
     hits: scan.hitCount,
-    hitsWithOddsQuoteId: hitQuoteIds.length,
+    scopedHits: scopedHits.length,
+    indicatorFixtures: indicatorFixtureIds.length,
+    excludedIndicatorFixtures: excludedIndicatorFixtureIds.length,
+    scoredIndicatorFixtures: indicatorFixtureIds.length - missingIndicatorFixtureIds.length,
+    missingIndicatorFixtureIds,
+    excludedIndicatorFixtureIds,
+    hitsWithOddsQuoteId: uniqueHitQuoteIds.length,
     uniqueHitOddsQuoteIds: uniqueHitQuoteIds.length,
     predictedHitOddsQuoteIds: uniqueHitQuoteIds.length - missingOddsQuoteIds.length,
-    missingPredictionHits: missingOddsQuoteIds.length,
+    missingPredictionHits: missingIndicatorFixtureIds.length,
     unlinkedHits,
-    complete: missingOddsQuoteIds.length === 0 && unlinkedHits === 0,
+    complete: missingIndicatorFixtureIds.length === 0 && unlinkedHits === 0,
     missingOddsQuoteIds,
   };
 }
@@ -1703,16 +1765,21 @@ function lowOddsSemanticKey(hit: LowOddsHitView): string {
 }
 
 function emptyLowOddsScan(date: string, threshold: number, marketScope: readonly MarketKey[] = []): LowOddsScanView {
+  const selectorMarketScope = lowOddsSelectorMarketScope();
   return {
     ...EMPTY_LOW_ODDS_SCAN,
     date,
     threshold,
     marketScope: [...marketScope],
+    selectorMarketScope: [...selectorMarketScope],
+    analysisMarketScope: [...marketScope],
     marketCoverage: {
       requestedMarkets: [...marketScope],
       quotedMarkets: [],
       hitMarkets: [],
-      missingMarkets: [...marketScope],
+      missingMarkets: [...selectorMarketScope],
+      selectorMarketScope: [...selectorMarketScope],
+      analysisMarketScope: [...marketScope],
     },
   };
 }

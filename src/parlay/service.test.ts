@@ -106,7 +106,7 @@ describe('runParlayBuild', () => {
     assert.equal(persisted.legs.length, 2);
   });
 
-  it('uses only current-run predictions when runtime has a run id', async () => {
+  it('uses every current-run projection, including normal and low-odds-expanded fixtures', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     let listQuery: any;
@@ -119,8 +119,8 @@ describe('runParlayBuild', () => {
           list: async (query) => {
             listQuery = query;
             return [
-              prediction({ id: 'prediction-1', runId: 'current-run-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8 }),
-              prediction({ id: 'prediction-2', runId: 'current-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.7 }),
+              prediction({ id: 'normal-projection', runId: 'current-run-1', fixtureId: 'fixture-normal', odds: 2, confidence: 0.8 }),
+              prediction({ id: 'low-odds-expanded-projection', runId: 'current-run-1', fixtureId: 'fixture-low-odds-expanded', odds: 1.5, confidence: 0.7 }),
             ] as any[];
           },
           listForFixtureDate: async () => {
@@ -140,6 +140,10 @@ describe('runParlayBuild', () => {
       take: 500,
     });
     assert.equal(result.build.parlay.legs.length, 2);
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), [
+      'normal-projection',
+      'low-odds-expanded-projection',
+    ]);
   });
 
   it('keeps hard research warning predictions out of the main parlay build', async () => {
