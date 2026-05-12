@@ -1076,6 +1076,137 @@ describe('executeRunPipeline', () => {
     assert.match(handoff, /webSearchCoverage:/);
   });
 
+  it('caps selected fixtures after low-odds expansion before live research and scoring', async () => {
+    const config = testConfig();
+    (config.apiFootball as any).maxFixturesPerRun = 2;
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const primaryA = fixture({ id: 'fixture-primary-a', providerFixtureId: '1001' });
+    const primaryB = fixture({ id: 'fixture-primary-b', providerFixtureId: '1002' });
+    const lowOnly = fixture({ id: 'fixture-low-only', providerFixtureId: '9001' });
+    const researched: string[] = [];
+    const scored: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      web: 'off',
+      validate: false,
+      markets: ['h2h'],
+    }, runtime, {
+      createRunId: () => 'run-selected-fixture-cap',
+      now: () => new Date('2026-04-29T12:00:00.000Z'),
+      discoverFixtures: async () => ({
+        fixtures: [primaryA, primaryB],
+        evaluations: [primaryA, primaryB].map((target) => ({
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        })),
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchOddsSnapshot: async (_config, providerFixtureId) => {
+        const target = providerFixtureId === primaryA.providerFixtureId ? primaryA : primaryB;
+        return {
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          oddsSnapshotId: `odds-snapshot-${target.providerFixtureId}`,
+          providerSnapshotId: `provider-snapshot-${target.providerFixtureId}`,
+          quoteRecordIds: {
+            [`test-book|h2h|home|`]: `odds-quote-${target.providerFixtureId}`,
+          },
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: 'hash',
+          quotes: [lowOddsQuoteFor(target, { price: 1.8, impliedProbability: 1 / 1.8 })],
+        };
+      },
+      discoverLowOddsFixtures: async () => ({
+        fixtures: [lowOnly],
+        evaluations: [{
+          fixtureId: lowOnly.id,
+          providerFixtureId: lowOnly.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        }],
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchLowOddsSnapshot: async () => ({
+        fixtureId: lowOnly.id,
+        providerFixtureId: lowOnly.providerFixtureId,
+        oddsSnapshotId: 'odds-snapshot-low',
+        providerSnapshotId: 'provider-snapshot-low',
+        quoteRecordIds: {
+          'test-book|h2h|home|': 'odds-quote-low',
+        },
+        capturedAt: '2026-04-29T12:00:00.000Z',
+        bookmakerCount: 1,
+        payloadHash: 'hash',
+        quotes: [lowOddsQuoteFor(lowOnly, { price: 1.18, impliedProbability: 1 / 1.18 })],
+      }),
+      researchFixture: async (_config, input) => {
+        researched.push(input.fixtureId);
+        return { ok: true, gateResult: { verdict: 'promotable', reasons: [], warnings: [] } };
+      },
+      scoreFixture: async (_config, input) => {
+        scored.push(input.fixtureId);
+        return {
+          ok: true,
+          runId: 'run-selected-fixture-cap',
+          fixtureId: input.fixtureId,
+          providerFixtureId: input.fixtureId,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          predictions: [predictionRecord({
+            runId: 'run-selected-fixture-cap',
+            providerFixtureId: input.fixtureId,
+            oddsQuoteId: `odds-quote-${input.fixtureId}`,
+          })],
+        } as any;
+      },
+      buildParlay: async () => ({
+        ok: false,
+        runId: 'run-selected-fixture-cap',
+        date: '2026-04-29',
+        gateResult: { verdict: 'blocked', reasons: ['no predictions found'], warnings: [] },
+        build: {
+          parlay: {
+            id: 'parlay-1',
+            sourceRunId: 'run-selected-fixture-cap',
+            legs: [],
+            aggregateConfidence: 0,
+            aggregateQuality: 0,
+            rationale: 'test',
+            warnings: [],
+            status: 'blocked',
+            generatedAt: '2026-04-29T12:00:00.000Z',
+          },
+          evaluations: [],
+          config: {
+            minLegs: 2,
+            maxLegs: 4,
+            allowMultipleLegsPerFixture: false,
+            minPredictionConfidence: 0,
+          },
+        },
+      }),
+    });
+
+    assert.deepEqual(researched, ['1001', '1002']);
+    assert.deepEqual(scored, ['1001', '1002']);
+
+    const selected = JSON.parse(readFileSync(join(result.artifactDir, 'selected-fixtures.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(selected.mergedFixtures, 3);
+    assert.equal(selected.selectedFixtures, 2);
+    assert.equal(selected.capped, true);
+    assert.match(selected.warnings.join('\n'), /selected fixtures capped from 3 to 2/);
+    assert.equal(evaluation.counts.selectedFixtures, 2);
+    assert.equal(evaluation.fixtureSelection.capped, true);
+  });
+
   it('tracks low-odds prediction coverage across all requested league presets', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');

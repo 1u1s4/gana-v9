@@ -473,10 +473,41 @@ export async function executeRunPipeline(
   });
   writeStepSpan(config, runtime, 'low_odds.scan', 'gate', lowOddsScanStepWarning ? 'blocked' : 'ok', lowOddsScanStepWarning ? { ...lowOddsScan, error: lowOddsScanStepWarning } : lowOddsScan);
 
-  const selectedFixtures = mergeFixtureSlates(
+  const mergedSelectedFixtures = mergeFixtureSlates(
     fixtureDiscovery.fixtures,
     selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan),
   );
+  const selectedFixtureLimit = Math.max(1, config.apiFootball.maxFixturesPerRun);
+  const selectedFixtures = mergedSelectedFixtures.slice(0, selectedFixtureLimit);
+  const selectedFixtureWarnings = mergedSelectedFixtures.length > selectedFixtures.length
+    ? [`selected fixtures capped from ${mergedSelectedFixtures.length} to ${selectedFixtures.length} by maxFixturesPerRun=${selectedFixtureLimit}`]
+    : [];
+  const fixtureSelection = {
+    primaryFixtures: fixtureDiscovery.fixtures.length,
+    lowOddsUniqueFixtures: uniqueFixtureCount(selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan)),
+    mergedFixtures: mergedSelectedFixtures.length,
+    selectedFixtures: selectedFixtures.length,
+    maxFixturesPerRun: selectedFixtureLimit,
+    capped: selectedFixtureWarnings.length > 0,
+    warnings: selectedFixtureWarnings,
+  };
+  writeJsonArtifact(config, runId, 'selected-fixtures.json', {
+    ...fixtureSelection,
+    fixtures: selectedFixtures.map((fixture) => ({
+      fixtureId: fixture.id,
+      providerFixtureId: fixture.providerFixtureId,
+      scheduledAt: fixture.scheduledAt,
+      status: fixture.status,
+      includedByFilters: fixture.includedByFilters,
+    })),
+  });
+  steps.push({
+    name: 'select fixtures',
+    ok: true,
+    verdict: selectedFixtureWarnings.length ? 'review-required' : 'promotable',
+    warnings: selectedFixtureWarnings,
+  });
+  writeStepSpan(config, runtime, 'fixtures.select', 'gate', 'ok', fixtureSelection);
   const webMode = input.web ?? defaultWebMode(config);
   const researchFixtureTimeoutMs = computeAgentFixtureTimeoutMs({
     baseTimeoutMs: AGENT_FIXTURE_TIMEOUT_MS,
@@ -646,6 +677,7 @@ export async function executeRunPipeline(
     steps,
     counts: {
       fixtures: fixtureDiscovery.fixtures.length,
+      selectedFixtures: selectedFixtures.length,
       oddsQuotes: quoteCount,
       lowOddsHits: lowOddsScan.hitCount,
       research: research.length,
@@ -654,6 +686,7 @@ export async function executeRunPipeline(
       validations: validation?.validations.length ?? 0,
     },
     lowOddsPredictionCoverage,
+    fixtureSelection,
     webSearchCoverage: webSearch,
     marketCoverage,
     calibrationSummary,
@@ -1351,6 +1384,10 @@ function selectLowOddsHitFixtures(fixtures: Fixture[], lowOddsScan: LowOddsScanV
   if (!fixtures.length || !lowOddsScan.hits.length) return [];
   const hitProviderFixtureIds = new Set(lowOddsScan.hits.map((hit) => hit.providerFixtureId));
   return fixtures.filter((fixture) => hitProviderFixtureIds.has(fixture.providerFixtureId));
+}
+
+function uniqueFixtureCount(fixtures: Fixture[]): number {
+  return new Set(fixtures.map((fixture) => fixture.providerFixtureId)).size;
 }
 
 function mergeFixtureSlates(primary: Fixture[], secondary: Fixture[]): Fixture[] {
