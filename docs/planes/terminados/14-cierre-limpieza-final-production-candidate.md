@@ -1,5 +1,7 @@
 ## Veredicto
 
+Estado: completado. Este brief se atendio cerrando la coherencia documental y operativa: MySQL queda como DB canonica del RC, PostgreSQL como migracion futura, la certificacion paso de `ci-smoke` a `ci-certification`, los fixtures bajo `fixtures/replays` quedan como soporte tecnico interno y el dashboard se mantiene como observabilidad/read-only.
+
 Va **muy bien**. Ya no lo veo como “proyecto en construcción inicial”, sino como un **production candidate avanzado**. El árbol actual muestra que el sistema ya tiene las piezas necesarias para operar como harness productivo: `runtime/pipeline.ts`, `runtime/run-service.ts`, `scheduler`, `worker`, `recovery`, `idempotency`, `observability`, `analytics`, `evals`, `dashboard`, `parlay`, `validation`, `permissions`, `security`, repositorios de storage y provider API-Football. 
 
 Mi evaluación actual sería:

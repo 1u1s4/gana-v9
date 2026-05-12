@@ -1,5 +1,9 @@
 # Roadmap MVP Productivo Online
 
+## Estado
+
+Completado y archivado en `docs/planes/terminados`. Este roadmap queda como registro historico de la secuencia 00-13: los planes operativos 01-13 ya existen en `terminados`, el RC actual usa DigitalOcean MySQL + Prisma y PostgreSQL queda como migracion futura explicita.
+
 ## Fuente canonica
 
 - Fuente: `docs/planes/gana-v9-srs-mvp-productivo-online.md`.

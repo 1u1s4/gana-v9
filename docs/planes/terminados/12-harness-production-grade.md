@@ -1,5 +1,9 @@
 # Harness Production-Grade
 
+## Estado
+
+Completado y archivado en `docs/planes/terminados`. La implementacion actual cubre registry/policy de tools, approvals persistidos, runtime durable, spans, evidence pack v2, `gana certify --profile ci-certification`, retrieval, skills versionadas, analytics, dashboard read-only, parlay avanzado, validation analytics y restriccion monetaria.
+
 ## Objetivo
 
 Cerrar la brecha entre el MVP harness-first actual y un harness production-grade alineado con la guia de "harness engineering". El proyecto ya tiene runtime, artifacts, auditoria, policy, evidencia, predicciones, validacion y persistencia, pero varias capas existen como modulos aislados y todavia no estan conectadas como una capa de control uniforme.
