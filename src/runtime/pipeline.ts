@@ -1073,7 +1073,7 @@ export async function exportRunArtifacts(
     hashes: Object.fromEntries(listRunFiles(artifactDir).map((file) => [file.name, file.sha256])),
     reproduction: {
       command: `pnpm gana run --date ${String((evaluationPayload as any)?.date ?? 'YYYY-MM-DD')} --web cached --validate auto`,
-      profile: 'ci-smoke',
+      profile: 'ci-certification',
     },
     lowOddsCoverageAudit: readJsonIfExists(join(artifactDir, 'low-odds-coverage-audit.json')),
     webSearchCoverage: (evaluationPayload as any)?.webSearchCoverage ?? null,

@@ -33,14 +33,14 @@ Completado como cierre production-candidate controlado.
   - `analyticalArtifactOnly: true`
   - `qualityVerdict`
   - `executionCapability: "none"`
-- `fixtures/replays` queda como soporte tecnico de certificacion/replay, no como modo operativo del producto.
+- `fixtures/replays` queda como soporte tecnico de certificacion deterministica, no como modo operativo del producto.
 - README actualizado con DB canonica y Browser Use fallback.
 
 ## Pruebas automatizadas
 
 - `pnpm typecheck`: OK
-- `pnpm test`: OK, 264 tests
-- `pnpm gana certify --profile ci-smoke`: cubierto por suite; el golden deterministico fue actualizado por el registro de la nueva tool `browser`.
+- `pnpm test`: OK, 320 tests
+- `pnpm gana certify --profile ci-certification`: cubierto por suite; el golden deterministico fue actualizado por el registro de la nueva tool `browser`.
 
 ## Pruebas reales ejecutadas
 
@@ -97,4 +97,4 @@ El sistema queda listo para operacion controlada en tandas. La recomendacion ope
 2. 40 fixtures.
 3. 100 fixtures maximo hasta medir tiempo, quota, blocked reasons, calibration y CLV.
 
-No se debe presentar `ci-smoke` como flujo productivo. Es certificacion deterministica local sobre replay fixture.
+No se debe presentar la certificacion deterministica local como flujo productivo. Usa fixtures tecnicos y no reemplaza acceptance live.

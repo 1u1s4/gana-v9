@@ -40,10 +40,14 @@ const REQUIRED_SKILLS = [
   'calibration-monitor-v1',
 ];
 
-export async function runCertification(config: AgentConfig, runtime: RuntimeContext, profile = 'ci-smoke'): Promise<CertificationResult> {
+const CERTIFICATION_PROFILE = 'ci-certification';
+const CERTIFICATION_FIXTURE_PATH = 'fixtures/replays/ci-certification.json';
+const CERTIFICATION_GOLDEN_PATH = 'fixtures/replays/ci-certification.golden.json';
+
+export async function runCertification(config: AgentConfig, runtime: RuntimeContext, profile = CERTIFICATION_PROFILE): Promise<CertificationResult> {
   const checks: CertificationCheck[] = [];
-  const replay = await runReplayPipelineCheck(config, runtime).catch((err) => ({
-    name: 'replay-pipeline-evidence-pack-v2',
+  const certification = await runCertificationPipelineCheck(config, runtime).catch((err) => ({
+    name: 'certification-pipeline-evidence-pack-v2',
     ok: false,
     details: err instanceof Error ? err.message : String(err),
   } satisfies CertificationCheck));
@@ -83,11 +87,11 @@ export async function runCertification(config: AgentConfig, runtime: RuntimeCont
     details: REQUIRED_SKILLS.map((skill) => ({ skill, promptSha256: promptHash(skill) })),
   });
   checks.push({
-    name: 'replay-fixture-present',
-    ok: existsSync(resolve('fixtures/replays/ci-smoke.json')),
+    name: 'certification-fixture-present',
+    ok: existsSync(resolve(CERTIFICATION_FIXTURE_PATH)),
   });
-  checks.push(replayMarketAnalyticsCheck());
-  checks.push(replay);
+  checks.push(certificationMarketAnalyticsCheck());
+  checks.push(certification);
   checks.push(secretLeakCheck());
   checks.push(predictionContractCheck());
   checks.push(handoffDisclaimerCheck());
@@ -98,17 +102,17 @@ export async function runCertification(config: AgentConfig, runtime: RuntimeCont
   });
   checks.push({
     name: 'manifest-v2-contract-covered',
-    ok: Boolean(replay.ok && (replay.details as any)?.manifestContract?.ok),
-    details: (replay.details as any)?.manifestContract ?? ['sources', 'claims', 'approvals', 'gates', 'hashes', 'reproduction', 'governanceScorecard'],
+    ok: Boolean(certification.ok && (certification.details as any)?.manifestContract?.ok),
+    details: (certification.details as any)?.manifestContract ?? ['sources', 'claims', 'approvals', 'gates', 'hashes', 'reproduction', 'governanceScorecard'],
   });
   checks.push({
     name: 'analytical-only-disclaimer-required',
-    ok: Boolean(replay.ok && (replay.details as any)?.manifestContract?.handoffDisclaimer),
-    details: (replay.details as any)?.manifestContract?.handoffDisclaimer,
+    ok: Boolean(certification.ok && (certification.details as any)?.manifestContract?.handoffDisclaimer),
+    details: (certification.details as any)?.manifestContract?.handoffDisclaimer,
   });
 
   const hash = certificationHash(checks);
-  const goldenPath = resolve('fixtures/replays/ci-smoke.golden.json');
+  const goldenPath = resolve(CERTIFICATION_GOLDEN_PATH);
   if (existsSync(goldenPath)) {
     const golden = JSON.parse(readFileSync(goldenPath, 'utf-8')) as { hash?: string };
     checks.push({
@@ -132,7 +136,8 @@ export async function runCertification(config: AgentConfig, runtime: RuntimeCont
     profile,
     generatedAt: '1970-01-01T00:00:00.000Z',
     deterministic: true,
-    replayFixture: 'fixtures/replays/ci-smoke.json',
+    fixtureMode: 'technical-certification-only',
+    certificationFixture: CERTIFICATION_FIXTURE_PATH,
     hash: finalHash,
     checks,
   };
@@ -160,33 +165,33 @@ function promptHash(skill: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
-function replayMarketAnalyticsCheck(): CertificationCheck {
+function certificationMarketAnalyticsCheck(): CertificationCheck {
   try {
-    const replay = JSON.parse(readFileSync(resolve('fixtures/replays/ci-smoke.json'), 'utf-8')) as {
+    const fixture = JSON.parse(readFileSync(resolve(CERTIFICATION_FIXTURE_PATH), 'utf-8')) as {
       odds?: Array<{ bookmaker?: string; selection: string; odds: number }>;
     };
-    const fair = consensusFairPrices((replay.odds ?? []).map((quote) => ({
+    const fair = consensusFairPrices((fixture.odds ?? []).map((quote) => ({
       bookmaker: quote.bookmaker,
       selection: quote.selection,
       odds: quote.odds,
     })));
     const probabilitySum = fair.reduce((sum, item) => sum + item.marketFairProbability, 0);
     return {
-      name: 'replay-market-analytics-devigged',
+      name: 'certification-market-analytics-devigged',
       ok: fair.length >= 2 && Math.abs(probabilitySum - 1) < 1e-9 && fair.every((item) => item.bookmakerCount >= 3),
       details: { selections: fair.length, probabilitySum, fair },
     };
   } catch (err) {
     return {
-      name: 'replay-market-analytics-devigged',
+      name: 'certification-market-analytics-devigged',
       ok: false,
       details: err instanceof Error ? err.message : String(err),
     };
   }
 }
 
-async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeContext): Promise<CertificationCheck> {
-  const replayConfig: AgentConfig = {
+async function runCertificationPipelineCheck(config: AgentConfig, runtime: RuntimeContext): Promise<CertificationCheck> {
+  const certificationConfig: AgentConfig = {
     ...config,
     apiFootball: {
       ...config.apiFootball,
@@ -194,19 +199,19 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
       lowOddsThreshold: 1.4,
     },
   };
-  const replay = JSON.parse(readFileSync(resolve('fixtures/replays/ci-smoke.json'), 'utf-8')) as {
+  const fixtureInput = JSON.parse(readFileSync(resolve(CERTIFICATION_FIXTURE_PATH), 'utf-8')) as {
     date: string;
     fixtureId: string;
   };
-  const runId = 'ci-smoke-replay-run';
+  const runId = 'ci-certification-run';
   rmSync(resolve(config.artifactRoot, 'runs', runId), { recursive: true, force: true });
   rmSync(resolve(config.artifactRoot, 'evidence-packs', runId), { recursive: true, force: true });
   rmSync(resolve(config.artifactRoot, 'handoffs', `${runId}.md`), { force: true });
   const generatedAt = new Date('2026-05-03T12:00:00.000Z');
   const fixture: Fixture = {
-    id: 'fixture-ci-smoke',
+    id: 'fixture-ci-certification',
     provider: 'api-football',
-    providerFixtureId: replay.fixtureId,
+    providerFixtureId: fixtureInput.fixtureId,
     homeTeamId: 'team-home',
     awayTeamId: 'team-away',
     scheduledAt: '2026-05-03T18:00:00.000Z',
@@ -222,9 +227,9 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
       selection: 'home',
       price: 1.33,
       impliedProbability: 1 / 1.33,
-      bookmaker: 'replay-a',
+      bookmaker: 'certification-a',
       capturedAt: generatedAt.toISOString(),
-      sourceSnapshotId: 'provider-snapshot-ci-smoke',
+      sourceSnapshotId: 'provider-snapshot-ci-certification',
     },
     {
       fixtureId: fixture.id,
@@ -232,13 +237,13 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
       selection: 'away',
       price: 3.2,
       impliedProbability: 1 / 3.2,
-      bookmaker: 'replay-a',
+      bookmaker: 'certification-a',
       capturedAt: generatedAt.toISOString(),
-      sourceSnapshotId: 'provider-snapshot-ci-smoke',
+      sourceSnapshotId: 'provider-snapshot-ci-certification',
     },
   ];
-  const result = await executeRunPipeline(replayConfig, {
-    date: replay.date,
+  const result = await executeRunPipeline(certificationConfig, {
+    date: fixtureInput.date,
     runId,
     web: 'cached',
     validate: 'force',
@@ -254,65 +259,65 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
         excludedReasons: [],
         eligible: true,
       }],
-      requestedLeagues: [{ providerCompetitionId: '1', season: 2026, name: 'CI Smoke League' }],
+      requestedLeagues: [{ providerCompetitionId: '1', season: 2026, name: 'CI Certification League' }],
       requestedTeams: [],
     }),
     fetchOddsSnapshot: async () => ({
       fixtureId: fixture.id,
       providerFixtureId: fixture.providerFixtureId,
-      oddsSnapshotId: 'odds-snapshot-ci-smoke',
-      providerSnapshotId: 'provider-snapshot-ci-smoke',
+      oddsSnapshotId: 'odds-snapshot-ci-certification',
+      providerSnapshotId: 'provider-snapshot-ci-certification',
       capturedAt: generatedAt.toISOString(),
       bookmakerCount: 1,
-      payloadHash: 'ci-smoke-replay',
+      payloadHash: 'ci-certification-fixture',
       quoteRecordIds: {
-        'replay-a|h2h|home|': 'odds-quote-ci-smoke-home',
-        'replay-a|h2h|away|': 'odds-quote-ci-smoke-away',
+        'certification-a|h2h|home|': 'odds-quote-ci-certification-home',
+        'certification-a|h2h|away|': 'odds-quote-ci-certification-away',
       },
       quotes: odds,
     }),
     researchFixture: async (_cfg, _input, rt) => {
       const bundle = {
-        id: 'research-bundle-ci-smoke',
+        id: 'research-bundle-ci-certification',
         runId,
         fixtureId: fixture.id,
         providerFixtureId: fixture.providerFixtureId,
         sources: [{
-          id: 'source-ci-smoke',
+          id: 'source-ci-certification',
           type: 'provider-snapshot' as const,
-          snapshotId: 'provider-snapshot-ci-smoke',
-          title: 'Replay provider snapshot',
+          snapshotId: 'provider-snapshot-ci-certification',
+          title: 'Certification provider snapshot',
           capturedAt: generatedAt.toISOString(),
         }],
         evidenceItems: [{
-          id: 'evidence-ci-smoke-1',
-          sourceId: 'source-ci-smoke',
-          claimIds: ['claim-ci-smoke'],
-          summary: 'Replay fixture has a low-odds home selection.',
+          id: 'evidence-ci-certification-1',
+          sourceId: 'source-ci-certification',
+          claimIds: ['claim-ci-certification'],
+          summary: 'Certification fixture has a low-odds home selection.',
           confidence: 0.9,
         }, {
-          id: 'evidence-ci-smoke-2',
-          sourceId: 'source-ci-smoke',
-          claimIds: ['claim-ci-smoke'],
-          summary: 'Replay odds include linked provider context.',
+          id: 'evidence-ci-certification-2',
+          sourceId: 'source-ci-certification',
+          claimIds: ['claim-ci-certification'],
+          summary: 'Certification odds include linked provider context.',
           confidence: 0.8,
         }],
         claims: [{
-          id: 'claim-ci-smoke',
-          statement: 'The replay fixture has enough provider evidence for scoring.',
+          id: 'claim-ci-certification',
+          statement: 'The certification fixture has enough provider evidence for scoring.',
           subject: { type: 'market' as const, market: 'h2h' },
           supportLevel: 'supported' as const,
-          evidenceIds: ['evidence-ci-smoke-1', 'evidence-ci-smoke-2'],
+          evidenceIds: ['evidence-ci-certification-1', 'evidence-ci-certification-2'],
           conflictStatus: 'none' as const,
         }],
-        gateResult: { verdict: 'promotable' as const, reasons: ['replay research complete'], warnings: [] },
+        gateResult: { verdict: 'promotable' as const, reasons: ['certification research complete'], warnings: [] },
         providerAgentic: 'codex' as const,
         model: config.model,
         promptVersion: 'research-fixture-v2',
         createdAt: generatedAt.toISOString(),
         warnings: [],
       };
-      const artifactPath = writeArtifact(replayConfig, rt.runId ?? runId, 'research-bundle.json', bundle);
+      const artifactPath = writeArtifact(certificationConfig, rt.runId ?? runId, 'research-bundle.json', bundle);
       return { ok: true, bundle, gateResult: bundle.gateResult, artifactPath };
     },
     scoreFixture: async (_cfg, _input, rt) => {
@@ -323,7 +328,7 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
         providerFixtureId: fixture.providerFixtureId,
         gateResult: { verdict: 'promotable', reasons: ['prediction gates passed'], warnings: [] },
         predictions: [{
-        id: 'prediction-ci-smoke',
+        id: 'prediction-ci-certification',
         runId,
         fixtureId: fixture.id,
         providerFixtureId: fixture.providerFixtureId,
@@ -336,12 +341,12 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
         marketImpliedProbability: 0.75,
         marketFairProbability: 0.72,
         edge: 0.1,
-        oddsSnapshotId: 'odds-snapshot-ci-smoke',
-        oddsQuoteId: 'odds-quote-ci-smoke-home',
-        researchBundleId: 'research-bundle-ci-smoke',
-        evidenceIds: ['evidence-ci-smoke-1', 'evidence-ci-smoke-2'],
-        claimIds: ['claim-ci-smoke'],
-        rationale: 'Replay prediction with positive edge and linked evidence.',
+        oddsSnapshotId: 'odds-snapshot-ci-certification',
+        oddsQuoteId: 'odds-quote-ci-certification-home',
+        researchBundleId: 'research-bundle-ci-certification',
+        evidenceIds: ['evidence-ci-certification-1', 'evidence-ci-certification-2'],
+        claimIds: ['claim-ci-certification'],
+        rationale: 'Certification prediction with positive edge and linked evidence.',
         blockers: [],
         promotable: true,
         warnings: [],
@@ -356,20 +361,20 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
         generatedAt: generatedAt.toISOString(),
       }],
       };
-      writeArtifact(replayConfig, rt.runId ?? runId, 'predictions.json', payload);
+      writeArtifact(certificationConfig, rt.runId ?? runId, 'predictions.json', payload);
       return payload as any;
     },
     buildParlay: async () => ({
       ok: true,
       runId,
-      date: replay.date,
+      date: fixtureInput.date,
       gateResult: { verdict: 'promotable', reasons: ['all parlay gates passed'], warnings: [] },
       build: {
         parlay: {
-          id: 'parlay-ci-smoke',
+          id: 'parlay-ci-certification',
           sourceRunId: runId,
           legs: [{
-            predictionId: 'prediction-ci-smoke',
+            predictionId: 'prediction-ci-certification',
             fixtureId: fixture.id,
             market: 'h2h',
             selection: 'home',
@@ -377,7 +382,7 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
           }],
           aggregateConfidence: 0.9,
           aggregateQuality: 0.9,
-          rationale: 'Replay parlay candidate for certification only.',
+          rationale: 'Certification parlay candidate for technical certification only.',
           warnings: [],
           status: 'promotable',
           generatedAt: generatedAt.toISOString(),
@@ -391,18 +396,18 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
       const payload = {
         ok: true,
         runId,
-        target: { date: replay.date },
-        gateResult: { verdict: 'promotable', reasons: ['replay validation complete'], warnings: [] },
+        target: { date: fixtureInput.date },
+        gateResult: { verdict: 'promotable', reasons: ['certification validation complete'], warnings: [] },
         validations: [{
-        id: 'validation-ci-smoke',
+        id: 'validation-ci-certification',
         runId,
-        predictionId: 'prediction-ci-smoke',
+        predictionId: 'prediction-ci-certification',
         status: 'won',
         outcome: { status: 'won', evaluatedAt: generatedAt.toISOString(), settlementRuleVersion: 'settlement-v1' },
         evaluatedAt: generatedAt.toISOString(),
       }],
       };
-      writeArtifact(replayConfig, rt.runId ?? runId, 'validations.json', payload);
+      writeArtifact(certificationConfig, rt.runId ?? runId, 'validations.json', payload);
       return payload as any;
     },
   });
@@ -410,7 +415,7 @@ async function runReplayPipelineCheck(config: AgentConfig, runtime: RuntimeConte
   const manifestContract = validateEvidencePackV2(manifest);
   const spanContract = validateRunSpans(resolve(config.artifactRoot, 'runs', runId, 'spans.jsonl'));
   return {
-    name: 'replay-pipeline-evidence-pack-v2',
+    name: 'certification-pipeline-evidence-pack-v2',
     ok: result.ok && result.verdict === 'promotable' && manifestContract.ok && spanContract.ok,
     details: {
       verdict: result.verdict,

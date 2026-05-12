@@ -15,10 +15,10 @@ La calidad analitica no se trata como un problema de prompt: se trata como una c
 - Secciones 2.6, 2.8, 2.9, 2.10 (runtime, profile, approval, redaccion).
 - Secciones 5.2, 5.3 (arquitectura, scheduler, dispatcher, recovery, artifact writer).
 - Secciones 10.5, 14, 15, 16, 17.4, 17.6 (artifacts, eventos, evidencia, seguridad, audit, sources).
-- Seccion 18 (criterios de aceptacion 6, 22, 23 y certificacion deterministica `ci-smoke`).
+- Seccion 18 (criterios de aceptacion 6, 22, 23 y certificacion deterministica `ci-certification`).
 - Seccion 19 (cambios requeridos sobre el codigo actual: separar provider agentic de runtime, no depender de OpenRouter como runtime).
 
-Nota de coherencia productiva: `ci-smoke` es solo el nombre historico del perfil de certificacion deterministica sobre replay fixture. No es un flujo operativo del producto, no reemplaza acceptance live, no consume providers reales y no debe presentarse como modo productivo.
+Nota de coherencia productiva: `ci-certification` es certificacion deterministica local sobre fixture tecnico. No es un flujo operativo del producto, no reemplaza acceptance live, no consume providers reales y no debe presentarse como modo productivo. Los fixtures bajo `fixtures/replays` existen solo para regresion tecnica interna.
 
 ## Diagnostico de partida
 
@@ -192,7 +192,7 @@ listTools(): RegisteredTool[];
 ```ts
 type ResearchSearchTool = {
   mode: 'disabled' | 'cached' | 'live';
-  provider: 'codex-native' | 'gemini-native' | 'replay';
+  provider: 'codex-native' | 'gemini-native' | 'certification-fixture';
   required: boolean;
 };
 ```
@@ -310,7 +310,7 @@ type ShellInput = {
 ### Reglas de egress (policy, no sandbox)
 
 - Allowlist de hosts por perfil:
-  - `mock`/`replay`: red deshabilitada (`off`).
+  - `mock`/`certification-fixture`: red deshabilitada (`off`).
   - `live-readonly`: API-Football y proveedor LLM agentic.
 - Cualquier host fuera de allowlist queda bloqueado en la tool y emite `policy.evaluate` con resultado `blocked`.
 - Web search obedece `ResearchSearchTool.mode` y nunca usa OpenRouter como runtime de red.
@@ -323,7 +323,7 @@ type ShellInput = {
 - `shell` con comando fuera de allowlist se enruta a `dangerous_shell` o falla.
 - `dangerous_shell` sin approval no ejecuta.
 - Llamada saliente a host fuera de allowlist es bloqueada y auditada.
-- En `mock`/`replay` no hay trafico saliente (verificado en certify).
+- En `mock`/`certification-fixture` no hay trafico saliente (verificado en certify).
 - Test unit cubre rechazo de paths sensibles (`.env`, `.git/`, fuera del workspace).
 - Test unit cubre bloqueo de host fuera de allowlist por perfil.
 
@@ -381,16 +381,16 @@ run.created
 ### Comando
 
 ```bash
-pnpm gana certify --profile ci-smoke
+pnpm gana certify --profile ci-certification
 ```
 
 ### Pipeline
 
 ```text
-1. cargar replay fixture
+1. cargar fixture tecnico de certificacion
 2. correr fixtures
-3. correr odds replay
-4. correr research mock/replay
+3. correr odds desde fixture tecnico
+4. correr research controlado
 5. correr score
 6. correr parlay
 7. correr validation
@@ -410,12 +410,12 @@ pnpm gana certify --profile ci-smoke
 - tool mutante sin approval;
 - secreto en logs/artifacts;
 - costo supera budget;
-- run no deterministico en replay.
+- run no deterministico en certificacion.
 
 ### Aceptacion
 
-- CI corre `pnpm gana certify --profile ci-smoke` sin credenciales reales.
-- Manifest hash es deterministico ante misma replay fixture.
+- CI corre `pnpm gana certify --profile ci-certification` sin credenciales reales.
+- Manifest hash es deterministico ante el mismo fixture tecnico.
 - Cambio en prompt version dispara regresion documentada o falla.
 
 ---
@@ -484,8 +484,8 @@ type HarnessSpan = {
   "gates": [],
   "hashes": {},
   "reproduction": {
-    "command": "pnpm gana run --date ... --provider replay",
-    "profile": "ci-smoke"
+    "command": "pnpm gana run --date ... --web cached",
+    "profile": "ci-certification"
   }
 }
 ```
@@ -493,7 +493,7 @@ type HarnessSpan = {
 ### Aceptacion
 
 - Manifest v2 es generado por todo run promovible.
-- Reproduction command reproduce el run en replay y produce hashes equivalentes.
+- Reproduction command reproduce el run tecnico de certificacion y produce hashes equivalentes.
 - Approvals y gates aparecen como secciones explicitas y enlazan a audit log.
 
 ---
@@ -818,7 +818,7 @@ prompt-version | modelo | mercado | liga | brier | logloss | clv% | hitrate | n
 
 ### Aceptacion
 
-- Run replay produce calibration plot y leaderboard entries reproducibles.
+- Run de certificacion produce calibration plot y leaderboard entries reproducibles.
 - Holdout set congelado se mantiene fuera de tuning.
 - Test integracion: muestra `n < 30` produce reporte con flag `low-sample`.
 
@@ -849,8 +849,8 @@ El default de un run no es "promover el mejor parlay disponible", es **no promov
 
 ### Aceptacion
 
-- Test integracion: corpus replay con todos los gates positivos promueve parlay.
-- Test integracion: corpus replay con `low-liquidity` en uno de los legs produce `no-parlay-today`.
+- Test integracion: corpus tecnico con todos los gates positivos promueve parlay.
+- Test integracion: corpus tecnico con `low-liquidity` en uno de los legs produce `no-parlay-today`.
 - Certify falla si `handoff.md` o evidence pack carecen del disclaimer.
 
 ---
@@ -889,7 +889,7 @@ PR-15 Approval real con pausa/reanudacion          (P0.2)
 PR-16 Shell/file/egress/filesystem policy          (P0.3)
 PR-17 Trace/span runtime                           (P1.6)
 PR-18 Evidence pack v2                             (P1.7)
-PR-19 Certification smoke `gana certify`           (P0.5)
+PR-19 Production certification `gana certify`      (P0.5)
 PR-20 HarnessTask dispatcher/recovery              (P0.4)
 PR-21 Retrieval formal                             (P1.8)
 PR-22 Skills versionadas                           (P1.9)
@@ -926,7 +926,7 @@ Incluido:
 - Egress allowlist y reglas de filesystem aplicadas como policy en las tools.
 - Trace/span jerarquico con costos.
 - Evidence pack v2 con secciones explicitas y reproduction command.
-- Eval harness `gana certify --profile ci-smoke`.
+- Eval harness `gana certify --profile ci-certification`.
 - Retrieval formal con BM25, frescura y provenance obligatoria.
 - Skills versionadas con tests, drift detection y bump obligatorio por cambio de prompt.
 - Devig + fair price multi-bookmaker como entrada canonica de odds.
@@ -958,7 +958,7 @@ Fuera:
 - `file_write`, `file_edit`, `shell`, `artifact_promote` y `prediction_promote` quedan pendientes en approval pending y se reanudan sin perder contexto.
 - Egress fuera de allowlist y escritura fuera de `.artifacts/` quedan bloqueados a nivel de tool.
 - `executeRunPipeline` puede interrumpirse y reanudarse usando `HarnessTask`.
-- `pnpm gana certify --profile ci-smoke` corre sin credenciales reales y compara contra golden manifest.
+- `pnpm gana certify --profile ci-certification` corre sin credenciales reales y compara contra golden manifest.
 - Evidence pack v2 incluye sources, claims, predictions, validations, approvals, gates, hashes y reproduction command.
 - Spans cubren llm calls, tool calls, retrievals, policy decisions y gates.
 - Retrieval bloquea sources stale y exige `sourceId` por claim.
@@ -991,7 +991,7 @@ Fuera:
   - prop con XI no confirmado bloquea hasta confirmacion;
   - run sin candidatos validos produce `no-parlay-today` reproducible.
 - Certification:
-  - `pnpm gana certify --profile ci-smoke` deterministico sobre replay fixture;
+  - `pnpm gana certify --profile ci-certification` deterministico sobre fixture tecnico;
   - manifest hash estable;
   - secret leak en log/artifact rompe certify;
   - prediction sin evidence rompe certify;
@@ -1003,7 +1003,7 @@ Fuera:
   - `/approval pending` lista pendientes redacted;
   - `/approve APPROVAL_ID` reanuda la accion original;
   - `pnpm gana approve APPROVAL_ID` funciona en headless;
-  - run completo en `replay` produce evidence pack v2 reproducible;
+  - run completo de certificacion produce evidence pack v2 reproducible;
   - `pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league` produce reporte con `n` y banda de confianza;
   - run con condiciones insuficientes muestra `no-parlay-today` con razones detalladas en TUI.
 

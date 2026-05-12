@@ -1513,7 +1513,7 @@ commands.push({
   description: 'Run deterministic harness certification',
   execute: async (args, ctx) => {
     const flags = parseFlags(args.split(' ').filter(Boolean));
-    const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-smoke');
+    const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-certification');
     printCertificationResult(result);
   },
 });
@@ -1801,7 +1801,7 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
 
     if (area === 'certify') {
       const flags = parseFlags(argv.slice(1));
-      const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-smoke');
+      const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-certification');
       printCertificationResult(result);
       return { ok: result.ok, exitCode: result.ok ? 0 : 1 };
     }
@@ -1939,7 +1939,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana certify --profile ci-smoke${RESET}`);
+  console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);
   console.log(`  ${CYAN}pnpm gana export --run-id RUN_ID${RESET}`);

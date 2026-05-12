@@ -55,11 +55,11 @@ describe('production-grade tool registry and certification', () => {
     }
   });
 
-  it('runs ci-smoke certification without real credentials', async () => {
+  it('runs ci-certification without real credentials', async () => {
     const root = mkdtempSync(join(tmpdir(), 'gana-certify-'));
     const config = loadConfig({ artifactRoot: join(root, 'artifacts'), databaseUrl: '', apiFootballKey: '' }, { skipApiKey: true });
     const runtime = createRuntimeContext(config, join(root, 'session.jsonl'));
-    const result = await runCertification(config, runtime, 'ci-smoke');
+    const result = await runCertification(config, runtime, 'ci-certification');
 
     assert.equal(result.ok, true);
     const manifest = JSON.parse(readFileSync(result.manifestPath, 'utf-8'));
