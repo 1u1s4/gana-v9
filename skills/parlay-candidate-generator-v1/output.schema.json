@@ -1,1 +1,53 @@
-{"type":"object","properties":{"candidates":{"type":"array"},"handoff":{"type":"object"}}}
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidates", "handoff"],
+  "properties": {
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "parlayId",
+          "legs",
+          "combinedFairProbability",
+          "combinedMarketOdds",
+          "combinedFairOdds",
+          "expectedEdge",
+          "correlationPenalty",
+          "diversityScore",
+          "riskScore",
+          "reason",
+          "blockers"
+        ],
+        "properties": {
+          "parlayId": { "type": "string", "minLength": 1 },
+          "legs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "combinedFairProbability": { "type": "number", "minimum": 0 },
+          "combinedMarketOdds": { "type": "number", "minimum": 0 },
+          "combinedFairOdds": { "type": "number", "minimum": 0 },
+          "expectedEdge": { "type": "number" },
+          "correlationPenalty": { "type": "number", "minimum": 0 },
+          "diversityScore": { "type": "number", "minimum": 0 },
+          "riskScore": { "type": "number", "minimum": 0 },
+          "reason": {
+            "type": "string",
+            "enum": ["top-ev", "low-variance", "high-conviction", "rejected"]
+          },
+          "blockers": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

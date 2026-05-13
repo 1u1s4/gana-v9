@@ -35,6 +35,7 @@ const REQUIRED_SKILLS = [
   'ensemble-disagreement-v1',
   'correlation-model-v1',
   'parlay-candidate-generator-v1',
+  'parlay-portfolio-v1',
   'parlay-ranker-v1',
   'validation-clv-v1',
   'calibration-monitor-v1',
@@ -80,6 +81,12 @@ export async function runCertification(config: AgentConfig, runtime: RuntimeCont
     name: 'skills-versioned-with-tests',
     ok: REQUIRED_SKILLS.every((skill) => skillComplete(skill)),
     details: REQUIRED_SKILLS,
+  });
+  const discoveredSkills = skillDirectories();
+  checks.push({
+    name: 'all-skill-directories-covered',
+    ok: discoveredSkills.every((skill) => REQUIRED_SKILLS.includes(skill)),
+    details: { required: REQUIRED_SKILLS, discovered: discoveredSkills },
   });
   checks.push({
     name: 'skill-prompt-hashes-match-manifests',
@@ -150,6 +157,13 @@ function skillComplete(skill: string): boolean {
   if (!existsSync(join(dir, 'skill.json')) || !existsSync(join(dir, 'prompt.md')) || !existsSync(join(dir, 'output.schema.json'))) return false;
   const tests = join(dir, 'tests');
   return existsSync(tests) && readdirSync(tests).length > 0 && validJson(join(dir, 'skill.json'));
+}
+
+function skillDirectories(): string[] {
+  return readdirSync(resolve('skills'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
 }
 
 function skillPromptHashMatches(skill: string): boolean {

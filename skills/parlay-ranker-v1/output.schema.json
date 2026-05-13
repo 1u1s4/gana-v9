@@ -1,1 +1,30 @@
-{"type":"object","properties":{"ranked":{"type":"array"}}}
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ranked"],
+  "properties": {
+    "ranked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["parlayId", "legs", "expectedEdge", "riskScore", "blockers"],
+        "properties": {
+          "parlayId": { "type": "string", "minLength": 1 },
+          "legs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "expectedEdge": { "type": "number" },
+          "riskScore": { "type": "number", "minimum": 0 },
+          "combinedMarketOdds": { "type": "number", "minimum": 0 },
+          "combinedFairProbability": { "type": "number", "minimum": 0 },
+          "blockers": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

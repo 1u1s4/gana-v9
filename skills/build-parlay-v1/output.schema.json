@@ -1,1 +1,67 @@
-{"type":"object","required":["parlays"],"properties":{"parlays":{"type":"array"}}}
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["parlays", "rejected", "diagnostics"],
+  "properties": {
+    "parlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "legs", "combinedOdds", "status", "rationale", "warnings"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "legs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": ["predictionId", "fixtureId", "market", "selection", "odds"],
+              "properties": {
+                "predictionId": { "type": "string", "minLength": 1 },
+                "fixtureId": { "type": "string", "minLength": 1 },
+                "market": {
+                  "type": "string",
+                  "enum": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"]
+                },
+                "selection": { "type": "string", "minLength": 1 },
+                "line": { "type": ["number", "null"] },
+                "odds": { "type": "number", "exclusiveMinimum": 1 }
+              }
+            }
+          },
+          "combinedOdds": { "type": "number", "minimum": 0 },
+          "status": {
+            "type": "string",
+            "enum": ["candidate", "review-required", "promotable", "blocked"]
+          },
+          "rationale": { "type": "string", "minLength": 1 },
+          "warnings": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reasons"],
+        "properties": {
+          "predictionId": { "type": ["string", "null"] },
+          "parlayId": { "type": ["string", "null"] },
+          "reasons": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
