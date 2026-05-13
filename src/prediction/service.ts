@@ -31,7 +31,7 @@ import type {
   StoragePrismaClient,
 } from '../storage/types.js';
 import { aggregatePredictionGate, evaluateEvidenceGate, evaluatePredictionGates } from './gates.js';
-import { buildAtomicPrediction, scorePredictionCandidate } from './scoring.js';
+import { buildAtomicPrediction, qualityFromConfidence, scorePredictionCandidate } from './scoring.js';
 import { SCORE_PREDICTION_PROMPT_VERSION, buildScorePredictionPrompt, type ResearchWebMode } from './prompts.js';
 import { SCORING_RULE_VERSION, type PredictionRecordView } from './types.js';
 
@@ -429,17 +429,7 @@ export async function runFixtureScoring(
     });
     const marketSpecificEvidenceMissing = marketSpecificEvidence.warnings.some((warning) => warning.startsWith('market-specific evidence missing'));
     const fairProbability = fairProbabilityForQuote(quote, pick);
-    const configurableGateWarnings = evaluateConfigurablePredictionWarnings({
-      pick,
-      quote,
-      confidence: calibration.confidence ?? pick.confidence,
-      evidenceIds: selectedEvidenceIds,
-      evidenceItems: research.evidenceItems,
-      edge: calibration.probability !== undefined && fairProbability !== null
-        ? calibration.probability - fairProbability
-        : undefined,
-    });
-    const warnings = [
+    const baseWarnings = [
       ...gate.warnings,
       ...retrievalWarnings,
       ...candidateScore.reasons,
@@ -447,6 +437,28 @@ export async function runFixtureScoring(
       ...pick.blockers,
       ...calibration.warnings,
       ...marketSpecificEvidence.warnings,
+      ...fairProbabilityWarnings(quote, pick, fairProbability),
+    ];
+    const riskControls = evaluatePostScoringRiskControls({
+      pick,
+      quote,
+      warnings: baseWarnings,
+      confidence: calibration.confidence ?? pick.confidence,
+      calibrationApplied: calibration.applied,
+    });
+    const configurableGateWarnings = evaluateConfigurablePredictionWarnings({
+      pick,
+      quote,
+      confidence: riskControls.confidence,
+      evidenceIds: selectedEvidenceIds,
+      evidenceItems: research.evidenceItems,
+      edge: calibration.probability !== undefined && fairProbability !== null
+        ? calibration.probability - fairProbability
+        : undefined,
+    });
+    const warnings = [
+      ...baseWarnings,
+      ...riskControls.warnings,
       ...configurableGateWarnings,
     ];
 
@@ -471,11 +483,11 @@ export async function runFixtureScoring(
       evidenceIds: selectedEvidenceIds,
       claimIds: selectedClaimIds,
       status: gate.verdict,
-      confidence: calibration.confidence ?? pick.confidence,
-      quality: pick.confidenceBand,
+      confidence: riskControls.confidence,
+      quality: riskControls.confidenceBand ?? pick.confidenceBand,
       rationale: pick.rationale,
       warnings,
-      parlayEligible: isParlayEligibleResearch(research.researchBundle ?? undefined, warnings),
+      parlayEligible: isParlayEligibleResearch(research.researchBundle ?? undefined, warnings) && !riskControls.parlayIneligible,
       providerAgentic: config.provider,
       model: config.model,
       researchBundleId: research.researchBundle?.id,
@@ -485,8 +497,8 @@ export async function runFixtureScoring(
       ...prediction,
       calibration,
       blockers: uniqueStrings([...prediction.blockers, ...pick.blockers]),
-      promotable: prediction.promotable && pick.promotable !== false && !marketSpecificEvidenceMissing,
-      status: prediction.status === 'promotable' && (pick.promotable === false || marketSpecificEvidenceMissing) ? 'review-required' : prediction.status,
+      promotable: prediction.promotable && pick.promotable !== false && !marketSpecificEvidenceMissing && !riskControls.forceReview,
+      status: prediction.status === 'promotable' && (pick.promotable === false || marketSpecificEvidenceMissing || riskControls.forceReview) ? 'review-required' : prediction.status,
       warnings: uniqueStrings([
         ...prediction.warnings,
         ...(pick.edge !== undefined && prediction.edge !== undefined && Math.abs(pick.edge - prediction.edge) > 0.02
@@ -1105,10 +1117,83 @@ function evaluateConfigurablePredictionWarnings(input: {
 }
 
 function fairProbabilityForQuote(quote: OddsQuoteRecord | undefined, pick: ParsedTopPick): number | null {
-  return numberOrNull(quote?.marketFairProbability)
+  const rawFairProbability = numberOrNull(quote?.marketFairProbability)
     ?? numberOrNull(pick.marketFairProbability)
     ?? numberOrNull(quote?.marketImpliedProbability)
     ?? (Number.isFinite(pick.odds) ? 1 / pick.odds : null);
+  const impliedProbability = numberOrNull(quote?.impliedProbability)
+    ?? (Number.isFinite(pick.odds) ? 1 / pick.odds : null);
+  if (
+    pick.market === 'double_chance'
+    && rawFairProbability !== null
+    && impliedProbability !== null
+    && impliedProbability >= 0.75
+    && rawFairProbability < impliedProbability - 0.2
+  ) {
+    return impliedProbability;
+  }
+  return rawFairProbability;
+}
+
+function fairProbabilityWarnings(quote: OddsQuoteRecord | undefined, pick: ParsedTopPick, fairProbability: number | null): string[] {
+  const rawFairProbability = numberOrNull(quote?.marketFairProbability) ?? numberOrNull(pick.marketFairProbability);
+  const impliedProbability = numberOrNull(quote?.impliedProbability)
+    ?? (Number.isFinite(pick.odds) ? 1 / pick.odds : null);
+  if (
+    pick.market === 'double_chance'
+    && rawFairProbability !== null
+    && impliedProbability !== null
+    && fairProbability !== rawFairProbability
+  ) {
+    return [`double_chance fair probability ${round(rawFairProbability)} was inconsistent with low-price implied probability ${round(impliedProbability)}; edge capped to implied probability`];
+  }
+  return [];
+}
+
+function evaluatePostScoringRiskControls(input: {
+  pick: ParsedTopPick;
+  quote?: OddsQuoteRecord;
+  warnings: string[];
+  confidence: number;
+  calibrationApplied?: boolean;
+}): {
+  confidence: number;
+  confidenceBand?: 'low' | 'medium' | 'high';
+  warnings: string[];
+  forceReview: boolean;
+  parlayIneligible: boolean;
+} {
+  const warnings: string[] = [];
+  let confidence = input.confidence;
+  let confidenceChanged = false;
+  let forceReview = false;
+  let parlayIneligible = false;
+  const warningText = input.warnings.join('\n');
+  const lowLiquidity = metadataBool(input.quote?.metadata, 'lowLiquidity') || /low[-_ ]liquidity|low liquidity/i.test(warningText);
+  const staleOdds = /stale (?:news|source|odds) source|stale odds/i.test(warningText);
+
+  if (staleOdds && lowLiquidity) {
+    const nextConfidence = Math.min(confidence, 0.49);
+    confidenceChanged = confidenceChanged || nextConfidence !== confidence;
+    confidence = nextConfidence;
+    forceReview = true;
+    parlayIneligible = true;
+    warnings.push('stale low-liquidity prediction requires review and is excluded from parlays');
+  }
+  if (confidence >= 0.8 && confidence < 0.9 && !input.calibrationApplied) {
+    const nextConfidence = Math.min(confidence, 0.74);
+    confidenceChanged = confidenceChanged || nextConfidence !== confidence;
+    confidence = nextConfidence;
+    warnings.push('uncalibrated high-confidence band 0.80-0.90 capped after validation overconfidence');
+  }
+
+  return {
+    confidence,
+    confidenceBand: confidenceChanged ? qualityFromConfidence(confidence) : undefined,
+    warnings,
+    forceReview,
+    parlayIneligible,
+  };
 }
 
 function buildScoringMarketCoverage(
@@ -1685,6 +1770,10 @@ function stringArray(value: unknown): string[] {
 
 function compactJson(value: Record<string, unknown>): JsonValue {
   return JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(value).filter(([, val]) => val !== undefined)))) as JsonValue;
+}
+
+function round(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 function basename(path: string): string {

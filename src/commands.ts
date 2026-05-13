@@ -544,9 +544,9 @@ async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags:
 
 async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
   const portfolio = optionalStringFlag(flags, 'portfolio');
-  const deterministicPortfolios = new Set(['low-variance', 'balanced', 'totals', 'high-conviction', 'market-diverse']);
+  const deterministicPortfolios = new Set(['low-variance', 'balanced', 'totals', 'high-conviction', 'market-diverse', 'parlay-oro']);
   if (portfolio !== undefined && portfolio !== 'llm' && portfolio !== 'low-odds-top' && !deterministicPortfolios.has(portfolio)) {
-    throw new Error('--portfolio must be llm, low-odds-top, low-variance, balanced, totals, high-conviction, or market-diverse when provided.');
+    throw new Error('--portfolio must be llm, low-odds-top, low-variance, balanced, totals, high-conviction, market-diverse, or parlay-oro when provided.');
   }
   if (portfolio === 'llm' || portfolio === 'low-odds-top' || deterministicPortfolios.has(portfolio ?? '')) {
     const selectedPortfolio = portfolio as NonNullable<Parameters<typeof runParlayBuild>[1]['portfolio']>;
@@ -708,7 +708,7 @@ function printOdds(quotes: OddsQuote[], details?: { oddsSnapshotId?: string; pro
 function printLowOddsScan(scan: LowOddsScanView): void {
   console.log(`  ${CYAN}low-odds${RESET} ${DIM}scan=${scan.scanId ?? 'none'} fixtures=${scan.fixtureCount} hits=${scan.hitCount} threshold=${scan.threshold}${RESET}`);
   if (scan.selectorMarketScope?.length) {
-    console.log(`  ${DIM}selector=${scan.selectorMarketScope.join(',')} home/away favorite indicator${RESET}`);
+    console.log(`  ${DIM}selector=${scan.selectorMarketScope.join(',')} market-scoped low-odds indicator${RESET}`);
   }
   for (const hit of scan.hits) {
     const line = hit.line === undefined ? '' : ` ${hit.line}`;
@@ -1937,7 +1937,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
-  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);

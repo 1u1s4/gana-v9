@@ -97,6 +97,39 @@ describe('parlay builder', () => {
     assert.equal(result.parlay.status, 'promotable');
   });
 
+  it('excludes automatic portfolio risk legs from the main build', () => {
+    const result = buildParlay({
+      id: 'parlay-1',
+      generatedAt: '2026-04-25T12:00:00.000Z',
+      predictions: [
+        prediction({ id: 'high-odds', fixtureId: 'fixture-1', status: 'promotable', odds: 2.35 }),
+        prediction({ id: 'stale-low-liquidity', fixtureId: 'fixture-2', status: 'promotable', warnings: ['stale odds source', 'low-liquidity'] }),
+        prediction({ id: 'unverified-corners', fixtureId: 'fixture-3', status: 'promotable', market: 'corners_over_under', selection: 'under', line: 9.5, odds: 1.7 }),
+        prediction({ id: 'inflated-dc', fixtureId: 'fixture-4', status: 'promotable', market: 'double_chance', selection: 'home_or_draw', odds: 1.1, edge: 0.45, marketFairProbability: 0.4 }),
+        prediction({ id: 'clean-1', fixtureId: 'fixture-5', status: 'promotable', odds: 1.7, edge: 0.03 }),
+        prediction({ id: 'clean-2', fixtureId: 'fixture-6', status: 'promotable', odds: 1.6, edge: 0.03 }),
+      ],
+    });
+
+    assert.deepEqual(result.parlay.legs.map((leg) => leg.predictionId), ['clean-1', 'clean-2']);
+    assert.deepEqual(
+      result.evaluations.find((evaluation) => evaluation.predictionId === 'high-odds')?.excludedReasons,
+      ['excluded-high-odds-risk'],
+    );
+    assert.deepEqual(
+      result.evaluations.find((evaluation) => evaluation.predictionId === 'stale-low-liquidity')?.excludedReasons,
+      ['excluded-stale-low-liquidity', 'excluded-research-not-promotable'],
+    );
+    assert.deepEqual(
+      result.evaluations.find((evaluation) => evaluation.predictionId === 'unverified-corners')?.excludedReasons,
+      ['excluded-corners-unverified'],
+    );
+    assert.deepEqual(
+      result.evaluations.find((evaluation) => evaluation.predictionId === 'inflated-dc')?.excludedReasons,
+      ['excluded-inflated-double-chance-edge'],
+    );
+  });
+
   it('excludes duplicate fixtures by default', () => {
     const result = buildParlay({
       id: 'parlay-1',

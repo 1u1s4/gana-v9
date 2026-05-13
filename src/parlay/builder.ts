@@ -7,6 +7,7 @@ import {
   calculateCombinedOdds,
   resolveParlayConfig,
 } from './rules.js';
+import { automaticParlayRiskReasons } from './eligibility.js';
 import type {
   BuildParlayInput,
   BuildParlayResult,
@@ -137,6 +138,13 @@ function evaluatePrediction(
     reasons.push('excluded-below-min-confidence');
   }
   if (prediction.parlayEligible === false) reasons.push('excluded-parlay-ineligible');
+  for (const reason of automaticParlayRiskReasons(prediction)) {
+    if (reason.includes('odds ceiling')) reasons.push('excluded-high-odds-risk');
+    else if (reason.includes('corners market')) reasons.push('excluded-corners-unverified');
+    else if (reason.includes('stale low-liquidity')) reasons.push('excluded-stale-low-liquidity');
+    else if (reason.includes('double-chance')) reasons.push('excluded-inflated-double-chance-edge');
+    else reasons.push('excluded-parlay-ineligible');
+  }
   if (hasHardResearchWarning(prediction)) reasons.push('excluded-research-not-promotable');
   if (prediction.blockers?.length) reasons.push('excluded-prediction-blockers');
   if (prediction.edge !== undefined && prediction.edge <= 0) reasons.push('excluded-no-edge');

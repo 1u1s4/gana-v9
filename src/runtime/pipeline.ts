@@ -235,7 +235,7 @@ export async function executeRunPipeline(
   const writeRun = deps.writeRunJson ?? writeRunJson;
   const startedAt = now();
   const marketScope = normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets);
-  const lowOddsSelectorMarkets = lowOddsSelectorMarketScope();
+  const lowOddsSelectorMarkets = lowOddsSelectorMarketScope(marketScope);
   const steps: PipelineStepResult[] = [];
   const durableTasks = await initializeDurableTasks(config, runId, {
     date: input.date,
@@ -865,7 +865,7 @@ function summarizePipelineMarketCoverage(
     requestedMarkets: [...requestedMarkets],
     oddsMarkets,
     lowOddsMarkets,
-    lowOddsSelectorMarkets: lowOddsScan.selectorMarketScope ?? lowOddsSelectorMarketScope(),
+    lowOddsSelectorMarkets: lowOddsScan.selectorMarketScope ?? lowOddsSelectorMarketScope(requestedMarkets),
     lowOddsAnalysisMarkets: lowOddsScan.analysisMarketScope ?? lowOddsScan.marketScope ?? [...requestedMarkets],
     researchEvidenceMarkets,
     predictionMarkets,
@@ -1346,13 +1346,13 @@ function buildLowOddsScan(
 ): LowOddsScanView {
   const hits: LowOddsHitView[] = [];
   const analysisMarketScope = normalizeMarketScope(requestedMarkets, config.apiFootball.defaultMarkets);
-  const selectorMarketScope = lowOddsSelectorMarketScope();
+  const selectorMarketScope = lowOddsSelectorMarketScope(analysisMarketScope);
   const fixturesByProviderId = new Map(discovery.fixtures.map((fixture) => [fixture.providerFixtureId, fixture]));
   for (const snapshot of snapshots) {
     const fixture = fixturesByProviderId.get(snapshot.providerFixtureId);
     if (!fixture) continue;
     for (const quote of snapshot.quotes) {
-      if (!isLowOddsFixtureSelectorQuote(quote)) continue;
+      if (!isLowOddsFixtureSelectorQuote(quote, selectorMarketScope)) continue;
       if (quote.price > config.apiFootball.lowOddsThreshold) continue;
       if (config.apiFootball.bookmakerAllowlist?.length && quote.bookmaker && !config.apiFootball.bookmakerAllowlist.includes(quote.bookmaker)) continue;
       hits.push({
@@ -1765,7 +1765,7 @@ function lowOddsSemanticKey(hit: LowOddsHitView): string {
 }
 
 function emptyLowOddsScan(date: string, threshold: number, marketScope: readonly MarketKey[] = []): LowOddsScanView {
-  const selectorMarketScope = lowOddsSelectorMarketScope();
+  const selectorMarketScope = lowOddsSelectorMarketScope(marketScope);
   return {
     ...EMPTY_LOW_ODDS_SCAN,
     date,

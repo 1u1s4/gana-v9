@@ -1,4 +1,5 @@
 import type { AgentConfig } from '../config.js';
+import { isMarketKey } from '../domain/markets.js';
 import { getApiFootballDateOddsSlate } from '../providers/sports/api-football.js';
 import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
@@ -89,7 +90,7 @@ export async function scanLowOdds(
     teamsDefault: input.teamsDefault,
     combineMode: input.combineMode,
   });
-  const selectorMarketScope = lowOddsSelectorMarketScope();
+  const selectorMarketScope = lowOddsSelectorMarketScope(filters.markets);
   const db = getPrismaClient() as unknown as StoragePrismaClient;
   const repositories = createStorageRepositories(db);
   const scan = await repositories.lowOddsScans.create({
@@ -141,7 +142,7 @@ export async function scanLowOdds(
           addEvaluationReason(fixtureEvaluations, fixture.providerFixtureId, 'excluded-missing-odds');
           continue;
         }
-        const marketQuotes = snapshot.quotes.filter(isLowOddsFixtureSelectorQuote);
+        const marketQuotes = snapshot.quotes.filter((quote) => isLowOddsFixtureSelectorQuote(quote, selectorMarketScope));
         const bookmakerQuotes = filters.bookmakerAllowlist?.length
           ? marketQuotes.filter((quote) => quote.bookmaker && filters.bookmakerAllowlist?.includes(quote.bookmaker))
           : marketQuotes;
@@ -268,7 +269,7 @@ export async function persistLowOddsScanResult(
       threshold: input.threshold,
       markets: input.markets,
       marketScope: input.markets,
-      selectorMarketScope: input.selectorMarketScope ?? lowOddsSelectorMarketScope(),
+      selectorMarketScope: input.selectorMarketScope ?? lowOddsSelectorMarketScope(input.markets.filter(isMarketKey)),
       analysisMarketScope: input.analysisMarketScope ?? input.markets,
       bookmakerAllowlist: input.bookmakerAllowlist ?? [],
     }),
@@ -305,7 +306,7 @@ export async function persistLowOddsScanResult(
         threshold: input.threshold,
         markets: input.markets,
         marketScope: input.markets,
-        selectorMarketScope: input.selectorMarketScope ?? lowOddsSelectorMarketScope(),
+        selectorMarketScope: input.selectorMarketScope ?? lowOddsSelectorMarketScope(input.markets.filter(isMarketKey)),
         analysisMarketScope: input.analysisMarketScope ?? input.markets,
         bookmakerAllowlist: input.bookmakerAllowlist ?? [],
         requestedLeagues: input.requestedLeagues ?? [],

@@ -1099,6 +1099,157 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].metadata.parlayEligible, false);
   });
 
+  it('caps stale low-liquidity predictions and excludes them from parlays', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+    const staleSource = {
+      ...sourceRecords[0],
+      capturedAt: new Date('2026-04-25T09:00:00.000Z'),
+    };
+    const lowLiquidityQuote = {
+      ...oddsQuote,
+      metadata: { lowLiquidity: true },
+    };
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => [lowLiquidityQuote] },
+        sourceRecords: { list: async () => [staleSource] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.86,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(persisted[0].confidence, 0.49);
+    assert.equal(persisted[0].quality, 'low');
+    assert.equal(persisted[0].metadata.parlayEligible, false);
+    assert.match(persisted[0].warnings.join('\n'), /stale low-liquidity prediction/);
+  });
+
+  it('caps uncalibrated 0.80-0.90 confidence predictions after validation overconfidence', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.85,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(persisted[0].confidence, 0.74);
+    assert.equal(persisted[0].quality, 'medium');
+    assert.match(persisted[0].warnings.join('\n'), /0.80-0.90 capped/);
+  });
+
+  it('caps inflated double-chance edge against implied probability', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+    const doubleChanceQuote = {
+      ...oddsQuote,
+      marketKey: 'double_chance',
+      selectionKey: 'home_or_draw',
+      price: 1.03,
+      impliedProbability: 0.9708737864,
+      marketImpliedProbability: 0.9708737864,
+      marketFairProbability: 0.45,
+    };
+    const doubleChanceClaim = {
+      ...claims[0],
+      marketKey: 'double_chance',
+      selectionKey: 'home_or_draw',
+    };
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001', markets: ['double_chance'] }, runtime, {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => [doubleChanceQuote] },
+        claims: { list: async () => [doubleChanceClaim] },
+      }),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'double_chance',
+            selection: 'home_or_draw',
+            line: null,
+            odds: 1.03,
+            modelProbability: 0.96,
+            marketFairProbability: 0.45,
+            confidence: 0.91,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'The favorite has home-or-draw support, but the fair price must be service checked.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(persisted[0].status, 'blocked');
+    assert.equal(persisted[0].edge < 0, true);
+    assert.equal(persisted[0].metadata.marketFairProbability, 0.9708737864);
+    assert.match(persisted[0].warnings.join('\n'), /edge capped to implied probability/);
+  });
+
   it('blocks without a persisted odds snapshot and does not persist predictions', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
