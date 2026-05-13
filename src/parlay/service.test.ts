@@ -1006,6 +1006,61 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames.slice(0, 2), ['parlay-market-diverse.json', 'parlays.json']);
   });
 
+  it('narrows low-variance parlays to low-priced double-chance legs', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-02',
+      sourceRunId: 'source-run-low-variance',
+      portfolio: 'low-variance',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-low-variance');
+            return [
+              prediction({ id: 'dc-1', runId: 'source-run-low-variance', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.9, edge: 0.03, estimatedProbability: 0.86 }),
+              prediction({ id: 'dc-2', runId: 'source-run-low-variance', fixtureId: 'fixture-2', marketKey: 'double_chance', selectionKey: 'away_or_draw', odds: 1.17, confidence: 0.88, edge: 0.025, estimatedProbability: 0.85 }),
+              prediction({ id: 'dc-3', runId: 'source-run-low-variance', fixtureId: 'fixture-3', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.15, confidence: 0.87, edge: 0.02, estimatedProbability: 0.84 }),
+              prediction({ id: 'h2h-low', runId: 'source-run-low-variance', fixtureId: 'fixture-4', marketKey: 'h2h', selectionKey: 'home', odds: 1.1, confidence: 0.95, edge: 0.04, estimatedProbability: 0.9 }),
+              prediction({ id: 'dc-expensive', runId: 'source-run-low-variance', fixtureId: 'fixture-5', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.23, confidence: 0.92, edge: 0.04, estimatedProbability: 0.87 }),
+              prediction({ id: 'dc-draw-risk', runId: 'source-run-low-variance', fixtureId: 'fixture-6', marketKey: 'double_chance', selectionKey: 'home_or_away', odds: 1.12, confidence: 0.91, edge: 0.03, estimatedProbability: 0.86 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-low-variance' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    const selectedIds = new Set(result.build.parlay.legs.map((leg) => leg.predictionId));
+    const excluded = result.portfolio?.diagnostics?.pool[0]?.excludedReasons ?? [];
+
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.profiles[0].profile, 'low-variance');
+    assert.equal(result.build.parlay.legs.length <= 3, true);
+    assert.equal((result.build.parlay.combinedOdds ?? 0) <= 1.8, true);
+    assert.equal(result.build.parlay.legs.every((leg) => leg.market === 'double_chance' && leg.odds <= 1.2), true);
+    assert.equal(selectedIds.has('h2h-low'), false);
+    assert.equal(selectedIds.has('dc-expensive'), false);
+    assert.equal(selectedIds.has('dc-draw-risk'), false);
+    assert.equal(excluded.some((item) => item.predictionId === 'h2h-low' && item.reasons.some((reason) => /market not allowed/.test(reason))), true);
+    assert.equal(excluded.some((item) => item.predictionId === 'dc-expensive' && item.reasons.some((reason) => /leg odds ceiling/.test(reason))), true);
+    assert.equal(excluded.some((item) => item.predictionId === 'dc-draw-risk' && item.reasons.some((reason) => /draw exposure/.test(reason))), true);
+    assert.equal(persisted.length, result.portfolio?.parlays.length);
+  });
+
   it('builds parlay-oro by maximizing combined odds from safe low-priced predictions', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

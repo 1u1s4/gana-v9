@@ -915,7 +915,7 @@ interface DeterministicProfileSpec {
 function deterministicProfileSpec(profile: DeterministicParlayProfile): DeterministicProfileSpec {
   switch (profile) {
     case 'low-variance':
-      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.25, maxOdds: 2.4, targetParlays: 6, minConfidence: 0.72, minEdge: 0.005, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, riskWeight: 0.7 };
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.25, maxOdds: 1.8, maxLegOdds: LOW_ODDS_TOP_MAX_LEG_ODDS, targetParlays: 6, minConfidence: 0.78, minEdge: 0.005, markets: ['double_chance'], avoidDrawExposure: true, riskWeight: 0.75 };
     case 'balanced':
       return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.8, maxOdds: 4.0, targetParlays: 6, minConfidence: 0.65, minEdge: 0.01, markets: ['h2h', 'btts', 'goals_over_under'], riskWeight: 0.55 };
     case 'totals':
