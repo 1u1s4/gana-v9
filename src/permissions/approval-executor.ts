@@ -16,10 +16,9 @@ export async function approveAndExecute(
   const approval = decideApproval(runtime, approvalId, 'approved', decidedBy);
   const tool = createToolRegistry({
     config: {
+      ...config,
       profile: 'full-permissions',
       approvalMode: 'auto-grant',
-      artifactRoot: config.artifactRoot,
-      browserUse: config.browserUse,
     },
     runtime,
   }).resolveTool(approval.toolName);

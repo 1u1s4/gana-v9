@@ -55,6 +55,7 @@ import type { ParlayConfig } from './parlay/types.js';
 import { runValidation, type RunValidationInput, type ValidationRunResult } from './validation/service.js';
 import type { ResearchWebMode } from './prediction/prompts.js';
 import { runCertification } from './evals/runner.js';
+import { runDailyMetrics, type DailyMetricsRunResult } from './metrics/daily.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -578,6 +579,19 @@ async function validateResults(ctx: HeadlessCommandContext | CommandContext, fla
   return runner(ctx.config, input, ctx.runtime);
 }
 
+async function buildDailyMetrics(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<DailyMetricsRunResult> {
+  const persistFlag = optionalStringFlag(flags, 'persist');
+  const persist = flags.persist === true || persistFlag === undefined
+    ? true
+    : !['false', 'off', 'no', '0'].includes(persistFlag.toLowerCase());
+  return runDailyMetrics(ctx.config, {
+    date: requireDateFlag(flags),
+    days: optionalPositiveIntegerFlag(flags, 'days'),
+    scope: optionalStringFlag(flags, 'scope'),
+    persist,
+  }, ctx.runtime);
+}
+
 async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunPipelineResult> {
   const input = requiredRunInput(flags);
   const service = await loadOptionalRunService();
@@ -810,6 +824,23 @@ function printValidationResult(result: ValidationRunResult): void {
   }
 }
 
+function printDailyMetricsResult(result: DailyMetricsRunResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}daily metrics${RESET} ${DIM}${result.ok ? 'ready' : 'failed'}${RESET}`);
+  printKeyValue('runId', result.runId);
+  printKeyValue('date', result.date);
+  printKeyValue('days', result.days);
+  printKeyValue('snapshots', result.metrics.length);
+  printKeyValue('persisted', result.persisted);
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  for (const snapshot of result.metrics) {
+    const predictions = snapshot.predictionMetrics;
+    const parlays = snapshot.parlayMetrics;
+    console.log(`  ${GREEN}•${RESET} ${CYAN}${snapshot.metricDate}${RESET} ${DIM}pred=${predictions.won}-${predictions.lost} hit=${formatNullablePercent(predictions.hitRate)} parlay=${parlays.won}-${parlays.lost} hit=${formatNullablePercent(parlays.hitRate)}${RESET}`);
+  }
+  if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
+}
+
 function printRunResult(result: RunPipelineResult): void {
   const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
   console.log(`  ${marker} ${CYAN}run${RESET} ${DIM}${result.verdict ?? (result.ok ? 'succeeded' : 'failed')}${RESET}`);
@@ -935,6 +966,12 @@ function printLeaderboardRows(rows: any[], by: string): void {
 function formatMetric(value: unknown): string {
   const numeric = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(numeric) ? numeric.toFixed(4) : 'n/a';
+}
+
+function formatNullablePercent(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'n/a';
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? `${numeric.toFixed(1)}%` : 'n/a';
 }
 
 function printSessionStatus(ctx: CommandContext): void {
@@ -1502,6 +1539,16 @@ commands.push({
 });
 
 commands.push({
+  name: '/metrics',
+  description: 'Compute and persist daily prediction/parlay metrics',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await buildDailyMetrics(ctx, flags);
+    printDailyMetricsResult(result);
+  },
+});
+
+commands.push({
   name: '/run',
   description: 'Run canonical headless pipeline for a date',
   execute: async (args, ctx) => {
@@ -1795,6 +1842,15 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
     }
 
+    if (area === 'metrics') {
+      const [metricAction] = argv.slice(1);
+      if (metricAction !== 'daily') throw new Error('metrics requires action: daily.');
+      const flags = parseFlags(argv.slice(2));
+      const result = await buildDailyMetrics(ctx, flags);
+      printDailyMetricsResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
     if (area === 'run') {
       const flags = parseFlags(argv.slice(1));
       const result = await runPipeline(ctx, flags);
@@ -1941,6 +1997,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
+  console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);

@@ -40,8 +40,10 @@ describe('production-grade tool registry and certification', () => {
     const config = loadConfig({ databaseUrl: '' }, { skipApiKey: true });
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const tools = createToolRegistry({ config, runtime }).listTools();
+    const toolNames = tools.map((tool) => tool.name);
 
     assert.ok(tools.length >= 8);
+    assert.ok(toolNames.includes('daily_metrics'));
     assert.equal(tools.some((tool) => tool.name.startsWith('openrouter:')), false);
     for (const tool of tools) {
       assert.ok(tool.schema, tool.name);

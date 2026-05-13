@@ -755,3 +755,23 @@ model LeaderboardEntry {
   @@index([generatedAt], map: "leaderboard_entries_generated_at_idx")
   @@map("leaderboard_entries")
 }
+
+model DailyMetric {
+  id                String   @id @default(uuid()) @db.Char(36)
+  metricDate        DateTime @map("metric_date") @db.Date
+  timezone          String   @db.VarChar(80)
+  scope             String   @default("all") @db.VarChar(80)
+  sourceWindowStart DateTime @map("source_window_start") @db.DateTime(3)
+  sourceWindowEnd   DateTime @map("source_window_end") @db.DateTime(3)
+  predictionMetrics Json?    @map("prediction_metrics")
+  parlayMetrics     Json?    @map("parlay_metrics")
+  chartMetrics      Json?    @map("chart_metrics")
+  generatedAt       DateTime @default(now()) @map("generated_at") @db.DateTime(3)
+  createdAt         DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.DateTime(3)
+
+  @@unique([metricDate, timezone, scope], map: "daily_metrics_date_timezone_scope_key")
+  @@index([metricDate], map: "daily_metrics_metric_date_idx")
+  @@index([generatedAt], map: "daily_metrics_generated_at_idx")
+  @@map("daily_metrics")
+}

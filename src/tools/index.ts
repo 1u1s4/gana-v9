@@ -17,6 +17,7 @@ import { dangerousShellTool, shellTool } from './shell.js';
 import { artifactPromoteTool, predictionPromoteTool } from './promote.js';
 import { ToolRegistry, riskFromMetadata } from './registry.js';
 import { createBrowserUseTool } from './browser.js';
+import { createDailyMetricsTool } from './daily-metrics.js';
 
 export const tools = [
   fileReadTool,
@@ -49,7 +50,7 @@ type ClientTool = {
 };
 
 export interface ToolPolicyContext {
-  config: Pick<AgentConfig, 'profile' | 'approvalMode' | 'artifactRoot' | 'browserUse'>;
+  config: AgentConfig;
   runtime?: RuntimeContext;
 }
 
@@ -72,7 +73,7 @@ export function createTools(context: ToolPolicyContext): any[] {
 
 export function createToolRegistry(context: ToolPolicyContext): ToolRegistry {
   const registry = new ToolRegistry();
-  for (const item of [...LOCAL_TOOLS, createBrowserUseTool(context.config)] as const) {
+  for (const item of [...LOCAL_TOOLS, createDailyMetricsTool(context), createBrowserUseTool(context.config)] as const) {
     const toolDef = item as unknown as ClientTool & { function: { inputSchema?: any } };
     const name = toolDef.function.name;
     registry.registerTool({

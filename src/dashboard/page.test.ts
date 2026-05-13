@@ -11,6 +11,7 @@ describe('dashboard page UX affordances', () => {
     assert.match(html, /data-quick-tab="predictions"/);
     assert.match(html, /data-quick-tab="parlays"/);
     assert.match(html, /data-quick-tab="validations"/);
+    assert.match(html, /data-quick-tab="metrics"/);
     assert.match(html, /data-quick-view="top-edge"/);
     assert.match(html, /id="exploration-strip"/);
   });
@@ -25,5 +26,16 @@ describe('dashboard page UX affordances', () => {
     assert.match(html, /data-open-validations-target/);
     assert.match(html, /targetId/);
     assert.match(html, /Historial de validación/);
+  });
+
+  it('renders daily metrics tab and chart helpers', () => {
+    const html = dashboardHtml();
+
+    assert.match(html, /data-tab="metrics"/);
+    assert.match(html, /function renderMetricRows/);
+    assert.match(html, /function renderMetricCharts/);
+    assert.match(html, /function renderBarChart/);
+    assert.match(html, /Parlay perfil/);
+    assert.match(html, /Pred\. mercado/);
   });
 });

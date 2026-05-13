@@ -2,7 +2,7 @@ import type { DashboardStatusOptions } from './types.js';
 import { PREDICTION_QUALITIES, PREDICTION_STATUSES } from '../prediction/types.js';
 import { MARKET_KEYS } from '../domain/markets.js';
 
-export type DashboardTab = 'fixtures' | 'predictions' | 'parlays' | 'validations' | 'runs';
+export type DashboardTab = 'fixtures' | 'predictions' | 'parlays' | 'validations' | 'runs' | 'metrics';
 
 export type DashboardDirection = 'asc' | 'desc';
 
@@ -52,6 +52,7 @@ export interface DashboardMetadata {
     parlays: readonly string[];
     validations: readonly string[];
     runs: readonly string[];
+    metrics: readonly string[];
   };
 }
 
@@ -60,7 +61,7 @@ export interface DashboardMetadataOption {
   name: string;
 }
 
-export const DASHBOARD_TABS: DashboardTab[] = ['fixtures', 'predictions', 'parlays', 'validations', 'runs'];
+export const DASHBOARD_TABS: DashboardTab[] = ['fixtures', 'predictions', 'parlays', 'validations', 'runs', 'metrics'];
 export const MAX_TAKE = 200;
 export const DEFAULT_TAKE = 50;
 export const TAKE_OPTIONS = [25, 50, 100, 200] as const;
@@ -71,6 +72,7 @@ export const OVERVIEW_SORT_OPTIONS = {
   parlays: ['generatedAt', 'combinedOdds', 'aggregateConfidence', 'aggregateQuality', 'status'] as const,
   validations: ['evaluatedAt', 'status', 'createdAt'] as const,
   runs: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'] as const,
+  metrics: ['metricDate', 'generatedAt', 'timezone', 'scope'] as const,
 } as const;
 
 export const DIRECTION_OPTIONS: readonly DashboardDirection[] = ['asc', 'desc'];
@@ -147,6 +149,7 @@ export function createMetadata(): DashboardMetadata {
       parlays: [...new Set(['draft', 'candidate', 'review-required', 'promotable', 'blocked'])],
       validations: ['pending', 'won', 'lost', 'push', 'voided', 'error', 'blocked'],
       runs: ['created', 'queued', 'running', 'succeeded', 'failed', 'cancelled'],
+      metrics: ['all'],
     },
     validationTargets: VALID_VALIDATION_TARGETS,
     markets: MARKET_KEYS,
@@ -161,6 +164,7 @@ export function createMetadata(): DashboardMetadata {
       parlays: OVERVIEW_SORT_OPTIONS.parlays,
       validations: OVERVIEW_SORT_OPTIONS.validations,
       runs: OVERVIEW_SORT_OPTIONS.runs,
+      metrics: OVERVIEW_SORT_OPTIONS.metrics,
     },
   };
 }

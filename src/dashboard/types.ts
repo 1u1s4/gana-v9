@@ -6,6 +6,7 @@ export interface DashboardStatusOptions {
   parlays: string[];
   validations: string[];
   runs: string[];
+  metrics: string[];
 }
 
 export type FixtureFilterDateWindow = {
@@ -30,6 +31,7 @@ export interface DashboardCounts {
   parlays: number;
   validations: number;
   runs: number;
+  metrics: number;
 }
 
 export interface DashboardPagination {
@@ -143,6 +145,20 @@ export interface DashboardRunRow extends DashboardOverviewRow {
   recentValidations?: DashboardValidationRow[];
 }
 
+export interface DashboardMetricRow extends DashboardOverviewRow {
+  id: string;
+  metricDate: string;
+  timezone: string;
+  scope: string;
+  sourceWindowStart: string;
+  sourceWindowEnd: string;
+  predictionMetrics: unknown;
+  parlayMetrics: unknown;
+  chartMetrics: unknown;
+  generatedAt: string;
+  createdAt: string;
+}
+
 export interface DashboardFixtureRow {
   id: string;
   providerFixtureId: string;
@@ -217,4 +233,5 @@ export interface DashboardOverviewResponse {
   parlays: DashboardParlayRow[];
   validations: DashboardValidationRow[];
   runs: DashboardRunRow[];
+  metrics: DashboardMetricRow[];
 }

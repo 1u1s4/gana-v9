@@ -586,6 +586,7 @@ async function main() {
     || command === 'score'
     || command === 'parlay'
     || command === 'validate'
+    || command === 'metrics'
     || command === 'run'
     || command === 'certify'
     || command === 'leaderboard'

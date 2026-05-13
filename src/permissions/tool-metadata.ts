@@ -127,6 +127,15 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     destructive: false,
     requiresApproval: 'standard',
   },
+  daily_metrics: {
+    name: 'daily_metrics',
+    readOnly: false,
+    mutatesFilesystem: true,
+    runsShell: false,
+    network: false,
+    destructive: false,
+    requiresApproval: 'standard',
+  },
   browser: {
     name: 'browser',
     readOnly: true,

@@ -145,6 +145,38 @@ const RUN = {
   },
 };
 
+const DAILY_METRIC = {
+  id: 'metric-1',
+  metricDate: new Date('2026-05-01T00:00:00.000Z'),
+  timezone: 'America/Guatemala',
+  scope: 'all',
+  sourceWindowStart: new Date('2026-05-01T06:00:00.000Z'),
+  sourceWindowEnd: new Date('2026-05-02T06:00:00.000Z'),
+  predictionMetrics: {
+    total: 2,
+    won: 1,
+    lost: 1,
+    hitRate: 50,
+    avgOdds: 1.8,
+    avgConfidence: 0.7,
+  },
+  parlayMetrics: {
+    total: 1,
+    won: 1,
+    lost: 0,
+    hitRate: 100,
+    avgOdds: 2.4,
+    avgConfidence: 0.77,
+  },
+  chartMetrics: {
+    parlayHitRateByProfile: [{ key: 'low-odds-top', label: 'low-odds-top', total: 1, won: 1, lost: 0, hitRate: 100 }],
+    parlayHitRateByOddsBucket: [{ key: '2.00-2.99', label: '2.00-2.99', total: 1, won: 1, lost: 0, hitRate: 100 }],
+    predictionHitRateByMarket: [{ key: 'h2h', label: 'h2h', total: 2, won: 1, lost: 1, hitRate: 50 }],
+  },
+  generatedAt: new Date('2026-05-01T18:00:00.000Z'),
+  createdAt: new Date('2026-05-01T18:00:00.000Z'),
+};
+
 function createDashboardDb() {
   return {
     team: {
@@ -228,6 +260,13 @@ function createDashboardDb() {
       ],
       count: async () => 1,
     },
+    dailyMetric: {
+      findMany: async () => [DAILY_METRIC],
+      groupBy: async () => [
+        { scope: 'all', _count: { _all: 1 } },
+      ],
+      count: async () => 1,
+    },
     $queryRaw: async () => 1,
   };
 }
@@ -250,6 +289,8 @@ describe('dashboard api queries', () => {
     assert.equal(metadata.directions.includes('asc'), true);
     assert.equal(metadata.sortOptions.fixtures.includes('scheduledAt'), true);
     assert.equal(metadata.sortOptions.predictions.includes('selectionKey'), true);
+    assert.equal(metadata.tabs.includes('metrics'), true);
+    assert.equal(metadata.sortOptions.metrics.includes('metricDate'), true);
   });
 
   it('reads overview for fixtures with prediction, parlay and validation activity', async () => {
@@ -453,6 +494,24 @@ describe('dashboard api queries', () => {
     assert.equal(run.recentValidations[0]?.id, 'validation-1');
   });
 
+  it('reads overview for daily metrics with chart-ready payloads', async () => {
+    const overview = await readOverview(createDashboardDb() as any, config, new URLSearchParams('tab=metrics&sort=metricDate&direction=desc'));
+
+    assert.equal(overview.activeTab, 'metrics');
+    assert.equal(overview.counts.metrics, 1);
+    assert.equal(overview.metrics.length, 1);
+    assert.equal(overview.metrics[0]?.metricDate, '2026-05-01');
+    assert.equal(overview.metrics[0]?.scope, 'all');
+    assert.deepEqual((overview.metrics[0]?.chartMetrics as any).predictionHitRateByMarket[0], {
+      key: 'h2h',
+      label: 'h2h',
+      total: 2,
+      won: 1,
+      lost: 1,
+      hitRate: 50,
+    });
+  });
+
   it('returns entity not found for missing validation id', async () => {
     const db = createDashboardDb() as any;
     const response = await readEntity(db, 'validation', 'missing');
@@ -530,6 +589,13 @@ describe('dashboard endpoints', () => {
       assert.equal(list.activeTab, 'parlays');
       assert.equal(Array.isArray(list.parlays), true);
       assert.equal(list.pagination.total >= 1, true);
+
+      const metrics = await fetch(`${base}/api/overview?tab=metrics&page=1&take=10&sort=metricDate&direction=desc`);
+      assert.equal(metrics.status, 200);
+      const metricsPayload = await metrics.json();
+      assert.equal(metricsPayload.activeTab, 'metrics');
+      assert.equal(Array.isArray(metricsPayload.metrics), true);
+      assert.equal(metricsPayload.metrics[0].scope, 'all');
 
       const prediction = await fetch(`${base}/api/entity/prediction/prediction-1`);
       assert.equal(prediction.status, 200);

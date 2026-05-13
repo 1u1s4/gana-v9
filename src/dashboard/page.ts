@@ -387,7 +387,7 @@ export function dashboardHtml(): string {
       grid-column: 2 / span 2;
       grid-row: 1;
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 6px;
       padding: 0;
       overflow: visible;
@@ -430,7 +430,7 @@ export function dashboardHtml(): string {
       align-self: start;
       z-index: 3;
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 2px;
       padding: 2px;
       border-bottom-left-radius: 0;
@@ -452,6 +452,48 @@ export function dashboardHtml(): string {
     }
     .tab.active { background: var(--secondary); color: var(--primary); }
     .tab:hover { color: var(--foreground); background: color-mix(in oklab, var(--secondary) 60%, transparent); }
+
+    .metric-charts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      min-width: 520px;
+    }
+    .metric-chart {
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--secondary) 38%, transparent);
+    }
+    .metric-chart h4 {
+      margin: 0 0 8px;
+      color: var(--muted-foreground);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(84px, 0.8fr) minmax(80px, 1fr) 42px;
+      gap: 6px;
+      align-items: center;
+      margin: 4px 0;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+    .bar-track {
+      height: 6px;
+      overflow: hidden;
+      border-radius: 2px;
+      background: var(--border-dim);
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--primary);
+    }
 
     .content {
       grid-column: 2 / span 2;
@@ -819,6 +861,7 @@ export function dashboardHtml(): string {
               <button class="icon-btn" data-quick-tab="parlays" type="button">Parlays</button>
               <button class="icon-btn" data-quick-tab="validations" type="button">Validaciones</button>
               <button class="icon-btn" data-quick-tab="runs" type="button">Runs</button>
+              <button class="icon-btn" data-quick-tab="metrics" type="button">Métricas</button>
             </div>
             <div class="quick-grid wide">
               <button class="icon-btn" data-quick-view="top-edge" type="button">Top edge</button>
@@ -836,6 +879,7 @@ export function dashboardHtml(): string {
         <button class="tab" data-tab="parlays">Parlays</button>
         <button class="tab" data-tab="validations">Validaciones</button>
         <button class="tab" data-tab="runs">Runs</button>
+        <button class="tab" data-tab="metrics">Métricas</button>
       </nav>
       <section class="content">
         <div class="panel module-shell">
@@ -869,6 +913,7 @@ export function dashboardHtml(): string {
         parlays: 'Parlays',
         validations: 'Validaciones',
         runs: 'Runs',
+        metrics: 'Métricas',
       };
       const KIND_TO_TAB = {
         fixture: 'fixtures',
@@ -914,14 +959,21 @@ export function dashboardHtml(): string {
           ['Inicio', 'startedAt'],
           ['Fin', 'completedAt'],
         ],
+        metrics: [
+          ['Fecha', 'metricDate'],
+          ['Scope', 'scope'],
+          ['Zona', 'timezone'],
+          ['Generado', 'generatedAt'],
+        ],
       };
-      const ALLOWED_TABS = ['fixtures', 'predictions', 'parlays', 'validations', 'runs'];
+      const ALLOWED_TABS = ['fixtures', 'predictions', 'parlays', 'validations', 'runs', 'metrics'];
       const DEFAULT_SORT_BY = {
         fixtures: 'scheduledAt',
         predictions: 'generatedAt',
         parlays: 'generatedAt',
         validations: 'evaluatedAt',
         runs: 'createdAt',
+        metrics: 'metricDate',
       };
       const state = {
         tab: 'fixtures',
@@ -962,6 +1014,7 @@ export function dashboardHtml(): string {
         '\'': '&#39;',
       }[char]));
       const fmtPct = (value, digits = 1) => value == null ? '—' : (Number(value) * 100).toFixed(digits) + '%';
+      const fmtRate = (value, digits = 1) => value == null || Number.isNaN(Number(value)) ? 'n/a' : Number(value).toFixed(digits) + '%';
       const fmtNum = (value, digits = 3) => value == null ? '—' : Number(value).toFixed(digits);
       const fmtDate = (value) => value ? new Date(value).toLocaleString() : '—';
       const fmtScore = (fixture) => {
@@ -1363,6 +1416,7 @@ export function dashboardHtml(): string {
           cards.push('<article class="stat' + (state.tab === 'parlays' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="parlays"><span class="muted">Parlays</span><b>' + state.data.counts.parlays + '</b></article>');
           cards.push('<article class="stat' + (state.tab === 'validations' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="validations"><span class="muted">Validaciones</span><b>' + state.data.counts.validations + '</b></article>');
           cards.push('<article class="stat' + (state.tab === 'runs' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="runs"><span class="muted">Runs</span><b>' + state.data.counts.runs + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'metrics' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="metrics"><span class="muted">Métricas</span><b>' + state.data.counts.metrics + '</b></article>');
         }
         $('#stats').innerHTML = cards.join('');
       }
@@ -1563,6 +1617,7 @@ export function dashboardHtml(): string {
         if (state.tab === 'parlays') return renderParlayRows(rows);
         if (state.tab === 'validations') return renderValidationRows(rows);
         if (state.tab === 'runs') return renderRunRows(rows);
+        if (state.tab === 'metrics') return renderMetricRows(rows);
       }
 
       function renderPager() {
@@ -1582,6 +1637,7 @@ export function dashboardHtml(): string {
         if (state.tab === 'predictions') return state.data.predictions || [];
         if (state.tab === 'parlays') return state.data.parlays || [];
         if (state.tab === 'validations') return state.data.validations || [];
+        if (state.tab === 'metrics') return state.data.metrics || [];
         return state.data.runs || [];
       }
 
@@ -1684,6 +1740,57 @@ export function dashboardHtml(): string {
             esc((row.predictionCount ?? 0) + ' pred. · ' + (row.parlayCount ?? 0) + ' parlays · ' + (row.validationCount ?? 0) + ' val.') +
             '</td></tr>').join('') +
           '</tbody></table>';
+      }
+
+      function renderMetricRows(rows) {
+        const headers = TAB_SORT_HEADERS.metrics;
+        const sort = state.sort;
+        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
+            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
+          '<th>Predicciones</th><th>Parlays</th><th>Gráficas</th>' +
+          '</tr></thead><tbody>' +
+          rows.map((row) => {
+            const pred = row.predictionMetrics || {};
+            const parlay = row.parlayMetrics || {};
+            const charts = row.chartMetrics || {};
+            return '<tr><td><b>' + esc(row.metricDate) + '</b><div class="sub mono">' + esc(row.id) + '</div></td><td>' + esc(row.scope) +
+              '</td><td>' + esc(row.timezone) + '</td><td>' + fmtDate(row.generatedAt) +
+              '</td><td>' + metricSummary(pred) + '</td><td>' + metricSummary(parlay) +
+              '</td><td>' + renderMetricCharts(charts) + '</td></tr>';
+          }).join('') +
+          '</tbody></table></div>';
+      }
+
+      function metricSummary(metrics) {
+        return '<div><b>' + esc(metrics.total ?? 0) + '</b> total</div>' +
+          '<div class="sub">' + esc(metrics.won ?? 0) + '-' + esc(metrics.lost ?? 0) + ' · hit ' + fmtRate(metrics.hitRate) + '</div>' +
+          '<div class="sub">odds ' + fmtNum(metrics.avgOdds) + ' · conf. ' + fmtPct(metrics.avgConfidence, 1) + '</div>';
+      }
+
+      function renderMetricCharts(charts) {
+        return '<div class="metric-charts">' +
+          renderBarChart('Parlay perfil', charts.parlayHitRateByProfile || []) +
+          renderBarChart('Parlay odds', charts.parlayHitRateByOddsBucket || []) +
+          renderBarChart('Pred. mercado', charts.predictionHitRateByMarket || []) +
+          '</div>';
+      }
+
+      function renderBarChart(title, rows) {
+        const bars = rows.slice(0, 6).map((row) => {
+          const value = Number(row.hitRate ?? 0);
+          const width = Math.max(0, Math.min(100, value));
+          const label = row.label || row.key || 'n/a';
+          return '<div class="bar-row"><span title="' + esc(label) + '">' + esc(compactText(label, 14)) + '</span>' +
+            '<span class="bar-track"><span class="bar-fill" style="width:' + width.toFixed(1) + '%"></span></span>' +
+            '<span>' + fmtRate(row.hitRate, 0) + '</span></div>';
+        }).join('');
+        return '<div class="metric-chart"><h4>' + esc(title) + '</h4>' + (bars || '<span class="muted-inline">Sin datos</span>') + '</div>';
+      }
+
+      function compactText(value, max) {
+        const text = String(value || '');
+        return text.length > max ? text.slice(0, max - 1) + '…' : text;
       }
 
       function renderMiniPrediction(row) {

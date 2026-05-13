@@ -186,6 +186,36 @@ describe('headless validate command', () => {
   });
 });
 
+describe('headless daily metrics command', () => {
+  it('requires --date before computing daily metrics', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['metrics', 'daily'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /--date YYYY-MM-DD/);
+  });
+
+  it('surfaces missing database configuration before metrics persistence', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['metrics', 'daily', '--date', '2026-05-13'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /DATABASE_URL is required/);
+  });
+
+  it('prints metrics usage', async () => {
+    const output = await captureConsole(() => printHeadlessUsage());
+
+    assert.match(output, /pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true\|false/);
+  });
+});
+
 describe('headless run command', () => {
   it('requires --date before running the canonical pipeline', async () => {
     let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
@@ -265,6 +295,7 @@ describe('artifacts command surface', () => {
     assert.ok(names.includes('/run'));
     assert.ok(names.includes('/export'));
     assert.ok(names.includes('/artifacts'));
+    assert.ok(names.includes('/metrics'));
   });
 
   it('prints artifacts usage', async () => {

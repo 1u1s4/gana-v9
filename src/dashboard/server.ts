@@ -16,6 +16,7 @@ import {
 import type {
   DashboardCounts,
   DashboardFixtureRow,
+  DashboardMetricRow,
   DashboardOverviewResponse,
   DashboardParlayRow,
   DashboardPredictionRow,
@@ -32,6 +33,7 @@ type DashboardDb = Pick<
   | 'fixture'
   | 'team'
   | 'competition'
+  | 'dailyMetric'
 > & {
   $queryRaw: PrismaClient['$queryRaw'];
 };
@@ -62,6 +64,7 @@ type SortCandidateMap = {
   parlays: ReadonlyArray<string>;
   validations: ReadonlyArray<string>;
   runs: ReadonlyArray<string>;
+  metrics: ReadonlyArray<string>;
 };
 
 const SORTABLE_FIELDS: SortCandidateMap = {
@@ -70,6 +73,7 @@ const SORTABLE_FIELDS: SortCandidateMap = {
   parlays: ['generatedAt', 'combinedOdds', 'aggregateConfidence', 'aggregateQuality', 'status'],
   validations: ['evaluatedAt', 'status', 'createdAt'],
   runs: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'],
+  metrics: ['metricDate', 'generatedAt', 'timezone', 'scope'],
 };
 
 const DEFAULT_SORT_BY = {
@@ -78,6 +82,7 @@ const DEFAULT_SORT_BY = {
   parlays: 'generatedAt',
   validations: 'evaluatedAt',
   runs: 'createdAt',
+  metrics: 'metricDate',
 } as const;
 
 export async function startDashboardServer(
@@ -230,6 +235,7 @@ export async function readOverview(
     parlays: rows.parlays,
     validations: rows.validations,
     runs: rows.runs,
+    metrics: rows.metrics,
   };
 }
 
@@ -455,6 +461,7 @@ function buildFilters(query: ReturnType<typeof parseOverviewQuery>, dateWindow: 
     parlays: buildParlayWhere(query, fixtureFilter, statusFilter),
     validations: buildValidationWhere(query, fixtureFilter, statusFilter, dateWindow),
     runs: buildRunWhere(query, statusFilter, dateWindow),
+    metrics: buildMetricWhere(query, dateWindow),
   };
 }
 
@@ -569,6 +576,15 @@ function buildRunWhere(
   return where;
 }
 
+function buildMetricWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  dateWindow: DateWindow | undefined,
+): QueryArgs {
+  const where: QueryArgs = {};
+  if (dateWindow) where.metricDate = dateRangeFilter(dateWindow);
+  return where;
+}
+
 function buildFixtureFilter(
   query: ReturnType<typeof parseOverviewQuery>,
   dateWindow: DateWindow | undefined,
@@ -643,6 +659,7 @@ async function readActiveRows(
       parlays: [],
       validations: [],
       runs: [],
+      metrics: [],
     };
   }
 
@@ -667,6 +684,7 @@ async function readActiveRows(
       parlays: [],
       validations: [],
       runs: [],
+      metrics: [],
     };
   }
 
@@ -704,6 +722,7 @@ async function readActiveRows(
       parlays: parlays.map((row) => mapParlay(row)),
       validations: [],
       runs: [],
+      metrics: [],
     };
   }
 
@@ -741,6 +760,25 @@ async function readActiveRows(
       parlays: [],
       validations: validations.map((row) => mapValidation(row)),
       runs: [],
+      metrics: [],
+    };
+  }
+
+  if (tab === 'metrics') {
+    const metrics = (await db.dailyMetric.findMany({
+      where: where as Prisma.DailyMetricWhereInput,
+      orderBy: orderBy as Prisma.DailyMetricFindManyArgs['orderBy'],
+      skip,
+      take,
+    }) as unknown[]);
+
+    return {
+      fixtures: [],
+      predictions: [],
+      parlays: [],
+      validations: [],
+      runs: [],
+      metrics: metrics.map((row) => mapMetric(row)),
     };
   }
 
@@ -762,6 +800,7 @@ async function readActiveRows(
     parlays: [],
     validations: [],
     runs: runs.map((row) => mapRun(row)),
+    metrics: [],
   };
 }
 
@@ -806,6 +845,21 @@ async function readStatusFacets(
     return statusFacetFromRows(rows);
   }
 
+  if (tab === 'metrics') {
+    const rows = (await (db.dailyMetric as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+      by: ['scope'],
+      where: where.metrics as unknown,
+      _count: { _all: true },
+    })) as Array<{ scope: string | null; _count: { _all: number | bigint } }>;
+    const facets: Record<string, number> = {};
+    for (const row of rows) {
+      const scope = toStringValue(row.scope);
+      if (!scope) continue;
+      facets[scope] = toStatusFacetCount(row._count._all);
+    }
+    return facets;
+  }
+
   const rows = (await (db.harnessRun as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
     by: ['status'],
     where: where.runs as unknown as Prisma.HarnessRunWhereInput,
@@ -834,6 +888,7 @@ async function countActive(db: DashboardDb, tab: DashboardTab, where: QueryArgs)
   if (tab === 'predictions') return db.prediction.count({ where });
   if (tab === 'parlays') return db.parlay.count({ where });
   if (tab === 'validations') return db.validationArtifact.count({ where });
+  if (tab === 'metrics') return db.dailyMetric.count({ where });
   return db.harnessRun.count({ where });
 }
 
@@ -844,6 +899,7 @@ async function countAllTabs(db: DashboardDb, where: ReturnType<typeof buildFilte
     parlays: await db.parlay.count({ where: omitStatus(where.parlays) }),
     validations: await db.validationArtifact.count({ where: omitStatus(where.validations) }),
     runs: await db.harnessRun.count({ where: omitStatus(where.runs) }),
+    metrics: await db.dailyMetric.count({ where: omitStatus(where.metrics) }),
   };
 }
 
@@ -974,6 +1030,23 @@ function mapValidation(row: unknown): DashboardValidationRow {
     createdAt: toDateString(item.createdAt),
     outcome: item.outcome,
     settlementRuleVersion: toStringValue(item.settlementRuleVersion),
+  };
+}
+
+function mapMetric(row: unknown): DashboardMetricRow {
+  const item = toRecord(row);
+  return {
+    id: toStringValue(item.id),
+    metricDate: toDateString(item.metricDate).slice(0, 10),
+    timezone: toStringValue(item.timezone),
+    scope: toStringValue(item.scope),
+    sourceWindowStart: toDateString(item.sourceWindowStart),
+    sourceWindowEnd: toDateString(item.sourceWindowEnd),
+    predictionMetrics: item.predictionMetrics ?? null,
+    parlayMetrics: item.parlayMetrics ?? null,
+    chartMetrics: item.chartMetrics ?? null,
+    generatedAt: toDateString(item.generatedAt),
+    createdAt: toDateString(item.createdAt),
   };
 }
 
