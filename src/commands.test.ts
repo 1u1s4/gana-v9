@@ -151,6 +151,29 @@ describe('headless parlay command', () => {
     assert.match(output, /pnpm gana parlay --date YYYY-MM-DD/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio llm/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top/);
+    assert.match(output, /pnpm gana parlay analyze --date YYYY-MM-DD --top 5 --bankroll 100/);
+  });
+
+  it('requires a date or run id before analyzing persisted parlays', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['parlay', 'analyze'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /--date YYYY-MM-DD or --run-id RUN_ID/);
+  });
+
+  it('surfaces missing database configuration before parlay analysis', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['parlay', 'analyze', '--date', '2026-05-13'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /DATABASE_URL is required/);
   });
 });
 
@@ -296,6 +319,7 @@ describe('artifacts command surface', () => {
     assert.ok(names.includes('/export'));
     assert.ok(names.includes('/artifacts'));
     assert.ok(names.includes('/metrics'));
+    assert.ok(names.includes('/parlay-analysis'));
   });
 
   it('prints artifacts usage', async () => {

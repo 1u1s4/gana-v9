@@ -49,6 +49,7 @@ export type ParlayRiskTag =
   | 'high_odds'
   | 'corners_unverified'
   | 'stale_low_liquidity'
+  | 'low_liquidity_h2h_favorite'
   | 'inflated_double_chance_edge'
   | 'uncalibrated_high_confidence';
 
@@ -182,6 +183,7 @@ export const parlaySourcePredictionSchema = z.object({
     'high_odds',
     'corners_unverified',
     'stale_low_liquidity',
+    'low_liquidity_h2h_favorite',
     'inflated_double_chance_edge',
     'uncalibrated_high_confidence',
   ])).optional(),

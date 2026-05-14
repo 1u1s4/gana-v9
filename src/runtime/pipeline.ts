@@ -14,6 +14,7 @@ import { runFixtureScoring, type FixtureScoringResult } from '../prediction/serv
 import type { ResearchWebMode } from '../prediction/prompts.js';
 import { getApiFootballDateOddsSlate, getApiFootballDateOddsSnapshots, getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
+import { runParlayAnalysis, type ParlayAnalysisRunResult } from '../parlay/analysis.js';
 import { runParlayBuild, type ParlayBuildRunResult } from '../parlay/service.js';
 import { runValidation, type ValidationRunResult } from '../validation/service.js';
 import { appendSpanJsonl } from '../observability/trace-writer.js';
@@ -79,6 +80,7 @@ export interface RunPipelineResult {
   research: FixtureResearchResult[];
   scoring: FixtureScoringResult[];
   parlay?: ParlayBuildRunResult;
+  parlayAnalysis?: ParlayAnalysisRunResult;
   validation?: ValidationRunResult;
   error?: string;
 }
@@ -164,6 +166,7 @@ export interface RunPipelineDependencies {
   researchFixture?: typeof runFixtureResearch;
   scoreFixture?: typeof runFixtureScoring;
   buildParlay?: typeof runParlayBuild;
+  analyzeParlays?: typeof runParlayAnalysis;
   validateRun?: typeof runValidation;
   writeArtifact?: typeof writeArtifact;
   writeRunJson?: typeof writeRunJson;
@@ -692,6 +695,31 @@ export async function executeRunPipeline(
   }
   const validationEvaluation = buildValidationEvaluation(input.date, validateMode, validation, validationSkipReason);
 
+  let parlayAnalysis: ParlayAnalysisRunResult;
+  try {
+    parlayAnalysis = await runDurableTask('parlay.analyze', 'parlay-analysis-result.json', async () => {
+      const result = await retryStorageConnection(() => (deps.analyzeParlays ?? runParlayAnalysis)(config, {
+        date: input.date,
+        runId,
+      }, runtime));
+      writeJsonArtifact(config, runId, 'parlay-analysis-result.json', result);
+      return result;
+    });
+  } catch (err: any) {
+    parlayAnalysis = blockedParlayAnalysisResult(config, runId, input.date, err);
+  }
+  steps.push({
+    name: 'analyze parlays',
+    ok: parlayAnalysis.ok || parlay.gateResult.verdict === 'blocked',
+    verdict: parlayAnalysis.ok ? 'promotable' : 'review-required',
+    warnings: [
+      ...(parlayAnalysis.error ? [parlayAnalysis.error] : []),
+      ...parlayAnalysis.diagnostics.rejected.slice(0, 10).flatMap((item) => item.reasons.map((reason) => `${item.parlayId}:${reason}`)),
+    ],
+    artifactPath: parlayAnalysis.artifactPath,
+  });
+  writeStepSpan(config, runtime, 'parlay.analyze', 'gate', parlayAnalysis.ok ? 'ok' : 'blocked', parlayAnalysis);
+
   const verdict = finalVerdict(steps);
   const status: PipelineStatus = verdict === 'blocked' ? 'failed' : 'succeeded';
   const completedAt = now();
@@ -711,6 +739,7 @@ export async function executeRunPipeline(
       research: research.length,
       predictions: scoring.reduce((sum, item) => sum + item.predictions.length, 0),
       parlayLegs: parlay.build.parlay.legs.length,
+      parlayRecommendations: parlayAnalysis.top.length,
       validations: validation?.validations.length ?? 0,
     },
     lowOddsPredictionCoverage,
@@ -719,6 +748,7 @@ export async function executeRunPipeline(
     marketCoverage,
     calibrationSummary,
     parlayPortfolioDiagnostics: parlay.portfolio?.diagnostics ?? null,
+    parlayAnalysisDiagnostics: parlayAnalysis.diagnostics,
     noParlayReasons: parlay.gateResult.verdict === 'blocked' ? parlay.gateResult.reasons : [],
     validation: validationEvaluation,
     lowOddsScanId: lowOddsScan.scanId ?? null,
@@ -774,6 +804,7 @@ export async function executeRunPipeline(
     research,
     scoring,
     parlay,
+    parlayAnalysis,
     validation,
   };
 }
@@ -1549,6 +1580,44 @@ function blockedParlayResult(config: AgentConfig, runId: string, date: string, e
   };
 }
 
+function blockedParlayAnalysisResult(config: AgentConfig, runId: string, date: string, err: unknown): ParlayAnalysisRunResult {
+  const error = errorMessage(err);
+  const generatedAt = new Date().toISOString();
+  const diagnostics = {
+    generatedAt,
+    analyticalArtifactOnly: true as const,
+    executionCapability: 'none' as const,
+    bankrollPolicy: {
+      bankrollUnits: 100,
+      maxPortfolioStake: 0.08,
+      maxParlayStake: 0.025,
+      unitLabel: 'analytical-units' as const,
+    },
+    universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null },
+    selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0 },
+    rejected: [],
+  };
+  const artifactPath = writeArtifact(config, runId, 'parlay-analysis-blocked.json', {
+    runId,
+    date,
+    generatedAt,
+    diagnostics,
+    error,
+    analyticalArtifactOnly: true,
+    executionCapability: 'none',
+  });
+  return {
+    ok: false,
+    runId,
+    date,
+    analyzed: 0,
+    top: [],
+    diagnostics,
+    artifactPath,
+    error,
+  };
+}
+
 function blockedValidationResult(config: AgentConfig, runId: string, date: string, err: unknown): ValidationRunResult {
   const error = errorMessage(err);
   const gateResult = {
@@ -1891,6 +1960,7 @@ function buildHandoffMarkdown(
     `- lowOddsHits: ${counts.lowOddsHits ?? 'unknown'}`,
     `- predictions: ${counts.predictions ?? 'unknown'}`,
     `- parlayLegs: ${counts.parlayLegs ?? 'unknown'}`,
+    `- parlayRecommendations: ${counts.parlayRecommendations ?? 'unknown'}`,
     `- validations: ${counts.validations ?? 'unknown'}`,
     `- lowOddsPredicted: ${lowOddsPredicted}`,
     `- webSearchCoverage: real=${webSearchCoverage.realWebSourceCount ?? 'unknown'} synthetic=${webSearchCoverage.syntheticWebSourceCount ?? 'unknown'}`,

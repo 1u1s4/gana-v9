@@ -323,6 +323,47 @@ describe('runParlayBuild', () => {
     assert.equal(artifactPayload.portfolio.profiles[0].profile, 'low-odds-top');
   });
 
+  it('falls back for low-odds-top when strict double-chance coverage is too thin', async () => {
+    const cfg = config({ apiFootball: { lowOddsThreshold: 1.2 } });
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-14',
+      sourceRunId: 'source-run-low-odds-fallback',
+      portfolio: 'low-odds-top',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-low-odds-fallback');
+            return [
+              prediction({ id: 'strict-dc', runId: 'source-run-low-odds-fallback', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.91, status: 'promotable', edge: 0.03 }),
+              prediction({ id: 'fallback-h2h', runId: 'source-run-low-odds-fallback', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'home', odds: 1.29, confidence: 0.9, status: 'promotable', edge: 0.08 }),
+              prediction({ id: 'fallback-total', runId: 'source-run-low-odds-fallback', fixtureId: 'fixture-3', marketKey: 'goals_over_under', selectionKey: 'over', line: 1.5, odds: 1.3, confidence: 0.86, status: 'promotable', edge: 0.04 }),
+              prediction({ id: 'too-high', runId: 'source-run-low-odds-fallback', fixtureId: 'fixture-4', marketKey: 'h2h', selectionKey: 'away', odds: 1.5, confidence: 0.95, status: 'promotable', edge: 0.1 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-low-odds-fallback' }) as any },
+        parlays: { createWithLegs: async () => ({ id: 'parlay-low-odds-fallback' }) as any },
+      },
+    });
+
+    const selectedIds = new Set(result.build.parlay.legs.map((leg) => leg.predictionId));
+    const diagnostics = result.portfolio?.diagnostics?.pool[0];
+    assert.equal(result.ok, true);
+    assert.equal(diagnostics?.fallback, true);
+    assert.equal(diagnostics?.strictEligible, 1);
+    assert.equal(selectedIds.has('strict-dc'), true);
+    assert.equal(selectedIds.has('fallback-h2h') || selectedIds.has('fallback-total'), true);
+    assert.equal(selectedIds.has('too-high'), false);
+    assert.match(result.portfolio?.profiles[0].warnings.join('\n') ?? '', /fallback selected/);
+  });
+
   it('keeps LLM portfolio risk notes informational when legs are promotable', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -1006,6 +1047,53 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames.slice(0, 2), ['parlay-market-diverse.json', 'parlays.json']);
   });
 
+  it('does not starve market-diverse generation on two-leg candidates when the pool is large', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const markets = ['h2h', 'btts', 'goals_over_under'] as const;
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-14',
+      sourceRunId: 'source-run-large-diverse',
+      portfolio: 'market-diverse',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-large-diverse');
+            return Array.from({ length: 30 }, (_, index) => {
+              const market = markets[index % markets.length];
+              return prediction({
+                id: `large-${index}`,
+                runId: 'source-run-large-diverse',
+                fixtureId: `fixture-${index}`,
+                marketKey: market,
+                selectionKey: market === 'h2h' ? 'home' : market === 'btts' ? 'yes' : 'over',
+                line: market === 'goals_over_under' ? 2.5 : null,
+                odds: 1.4,
+                confidence: 0.8,
+                edge: 0.05,
+                estimatedProbability: 0.74,
+              });
+            }) as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-large-diverse' }) as any },
+        parlays: { createWithLegs: async () => ({ id: 'parlay-large-diverse' }) as any },
+      },
+    });
+
+    const selectedMarkets = new Set(result.build.parlay.legs.map((leg) => leg.market));
+    assert.equal(result.ok, true);
+    assert.equal(result.build.parlay.legs.length >= 3, true);
+    assert.equal(selectedMarkets.size >= 3, true);
+    assert.equal(result.portfolio?.profiles[0].profile, 'market-diverse');
+  });
+
   it('narrows low-variance parlays to low-priced double-chance legs', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -1061,6 +1149,49 @@ describe('runParlayBuild', () => {
     assert.equal(persisted.length, result.portfolio?.parlays.length);
   });
 
+  it('falls back for low-variance when strict low-priced double-chance legs are insufficient', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-14',
+      sourceRunId: 'source-run-low-variance-fallback',
+      portfolio: 'low-variance',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-low-variance-fallback');
+            return [
+              prediction({ id: 'strict-dc', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.9, edge: 0.015, estimatedProbability: 0.86, warnings: ['low-liquidity'] }),
+              prediction({ id: 'fallback-h2h', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'home', odds: 1.29, confidence: 0.91, edge: 0.08, estimatedProbability: 0.84 }),
+              prediction({ id: 'low-liquidity-short', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-3', marketKey: 'h2h', selectionKey: 'home', odds: 1.12, confidence: 0.96, edge: 0.05, estimatedProbability: 0.9, warnings: ['low-liquidity'] }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-low-variance-fallback' }) as any },
+        parlays: { createWithLegs: async () => ({ id: 'parlay-low-variance-fallback' }) as any },
+      },
+    });
+
+    const selectedIds = new Set(result.build.parlay.legs.map((leg) => leg.predictionId));
+    const diagnostics = result.portfolio?.diagnostics?.pool[0];
+    assert.equal(result.ok, true);
+    assert.equal(diagnostics?.fallback, true);
+    assert.equal(diagnostics?.strictEligible, 0);
+    assert.equal(selectedIds.has('strict-dc'), true);
+    assert.equal(selectedIds.has('fallback-h2h'), true);
+    assert.equal(selectedIds.has('low-liquidity-short'), false);
+    assert.equal(
+      diagnostics?.excludedReasons.some((item) => item.predictionId === 'low-liquidity-short' && item.reasons.some((reason) => /low-liquidity h2h short favorite/.test(reason))),
+      true,
+    );
+  });
+
   it('builds parlay-oro by maximizing combined odds from safe low-priced predictions', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -1082,12 +1213,12 @@ describe('runParlayBuild', () => {
           list: async (query) => {
             assert.equal(query.runId, 'source-run-oro');
             return [
-              prediction({ id: 'safe-1', runId: 'source-run-oro', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.12, confidence: 0.95, edge: 0.03, estimatedProbability: 0.9 }),
+              prediction({ id: 'low-liquidity-h2h', runId: 'source-run-oro', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.12, confidence: 0.95, edge: 0.03, estimatedProbability: 0.9, warnings: ['low-liquidity'] }),
               prediction({ id: 'safe-2', runId: 'source-run-oro', fixtureId: 'fixture-2', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.92, edge: 0.025, estimatedProbability: 0.88 }),
               prediction({ id: 'safe-3', runId: 'source-run-oro', fixtureId: 'fixture-3', marketKey: 'double_chance', selectionKey: 'away_or_draw', odds: 1.2, confidence: 0.91, edge: 0.02, estimatedProbability: 0.87 }),
               prediction({ id: 'safe-4', runId: 'source-run-oro', fixtureId: 'fixture-4', marketKey: 'h2h', selectionKey: 'away', odds: 1.08, confidence: 0.94, edge: 0.03, estimatedProbability: 0.91 }),
               prediction({ id: 'safe-5', runId: 'source-run-oro', fixtureId: 'fixture-5', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.17, confidence: 0.9, edge: 0.02, estimatedProbability: 0.86 }),
-              prediction({ id: 'safe-6', runId: 'source-run-oro', fixtureId: 'fixture-6', marketKey: 'h2h', selectionKey: 'home', odds: 1.23, confidence: 0.88, edge: 0.015, estimatedProbability: 0.84 }),
+              prediction({ id: 'safe-6', runId: 'source-run-oro', fixtureId: 'fixture-6', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.16, confidence: 0.89, edge: 0.02, estimatedProbability: 0.84 }),
               prediction({ id: 'too-expensive', runId: 'source-run-oro', fixtureId: 'fixture-7', marketKey: 'h2h', selectionKey: 'home', odds: 1.35, confidence: 0.99, edge: 0.04, estimatedProbability: 0.92 }),
               prediction({ id: 'too-weak', runId: 'source-run-oro', fixtureId: 'fixture-8', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.2, confidence: 0.7, edge: 0.04, estimatedProbability: 0.86 }),
               prediction({ id: 'draw-risk', runId: 'source-run-oro', fixtureId: 'fixture-9', marketKey: 'double_chance', selectionKey: 'home_or_away', odds: 1.19, confidence: 0.91, edge: 0.02, estimatedProbability: 0.86 }),
@@ -1110,9 +1241,10 @@ describe('runParlayBuild', () => {
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.profiles[0].profile, 'parlay-oro');
     assert.equal(result.portfolio?.promptVersion, 'deterministic-parlay-oro-v1');
-    assert.equal(result.build.parlay.legs.length, 6);
-    assert.equal((result.build.parlay.combinedOdds ?? 0) > 2.2, true);
-    assert.deepEqual(new Set(firstLegIds), new Set(['safe-1', 'safe-2', 'safe-3', 'safe-4', 'safe-5', 'safe-6']));
+    assert.equal(result.build.parlay.legs.length, 5);
+    assert.equal((result.build.parlay.combinedOdds ?? 0) > 1.8, true);
+    assert.deepEqual(new Set(firstLegIds), new Set(['safe-2', 'safe-3', 'safe-4', 'safe-5', 'safe-6']));
+    assert.equal(firstLegIds.includes('low-liquidity-h2h'), false);
     assert.equal(firstLegIds.includes('too-expensive'), false);
     assert.equal(firstLegIds.includes('too-weak'), false);
     assert.equal(firstLegIds.includes('draw-risk'), false);
@@ -1124,7 +1256,52 @@ describe('runParlayBuild', () => {
       result.portfolio?.diagnostics?.pool[0].excludedReasons.some((item) => item.predictionId === 'too-expensive' && item.reasons.some((reason) => /leg odds ceiling/.test(reason))),
       true,
     );
+    assert.equal(
+      result.portfolio?.diagnostics?.pool[0].excludedReasons.some((item) => item.predictionId === 'low-liquidity-h2h' && item.reasons.some((reason) => /low-liquidity h2h short favorite/.test(reason))),
+      true,
+    );
     assert.deepEqual(artifactNames.slice(0, 2), ['parlay-oro.json', 'parlays.json']);
+  });
+
+  it('falls back for parlay-oro when the strict low-odds pool is empty', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-14',
+      sourceRunId: 'source-run-oro-fallback',
+      portfolio: 'parlay-oro',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-oro-fallback');
+            return [
+              prediction({ id: 'h2h-fallback', runId: 'source-run-oro-fallback', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.29, confidence: 0.9, edge: 0.09, estimatedProbability: 0.84 }),
+              prediction({ id: 'dc-fallback', runId: 'source-run-oro-fallback', fixtureId: 'fixture-2', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.33, confidence: 0.88, edge: 0.04, estimatedProbability: 0.82 }),
+              prediction({ id: 'total-fallback', runId: 'source-run-oro-fallback', fixtureId: 'fixture-3', marketKey: 'goals_over_under', selectionKey: 'over', line: 1.5, odds: 1.35, confidence: 0.82, edge: 0.05, estimatedProbability: 0.78 }),
+              prediction({ id: 'too-expensive', runId: 'source-run-oro-fallback', fixtureId: 'fixture-4', marketKey: 'h2h', selectionKey: 'away', odds: 1.6, confidence: 0.95, edge: 0.1, estimatedProbability: 0.84 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-oro-fallback' }) as any },
+        parlays: { createWithLegs: async () => ({ id: 'parlay-oro-fallback' }) as any },
+      },
+    });
+
+    const selectedIds = new Set(result.build.parlay.legs.map((leg) => leg.predictionId));
+    const diagnostics = result.portfolio?.diagnostics?.pool[0];
+    assert.equal(result.ok, true);
+    assert.equal(diagnostics?.fallback, true);
+    assert.equal(diagnostics?.strictEligible, 0);
+    assert.equal(selectedIds.has('h2h-fallback'), true);
+    assert.equal(selectedIds.has('dc-fallback') || selectedIds.has('total-fallback'), true);
+    assert.equal(selectedIds.has('too-expensive'), false);
+    assert.match(result.portfolio?.profiles[0].warnings.join('\n') ?? '', /fallback eligibility/);
   });
 
   it('writes a blocked artifact when database access is unavailable', async () => {

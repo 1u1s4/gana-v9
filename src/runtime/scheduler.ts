@@ -9,6 +9,7 @@ export const CANONICAL_TASK_TYPES = [
   'score.fixture',
   'parlay.build',
   'validation.run',
+  'parlay.analyze',
   'evidence_pack.export',
 ] as const;
 

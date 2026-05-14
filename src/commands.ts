@@ -50,6 +50,7 @@ import { isMarketKey, MARKET_KEYS, type MarketKey } from './domain/markets.js';
 import type { OddsQuote } from './domain/odds.js';
 import { runFixtureResearch, type FixtureResearchResult } from './evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from './prediction/service.js';
+import { runParlayAnalysis, type ParlayAnalysisRunResult } from './parlay/analysis.js';
 import { runParlayBuild, type ParlayBuildRunResult } from './parlay/service.js';
 import type { ParlayConfig } from './parlay/types.js';
 import { runValidation, type RunValidationInput, type ValidationRunResult } from './validation/service.js';
@@ -478,6 +479,13 @@ function optionalPositiveIntegerFlag(flags: Record<string, string | true>, key: 
   return parsed;
 }
 
+function optionalPositiveFloatFlag(flags: Record<string, string | true>, key: string): number | undefined {
+  const value = optionalFloatFlag(flags, key);
+  if (value === undefined) return undefined;
+  if (value <= 0) throw new Error(`--${key} must be greater than 0.`);
+  return value;
+}
+
 function optionalProbabilityFlag(flags: Record<string, string | true>, key: string): number | undefined {
   const value = optionalFloatFlag(flags, key);
   if (value === undefined) return undefined;
@@ -570,6 +578,17 @@ async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: 
   const service = await loadOptionalRunService();
   const runner = service.runParlayBuild ?? runParlayBuild;
   return runner(ctx.config, input, ctx.runtime);
+}
+
+async function analyzeParlays(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayAnalysisRunResult> {
+  return runParlayAnalysis(ctx.config, {
+    date: optionalStringFlag(flags, 'date'),
+    runId: optionalStringFlag(flags, 'run-id'),
+    top: optionalPositiveIntegerFlag(flags, 'top'),
+    bankrollUnits: optionalPositiveFloatFlag(flags, 'bankroll') ?? optionalPositiveFloatFlag(flags, 'bank'),
+    maxPortfolioExposure: optionalFloatFlag(flags, 'max-portfolio-exposure'),
+    maxParlayExposure: optionalFloatFlag(flags, 'max-parlay-exposure'),
+  }, ctx.runtime);
 }
 
 async function validateResults(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ValidationRunResult> {
@@ -804,6 +823,27 @@ function printParlayResult(result: ParlayBuildRunResult): void {
   }
   for (const warning of result.gateResult.warnings) {
     console.log(`  ${YELLOW}!${RESET} ${DIM}${warning}${RESET}`);
+  }
+}
+
+function printParlayAnalysisResult(result: ParlayAnalysisRunResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}parlay analysis${RESET} ${DIM}${result.ok ? 'completed' : 'blocked'}${RESET}`);
+  printKeyValue('runId', result.runId);
+  if (result.date) printKeyValue('date', result.date);
+  if (result.sourceRunId) printKeyValue('sourceRunId', result.sourceRunId);
+  printKeyValue('analyzed', result.analyzed);
+  printKeyValue('top', result.top.length);
+  printKeyValue('artifactType', 'analytical only; not executable');
+  printKeyValue('bankrollPolicy', `${result.diagnostics.bankrollPolicy.bankrollUnits} analytical units, max portfolio stake ${(result.diagnostics.bankrollPolicy.maxPortfolioStake * 100).toFixed(2)}%`);
+  printKeyValue('universeHitRate', result.diagnostics.universe.hitRate === null ? 'n/a' : `${(result.diagnostics.universe.hitRate * 100).toFixed(1)}%`);
+  printKeyValue('selectedHitRate', result.diagnostics.selected.hitRate === null ? 'n/a' : `${(result.diagnostics.selected.hitRate * 100).toFixed(1)}%`);
+  printKeyValue('selectedStakeUnits', result.diagnostics.selected.totalStakeUnits);
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  if (result.error) console.log(`  ${DIM}reason:${RESET} ${CYAN}${result.error}${RESET}`);
+  for (const recommendation of result.top) {
+    const banker = recommendation.bankerLegs.length ? ` bankerLegs:${recommendation.bankerLegs.length}` : '';
+    console.log(`  ${CYAN}#${recommendation.rank}${RESET} ${recommendation.parlayId} ${DIM}${recommendation.profile} ${recommendation.validationStatus}${RESET} odds:${recommendation.combinedOdds} stake:${recommendation.stake.units}${banker}`);
   }
 }
 
@@ -1529,6 +1569,16 @@ commands.push({
 });
 
 commands.push({
+  name: '/parlay-analysis',
+  description: 'Rank persisted parlays, suggest analytical stake, and identify banker legs',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await analyzeParlays(ctx, flags);
+    printParlayAnalysisResult(result);
+  },
+});
+
+commands.push({
   name: '/validate',
   description: 'Validate predictions or parlays against final provider results',
   execute: async (args, ctx) => {
@@ -1829,6 +1879,12 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
     }
 
     if (area === 'parlay') {
+      if (action === 'analyze') {
+        const flags = parseFlags(argv.slice(2));
+        const result = await analyzeParlays(ctx, flags);
+        printParlayAnalysisResult(result);
+        return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+      }
       const flags = parseFlags(argv.slice(1));
       const result = await buildParlay(ctx, flags);
       printParlayResult(result);
@@ -1994,6 +2050,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay analyze --date YYYY-MM-DD --top 5 --bankroll 100${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);

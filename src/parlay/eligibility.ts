@@ -11,6 +11,9 @@ export function automaticParlayRiskReasons(prediction: ParlaySourcePrediction): 
   if (hasStaleLowLiquidityRisk(prediction)) {
     reasons.push('stale low-liquidity prediction');
   }
+  if (hasLowLiquidityH2hFavoriteRisk(prediction)) {
+    reasons.push('low-liquidity h2h short favorite');
+  }
   if (hasUnverifiedCornersRisk(prediction)) {
     reasons.push('corners market lacks settlement reliability or market-specific evidence');
   }
@@ -24,6 +27,13 @@ export function hasStaleLowLiquidityRisk(prediction: ParlaySourcePrediction): bo
   const text = predictionText(prediction);
   return /stale (?:news|source|odds) source|stale odds/i.test(text)
     && /low[-_ ]liquidity|low liquidity/i.test(text);
+}
+
+export function hasLowLiquidityH2hFavoriteRisk(prediction: ParlaySourcePrediction): boolean {
+  if (prediction.market !== 'h2h') return false;
+  if (prediction.selection === 'draw') return false;
+  if (prediction.odds > LOW_ODDS_TOP_MAX_LEG_ODDS) return false;
+  return /low[-_ ]liquidity|low liquidity|single[-_ ]bookmaker/i.test(predictionText(prediction));
 }
 
 export function hasUnverifiedCornersRisk(prediction: ParlaySourcePrediction): boolean {

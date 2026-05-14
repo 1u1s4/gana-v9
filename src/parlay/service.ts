@@ -19,7 +19,7 @@ import type {
   StoragePrismaClient,
 } from '../storage/types.js';
 import { buildParlay } from './builder.js';
-import { generateParlayCandidates, type ParlayCandidate } from './candidate-generator.js';
+import { generateParlayCandidatesForLegRange, type ParlayCandidate } from './candidate-generator.js';
 import { correlationBlockers, correlationPenalty } from './correlation.js';
 import { diversifyParlays } from './diversifier.js';
 import {
@@ -27,6 +27,7 @@ import {
   LOW_ODDS_TOP_MAX_LEG_ODDS,
   automaticParlayRiskReasons,
   hasInflatedDoubleChanceEdgeRisk,
+  hasLowLiquidityH2hFavoriteRisk,
   hasStaleLowLiquidityRisk,
   hasUnverifiedCornersRisk,
 } from './eligibility.js';
@@ -76,6 +77,9 @@ const LOW_ODDS_TOP_PROFILE = {
   allowDrawExposure: false,
   reviewOnly: false,
 } as const;
+const LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS = 1.35;
+const LOW_VARIANCE_FALLBACK_MAX_LEG_ODDS = 1.35;
+const PARLAY_ORO_FALLBACK_MAX_LEG_ODDS = 1.45;
 
 type DeterministicParlayProfile = 'low-variance' | 'balanced' | 'totals' | 'high-conviction' | 'market-diverse' | 'parlay-oro';
 type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'] | typeof LOW_ODDS_TOP_PROFILE['key'] | DeterministicParlayProfile;
@@ -171,6 +175,9 @@ export interface ParlayPortfolio {
       eligible: number;
       excluded: number;
       excludedReasons: Array<{ predictionId: string; reasons: string[] }>;
+      fallback?: boolean;
+      strictEligible?: number;
+      strictExcluded?: number;
     }>;
     agentOutputs?: Array<{
       profile: ParlayPortfolioProfile;
@@ -594,10 +601,19 @@ async function runLowOddsTopPortfolio(
   });
   const sourcePredictions = records.map(toSourcePrediction);
   const decoratedPredictions = sourcePredictions.map(decoratePortfolioPrediction);
-  const excludedReasons = decoratedPredictions
+  const strictExcludedReasons = decoratedPredictions
     .map((prediction) => ({ predictionId: prediction.id, reasons: lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold) }))
     .filter((item) => item.reasons.length > 0);
-  const pool = decoratedPredictions.filter((prediction) => lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold).length === 0);
+  const strictPool = decoratedPredictions.filter((prediction) => lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold).length === 0);
+  const fallbackEnabled = strictPool.length < LOW_ODDS_TOP_PROFILE.minLegs;
+  const excludedReasons = fallbackEnabled
+    ? decoratedPredictions
+      .map((prediction) => ({ predictionId: prediction.id, reasons: lowOddsTopFallbackExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS) }))
+      .filter((item) => item.reasons.length > 0)
+    : strictExcludedReasons;
+  const pool = fallbackEnabled
+    ? decoratedPredictions.filter((prediction) => lowOddsTopFallbackExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS).length === 0)
+    : strictPool;
   const portfolioId = randomUUID();
   const usedSignatures = new Set<string>();
   const fills = generateDeterministicPortfolioFills({
@@ -614,7 +630,11 @@ async function runLowOddsTopPortfolio(
     builds.push({ profile: validation.profile, build: validation.build });
   }
   const warnings = builds.length
-    ? [`deterministic low-odds-top selected ${builds.length} parlay(s) from double_chance predictions with odds <= ${threshold}`]
+    ? [
+      fallbackEnabled
+        ? `deterministic low-odds-top fallback selected ${builds.length} parlay(s) from h2h/double_chance/goals_over_under predictions with odds <= ${LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS}`
+        : `deterministic low-odds-top selected ${builds.length} parlay(s) from double_chance predictions with odds <= ${threshold}`,
+    ]
     : [`low-odds-top pool has ${pool.length} eligible prediction(s); ${LOW_ODDS_TOP_PROFILE.minLegs} required`];
   const portfolio: ParlayPortfolio = {
     id: portfolioId,
@@ -637,6 +657,11 @@ async function runLowOddsTopPortfolio(
         eligible: pool.length,
         excluded: excludedReasons.length,
         excludedReasons,
+        ...(fallbackEnabled ? {
+          strictEligible: strictPool.length,
+          strictExcluded: strictExcludedReasons.length,
+          fallback: true,
+        } : {}),
       }],
       agentOutputs: [{
         profile: LOW_ODDS_TOP_PROFILE.key,
@@ -747,13 +772,20 @@ async function runDeterministicParlayProfile(
     });
   }
 
-  const spec = deterministicProfileSpec(profile);
+  const baseSpec = deterministicProfileSpec(profile);
   const records = await repositories.predictions.list({
     runId: sourceRunId,
     status: PORTFOLIO_PREDICTION_STATUSES,
     take: 500,
   });
   const sourcePredictions = records.map(toSourcePrediction).map(decoratePortfolioPrediction);
+  const strictExcludedReasons = sourcePredictions
+    .map((prediction) => ({ predictionId: prediction.id, reasons: deterministicProfileExclusionReasons(prediction, baseSpec) }))
+    .filter((item) => item.reasons.length > 0);
+  const strictPool = sourcePredictions.filter((prediction) => deterministicProfileExclusionReasons(prediction, baseSpec).length === 0);
+  const fallbackSpec = deterministicFallbackProfileSpec(profile, baseSpec, strictPool.length);
+  const spec = fallbackSpec ?? baseSpec;
+  const fallbackEnabled = Boolean(fallbackSpec);
   const excludedReasons = sourcePredictions
     .map((prediction) => ({ predictionId: prediction.id, reasons: deterministicProfileExclusionReasons(prediction, spec) }))
     .filter((item) => item.reasons.length > 0);
@@ -788,7 +820,11 @@ async function runDeterministicParlayProfile(
       reasons: candidate.blockers,
     }));
   const warnings = builds.length
-    ? [`deterministic ${profile} generated ${builds.length} analytical parlay(s)`]
+    ? [
+      fallbackEnabled
+        ? `deterministic ${profile} generated ${builds.length} analytical parlay(s) using fallback eligibility after strict pool had ${strictPool.length}/${baseSpec.minLegs} required leg(s)`
+        : `deterministic ${profile} generated ${builds.length} analytical parlay(s)`,
+    ]
     : [`deterministic ${profile} pool has ${pool.length} eligible prediction(s); ${spec.minLegs} required`];
   const portfolioId = randomUUID();
   const portfolio: ParlayPortfolio = {
@@ -812,6 +848,11 @@ async function runDeterministicParlayProfile(
         eligible: pool.length,
         excluded: excludedReasons.length,
         excludedReasons,
+        ...(fallbackEnabled ? {
+          strictEligible: strictPool.length,
+          strictExcluded: strictExcludedReasons.length,
+          fallback: true,
+        } : {}),
       }],
       agentOutputs: [{
         profile,
@@ -908,6 +949,7 @@ interface DeterministicProfileSpec {
   markets?: MarketKey[];
   requireLine?: boolean;
   avoidDrawExposure?: boolean;
+  allowFragileLowPriceDc?: boolean;
   requireMarketDiversity?: boolean;
   riskWeight: number;
 }
@@ -929,6 +971,38 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
   }
 }
 
+function deterministicFallbackProfileSpec(
+  profile: DeterministicParlayProfile,
+  base: DeterministicProfileSpec,
+  strictPoolSize: number,
+): DeterministicProfileSpec | undefined {
+  if (strictPoolSize >= base.minLegs) return undefined;
+  if (profile === 'low-variance') {
+    return {
+      ...base,
+      minOdds: 1.25,
+      maxOdds: 2.2,
+      maxLegOdds: LOW_VARIANCE_FALLBACK_MAX_LEG_ODDS,
+      markets: ['h2h', 'double_chance'],
+      allowFragileLowPriceDc: true,
+    };
+  }
+  if (profile === 'parlay-oro') {
+    return {
+      ...base,
+      minLegs: 2,
+      maxLegs: 5,
+      minOdds: 1.45,
+      maxOdds: 3.5,
+      maxLegOdds: PARLAY_ORO_FALLBACK_MAX_LEG_ODDS,
+      minConfidence: 0.74,
+      markets: ['h2h', 'double_chance', 'goals_over_under'],
+      allowFragileLowPriceDc: true,
+    };
+  }
+  return undefined;
+}
+
 function deterministicProfileExclusionReasons(
   prediction: ParlaySourcePrediction,
   spec: DeterministicProfileSpec,
@@ -944,7 +1018,7 @@ function deterministicProfileExclusionReasons(
   if (hasRiskTag(prediction, 'fragile_low_total_over') && hasRiskTag(prediction, 'low_edge')) {
     reasons.push('fragile low total over with low edge');
   }
-  if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) {
+  if (!spec.allowFragileLowPriceDc && hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) {
     reasons.push('fragile low-price double chance with low edge');
   }
   if (spec.markets && !spec.markets.includes(prediction.market)) reasons.push(`market not allowed for ${spec.profile}`);
@@ -984,7 +1058,7 @@ function deterministicCandidatesForProfile(
   if (profile === 'parlay-oro') {
     return generateParlayOroCandidates(pool, spec);
   }
-  return generateParlayCandidates([...pool], spec.maxLegs);
+  return generateParlayCandidatesForLegRange([...pool], spec.minLegs, spec.maxLegs);
 }
 
 function generateParlayOroCandidates(
@@ -1751,6 +1825,21 @@ function lowOddsTopPoolExclusionReasons(
   return [...new Set(reasons)];
 }
 
+function lowOddsTopFallbackExclusionReasons(
+  prediction: ParlaySourcePrediction,
+  profile: ParlayPortfolioProfileSpec,
+  maxOdds: number,
+): string[] {
+  const reasons = portfolioPoolExclusionReasons(prediction, profile);
+  if (!['h2h', 'double_chance', 'goals_over_under'].includes(prediction.market)) {
+    reasons.push('market not allowed for low-odds-top fallback');
+  }
+  if (prediction.odds > maxOdds) reasons.push(`above low-odds fallback threshold ${maxOdds}`);
+  if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
+  if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
+  return [...new Set(reasons)];
+}
+
 function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {
   return (prediction.warnings ?? []).some((warning) =>
     /research is not promotable|fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
@@ -1780,6 +1869,7 @@ function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] 
   if (prediction.status === 'review-required') tags.push('review_required');
   if (hasPortfolioHardOrResearchWarning(prediction)) tags.push('research_warning');
   if (hasStaleLowLiquidityRisk(prediction)) tags.push('stale_low_liquidity');
+  if (hasLowLiquidityH2hFavoriteRisk(prediction)) tags.push('low_liquidity_h2h_favorite');
   if (hasUnverifiedCornersRisk(prediction)) tags.push('corners_unverified');
   if (hasInflatedDoubleChanceEdgeRisk(prediction)) tags.push('inflated_double_chance_edge');
   if (prediction.market === 'goals_over_under' && prediction.selection === 'over' && (prediction.line ?? 0) <= 1.5 && prediction.odds <= 1.4) {

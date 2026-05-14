@@ -73,7 +73,8 @@ describe('production-grade tool registry and certification', () => {
 describe('durable runtime task primitives', () => {
   it('schedules, leases, recovers, and deduplicates tasks deterministically', () => {
     const tasks = scheduleRunTasks('run-1', { date: '2026-05-03' });
-    assert.equal(tasks.length, 8);
+    assert.equal(tasks.length, 9);
+    assert.ok(tasks.some((task) => task.type === 'parlay.analyze'));
     const leased = leaseNextTask(tasks, new Date('2026-05-03T00:00:00.000Z'), 1_000);
     assert.equal(leased?.status, 'running');
     const recovered = recoverExpiredLeases(tasks, new Date('2026-05-03T00:00:02.000Z'));

@@ -17,11 +17,19 @@ export interface ParlayCandidate {
 }
 
 export function generateParlayCandidates(predictions: ParlaySourcePrediction[], maxLegs = 4): ParlayCandidate[] {
+  return generateParlayCandidatesForLegRange(predictions, 2, maxLegs);
+}
+
+export function generateParlayCandidatesForLegRange(
+  predictions: ParlaySourcePrediction[],
+  minLegs = 2,
+  maxLegs = 4,
+): ParlayCandidate[] {
   const eligible = predictions
     .filter((prediction: any) => (prediction.status === 'promotable' || prediction.status === 'candidate') && !(prediction.blockers?.length))
     .sort((a, b) => (b.edge ?? 0) - (a.edge ?? 0) || b.confidence - a.confidence || a.odds - b.odds);
   const candidates: ParlayCandidate[] = [];
-  for (let size = 2; size <= Math.min(maxLegs, eligible.length); size++) {
+  for (let size = Math.max(2, minLegs); size <= Math.min(maxLegs, eligible.length); size++) {
     collectCombinations(eligible, size, 0, [], candidates, 300);
   }
   return candidates.length ? candidates : [buildRejectedCandidate(predictions)];

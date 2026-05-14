@@ -110,6 +110,7 @@ function successfulPipelineDeps(input: {
   scoreFixture?: RunPipelineDependencies['scoreFixture'];
   validateRun?: RunPipelineDependencies['validateRun'];
   buildParlay?: RunPipelineDependencies['buildParlay'];
+  analyzeParlays?: RunPipelineDependencies['analyzeParlays'];
   discoverLowOddsFixtures?: RunPipelineDependencies['discoverLowOddsFixtures'];
   fetchLowOddsSnapshot?: RunPipelineDependencies['fetchLowOddsSnapshot'];
 }): RunPipelineDependencies {
@@ -233,6 +234,39 @@ function successfulPipelineDeps(input: {
         }],
       };
     }),
+    analyzeParlays: input.analyzeParlays ?? (async () => ({
+        ok: true,
+        runId: input.runId,
+        date: input.date,
+        analyzed: 1,
+        top: [{
+          rank: 1,
+          parlayId: 'parlay-1',
+          sourceRunId: input.runId,
+          profile: 'default',
+          validationStatus: 'pending',
+          harnessStatus: 'review-required',
+          combinedOdds: 1.8,
+          aggregateConfidence: 0.6,
+          adjustedProbability: 0.62,
+          expectedEdge: 0.116,
+          score: 0.5,
+          stake: { units: 1, percentOfBankroll: 0.01, policy: 'fractional-kelly-capped-analytical-stake' }, bankerLegs: [],
+          reasons: ['test recommendation'],
+          riskFlags: [],
+          legs: [],
+        }],
+        diagnostics: {
+          generatedAt: evaluatedAt,
+          analyticalArtifactOnly: true,
+          executionCapability: 'none',
+          bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' },
+          universe: { won: 0, lost: 0, voided: 0, pending: 1, unvalidated: 0, settled: 0, hitRate: null },
+          selected: { won: 0, lost: 0, voided: 0, pending: 1, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 1, totalStakePercentOfBankroll: 0.01 },
+          rejected: [],
+        },
+        artifactPath: '/tmp/parlay-analysis.json',
+      })),
   };
 }
 
@@ -397,6 +431,42 @@ describe('executeRunPipeline', () => {
           }],
         };
       },
+      analyzeParlays: async () => {
+        calls.push('parlay-analysis');
+        return {
+          ok: true,
+          runId: 'run-test-1',
+          date: '2026-04-29',
+          analyzed: 1,
+          top: [{
+            rank: 1,
+            parlayId: 'parlay-1',
+            sourceRunId: 'run-test-1',
+            profile: 'default',
+            validationStatus: 'pending',
+            harnessStatus: 'review-required',
+            combinedOdds: 1.8,
+            aggregateConfidence: 0.6,
+            adjustedProbability: 0.62,
+            expectedEdge: 0.116,
+            score: 0.5,
+            stake: { units: 1, percentOfBankroll: 0.01, policy: 'fractional-kelly-capped-analytical-stake' }, bankerLegs: [],
+            reasons: ['pipeline parlay analysis'],
+            riskFlags: [],
+            legs: [],
+          }],
+          diagnostics: {
+            generatedAt: '2026-04-29T12:00:00.000Z',
+            analyticalArtifactOnly: true,
+            executionCapability: 'none',
+            bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' },
+            universe: { won: 0, lost: 0, voided: 0, pending: 1, unvalidated: 0, settled: 0, hitRate: null },
+            selected: { won: 0, lost: 0, voided: 0, pending: 1, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 1, totalStakePercentOfBankroll: 0.01 },
+            rejected: [],
+          },
+          artifactPath: '/tmp/parlay-analysis.json',
+        };
+      },
       repositories: {
         lowOddsScans: {
           create: async () => ({ id: 'scan-1' }),
@@ -414,7 +484,7 @@ describe('executeRunPipeline', () => {
     assert.equal(runtime.runId, 'run-test-1');
     assert.equal(result.runId, 'run-test-1');
     assert.equal(result.verdict, 'review-required');
-    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay', 'validate']);
+    assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay', 'validate', 'parlay-analysis']);
     assert.ok(existsSync(join(result.artifactDir, 'input.json')));
     assert.ok(existsSync(join(result.artifactDir, 'filters.json')));
     assert.ok(existsSync(join(result.artifactDir, 'fixtures.json')));
@@ -432,6 +502,8 @@ describe('executeRunPipeline', () => {
     assert.equal(lowOddsScan.hits[0].oddsQuoteId, 'odds-quote-1');
     assert.equal(evaluation.lowOddsScanId, 'scan-1');
     assert.equal(evaluation.counts.validations, 1);
+    assert.equal(evaluation.counts.parlayRecommendations, 1);
+    assert.equal(evaluation.parlayAnalysisDiagnostics.selected.totalStakeUnits, 1);
     assert.equal(evaluation.lowOddsPredictionCoverage.hits, 1);
     assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 1);
     assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 0);
@@ -445,7 +517,9 @@ describe('executeRunPipeline', () => {
     assert.equal(manifest.handoff.parlay, 'no-parlay-today');
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'input.json'));
     assert.ok(manifest.files.some((item: { name: string }) => item.name === 'handoff.md'));
-    assert.match(readFileSync(result.handoffPath, 'utf-8'), /handoff\.parlay: no-parlay-today/);
+    const handoff = readFileSync(result.handoffPath, 'utf-8');
+    assert.match(handoff, /handoff\.parlay: no-parlay-today/);
+    assert.match(handoff, /parlayRecommendations: 1/);
   });
 
   it('uses injected artifact exporter on successful runs', async () => {
