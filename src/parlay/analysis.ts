@@ -7,6 +7,7 @@ import { fixtureDateRange } from '../storage/repositories/helpers.js';
 export interface RunParlayAnalysisInput {
   date?: string;
   runId?: string;
+  runIds?: string[];
   top?: number;
   bankrollUnits?: number;
   /** @deprecated use bankrollUnits. Kept as a CLI/API compatibility alias for older callers. */
@@ -172,8 +173,9 @@ export async function runParlayAnalysis(
   const maxParlayExposure = clampProbability(input.maxParlayExposure ?? DEFAULT_MAX_PARLAY_EXPOSURE, 'max parlay exposure');
   const profileScope = parseProfileScope(input.profileScope);
 
-  if (!input.date && !input.runId) {
-    return { ok: false, runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope), error: 'parlay analyze requires --date YYYY-MM-DD or --run-id RUN_ID.' };
+  const analysisRunIds = normalizeRunIds(input.runIds, input.runId);
+  if (!input.date && analysisRunIds.length === 0) {
+    return { ok: false, runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope), error: 'parlay analyze requires --date YYYY-MM-DD, --run-id RUN_ID, or --run-ids RUN_ID_A,RUN_ID_B.' };
   }
   if (input.date && !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
     return { ok: false, runId, date: input.date, sourceRunId: input.runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope), error: 'parlay analyze requires --date YYYY-MM-DD.' };
@@ -194,7 +196,7 @@ export async function runParlayAnalysis(
   const artifactPath = artifactWriter(runId, 'parlay-analysis.json', {
     runId,
     date: input.date,
-    sourceRunId: input.runId,
+    sourceRunId: analysisRunIds.join(',') || input.runId,
     generatedAt: generatedAt.toISOString(),
     analyzed: candidates.length,
     rawAnalyzed: rawRows.length,
@@ -211,7 +213,7 @@ export async function runParlayAnalysis(
     ok: true,
     runId,
     date: input.date,
-    sourceRunId: input.runId,
+    sourceRunId: analysisRunIds.join(',') || input.runId,
     analyzed: candidates.length,
     top: recommendations,
     diagnostics,
@@ -221,7 +223,9 @@ export async function runParlayAnalysis(
 
 function buildParlayQuery(config: AgentConfig, input: RunParlayAnalysisInput): unknown {
   const where: Record<string, unknown> = {};
-  if (input.runId) where.runId = input.runId;
+  const runIds = normalizeRunIds(input.runIds, input.runId);
+  if (runIds.length > 1) where.runId = { in: runIds };
+  else if (runIds.length === 1) where.runId = runIds[0];
   if (input.date) {
     const window = fixtureDateRange(input.date, config.apiFootball.timezone);
     where.legs = {
@@ -263,6 +267,13 @@ function buildParlayQuery(config: AgentConfig, input: RunParlayAnalysisInput): u
     orderBy: [{ generatedAt: 'desc' }, { id: 'asc' }],
     take: 500,
   };
+}
+
+function normalizeRunIds(runIds: string[] | undefined, runId?: string): string[] {
+  return Array.from(new Set([
+    ...(runIds ?? []),
+    ...(runId ? [runId] : []),
+  ].map((item) => item.trim()).filter(Boolean)));
 }
 
 function toCandidate(row: unknown): Candidate {

@@ -152,7 +152,9 @@ describe('headless parlay command', () => {
     assert.match(output, /pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio llm/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top/);
+    assert.match(output, /pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B --portfolio low-variance/);
     assert.match(output, /pnpm gana parlay analyze --date YYYY-MM-DD --top 9 --bankroll 100 --profile-scope core/);
+    assert.match(output, /pnpm gana parlay analyze --run-ids RUN_ID_A,RUN_ID_B --top 9 --bankroll 100 --profile-scope all/);
   });
 
   it('requires a date or run id before analyzing persisted parlays', async () => {
@@ -163,7 +165,7 @@ describe('headless parlay command', () => {
 
     assert.equal(result?.ok, false);
     assert.equal(result?.exitCode, 1);
-    assert.match(result?.message ?? '', /--date YYYY-MM-DD or --run-id RUN_ID/);
+    assert.match(result?.message ?? '', /--date YYYY-MM-DD, --run-id RUN_ID, or --run-ids RUN_ID_A,RUN_ID_B/);
   });
 
   it('surfaces missing database configuration before parlay analysis', async () => {

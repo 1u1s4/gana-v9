@@ -575,9 +575,13 @@ async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: 
   }
   if (portfolio === 'llm' || portfolio === 'low-odds-top' || deterministicPortfolios.has(portfolio ?? '')) {
     const selectedPortfolio = portfolio as NonNullable<Parameters<typeof runParlayBuild>[1]['portfolio']>;
+    const sourceRunId = portfolio === 'llm'
+      ? requireStringFlag(flags, 'run-id')
+      : optionalStringFlag(flags, 'run-id');
     const input = {
       date: typeof flags.date === 'string' ? requireDateFlag(flags) : formatLocalDate(new Date()),
-      sourceRunId: requireStringFlag(flags, 'run-id'),
+      sourceRunId,
+      sourceRunIds: portfolio === 'llm' ? undefined : optionalRunIdsFlag(flags),
       portfolio: selectedPortfolio,
       configOverrides: optionalParlayConfig(flags),
     };
@@ -601,6 +605,7 @@ async function analyzeParlays(ctx: HeadlessCommandContext | CommandContext, flag
   return runParlayAnalysis(ctx.config, {
     date: optionalStringFlag(flags, 'date'),
     runId: optionalStringFlag(flags, 'run-id'),
+    runIds: optionalRunIdsFlag(flags),
     top: optionalPositiveIntegerFlag(flags, 'top'),
     bankrollUnits: optionalPositiveFloatFlag(flags, 'bankroll') ?? optionalPositiveFloatFlag(flags, 'bank'),
     maxPortfolioExposure: optionalFloatFlag(flags, 'max-portfolio-exposure'),
@@ -2072,8 +2077,10 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B --portfolio low-variance${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay analyze --date YYYY-MM-DD --top 9 --bankroll 100 --profile-scope core${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay analyze --run-ids RUN_ID_A,RUN_ID_B --top 9 --bankroll 100 --profile-scope all${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);

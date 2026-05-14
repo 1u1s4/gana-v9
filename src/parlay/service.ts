@@ -793,18 +793,18 @@ async function runDeterministicParlayProfile(
 ): Promise<ParlayBuildRunResult> {
   const runId = runtime.runId ?? randomUUID();
   runtime.runId = runId;
-  const sourceRunId = input.sourceRunId;
+  const { sourceRunId, sourceRunIds } = sourceRunScopeFor(input);
   const generatedAt = now().toISOString();
   if (!sourceRunId) {
     return blockedResult(runId, input, artifactWriter, generatedAt, {
-      error: `--run-id is required when --portfolio ${profile} is used.`,
+      error: `--run-id or --run-ids is required when --portfolio ${profile} is used.`,
       reasons: ['missing source run id'],
     });
   }
 
   const baseSpec = deterministicProfileSpec(profile);
   const records = await repositories.predictions.list({
-    runId: sourceRunId,
+    ...sourcePredictionScopeQuery(sourceRunIds),
     status: PORTFOLIO_PREDICTION_STATUSES,
     take: 500,
   });

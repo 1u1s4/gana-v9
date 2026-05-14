@@ -250,6 +250,6 @@ describe('runParlayAnalysis', () => {
     const result = await runParlayAnalysis(cfg, {}, runtime, { now: () => now });
 
     assert.equal(result.ok, false);
-    assert.match(result.error ?? '', /--date YYYY-MM-DD or --run-id RUN_ID/);
+    assert.match(result.error ?? '', /--date YYYY-MM-DD, --run-id RUN_ID, or --run-ids RUN_ID_A,RUN_ID_B/);
   });
 });
