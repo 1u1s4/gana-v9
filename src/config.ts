@@ -34,6 +34,8 @@ export interface ApiFootballFilterConfig {
   includeLiveFixtures: boolean;
   includeCompletedFixtures: boolean;
   maxFixturesPerRun: number;
+  maxProviderRequestsPerRun: number;
+  maxAgenticResearchCallsPerRun: number;
   bookmakerAllowlist?: string[];
 }
 
@@ -60,7 +62,7 @@ export interface GanaConfigExtension {
 }
 
 export interface AgentConfig extends GanaConfigExtension {
-  provider: 'codex' | 'gemini' | 'cursor' | 'openrouter';
+  provider: 'codex' | 'gemini' | 'openrouter';
   apiKey: string;
   model: string;
   name: string;
@@ -84,10 +86,6 @@ export interface AgentConfig extends GanaConfigExtension {
   geminiModelListPath: string;
   geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
   geminiSessionId?: string;
-  cursorModelListPath: string;
-  cursorTrust: boolean;
-  cursorForce: boolean;
-  cursorSessionId?: string;
 }
 
 export type AppConfig = AgentConfig;
@@ -131,6 +129,22 @@ function isCodexSandbox(value: unknown): value is AgentConfig['codexSandbox'] {
 
 function isGeminiApprovalMode(value: unknown): value is AgentConfig['geminiApprovalMode'] {
   return value === 'default' || value === 'auto_edit' || value === 'yolo' || value === 'plan';
+}
+
+const SUPPORTED_AGENT_PROVIDERS = ['codex', 'gemini', 'openrouter'] as const;
+
+function parseAgentProvider(value: unknown, source: string): AgentConfig['provider'] | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (SUPPORTED_AGENT_PROVIDERS.includes(value as AgentConfig['provider'])) {
+    return value as AgentConfig['provider'];
+  }
+  if (value === 'cursor') {
+    throw new Error(`Cursor provider has been removed. Use ${SUPPORTED_AGENT_PROVIDERS.join(', ')} for ${source}.`);
+  }
+  if (typeof value === 'string') {
+    throw new Error(`Unsupported agent provider "${value}" in ${source}. Use ${SUPPORTED_AGENT_PROVIDERS.join(', ')}.`);
+  }
+  throw new Error(`Invalid agent provider in ${source}. Use ${SUPPORTED_AGENT_PROVIDERS.join(', ')}.`);
 }
 
 function parseMarkets(value: string | undefined): MarketKey[] | undefined {
@@ -224,6 +238,8 @@ const DEFAULTS: AgentConfig = {
     includeLiveFixtures: false,
     includeCompletedFixtures: false,
     maxFixturesPerRun: 80,
+    maxProviderRequestsPerRun: 500,
+    maxAgenticResearchCallsPerRun: 80,
   },
   browserUse: {
     apiKey: '',
@@ -275,9 +291,6 @@ const DEFAULTS: AgentConfig = {
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
   geminiApprovalMode: 'default',
-  cursorModelListPath: 'config/cursor-models.json',
-  cursorTrust: false,
-  cursorForce: false,
 };
 
 export function loadConfig(
@@ -293,7 +306,9 @@ export function loadConfig(
 
   const configPath = resolve('agent.config.json');
   if (existsSync(configPath)) {
-    const file = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<AgentConfig>;
+    const file = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<AgentConfig> & { provider?: unknown };
+    const { provider, ...fileConfig } = file;
+    const fileProvider = parseAgentProvider(provider, 'agent.config.json');
     if (file.display) {
       config.display = { ...config.display, ...file.display };
     }
@@ -303,7 +318,14 @@ export function loadConfig(
     if (file.browserUse) {
       config.browserUse = mergeBrowserUseConfig(config.browserUse, file.browserUse);
     }
-    config = { ...config, ...file, display: config.display, apiFootball: config.apiFootball, browserUse: config.browserUse };
+    config = {
+      ...config,
+      ...fileConfig,
+      ...(fileProvider && { provider: fileProvider }),
+      display: config.display,
+      apiFootball: config.apiFootball,
+      browserUse: config.browserUse,
+    };
   }
 
   if (process.env.OPENROUTER_API_KEY) config.apiKey = process.env.OPENROUTER_API_KEY;
@@ -317,14 +339,7 @@ export function loadConfig(
   if (config.profile === 'full-permissions' && !process.env.GANA_APPROVAL_MODE) {
     config.approvalMode = 'auto-grant';
   }
-  if (
-    process.env.AGENT_PROVIDER === 'codex'
-    || process.env.AGENT_PROVIDER === 'gemini'
-    || process.env.AGENT_PROVIDER === 'cursor'
-    || process.env.AGENT_PROVIDER === 'openrouter'
-  ) {
-    config.provider = process.env.AGENT_PROVIDER;
-  }
+  config.provider = parseAgentProvider(process.env.AGENT_PROVIDER, 'AGENT_PROVIDER') ?? config.provider;
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
   if (process.env.AGENT_FAST_MODE === 'true') config.fastMode = true;
   if (process.env.AGENT_NATIVE_WEB_SEARCH === 'true') config.nativeWebSearch = true;
@@ -370,19 +385,12 @@ export function loadConfig(
   if (isGeminiApprovalMode(process.env.AGENT_GEMINI_APPROVAL_MODE)) {
     config.geminiApprovalMode = process.env.AGENT_GEMINI_APPROVAL_MODE;
   }
-  if (process.env.CURSOR_MODEL_LIST_PATH) config.cursorModelListPath = process.env.CURSOR_MODEL_LIST_PATH;
-  {
-    const envCursorTrust = parseBoolean(process.env.AGENT_CURSOR_TRUST);
-    if (envCursorTrust !== undefined) config.cursorTrust = envCursorTrust;
-  }
-  {
-    const envCursorForce = parseBoolean(process.env.AGENT_CURSOR_FORCE);
-    if (envCursorForce !== undefined) config.cursorForce = envCursorForce;
-  }
 
   const envSeason = parseNumber(process.env.GANA_DEFAULT_SEASON);
   const envThreshold = parseNumber(process.env.GANA_LOW_ODDS_THRESHOLD);
   const envMaxFixtures = parseNumber(process.env.GANA_MAX_FIXTURES_PER_RUN);
+  const envMaxProviderRequests = parseNumber(process.env.GANA_MAX_PROVIDER_REQUESTS_PER_RUN);
+  const envMaxAgenticResearchCalls = parseNumber(process.env.GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN);
   const envWindow = parseNumber(process.env.GANA_KICKOFF_WINDOW_HOURS);
   const envTimezone = process.env.GANA_FIXTURE_TIMEZONE || process.env.GANA_TIMEZONE;
   const envLeaguePresetsPath = process.env.GANA_LEAGUE_PRESETS_PATH;
@@ -397,6 +405,8 @@ export function loadConfig(
     ...(envSeason !== undefined && { defaultSeason: envSeason, defaultSeasonInferred: false }),
     ...(envThreshold !== undefined && { lowOddsThreshold: envThreshold }),
     ...(envMaxFixtures !== undefined && { maxFixturesPerRun: envMaxFixtures }),
+    ...(envMaxProviderRequests !== undefined && envMaxProviderRequests > 0 && { maxProviderRequestsPerRun: envMaxProviderRequests }),
+    ...(envMaxAgenticResearchCalls !== undefined && envMaxAgenticResearchCalls > 0 && { maxAgenticResearchCallsPerRun: envMaxAgenticResearchCalls }),
     ...(envWindow !== undefined && { kickoffWindowHours: envWindow }),
     ...(envTimezone && { timezone: envTimezone }),
     ...(envLeaguePresetsPath && { leaguePresetsPath: envLeaguePresetsPath }),
@@ -418,7 +428,16 @@ export function loadConfig(
   if (overrides.browserUse) {
     config.browserUse = mergeBrowserUseConfig(config.browserUse, overrides.browserUse);
   }
-  config = { ...config, ...overrides, display: config.display, apiFootball: config.apiFootball, browserUse: config.browserUse };
+  const overrideProvider = parseAgentProvider((overrides as { provider?: unknown }).provider, 'config overrides');
+  const { provider: _overrideProvider, ...safeOverrides } = overrides;
+  config = {
+    ...config,
+    ...safeOverrides,
+    ...(overrideProvider && { provider: overrideProvider }),
+    display: config.display,
+    apiFootball: config.apiFootball,
+    browserUse: config.browserUse,
+  };
   if (config.profile === 'full-permissions' && !overrides.approvalMode && !process.env.GANA_APPROVAL_MODE) {
     config.approvalMode = 'auto-grant';
   }
@@ -432,10 +451,6 @@ export function loadConfig(
   }
   if (config.provider === 'gemini' && validateAgentAuth && !existsSync(resolve(config.geminiHome, 'oauth_creds.json'))) {
     throw new Error(`Gemini auth not found at ${resolve(config.geminiHome, 'oauth_creds.json')}. Run "gemini" and complete login first.`);
-  }
-  if (config.provider === 'cursor' && validateAgentAuth) {
-    const ok = existsSync(resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json'));
-    if (!ok) throw new Error('Cursor Agent auth/config not found. Run "cursor-agent login" first.');
   }
   return config;
 }

@@ -17,8 +17,7 @@
     "db:status": "tsx src/cli.ts db status",
     "dashboard": "tsx src/cli.ts dashboard",
     "update:codex-models": "tsx scripts/update-codex-models.ts",
-    "update:gemini-models": "tsx scripts/update-gemini-models.ts",
-    "update:cursor-models": "tsx scripts/update-cursor-models.ts"
+    "update:gemini-models": "tsx scripts/update-gemini-models.ts"
   },
   "keywords": [
     "agent",

@@ -12,6 +12,10 @@ export interface RuntimeContext {
   providerSports: 'api-football';
   model: string;
   databaseUrl?: string;
+  providerRequestCount?: number;
+  providerRequestLimit?: number;
+  agenticResearchCallCount?: number;
+  agenticResearchCallLimit?: number;
 }
 
 export function createRuntimeContext(config: AgentConfig, sessionPath: string): RuntimeContext {
@@ -24,6 +28,10 @@ export function createRuntimeContext(config: AgentConfig, sessionPath: string): 
     providerSports: 'api-football',
     model: config.model,
     databaseUrl: config.databaseUrl,
+    providerRequestCount: 0,
+    providerRequestLimit: config.apiFootball.maxProviderRequestsPerRun,
+    agenticResearchCallCount: 0,
+    agenticResearchCallLimit: config.apiFootball.maxAgenticResearchCallsPerRun,
   };
 }
 
@@ -41,6 +49,10 @@ export function updateRuntimeContext(
     providerSports: 'api-football' as const,
     model: config.model,
     databaseUrl: config.databaseUrl,
+    providerRequestCount: context.providerRequestCount ?? 0,
+    providerRequestLimit: config.apiFootball.maxProviderRequestsPerRun,
+    agenticResearchCallCount: context.agenticResearchCallCount ?? 0,
+    agenticResearchCallLimit: config.apiFootball.maxAgenticResearchCallsPerRun,
     ...patch,
   });
   return context;

@@ -43,6 +43,12 @@ export interface ParlayAnalysisRecommendation {
   adjustedProbability: number;
   expectedEdge: number;
   score: number;
+  exposure: {
+    units: number;
+    percentOfAnalyticalBankroll: number;
+    policy: string;
+  };
+  /** @deprecated use exposure. Kept for CLI/API compatibility with older artifacts. */
   stake: {
     units: number;
     percentOfBankroll: number;
@@ -89,6 +95,13 @@ export interface ParlayAnalysisDiagnostics {
   rawAnalyzed: number;
   profileScopedAnalyzed: number;
   cohortSourceRunId?: string;
+  exposurePolicy: {
+    analyticalUnits: number;
+    maxPortfolioExposure: number;
+    maxParlayExposure: number;
+    unitLabel: 'analytical-units';
+  };
+  /** @deprecated use exposurePolicy. Kept for compatibility with existing artifacts/tests. */
   bankrollPolicy: {
     bankrollUnits: number;
     maxPortfolioStake: number;
@@ -114,6 +127,8 @@ export interface ParlayAnalysisDiagnostics {
     hitRate: number | null;
     totalStakeUnits: number;
     totalStakePercentOfBankroll: number;
+    totalExposureUnits: number;
+    totalExposurePercent: number;
   };
   rejected: Array<{ parlayId: string; reasons: string[] }>;
 }
@@ -190,6 +205,7 @@ export async function runParlayAnalysis(
   const profileCandidates = profileRows.map(toCandidate);
   const cohort = selectCandidatesForAnalysis(profileCandidates, profileScope);
   const candidates = cohort.candidates.sort((a, b) => b.score - a.score || a.combinedOdds - b.combinedOdds);
+  markDuplicateLegSetRejections(candidates);
   const eligible = candidates.filter((candidate) => !candidate.rejectedReasons.length).slice(0, top);
   const recommendations = allocateStake(eligible, bankrollUnits, maxPortfolioExposure, maxParlayExposure);
   const diagnostics = buildDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope, rawRows.length, profileRows.length, cohort.sourceRunId, candidates, recommendations);
@@ -308,6 +324,30 @@ function toCandidate(row: unknown): Candidate {
     legs,
     rejectedReasons,
   };
+}
+
+function markDuplicateLegSetRejections(candidates: Candidate[]): void {
+  const seenEligible = new Set<string>();
+  for (const candidate of candidates) {
+    if (candidate.rejectedReasons.length) continue;
+    const signature = candidateLegSetSignature(candidate);
+    if (!signature) continue;
+    if (seenEligible.has(signature)) {
+      candidate.rejectedReasons.push('duplicate parlay leg set across source runs');
+      candidate.riskFlags = [...new Set([...candidate.riskFlags, 'duplicate-leg-set'])];
+      candidate.reasons = [...candidate.reasons, 'risk flags: duplicate-leg-set'];
+      continue;
+    }
+    seenEligible.add(signature);
+  }
+}
+
+function candidateLegSetSignature(candidate: Candidate): string {
+  return candidate.legs
+    .map((leg) => leg.predictionId)
+    .filter(Boolean)
+    .sort()
+    .join('|');
 }
 
 function toLeg(leg: any): ParlayAnalysisLeg {
@@ -464,6 +504,11 @@ function allocateStake(candidates: Candidate[], bankrollUnits: number, maxPortfo
       adjustedProbability: candidate.adjustedProbability,
       expectedEdge: round(candidate.expectedEdge, 6),
       score: candidate.score,
+      exposure: {
+        units: round(bankrollUnits * percent, 4),
+        percentOfAnalyticalBankroll: percent,
+        policy: 'fractional-kelly-capped-analytical-exposure',
+      },
       stake: {
         units: round(bankrollUnits * percent, 4),
         percentOfBankroll: percent,
@@ -509,6 +554,12 @@ function buildDiagnostics(
     rawAnalyzed,
     profileScopedAnalyzed,
     ...(cohortSourceRunId ? { cohortSourceRunId } : {}),
+    exposurePolicy: {
+      analyticalUnits: bankrollUnits,
+      maxPortfolioExposure,
+      maxParlayExposure,
+      unitLabel: 'analytical-units',
+    },
     bankrollPolicy: {
       bankrollUnits,
       maxPortfolioStake: maxPortfolioExposure,
@@ -520,6 +571,8 @@ function buildDiagnostics(
       ...summarizeStatuses(recommendations.map((recommendation) => recommendation.validationStatus)),
       totalStakeUnits: round(recommendations.reduce((sum, recommendation) => sum + recommendation.stake.units, 0), 4),
       totalStakePercentOfBankroll: round(recommendations.reduce((sum, recommendation) => sum + recommendation.stake.percentOfBankroll, 0), 6),
+      totalExposureUnits: round(recommendations.reduce((sum, recommendation) => sum + recommendation.exposure.units, 0), 4),
+      totalExposurePercent: round(recommendations.reduce((sum, recommendation) => sum + recommendation.exposure.percentOfAnalyticalBankroll, 0), 6),
     },
     rejected: candidates
       .filter((candidate) => candidate.rejectedReasons.length)
@@ -560,9 +613,10 @@ function emptyDiagnostics(
     profileScope,
     rawAnalyzed: 0,
     profileScopedAnalyzed: 0,
+    exposurePolicy: { analyticalUnits: bankrollUnits, maxPortfolioExposure, maxParlayExposure, unitLabel: 'analytical-units' },
     bankrollPolicy: { bankrollUnits, maxPortfolioStake: maxPortfolioExposure, maxParlayStake: maxParlayExposure, unitLabel: 'analytical-units' },
     universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null },
-    selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0 },
+    selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 },
     rejected: [],
   };
 }

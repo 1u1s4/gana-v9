@@ -73,12 +73,11 @@ type ModelInfo = {
 
 type Provider = AgentProviderCompat;
 
-const PROVIDERS: Provider[] = ['codex', 'gemini', 'cursor', 'openrouter'];
+const PROVIDERS: Provider[] = ['codex', 'gemini', 'openrouter'];
 
 const PROVIDER_DEFAULT_MODELS: Record<Provider, string[]> = {
   codex: [...AGENT_PROVIDER_DEFAULT_MODELS.codex],
   gemini: [...AGENT_PROVIDER_DEFAULT_MODELS.gemini],
-  cursor: [...AGENT_PROVIDER_DEFAULT_MODELS.cursor],
   openrouter: [...AGENT_PROVIDER_DEFAULT_MODELS.openrouter],
 };
 
@@ -238,26 +237,9 @@ function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
     .map((id) => ({ id, name: names.get(id) ?? id }));
 }
 
-function loadCursorModels(ctx: CommandContext): ModelInfo[] {
-  const path = resolve(ctx.config.cursorModelListPath);
-  if (!existsSync(path)) return [];
-
-  const raw = JSON.parse(readFileSync(path, 'utf-8')) as { models?: unknown };
-  const models = raw.models;
-  if (!Array.isArray(models)) return [];
-
-  return models
-    .map((model: any) => ({
-      id: String(model.id ?? model.modelId ?? ''),
-      name: String(model.name ?? model.displayName ?? model.id ?? ''),
-    }))
-    .filter((model) => model.id);
-}
-
 function loadProviderModels(ctx: CommandContext): ModelInfo[] {
   if (ctx.config.provider === 'codex') return loadCodexModels(ctx);
   if (ctx.config.provider === 'gemini') return loadGeminiModels(ctx);
-  if (ctx.config.provider === 'cursor') return loadCursorModels(ctx);
   return [];
 }
 
@@ -287,7 +269,6 @@ function saveAgentCommandEvent(ctx: CommandContext, type: string, payload: Recor
     sessionPath: ctx.sessionPath,
     codexThreadId: redactProviderSessionId(ctx.config.codexThreadId) ?? null,
     geminiSessionId: redactProviderSessionId(ctx.config.geminiSessionId) ?? null,
-    cursorSessionId: redactProviderSessionId(ctx.config.cursorSessionId) ?? null,
     payload,
   };
   saveSessionEvent(ctx.sessionPath, event);
@@ -300,9 +281,6 @@ function providerCatalogHint(ctx: CommandContext): { path?: string; script?: str
   }
   if (ctx.config.provider === 'gemini') {
     return { path: resolve(ctx.config.geminiModelListPath), script: 'npm run update:gemini-models' };
-  }
-  if (ctx.config.provider === 'cursor') {
-    return { path: resolve(ctx.config.cursorModelListPath), script: 'npm run update:cursor-models' };
   }
   return {};
 }
@@ -862,15 +840,15 @@ function printParlayAnalysisResult(result: ParlayAnalysisRunResult): void {
   if (result.diagnostics.rawAnalyzed !== result.analyzed) printKeyValue('rawAnalyzed', result.diagnostics.rawAnalyzed);
   if (result.diagnostics.profileScopedAnalyzed !== result.analyzed) printKeyValue('profileScopedAnalyzed', result.diagnostics.profileScopedAnalyzed);
   if (result.diagnostics.cohortSourceRunId) printKeyValue('cohortSourceRunId', result.diagnostics.cohortSourceRunId);
-  printKeyValue('bankrollPolicy', `${result.diagnostics.bankrollPolicy.bankrollUnits} analytical units, max portfolio stake ${(result.diagnostics.bankrollPolicy.maxPortfolioStake * 100).toFixed(2)}%`);
+  printKeyValue('exposurePolicy', `${result.diagnostics.exposurePolicy.analyticalUnits} analytical units, max portfolio exposure ${(result.diagnostics.exposurePolicy.maxPortfolioExposure * 100).toFixed(2)}%`);
   printKeyValue('universeHitRate', result.diagnostics.universe.hitRate === null ? 'n/a' : `${(result.diagnostics.universe.hitRate * 100).toFixed(1)}%`);
   printKeyValue('selectedHitRate', result.diagnostics.selected.hitRate === null ? 'n/a' : `${(result.diagnostics.selected.hitRate * 100).toFixed(1)}%`);
-  printKeyValue('selectedStakeUnits', result.diagnostics.selected.totalStakeUnits);
+  printKeyValue('selectedExposureUnits', result.diagnostics.selected.totalExposureUnits);
   if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
   if (result.error) console.log(`  ${DIM}reason:${RESET} ${CYAN}${result.error}${RESET}`);
   for (const recommendation of result.top) {
     const banker = recommendation.bankerLegs.length ? ` bankerLegs:${recommendation.bankerLegs.length}` : '';
-    console.log(`  ${CYAN}#${recommendation.rank}${RESET} ${recommendation.parlayId} ${DIM}${recommendation.profile} ${recommendation.validationStatus}${RESET} odds:${recommendation.combinedOdds} stake:${recommendation.stake.units}${banker}`);
+    console.log(`  ${CYAN}#${recommendation.rank}${RESET} ${recommendation.parlayId} ${DIM}${recommendation.profile} ${recommendation.validationStatus}${RESET} odds:${recommendation.combinedOdds} exposure:${recommendation.exposure.units}${banker}`);
   }
 }
 
@@ -1048,8 +1026,6 @@ function printSessionStatus(ctx: CommandContext): void {
     codexAuthConfigured: existsSync(resolve(ctx.config.codexHome, 'auth.json')),
     geminiAuthPath: resolve(ctx.config.geminiHome, 'oauth_creds.json'),
     geminiAuthConfigured: existsSync(resolve(ctx.config.geminiHome, 'oauth_creds.json')),
-    cursorAuthPath: resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json'),
-    cursorAuthConfigured: existsSync(resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json')),
     openrouterConfigured: Boolean(ctx.config.apiKey || process.env.OPENROUTER_API_KEY),
   });
   printKeyValue('sessionPath', ctx.sessionPath);
@@ -1060,7 +1036,6 @@ function printSessionStatus(ctx: CommandContext): void {
   printKeyValue('model', ctx.config.model);
   printKeyValue('codexThreadId', redactProviderSessionId(ctx.config.codexThreadId) ?? 'none');
   printKeyValue('geminiSessionId', redactProviderSessionId(ctx.config.geminiSessionId) ?? 'none');
-  printKeyValue('cursorSessionId', redactProviderSessionId(ctx.config.cursorSessionId) ?? 'none');
   printKeyValue('nativeWebSearch', ctx.config.nativeWebSearch ? `${ctx.config.nativeWebSearchMode} available` : 'off');
   printKeyValue('profile', ctx.config.profile);
   printKeyValue('approvalMode', ctx.config.approvalMode);
@@ -1166,7 +1141,6 @@ function applyProfile(profile: AgentConfig['profile'], ctx: Pick<CommandContext,
 function providerReady(ctx: CommandContext, provider: Provider): boolean {
   if (provider === 'codex') return existsSync(resolve(ctx.config.codexHome, 'auth.json'));
   if (provider === 'gemini') return existsSync(resolve(ctx.config.geminiHome, 'oauth_creds.json'));
-  if (provider === 'cursor') return existsSync(resolve(process.env.HOME ?? '', '.cursor', 'cli-config.json'));
   return Boolean(ctx.config.apiKey || process.env.OPENROUTER_API_KEY);
 }
 
@@ -1187,36 +1161,10 @@ function resetProviderSession(ctx: CommandContext): void {
   ctx.messages.length = 0;
   ctx.config.codexThreadId = undefined;
   ctx.config.geminiSessionId = undefined;
-  ctx.config.cursorSessionId = undefined;
   ctx.config.fastMode = false;
   ctx.config.reasoningEffort = undefined;
   ctx.sessionPath = ctx.resetSession();
   updateRuntimeContext(ctx.runtime, ctx.config, { sessionPath: ctx.sessionPath });
-}
-
-function findCursorVariant(models: ModelInfo[], current: string, suffix: string): string | undefined {
-  const withoutReasoning = current
-    .replace(/-(low|medium|high|xhigh|extra-high)(-fast)?$/, '$2')
-    .replace(/--/, '-');
-  const candidates = [
-    `${withoutReasoning}-${suffix}`,
-    current.replace(/-(low|medium|high|xhigh|extra-high)(-fast)?$/, `-${suffix}$2`),
-    current.replace(/-fast$/, `-${suffix}-fast`),
-  ];
-
-  return candidates.find((id) => models.some((model) => model.id === id));
-}
-
-function findCursorFastVariant(models: ModelInfo[], current: string, enabled: boolean): string | undefined {
-  if (enabled) {
-    if (current.endsWith('-fast')) return current;
-    const candidates = [`${current}-fast`, current.replace(/-(low|medium|high|xhigh|extra-high)$/, '-$1-fast')];
-    return candidates.find((id) => models.some((model) => model.id === id));
-  }
-
-  if (!current.endsWith('-fast')) return current;
-  const regular = current.replace(/-fast$/, '');
-  return models.some((model) => model.id === regular) ? regular : undefined;
 }
 
 async function loadOpenRouterModels() {
@@ -1227,7 +1175,7 @@ async function loadOpenRouterModels() {
 
 commands.push({
   name: '/provider',
-  description: 'Switch provider: codex, gemini, cursor, openrouter',
+  description: 'Switch provider: codex, gemini, openrouter',
   execute: async (args, ctx) => {
     const next = args.trim().toLowerCase() as Provider | '';
 
@@ -1237,12 +1185,12 @@ commands.push({
         const ready = providerReady(ctx, provider) ? 'ready' : 'not configured';
         console.log(`  ${DIM}${marker}${RESET} ${CYAN}${provider.padEnd(10)}${RESET}${DIM}${providerLabel(provider)} · ${ready}${RESET}`);
       }
-      console.log(`\n  ${DIM}Usage:${RESET} ${CYAN}/provider codex|gemini|cursor|openrouter${RESET}`);
+      console.log(`\n  ${DIM}Usage:${RESET} ${CYAN}/provider codex|gemini|openrouter${RESET}`);
       return;
     }
 
     if (!PROVIDERS.includes(next)) {
-      console.log(`  ${YELLOW}!${RESET} ${DIM}Unknown provider "${next}". Use codex, gemini, cursor, or openrouter.${RESET}`);
+      console.log(`  ${YELLOW}!${RESET} ${DIM}Unknown provider "${next}". Use codex, gemini, or openrouter.${RESET}`);
       return;
     }
 
@@ -1331,19 +1279,6 @@ commands.push({
       return;
     }
 
-    if (ctx.config.provider === 'cursor') {
-      const target = findCursorFastVariant(models, ctx.config.model, next);
-      if (!target) {
-        console.log(`  ${YELLOW}!${RESET} ${DIM}No ${next ? 'fast' : 'regular'} variant found for ${ctx.config.model}.${RESET}`);
-        return;
-      }
-      ctx.config.model = target;
-      ctx.config.fastMode = next;
-      syncRuntime(ctx);
-      console.log(`  ${GREEN}✓${RESET} ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
-      return;
-    }
-
     console.log(`  ${YELLOW}!${RESET} ${DIM}/fast is not supported for provider "${ctx.config.provider}".${RESET}`);
   },
 });
@@ -1369,20 +1304,6 @@ commands.push({
       ctx.config.reasoningEffort = effort;
       syncRuntime(ctx);
       console.log(`  ${GREEN}✓${RESET} ${DIM}Codex reasoning →${RESET} ${CYAN}${effort}${RESET}`);
-      return;
-    }
-
-    if (ctx.config.provider === 'cursor') {
-      const suffix = effort === 'xhigh' ? 'xhigh' : effort;
-      const target = findCursorVariant(models, ctx.config.model, suffix);
-      if (!target) {
-        console.log(`  ${YELLOW}!${RESET} ${DIM}No Cursor model variant found for reasoning "${effort}" from ${ctx.config.model}.${RESET}`);
-        return;
-      }
-      ctx.config.model = target;
-      ctx.config.reasoningEffort = effort;
-      syncRuntime(ctx);
-      console.log(`  ${GREEN}✓${RESET} ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
       return;
     }
 

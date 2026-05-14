@@ -51,7 +51,7 @@ Ejecucion manual con env vars reales. No corre por defecto en CI ni local:
 
 - `API_FOOTBALL_KEY`
 - `DATABASE_URL`
-- auth local de Codex/Gemini/Cursor segun `AGENT_PROVIDER`; para `openrouter`, `OPENROUTER_API_KEY`.
+- auth local de Codex/Gemini segun `AGENT_PROVIDER`; para `openrouter`, `OPENROUTER_API_KEY`.
 
 La fecha debe ser absoluta para evitar flakiness y proteger la cuota de API-Football. El primer run productivo debe limitar fixtures explicitamente:
 
@@ -90,7 +90,7 @@ Un verdict `blocked` impide promover el run. Un verdict `review-required` se per
 
 1. `pnpm gana` abre TUI.
 2. TUI muestra provider agentic, modelo, perfil, API-Football status, DB status y filtros.
-3. `/provider` cambia entre Codex, Gemini y Cursor cuando estan autenticados.
+3. `/provider` cambia entre Codex, Gemini y OpenRouter cuando estan configurados.
 4. `/model` lista modelos del provider activo.
 5. `/web live` exige web search nativo en research.
 6. `/profile full-permissions` activa autoautorizacion auditada.

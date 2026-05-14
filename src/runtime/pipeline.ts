@@ -297,6 +297,8 @@ export async function executeRunPipeline(
     kickoffWindowHours: config.apiFootball.kickoffWindowHours,
     includeLiveFixtures: config.apiFootball.includeLiveFixtures,
     includeCompletedFixtures: config.apiFootball.includeCompletedFixtures,
+    maxProviderRequestsPerRun: config.apiFootball.maxProviderRequestsPerRun,
+    maxAgenticResearchCallsPerRun: config.apiFootball.maxAgenticResearchCallsPerRun,
   };
   writeJsonArtifact(config, runId, 'filters.json', filtersPayload);
   steps.push({ name: 'apply filters', ok: true, verdict: 'promotable', warnings: [] });
@@ -503,12 +505,18 @@ export async function executeRunPipeline(
   const selectedFixtureLimit = Math.max(1, config.apiFootball.maxFixturesPerRun);
   const selectedFixtures = localDateSelectedFixtures.slice(0, selectedFixtureLimit);
   const selectionCapped = localDateSelectedFixtures.length > selectedFixtures.length;
+  const agenticFixtureLimit = Math.max(1, config.apiFootball.maxAgenticResearchCallsPerRun);
+  const agenticFixtures = selectedFixtures.slice(0, agenticFixtureLimit);
+  const agenticCapped = selectedFixtures.length > agenticFixtures.length;
   const selectedFixtureWarnings = [
     ...(localDateExcludedFixtures > 0
       ? [`excluded ${localDateExcludedFixtures} fixtures outside local date ${input.date} in timezone ${config.apiFootball.timezone}`]
       : []),
     ...(selectionCapped
       ? [`selected fixtures capped from ${localDateSelectedFixtures.length} to ${selectedFixtures.length} by maxFixturesPerRun=${selectedFixtureLimit}`]
+      : []),
+    ...(agenticCapped
+      ? [`agentic fixture calls capped from ${selectedFixtures.length} to ${agenticFixtures.length} by maxAgenticResearchCallsPerRun=${agenticFixtureLimit}`]
       : []),
   ];
   const fixtureSelection = {
@@ -518,8 +526,11 @@ export async function executeRunPipeline(
     localDateEligibleFixtures: localDateSelectedFixtures.length,
     localDateExcludedFixtures,
     selectedFixtures: selectedFixtures.length,
+    agenticFixtures: agenticFixtures.length,
     maxFixturesPerRun: selectedFixtureLimit,
+    maxAgenticResearchCallsPerRun: agenticFixtureLimit,
     capped: selectionCapped,
+    agenticCapped,
     warnings: selectedFixtureWarnings,
   };
   writeJsonArtifact(config, runId, 'selected-fixtures.json', {
@@ -530,6 +541,7 @@ export async function executeRunPipeline(
       scheduledAt: fixture.scheduledAt,
       status: fixture.status,
       includedByFilters: fixture.includedByFilters,
+      agenticIncluded: agenticFixtures.some((item) => item.id === fixture.id),
     })),
   });
   steps.push({
@@ -549,8 +561,9 @@ export async function executeRunPipeline(
   });
 
   const researchPayload = await runDurableTask('research.fixture', 'research-results.json', async () => {
-    const results = await mapWithConcurrency(selectedFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
+    const results = await mapWithConcurrency(agenticFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
       try {
+        runtime.agenticResearchCallCount = (runtime.agenticResearchCallCount ?? 0) + 1;
         return await withAbortableTimeout(
           (signal) => retryStorageConnection(() => (deps.researchFixture ?? runFixtureResearch)(isolatedAgentConfig(config), {
             fixtureId: fixture.providerFixtureId,
@@ -575,13 +588,13 @@ export async function executeRunPipeline(
     verdict: result.gateResult.verdict,
     warnings: [...gateWarnings(result.gateResult), ...(result.error ? [result.error] : [])],
     artifactPath: result.artifactPath,
-  })), selectedFixtures.length));
+    })), agenticFixtures.length));
   const webSearch = summarizeResearchWebSearch(research, input.web ?? defaultWebMode(config));
   writeStepSpan(config, runtime, 'research.web_search', 'retrieval', webSearch.required && webSearch.realWebSourceCount === 0 ? 'blocked' : 'ok', webSearch);
   writeStepSpan(config, runtime, 'research.agent_call', 'llm', research.some((item) => item.ok) ? 'ok' : 'blocked', research);
 
   const scoringPayload = await runDurableTask('score.fixture', 'scoring-results.json', async () => {
-    const results = await mapWithConcurrency(selectedFixtures, SCORING_CONCURRENCY, async (fixture) => {
+    const results = await mapWithConcurrency(agenticFixtures, SCORING_CONCURRENCY, async (fixture) => {
       try {
         return await withAbortableTimeout(
           (signal) => retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(isolatedAgentConfig(config), {
@@ -602,7 +615,7 @@ export async function executeRunPipeline(
     return payload;
   });
   const scoring: FixtureScoringResult[] = scoringPayload.results;
-  const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring, selectedFixtures);
+  const lowOddsPredictionCoverage = buildLowOddsPredictionCoverage(lowOddsScan, scoring, agenticFixtures);
   writeJsonArtifact(config, runId, 'low-odds-coverage-audit.json', {
     ...lowOddsPredictionCoverage,
     semanticLowOddsTargets: lowOddsPredictionCoverage.uniqueHitOddsQuoteIds,
@@ -617,7 +630,7 @@ export async function executeRunPipeline(
     verdict: result.gateResult.verdict,
     warnings: [...gateWarnings(result.gateResult), ...(result.error ? [result.error] : [])],
     artifactPath: result.artifactPath,
-  })), selectedFixtures.length);
+  })), agenticFixtures.length);
   if (!lowOddsPredictionCoverage.complete) {
     scoreStep.verdict = scoreStep.verdict === 'blocked' ? 'blocked' : 'review-required';
     scoreStep.warnings.push(
@@ -654,8 +667,8 @@ export async function executeRunPipeline(
   }
   steps.push({
     name: 'build parlay',
-    ok: parlay.ok || selectedFixtures.length < 2,
-    verdict: selectedFixtures.length < 2 && parlay.gateResult.verdict === 'blocked'
+    ok: parlay.ok || agenticFixtures.length < 2,
+    verdict: agenticFixtures.length < 2 && parlay.gateResult.verdict === 'blocked'
       ? 'review-required'
       : parlay.gateResult.verdict,
     warnings: [...gateWarnings(parlay.gateResult), ...(parlay.error ? [parlay.error] : [])],
@@ -737,6 +750,9 @@ export async function executeRunPipeline(
     counts: {
       fixtures: fixtureDiscovery.fixtures.length,
       selectedFixtures: selectedFixtures.length,
+      agenticFixtures: agenticFixtures.length,
+      providerRequests: runtime.providerRequestCount ?? null,
+      agenticResearchCalls: runtime.agenticResearchCallCount ?? null,
       oddsQuotes: quoteCount,
       lowOddsHits: lowOddsScan.hitCount,
       research: research.length,
@@ -1593,6 +1609,12 @@ function blockedParlayAnalysisResult(config: AgentConfig, runId: string, date: s
     profileScope: 'core' as const,
     rawAnalyzed: 0,
     profileScopedAnalyzed: 0,
+    exposurePolicy: {
+      analyticalUnits: 100,
+      maxPortfolioExposure: 0.08,
+      maxParlayExposure: 0.025,
+      unitLabel: 'analytical-units' as const,
+    },
     bankrollPolicy: {
       bankrollUnits: 100,
       maxPortfolioStake: 0.08,
@@ -1600,7 +1622,7 @@ function blockedParlayAnalysisResult(config: AgentConfig, runId: string, date: s
       unitLabel: 'analytical-units' as const,
     },
     universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null },
-    selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0 },
+    selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 },
     rejected: [],
   };
   const artifactPath = writeArtifact(config, runId, 'parlay-analysis-blocked.json', {
@@ -1679,7 +1701,6 @@ function isolatedAgentConfig(config: AgentConfig): AgentConfig {
     ...config,
     codexThreadId: undefined,
     geminiSessionId: undefined,
-    cursorSessionId: undefined,
   };
 }
 

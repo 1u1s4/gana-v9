@@ -3,7 +3,7 @@
 **Estado:** borrador canónico actualizado  
 **Fecha:** 2026-04-25  
 **Owner:** Luis / Jo  
-**Alcance:** requisitos de producto y sistema para Gana v9 como harness operativo completamente basado en TUI, conectado desde el inicio a API-Football, persistido en base de datos durable en DigitalOcean y asistido por Codex CLI, Gemini CLI y Cursor Agent.
+**Alcance:** requisitos de producto y sistema para Gana v9 como harness operativo completamente basado en TUI, conectado desde el inicio a API-Football, persistido en base de datos durable en DigitalOcean y asistido por Codex CLI y Gemini CLI.
 
 ---
 
@@ -20,7 +20,7 @@ Esto significa que:
 - API-Football es el proveedor deportivo obligatorio desde el inicio.
 - DigitalOcean DB es parte del backend inicial, no un agregado posterior.
 - La TUI es el centro de operación principal.
-- Codex CLI, Gemini CLI y Cursor Agent son los proveedores agentic principales.
+- Codex CLI y Gemini CLI son los proveedores agentic principales.
 - La operación debe ser auditable mediante runs, eventos, evidence packs, snapshots y registros en DB.
 - Los filtros de búsqueda deportiva deben existir desde el inicio para ligas, equipos, mercados y cuotas.
 - El sistema no debe ejecutar apuestas monetarias ni conectarse a casas de apuestas para colocar jugadas. Los parlays y predicciones son artifacts analíticos.
@@ -107,7 +107,6 @@ El sistema debe usar proveedores agentic locales ya autenticados mediante CLI:
 
 - Codex CLI;
 - Gemini CLI;
-- Cursor Agent.
 
 El operador debe poder cambiar entre ellos desde la TUI. Cada proveedor debe normalizar sus eventos hacia un contrato común del harness.
 
@@ -136,7 +135,6 @@ Gana v9 debe producir análisis, predicciones y candidatos estructurados. No deb
 - Backend durable en DigitalOcean DB.
 - Provider agentic por Codex CLI.
 - Provider agentic por Gemini CLI.
-- Provider agentic por Cursor Agent.
 - Cambio de provider desde `/provider`.
 - Cambio de modelo desde `/model`.
 - Modo rápido desde `/fast` cuando el proveedor lo soporte.
@@ -195,7 +193,7 @@ Ejecuta el harness desde terminal. Revisa fixtures, filtros, cuotas, odds, evide
 
 ### 4.2 Agente implementador
 
-Usa Codex CLI, Gemini CLI o Cursor Agent para inspeccionar código, modificar archivos, correr comandos, generar artifacts y avanzar tareas dentro del repo.
+Usa Codex CLI o Gemini CLI para inspeccionar código, modificar archivos, correr comandos, generar artifacts y avanzar tareas dentro del repo.
 
 ### 4.3 Evaluador agentic
 
@@ -216,7 +214,7 @@ Debe cumplir:
 - permitir kill-switch de sesión;
 - mantener redacción de secretos;
 - mantener timeout y límite de output para shell;
-- permitir configuración explícita de sandbox Codex, approval mode Gemini y trust/force Cursor;
+- permitir configuración explícita de sandbox Codex y approval mode Gemini;
 - impedir que la ausencia de prompts elimine la trazabilidad.
 
 Configuración recomendada:
@@ -230,8 +228,7 @@ Configuración recomendada:
     "redactSecrets": true
   },
   "codexSandbox": "danger-full-access",
-  "geminiApprovalMode": "yolo",
-  "cursorForce": true
+  "geminiApprovalMode": "yolo"
 }
 ```
 
@@ -249,7 +246,6 @@ gana-v9
 ├── docs
 ├── scripts
 │   ├── update-codex-models.ts
-│   ├── update-cursor-models.ts
 │   └── update-gemini-models.ts
 └── src
     ├── agent.ts
@@ -291,7 +287,6 @@ src/
     agentic/
       codex-cli.ts
       gemini-cli.ts
-      cursor-agent.ts
   domain/
   prediction/
   parlay/
@@ -353,7 +348,7 @@ El código actual ya implementa o prepara estos comandos:
 
 - `/help`: lista comandos disponibles.
 - `/new`: inicia una sesión nueva.
-- `/provider`: cambia entre `codex`, `gemini`, `cursor` y compatibilidad `openrouter`.
+- `/provider`: cambia entre `codex`, `gemini` y compatibilidad `openrouter`.
 - `/model`: cambia modelo del provider activo.
 - `/fast`: activa modo rápido cuando el provider lo soporte.
 - `/think`: define reasoning effort cuando el provider lo soporte.
@@ -435,14 +430,13 @@ Gana v9 debe tener un contrato común para proveedores agentic CLI y soportar de
 
 - Codex CLI;
 - Gemini CLI;
-- Cursor Agent.
 
 OpenRouter puede permanecer como compatibilidad técnica mientras exista en el código, pero no es el enfoque estratégico del producto.
 
 ### 7.2 Contrato común
 
 ```ts
-type AgentProvider = 'codex' | 'gemini' | 'cursor';
+type AgentProvider = 'codex' | 'gemini';
 
 type AgentEvent =
   | { type: 'text'; delta: string }
@@ -481,40 +475,20 @@ Requisitos:
 - registrar stats de tokens cuando el CLI los reporte;
 - no imprimir credenciales OAuth.
 
-### 7.5 Cursor Agent
-
-Requisitos:
-
-- ejecutar `cursor-agent --print`;
-- usar `--output-format stream-json`;
-- usar `--stream-partial-output`;
-- soportar `--workspace`;
-- soportar `--model`;
-- soportar `--resume` con session ID;
-- permitir `--trust` en perfiles autorizados;
-- permitir `--force` cuando el perfil lo autorice;
-- detectar tool calls y results;
-- detectar web search cuando sea requerido;
-- registrar tokens cuando el CLI los reporte.
-
-### 7.6 Model registry
+### 7.5 Model registry
 
 Los scripts existentes deben conservarse como parte del sistema:
 
 - `scripts/update-codex-models.ts` actualiza `config/codex-models.json`.
 - `scripts/update-gemini-models.ts` actualiza `config/gemini-models.json`.
-- `scripts/update-cursor-models.ts` actualiza `config/cursor-models.json`.
-
 El comando `/model` debe leer el catálogo del provider activo y no mezclar modelos entre proveedores.
 
-### 7.7 Web search nativo
+### 7.6 Web search nativo
 
 Cuando `nativeWebSearch` esté activo, el harness debe exigir que el provider agentic use su herramienta nativa de búsqueda antes de responder en tareas que requieren información actual.
 
 - Codex: `web_search`.
 - Gemini: `google_web_search`.
-- Cursor: `web_search`.
-
 Si el provider no usa la herramienta requerida, el turno debe fallar con error accionable.
 
 ---
@@ -918,7 +892,6 @@ El comando `/provider` debe permitir cambiar entre:
 
 - `codex`;
 - `gemini`;
-- `cursor`.
 
 El cambio de provider debe:
 
@@ -937,7 +910,6 @@ Fuentes:
 
 - Codex: `config/codex-models.json` o cache local del CLI.
 - Gemini: `config/gemini-models.json`, settings locales o catálogo disponible.
-- Cursor: `config/cursor-models.json`.
 
 El cambio de modelo debe registrarse en session y run context.
 
@@ -1392,7 +1364,7 @@ type Prediction = {
   warnings: string[];
   evidenceIds: string[];
   includedByFilters: string[];
-  providerAgentic: 'codex' | 'gemini' | 'cursor';
+  providerAgentic: 'codex' | 'gemini';
   model: string;
   promptVersion: string;
   scoringRuleVersion: string;
@@ -1428,7 +1400,7 @@ type HarnessRun = {
   runtime: 'mvp-productivo-online';
   profile: 'standard' | 'full-permissions';
   providerSports: 'api-football';
-  providerAgentic: 'codex' | 'gemini' | 'cursor';
+  providerAgentic: 'codex' | 'gemini';
   model: string;
   filterPresetId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
@@ -1622,7 +1594,6 @@ type ToolMetadata = {
 - Mantiene límite de output.
 - Permite `danger-full-access` en Codex solo si está explícitamente configurado.
 - Permite `geminiApprovalMode: yolo`.
-- Permite `cursor --trust --force`.
 
 ### 16.4 Audit log
 
@@ -1678,7 +1649,7 @@ El sistema no debe:
 
 - La operación normal requiere API-Football.
 - La operación normal requiere DigitalOcean DB.
-- La operación agentic requiere Codex CLI, Gemini CLI o Cursor Agent autenticado.
+- La operación agentic requiere Codex CLI o Gemini CLI autenticado.
 - Research actual requiere proveedor agentic con web search nativo disponible.
 - Los errores de red deben ser explícitos y accionables.
 
@@ -1729,7 +1700,7 @@ Gana v9 se considera funcional en este SRS cuando:
 
 1. `pnpm gana` abre la TUI.
 2. La TUI muestra provider agentic, modelo, perfil, API-Football status, DB status y filtros activos.
-3. `/provider` cambia entre Codex CLI, Gemini CLI y Cursor Agent cuando están autenticados.
+3. `/provider` cambia entre Codex CLI, Gemini CLI y OpenRouter cuando están configurados.
 4. `/model` lista modelos del provider activo usando catálogos locales.
 5. `/web live` exige uso de web search nativo en tareas de research.
 6. `/profile full-permissions` activa autoautorización auditada.
@@ -1766,7 +1737,7 @@ Debe conservarse la estructura actual:
 - `src/renderer.ts` como render de eventos.
 - `src/session.ts` como sesiones JSONL.
 - `src/tools/*` como herramientas base.
-- Scripts de actualización de modelos para Codex, Gemini y Cursor.
+- Scripts de actualización de modelos para Codex y Gemini.
 
 ### 19.2 Agregar
 
@@ -1868,12 +1839,11 @@ Las sesiones JSONL deben incluir:
 
 Este SRS se alinea con los siguientes elementos ya presentes en el código:
 
-- `src/agent.ts`: selección de provider `codex`, `gemini`, `cursor`, `openrouter`; ejecución por `spawn`; normalización de eventos; enforcement de web search nativo.
-- `src/config.ts`: configuración de provider, modelo, native web search, Codex sandbox, Gemini approval mode y Cursor force.
+- `src/agent.ts`: selección de provider `codex`, `gemini`, `openrouter`; ejecución por `spawn`; normalización de eventos; enforcement de web search nativo.
+- `src/config.ts`: configuración de provider, modelo, native web search, Codex sandbox y Gemini approval mode.
 - `src/commands.ts`: slash commands `/provider`, `/model`, `/fast`, `/think`, `/web`, `/new`, `/help`.
 - `scripts/update-codex-models.ts`: catálogo de modelos Codex.
 - `scripts/update-gemini-models.ts`: catálogo de modelos Gemini.
-- `scripts/update-cursor-models.ts`: catálogo de modelos Cursor.
 - `src/tools/*`: herramientas de archivo, búsqueda y shell.
 - `src/renderer.ts`: visualización grouped/minimal/emoji de tool events.
 - `src/session.ts`: persistencia JSONL append-only.
@@ -1882,8 +1852,8 @@ Este SRS se alinea con los siguientes elementos ya presentes en el código:
 
 ## 21. Resumen ejecutivo
 
-Gana v9 debe ser una consola/harness de predicción deportiva operada desde TUI, con enfoque de **MVP productivo online** desde el primer corte. El sistema debe consultar API-Football, aplicar filtros por ligas, equipos, mercados y cuotas, detectar partidos con cuotas iguales o menores a `1.20`, persistir todo en DigitalOcean DB, usar agentes reales por Codex CLI, Gemini CLI y Cursor Agent, soportar perfil de permisos completos, generar evidencia obligatoria y validar predicciones bajo reglas versionadas.
+Gana v9 debe ser una consola/harness de predicción deportiva operada desde TUI, con enfoque de **MVP productivo online** desde el primer corte. El sistema debe consultar API-Football, aplicar filtros por ligas, equipos, mercados y cuotas, detectar partidos con cuotas iguales o menores a `1.20`, persistir todo en DigitalOcean DB, usar agentes reales por Codex CLI y Gemini CLI, soportar perfil de permisos completos, generar evidencia obligatoria y validar predicciones bajo reglas versionadas.
 
 La frase que resume este SRS es:
 
-> Gana v9 será un harness TUI-first de operación productiva online, conectado a API-Football y DigitalOcean DB, asistido por Codex/Gemini/Cursor, con filtros deportivos desde el inicio y predicciones auditables antes de cualquier promoción.
+> Gana v9 será un harness TUI-first de operación productiva online, conectado a API-Football y DigitalOcean DB, asistido por Codex/Gemini, con filtros deportivos desde el inicio y predicciones auditables antes de cualquier promoción.

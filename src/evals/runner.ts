@@ -424,6 +424,11 @@ async function runCertificationPipelineCheck(config: AgentConfig, runtime: Runti
         adjustedProbability: 0.82,
         expectedEdge: 0.0906,
         score: 0.78,
+        exposure: {
+          units: 2,
+          percentOfAnalyticalBankroll: 0.02,
+          policy: 'fractional-kelly-capped-analytical-exposure',
+        },
         stake: {
           units: 2,
           percentOfBankroll: 0.02,
@@ -460,6 +465,12 @@ async function runCertificationPipelineCheck(config: AgentConfig, runtime: Runti
         generatedAt: generatedAt.toISOString(),
         analyticalArtifactOnly: true,
         executionCapability: 'none',
+        exposurePolicy: {
+          analyticalUnits: 100,
+          maxPortfolioExposure: 0.08,
+          maxParlayExposure: 0.025,
+          unitLabel: 'analytical-units',
+        },
         bankrollPolicy: {
           bankrollUnits: 100,
           maxPortfolioStake: 0.08,
@@ -485,6 +496,8 @@ async function runCertificationPipelineCheck(config: AgentConfig, runtime: Runti
           hitRate: 1,
           totalStakeUnits: 2,
           totalStakePercentOfBankroll: 0.02,
+          totalExposureUnits: 2,
+          totalExposurePercent: 0.02,
         },
         rejected: [],
       },

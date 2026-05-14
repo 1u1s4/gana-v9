@@ -1,4 +1,4 @@
-export type AgentProvider = 'codex' | 'gemini' | 'cursor';
+export type AgentProvider = 'codex' | 'gemini';
 
 export type AgentProviderCompat = AgentProvider | 'openrouter';
 

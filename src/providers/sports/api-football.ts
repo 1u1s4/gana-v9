@@ -65,8 +65,9 @@ const API_FOOTBALL_REQUEST_TIMEOUT_MS = 15_000;
 export function createApiFootballProvider(
   config: ApiFootballProviderConfig,
   persistence: ApiFootballPersistence = {},
+  runtime?: RuntimeContext,
 ): SportsDataProvider {
-  return new ApiFootballProvider(config, persistence);
+  return new ApiFootballProvider(config, persistence, runtime);
 }
 
 export class ApiFootballProvider implements SportsDataProvider {
@@ -75,6 +76,7 @@ export class ApiFootballProvider implements SportsDataProvider {
   constructor(
     private readonly config: ApiFootballProviderConfig,
     private readonly persistence: ApiFootballPersistence = {},
+    private readonly runtime?: RuntimeContext,
   ) {}
 
   async getStatus(): Promise<ProviderStatus> {
@@ -377,6 +379,7 @@ export class ApiFootballProvider implements SportsDataProvider {
     }
 
     const url = buildApiFootballUrl(this.config.apiFootballBaseUrl, path, query);
+    reserveProviderRequest(this.config, this.runtime, endpointName);
     const egress = evaluateEgress({ url, config: this.config });
     if (!egress.allowed) {
       throw new ApiFootballProviderError({
@@ -616,7 +619,7 @@ export async function listApiFootballFixtures(
   runtime?: RuntimeContext,
 ): Promise<Fixture[]> {
   const persistence = await createApiFootballPersistence(config, runtime);
-  const provider = createApiFootballProvider(config, persistence);
+  const provider = createApiFootballProvider(config, persistence, runtime);
   return provider.listFixtures(query);
 }
 
@@ -633,7 +636,7 @@ export async function getApiFootballOddsSnapshot(
   if (!persistence.providerId || !persistence.persistOddsSnapshot) {
     throw new Error('Database persistence is required to store odds snapshots and quotes.');
   }
-  const provider = createApiFootballProvider(config, persistence) as ApiFootballProvider;
+  const provider = createApiFootballProvider(config, persistence, runtime) as ApiFootballProvider;
   return provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId, markets });
 }
 
@@ -661,8 +664,30 @@ export async function getApiFootballDateOddsSlate(
   if (!persistence.providerId || !persistence.persistOddsSnapshot) {
     throw new Error('Database persistence is required to store odds snapshots and quotes.');
   }
-  const provider = createApiFootballProvider(config, persistence) as ApiFootballProvider;
+  const provider = createApiFootballProvider(config, persistence, runtime) as ApiFootballProvider;
   return provider.getCanonicalOddsSlateForDate({ date, fixtures, markets });
+}
+
+function reserveProviderRequest(
+  config: ApiFootballProviderConfig,
+  runtime: RuntimeContext | undefined,
+  endpointName: ApiFootballEndpointName,
+): void {
+  if (!runtime) return;
+  const limit = runtime.providerRequestLimit ?? config.apiFootball.maxProviderRequestsPerRun;
+  if (!Number.isFinite(limit) || limit <= 0) return;
+  const nextCount = (runtime.providerRequestCount ?? 0) + 1;
+  if (nextCount > limit) {
+    throw new ApiFootballProviderError({
+      code: 'rate_limited',
+      endpointName,
+      message: `Provider request limit reached for this run (${limit}).`,
+      expected: `At most ${limit} API-Football requests in one harness run.`,
+      received: { providerRequestCount: runtime.providerRequestCount ?? 0, attemptedEndpoint: endpointName },
+      nextAction: 'Raise GANA_MAX_PROVIDER_REQUESTS_PER_RUN for a larger canary, reduce GANA_MAX_FIXTURES_PER_RUN, or resume with a new run after reviewing quota.',
+    });
+  }
+  runtime.providerRequestCount = nextCount;
 }
 
 export async function createApiFootballPersistence(

@@ -36,7 +36,7 @@ export type GanaRuntime = 'mvp-productivo-online';
 
 export type GanaProfile = 'standard' | 'full-permissions';
 
-export type ProviderAgentic = 'codex' | 'gemini' | 'cursor' | 'openrouter';
+export type ProviderAgentic = 'codex' | 'gemini' | 'openrouter';
 
 export type ProviderSports = 'api-football';
 

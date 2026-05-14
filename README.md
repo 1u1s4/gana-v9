@@ -34,14 +34,17 @@ La aceptacion productiva es manual y usa la CLI real con DB, API-Football y auth
 pnpm gana db status
 pnpm gana football status
 pnpm gana filters show
-GANA_MAX_FIXTURES_PER_RUN=5 pnpm gana run --date YYYY-MM-DD
+GANA_MAX_FIXTURES_PER_RUN=5 \
+GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=5 \
+GANA_MAX_PROVIDER_REQUESTS_PER_RUN=600 \
+pnpm gana run --date YYYY-MM-DD
 pnpm gana artifacts --run-id RUN_ID
 pnpm gana export --run-id RUN_ID
 pnpm gana validate --date YYYY-MM-DD
 pnpm gana dashboard --port 4317
 ```
 
-Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini`, `cursor` u `openrouter`). La DB canonica del RC actual es DigitalOcean MySQL via Prisma; PostgreSQL queda como migracion futura documentada, no como requisito operativo actual. El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
+Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini` u `openrouter`). La DB canonica del RC actual es DigitalOcean MySQL via Prisma; PostgreSQL queda como migracion futura documentada, no como requisito operativo actual. El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
 
 ## Configuracion
 
@@ -54,21 +57,26 @@ Browser Use fallback:
 - Los limites por defecto respetan la capa free: `BROWSER_USE_MAX_TASKS_PER_MONTH=10`, `BROWSER_USE_MAX_CONCURRENT_SESSIONS=3`, `BROWSER_USE_TIMEOUT_MS=180000`.
 - Esta herramienta es solo para research de lectura; queda cubierta por policy, auditoria, redaccion y bloqueo de automatizacion monetaria.
 
+Limites operativos por run:
+
+- `GANA_MAX_FIXTURES_PER_RUN` limita fixtures seleccionados para el pipeline.
+- `GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN` limita fixtures enviados a research/scoring agentic.
+- `GANA_MAX_PROVIDER_REQUESTS_PER_RUN` limita requests reales a API-Football y bloquea con error accionable si el canary excede el techo.
+
 Providers validos:
 
 - `codex` con modelos como `gpt-5.5`.
 - `gemini` con modelos como `gemini-2.5-flash`.
-- `cursor` con modelos como `composer-2-fast`.
 - `openrouter` con IDs de OpenRouter.
 
 Comandos disponibles dentro de la TUI:
 
 - `/help`: lista comandos.
 - `/dashboard`: sirve una interfaz web local para ver partidos/resultados, predicciones, parlays, validaciones y runs.
-- `/provider`: lista providers disponibles y cambia entre `codex`, `gemini`, `cursor` y `openrouter`.
+- `/provider`: lista providers disponibles y cambia entre `codex`, `gemini` y `openrouter`.
 - `/model`: lista, busca y cambia modelos del provider activo.
 - `/fast`: alterna modo rapido cuando el provider/modelo lo soporta.
-- `/think low|medium|high|xhigh`: ajusta nivel de razonamiento en Codex o cambia a una variante equivalente en Cursor cuando exista.
+- `/think low|medium|high|xhigh`: ajusta nivel de razonamiento en Codex cuando el modelo lo soporta.
 - `/web`: muestra o cambia el uso obligatorio de web search nativo: `on`, `off`, `cached`, `live`.
 - `/new`: inicia una conversacion nueva.
 - `exit`: cierra la TUI.
@@ -104,21 +112,6 @@ npm run update:gemini-models
 ```
 
 El script lee modelos desde el Gemini CLI instalado. Si defines `GEMINI_API_KEY` o `GOOGLE_API_KEY`, tambien intenta consultar la API de Gemini y fusionar esos resultados.
-
-Backend Cursor Agent:
-
-- Disponible configurando `provider: "cursor"` y un modelo como `composer-2-fast`.
-- Usa `cursor-agent --print --output-format stream-json` como subprocess.
-- Lee tu autenticacion local de Cursor Agent.
-- Fuerza el uso del tool nativo `WebSearch` cuando `nativeWebSearch` esta activo; el harness usa `--force` para aprobarlo en modo headless.
-- Reanuda la sesion de Cursor entre turnos hasta usar `/new`.
-- `/model` lee `config/cursor-models.json`.
-
-Actualizar el listado de modelos Cursor:
-
-```bash
-npm run update:cursor-models
-```
 
 Backend OpenRouter:
 

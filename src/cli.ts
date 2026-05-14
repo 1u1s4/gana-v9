@@ -57,7 +57,6 @@ function textBanner(name: string, model: string, provider: string) {
 function providerLabel(provider: string): string {
   if (provider === 'codex') return 'local codex auth';
   if (provider === 'gemini') return 'local gemini auth';
-  if (provider === 'cursor') return 'local cursor auth';
   return 'openrouter';
 }
 
@@ -77,7 +76,6 @@ function sessionRunId(sessionPath: string): string {
 function providerNativeSession(config: ReturnType<typeof loadConfig>): Record<string, unknown> {
   if (config.provider === 'codex') return { codexThreadId: redactProviderSessionId(config.codexThreadId) ?? null };
   if (config.provider === 'gemini') return { geminiSessionId: redactProviderSessionId(config.geminiSessionId) ?? null };
-  if (config.provider === 'cursor') return { cursorSessionId: redactProviderSessionId(config.cursorSessionId) ?? null };
   return {};
 }
 
@@ -159,8 +157,6 @@ function recordAutoGrantedProviderOptions(config: ReturnType<typeof loadConfig>,
   const actions: string[] = [];
   if (config.provider === 'codex' && config.codexSandbox === 'danger-full-access') actions.push('codex.danger-full-access');
   if (config.provider === 'gemini' && config.geminiApprovalMode === 'yolo') actions.push('gemini.yolo');
-  if (config.provider === 'cursor' && config.cursorTrust) actions.push('cursor.trust');
-  if (config.provider === 'cursor' && config.cursorForce) actions.push('cursor.force');
   for (const action of actions) appendAutoApproval(runtime, action);
 }
 

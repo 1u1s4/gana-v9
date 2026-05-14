@@ -15,7 +15,6 @@ export interface AgentConfigLike {
   codexThreadId?: string;
   geminiHome?: string;
   geminiSessionId?: string;
-  cursorSessionId?: string;
 }
 
 export interface AgentProviderStateOptions {
@@ -23,35 +22,29 @@ export interface AgentProviderStateOptions {
   codexAuthConfigured?: boolean;
   geminiAuthPath?: string;
   geminiAuthConfigured?: boolean;
-  cursorAuthPath?: string;
-  cursorAuthConfigured?: boolean;
   openrouterConfigured?: boolean;
 }
 
 export const AGENT_PROVIDER_LABELS: Record<AgentProviderCompat, string> = {
   codex: 'Codex',
   gemini: 'Gemini CLI',
-  cursor: 'Cursor Agent',
   openrouter: 'OpenRouter',
 };
 
 export const AGENT_PROVIDER_DEFAULT_MODELS: Record<AgentProviderCompat, readonly string[]> = {
   codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
   gemini: ['gemini-3-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
-  cursor: ['composer-2', 'auto'],
   openrouter: ['anthropic/claude-sonnet-4.5', 'anthropic/claude-haiku-4.5'],
 };
 
 const NATIVE_WEB_TOOL_NAMES: Record<AgentProvider, string> = {
   codex: 'web_search',
   gemini: 'google_web_search',
-  cursor: 'web_search',
 };
 
 const NATIVE_WEB_DISPLAY_TOOL_NAMES: Record<AgentProvider, string> = {
   codex: 'Codex web_search',
   gemini: 'Gemini google_web_search',
-  cursor: 'Cursor WebSearch',
 };
 
 export function providerLabel(provider: AgentProviderCompat): string {
@@ -59,7 +52,7 @@ export function providerLabel(provider: AgentProviderCompat): string {
 }
 
 export function isNativeAgentProvider(provider: AgentProviderCompat): provider is AgentProvider {
-  return provider === 'codex' || provider === 'gemini' || provider === 'cursor';
+  return provider === 'codex' || provider === 'gemini';
 }
 
 export function expectedNativeWebToolName(provider: AgentProviderCompat): string | undefined {
@@ -167,14 +160,6 @@ function providerAuthState(
     };
   }
 
-  if (config.provider === 'cursor') {
-    return {
-      label: 'local cursor auth',
-      configured: options.cursorAuthConfigured ?? false,
-      path: options.cursorAuthPath,
-    };
-  }
-
   return {
     label: 'openrouter',
     configured: options.openrouterConfigured ?? Boolean(config.apiKey),
@@ -193,13 +178,6 @@ function providerSessionState(config: AgentConfigLike): AgentProviderState['sess
     return {
       label: 'session',
       redactedId: redactProviderSessionId(config.geminiSessionId) ?? '',
-    };
-  }
-
-  if (config.provider === 'cursor' && config.cursorSessionId) {
-    return {
-      label: 'session',
-      redactedId: redactProviderSessionId(config.cursorSessionId) ?? '',
     };
   }
 

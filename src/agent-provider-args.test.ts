@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { codexArgs, cursorArgs, geminiArgs, runAgent } from './agent.js';
+import { codexArgs, geminiArgs, runAgent } from './agent.js';
 import { loadConfig, type AgentConfig } from './config.js';
 import { deriveNativeWebSearchRequirement } from './providers/agentic/helpers.js';
 
@@ -16,8 +16,6 @@ function config(overrides: Partial<AgentConfig>): AgentConfig {
     model: 'test-model',
     codexSandbox: 'workspace-write',
     geminiApprovalMode: 'default',
-    cursorTrust: false,
-    cursorForce: false,
     nativeWebSearch: false,
     ...overrides,
   }, { skipApiKey: true });
@@ -106,32 +104,6 @@ describe('native provider args', () => {
     assert.equal(argValue(geminiArgs(cfg, 'prompt'), '--approval-mode'), 'yolo');
   });
 
-  it('does not add Cursor trust or force from full-permissions profile alone', () => {
-    const cfg = config({
-      provider: 'cursor',
-      profile: 'full-permissions',
-      approvalMode: 'auto-grant',
-      cursorTrust: false,
-      cursorForce: false,
-    });
-    const args = cursorArgs(cfg, 'prompt', requirement(cfg));
-
-    assert.equal(args.includes('--trust'), false);
-    assert.equal(args.includes('--force'), false);
-  });
-
-  it('adds Cursor trust and force only from explicit flags', () => {
-    const cfg = config({
-      provider: 'cursor',
-      cursorTrust: true,
-      cursorForce: true,
-    });
-    const args = cursorArgs(cfg, 'prompt', requirement(cfg));
-
-    assert.equal(args.includes('--trust'), true);
-    assert.equal(args.includes('--force'), true);
-  });
-
   it('falls back to gpt-5.4-mini when Codex reports a quota limit for the primary model', async () => {
     const originalPath = process.env.PATH;
     const binDir = mkdtempSync(join(tmpdir(), 'gana-codex-bin-'));
@@ -175,6 +147,13 @@ console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, o
     await assert.rejects(
       () => runAgent(cfg, 'place bet $50 on the home team'),
       /Monetary automation is blocked/,
+    );
+  });
+
+  it('rejects removed Cursor provider config', () => {
+    assert.throws(
+      () => loadConfig({ provider: 'cursor' } as any, { skipApiKey: true }),
+      /Cursor provider has been removed/,
     );
   });
 });

@@ -68,14 +68,6 @@ Runs reales con providers:
   - resultado: `review-required`
   - artifacts: evidence pack y handoff exportados.
 
-- Cursor:
-  - comando: `AGENT_PROVIDER=cursor AGENT_MODEL=auto GANA_MAX_FIXTURES_PER_RUN=1 pnpm gana run --date 2026-05-07 --web live --validate off`
-  - primer intento: `4f43f587-0f5f-4da8-adef-b85c4d076a4a`, bloqueado por `conflictStatus: "minor"` fuera de schema.
-  - fix aplicado: normalizacion `minor -> potential`.
-  - reintento: `1d11ed76-3f2e-4dbc-a773-2c038442cb3b`
-  - resultado: `review-required`
-  - artifacts: evidence pack y handoff exportados para inspeccion.
-
 - Parlay real consolidado:
   - comando: `pnpm gana parlay --date 2026-05-07`
   - runId: `7f934e4a-e98b-4663-a85c-5cb79fcf16cc`

@@ -36,6 +36,8 @@ const config: Pick<AgentConfig, 'apiFootball'> = {
     includeLiveFixtures: false,
     includeCompletedFixtures: false,
     maxFixturesPerRun: 80,
+    maxProviderRequestsPerRun: 500,
+    maxAgenticResearchCallsPerRun: 80,
   },
 };
 

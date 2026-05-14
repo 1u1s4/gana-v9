@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 
 import type { Fixture } from '../../domain/fixtures.js';
+import type { RuntimeContext } from '../../runtime/context.js';
 import type { ApiFootballPersistence, ApiFootballProviderConfig, CanonicalOddsSnapshot, NormalizedFixture } from './types.js';
 import { createApiFootballProvider } from './api-football.js';
 import { isApiFootballProviderError } from './api-football-errors.js';
@@ -50,6 +51,40 @@ describe('api-football provider', () => {
     assert.equal(fixtureRequest.searchParams.get('date'), '2026-05-01');
     assert.equal(fixtureRequest.searchParams.get('league'), '39');
     assert.equal(fixtureRequest.searchParams.has('season'), false);
+  });
+
+  it('blocks provider calls after the per-run request limit is reached', async () => {
+    const requests: URL[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      requests.push(url);
+      return jsonResponse({ response: [] });
+    }) as typeof fetch;
+    const config = testConfig({ maxProviderRequestsPerRun: 1 });
+    const runtime: RuntimeContext = {
+      sessionPath: 'session.jsonl',
+      artifactRoot: '.artifacts/test',
+      profile: 'standard',
+      approvalMode: 'manual',
+      providerAgentic: 'codex',
+      providerSports: 'api-football',
+      model: 'test-model',
+      providerRequestCount: 0,
+      providerRequestLimit: 1,
+    };
+    const provider = createApiFootballProvider(config, {}, runtime);
+
+    await provider.listFixtures({ date: '2026-05-01', league: 39 });
+    await assert.rejects(
+      () => provider.listFixtures({ date: '2026-05-01', league: 40 }),
+      (err) => {
+        assert.equal(isApiFootballProviderError(err), true);
+        assert.match((err as Error).message, /Provider request limit reached/);
+        return true;
+      },
+    );
+    assert.equal(requests.length, 1);
+    assert.equal(runtime.providerRequestCount, 1);
   });
 
   it('retries seasonless league fixture discovery with date-derived seasons when provider requires season', async () => {
@@ -254,6 +289,8 @@ function testConfig(apiFootball: Partial<ApiFootballProviderConfig['apiFootball'
       includeLiveFixtures: true,
       includeCompletedFixtures: true,
       maxFixturesPerRun: 10,
+      maxProviderRequestsPerRun: 500,
+      maxAgenticResearchCallsPerRun: 10,
       ...apiFootball,
     },
   };

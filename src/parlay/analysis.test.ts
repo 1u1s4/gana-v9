@@ -95,6 +95,18 @@ describe('runParlayAnalysis', () => {
         ],
       }),
       parlay({
+        id: 'parlay-low-odds-top-duplicate',
+        profile: 'low-odds-top',
+        validation: 'won',
+        odds: 1.404,
+        confidence: 0.84,
+        status: 'promotable',
+        legs: [
+          leg({ id: 'safe-a', market: 'double_chance', selection: 'home_or_draw', odds: 1.2, confidence: 0.92, validation: 'won' }),
+          leg({ id: 'safe-b', market: 'double_chance', selection: 'home_or_draw', odds: 1.17, confidence: 0.91, validation: 'won' }),
+        ],
+      }),
+      parlay({
         id: 'parlay-low-variance',
         profile: 'low-variance',
         validation: 'won',
@@ -152,22 +164,27 @@ describe('runParlayAnalysis', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.analyzed, 4);
+    assert.equal(result.analyzed, 5);
     assert.equal(result.diagnostics.profileScope, 'all');
-    assert.equal(result.diagnostics.rawAnalyzed, 4);
-    assert.equal(result.diagnostics.profileScopedAnalyzed, 4);
+    assert.equal(result.diagnostics.rawAnalyzed, 5);
+    assert.equal(result.diagnostics.profileScopedAnalyzed, 5);
     assert.equal(query.where.legs.some.fixture.scheduledAt.gte.toISOString(), '2026-05-13T06:00:00.000Z');
     assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-low-odds-top', 'parlay-low-variance']);
     assert.equal(result.top.every((item) => item.validationStatus === 'won'), true);
-    assert.equal(result.diagnostics.universe.hitRate, 0.5);
+    assert.equal(result.diagnostics.universe.hitRate, 0.6);
     assert.equal(result.diagnostics.selected.hitRate, 1);
     assert.equal(result.diagnostics.selected.totalStakeUnits > 0, true);
+    assert.equal(result.diagnostics.selected.totalExposureUnits > 0, true);
     assert.equal(result.diagnostics.selected.totalStakePercentOfBankroll <= 0.08, true);
+    assert.equal(result.diagnostics.selected.totalExposurePercent <= 0.08, true);
+    assert.equal(result.top[0].exposure.policy, 'fractional-kelly-capped-analytical-exposure');
     assert.equal(result.top[0].stake.policy, 'fractional-kelly-capped-analytical-stake');
     assert.equal(result.top[0].bankerLegs.length, 2);
     assert.equal(result.top[0].legs.every((item) => item.banker), true);
     assert.equal(result.diagnostics.bankrollPolicy.bankrollUnits, 100);
+    assert.equal(result.diagnostics.exposurePolicy.analyticalUnits, 100);
     assert.match(JSON.stringify(result.diagnostics.rejected), /low-liquidity h2h short favorite/);
+    assert.match(JSON.stringify(result.diagnostics.rejected), /duplicate parlay leg set across source runs/);
     assert.equal(artifactPayload.analyticalArtifactOnly, true);
     assert.equal(artifactPayload.executionCapability, 'none');
     assert.equal('bank' in result.top[0], false);

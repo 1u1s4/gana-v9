@@ -18,12 +18,10 @@ describe('agentic provider helpers', () => {
   it('labels providers and exposes expected native web tool names', () => {
     assert.equal(providerLabel('codex'), 'Codex');
     assert.equal(providerLabel('gemini'), 'Gemini CLI');
-    assert.equal(providerLabel('cursor'), 'Cursor Agent');
     assert.equal(providerLabel('openrouter'), 'OpenRouter');
 
     assert.equal(expectedNativeWebToolName('codex'), 'web_search');
     assert.equal(expectedNativeWebToolName('gemini'), 'google_web_search');
-    assert.equal(expectedNativeWebToolName('cursor'), 'web_search');
     assert.equal(expectedNativeWebToolName('openrouter'), undefined);
   });
 
@@ -140,21 +138,6 @@ describe('agentic provider helpers', () => {
     });
 
     assert.deepEqual(deriveNativeWebSearchRequirement({
-      provider: 'cursor',
-      nativeWebSearch: false,
-      nativeWebSearchMode: 'live',
-    }), {
-      provider: 'cursor',
-      required: false,
-      enforce: false,
-      supported: true,
-      expectedToolName: 'web_search',
-      displayToolName: 'Cursor WebSearch',
-      mode: 'live',
-      reason: undefined,
-    });
-
-    assert.deepEqual(deriveNativeWebSearchRequirement({
       provider: 'openrouter',
       nativeWebSearch: true,
       nativeWebSearchMode: 'live',
@@ -216,14 +199,5 @@ describe('agentic provider helpers', () => {
     for (const defaults of Object.values(AGENT_PROVIDER_DEFAULT_MODELS)) {
       assert.equal(defaults.some(isFastModelId), false);
     }
-
-    assert.equal(
-      selectDefaultModelForProvider('cursor', ['composer-2-fast', 'composer-2']),
-      'composer-2',
-    );
-    assert.equal(
-      selectDefaultModelForProvider('cursor', ['composer-2-fast', 'custom-model']),
-      'custom-model',
-    );
   });
 });
