@@ -134,6 +134,7 @@ describe('runParlayAnalysis', () => {
       date: '2026-05-13',
       top: 3,
       bankrollUnits: 100,
+      profileScope: 'all',
     }, runtime, {
       now: () => now,
       db: {
@@ -152,6 +153,9 @@ describe('runParlayAnalysis', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.analyzed, 4);
+    assert.equal(result.diagnostics.profileScope, 'all');
+    assert.equal(result.diagnostics.rawAnalyzed, 4);
+    assert.equal(result.diagnostics.profileScopedAnalyzed, 4);
     assert.equal(query.where.legs.some.fixture.scheduledAt.gte.toISOString(), '2026-05-13T06:00:00.000Z');
     assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-low-odds-top', 'parlay-low-variance']);
     assert.equal(result.top.every((item) => item.validationStatus === 'won'), true);
@@ -167,6 +171,76 @@ describe('runParlayAnalysis', () => {
     assert.equal(artifactPayload.analyticalArtifactOnly, true);
     assert.equal(artifactPayload.executionCapability, 'none');
     assert.equal('bank' in result.top[0], false);
+  });
+
+  it('defaults to the stable core profile scope for bankroll selection', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const rows = [
+      parlay({
+        id: 'parlay-low-odds-top',
+        profile: 'low-odds-top',
+        validation: 'unvalidated',
+        odds: 1.4,
+        confidence: 0.9,
+        status: 'promotable',
+        legs: [
+          leg({ id: 'low-a', market: 'double_chance', selection: 'home_or_draw', odds: 1.18, confidence: 0.92 }),
+          leg({ id: 'low-b', market: 'double_chance', selection: 'home_or_draw', odds: 1.18, confidence: 0.91 }),
+        ],
+      }),
+      parlay({
+        id: 'parlay-core-high',
+        profile: 'high-conviction',
+        validation: 'unvalidated',
+        odds: 1.806,
+        confidence: 0.81,
+        legs: [
+          leg({ id: 'core-a', market: 'goals_over_under', selection: 'over', odds: 1.4, confidence: 0.9 }),
+          leg({ id: 'core-b', market: 'h2h', selection: 'home', odds: 1.29, confidence: 0.9 }),
+        ],
+      }),
+      parlay({
+        id: 'parlay-core-balanced',
+        profile: 'balanced',
+        validation: 'unvalidated',
+        odds: 2.506,
+        confidence: 0.657,
+        legs: [
+          leg({ id: 'core-c', market: 'goals_over_under', selection: 'over', odds: 1.4, confidence: 0.9 }),
+          leg({ id: 'core-d', market: 'h2h', selection: 'home', odds: 1.79, confidence: 0.73 }),
+        ],
+      }),
+      parlay({
+        id: 'parlay-oro-noisy',
+        profile: 'parlay-oro',
+        validation: 'unvalidated',
+        odds: 3.498,
+        confidence: 0.2219,
+        legs: [
+          leg({ id: 'oro-a', market: 'h2h', selection: 'home', odds: 1.4, confidence: 0.74 }),
+          leg({ id: 'oro-b', market: 'h2h', selection: 'home', odds: 1.28, confidence: 0.74 }),
+        ],
+      }),
+    ];
+
+    const result = await runParlayAnalysis(cfg, {
+      date: '2026-05-14',
+      top: 9,
+      bankrollUnits: 100,
+    }, runtime, {
+      now: () => now,
+      db: { parlay: { findMany: async () => rows } },
+      writeArtifact: () => '/tmp/parlay-analysis.json',
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.diagnostics.profileScope, 'core');
+    assert.equal(result.diagnostics.rawAnalyzed, 4);
+    assert.equal(result.diagnostics.profileScopedAnalyzed, 2);
+    assert.equal(result.analyzed, 2);
+    assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-core-high', 'parlay-core-balanced']);
+    assert.equal(result.top.some((item) => item.profile === 'low-odds-top' || item.profile === 'parlay-oro'), false);
   });
 
   it('requires a persisted parlay scope', async () => {

@@ -209,6 +209,7 @@ const RESEARCH_AGENT_TIMEOUT_MS = positiveInteger(process.env.GANA_RESEARCH_AGEN
   ?? positiveInteger(process.env.GANA_AGENT_TIMEOUT_MS)
   ?? 300_000;
 const RESEARCH_AGENT_JSON_ATTEMPTS = positiveInteger(process.env.GANA_RESEARCH_AGENT_JSON_ATTEMPTS) ?? 2;
+const LOW_ODDS_SCAN_TIMEOUT_MS = positiveInteger(process.env.GANA_LOW_ODDS_SCAN_TIMEOUT_MS) ?? 180_000;
 
 export function computeAgentFixtureTimeoutMs(input: {
   baseTimeoutMs: number;
@@ -392,6 +393,7 @@ export async function executeRunPipeline(
   let lowOddsScan: LowOddsScanView;
   try {
     lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
+      return await withAbortableTimeout(async () => {
       const useProviderDateSlate = !deps.discoverLowOddsFixtures
         && !deps.fetchLowOddsSnapshot
         && !deps.fetchOddsSnapshot
@@ -467,6 +469,7 @@ export async function executeRunPipeline(
       }
       writeJsonArtifact(config, runId, 'low-odds-scan.json', scan);
       return scan;
+      }, LOW_ODDS_SCAN_TIMEOUT_MS, `low-odds scan timed out after ${LOW_ODDS_SCAN_TIMEOUT_MS}ms`);
     });
   } catch (err: any) {
     lowOddsScanStepWarning = errorMessage(err);
@@ -1587,6 +1590,9 @@ function blockedParlayAnalysisResult(config: AgentConfig, runId: string, date: s
     generatedAt,
     analyticalArtifactOnly: true as const,
     executionCapability: 'none' as const,
+    profileScope: 'core' as const,
+    rawAnalyzed: 0,
+    profileScopedAnalyzed: 0,
     bankrollPolicy: {
       bankrollUnits: 100,
       maxPortfolioStake: 0.08,

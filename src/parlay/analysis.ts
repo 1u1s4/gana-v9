@@ -13,7 +13,10 @@ export interface RunParlayAnalysisInput {
   bankUnits?: number;
   maxPortfolioExposure?: number;
   maxParlayExposure?: number;
+  profileScope?: ParlayAnalysisProfileScope;
 }
+
+export type ParlayAnalysisProfileScope = 'core' | 'all';
 
 export interface ParlayAnalysisRunResult {
   ok: boolean;
@@ -81,6 +84,10 @@ export interface ParlayAnalysisDiagnostics {
   generatedAt: string;
   analyticalArtifactOnly: true;
   executionCapability: 'none';
+  profileScope: ParlayAnalysisProfileScope;
+  rawAnalyzed: number;
+  profileScopedAnalyzed: number;
+  cohortSourceRunId?: string;
   bankrollPolicy: {
     bankrollUnits: number;
     maxPortfolioStake: number;
@@ -145,6 +152,8 @@ const DEFAULT_TOP = 5;
 const DEFAULT_BANKROLL_UNITS = 100;
 const DEFAULT_MAX_PORTFOLIO_EXPOSURE = 0.08;
 const DEFAULT_MAX_PARLAY_EXPOSURE = 0.025;
+const DEFAULT_PROFILE_SCOPE: ParlayAnalysisProfileScope = 'core';
+const CORE_ANALYSIS_PROFILES = new Set(['default', 'balanced', 'high-conviction']);
 
 export async function runParlayAnalysis(
   config: AgentConfig,
@@ -161,29 +170,37 @@ export async function runParlayAnalysis(
   const bankrollUnits = positiveNumber(input.bankrollUnits ?? input.bankUnits ?? DEFAULT_BANKROLL_UNITS, 'bankroll units');
   const maxPortfolioExposure = clampProbability(input.maxPortfolioExposure ?? DEFAULT_MAX_PORTFOLIO_EXPOSURE, 'max portfolio exposure');
   const maxParlayExposure = clampProbability(input.maxParlayExposure ?? DEFAULT_MAX_PARLAY_EXPOSURE, 'max parlay exposure');
+  const profileScope = parseProfileScope(input.profileScope);
 
   if (!input.date && !input.runId) {
-    return { ok: false, runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure), error: 'parlay analyze requires --date YYYY-MM-DD or --run-id RUN_ID.' };
+    return { ok: false, runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope), error: 'parlay analyze requires --date YYYY-MM-DD or --run-id RUN_ID.' };
   }
   if (input.date && !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-    return { ok: false, runId, date: input.date, sourceRunId: input.runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure), error: 'parlay analyze requires --date YYYY-MM-DD.' };
+    return { ok: false, runId, date: input.date, sourceRunId: input.runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope), error: 'parlay analyze requires --date YYYY-MM-DD.' };
   }
   if (!deps.db && !config.databaseUrl) {
-    return { ok: false, runId, date: input.date, sourceRunId: input.runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure), error: 'DATABASE_URL is required to analyze persisted parlays.' };
+    return { ok: false, runId, date: input.date, sourceRunId: input.runId, analyzed: 0, top: [], diagnostics: emptyDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope), error: 'DATABASE_URL is required to analyze persisted parlays.' };
   }
 
   const db = deps.db ?? getPrismaClient() as unknown as ParlayAnalysisDb;
-  const rows = await db.parlay.findMany(buildParlayQuery(config, input));
-  const candidates = rows.map(toCandidate).sort((a, b) => b.score - a.score || a.combinedOdds - b.combinedOdds);
+  const rawRows = await db.parlay.findMany(buildParlayQuery(config, input));
+  const profileRows = filterRowsByProfileScope(rawRows, profileScope);
+  const profileCandidates = profileRows.map(toCandidate);
+  const cohort = selectCandidatesForAnalysis(profileCandidates, profileScope);
+  const candidates = cohort.candidates.sort((a, b) => b.score - a.score || a.combinedOdds - b.combinedOdds);
   const eligible = candidates.filter((candidate) => !candidate.rejectedReasons.length).slice(0, top);
   const recommendations = allocateStake(eligible, bankrollUnits, maxPortfolioExposure, maxParlayExposure);
-  const diagnostics = buildDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, candidates, recommendations);
+  const diagnostics = buildDiagnostics(generatedAt, bankrollUnits, maxPortfolioExposure, maxParlayExposure, profileScope, rawRows.length, profileRows.length, cohort.sourceRunId, candidates, recommendations);
   const artifactPath = artifactWriter(runId, 'parlay-analysis.json', {
     runId,
     date: input.date,
     sourceRunId: input.runId,
     generatedAt: generatedAt.toISOString(),
-    analyzed: rows.length,
+    analyzed: candidates.length,
+    rawAnalyzed: rawRows.length,
+    profileScopedAnalyzed: profileRows.length,
+    cohortSourceRunId: cohort.sourceRunId,
+    profileScope,
     top: recommendations,
     diagnostics,
     analyticalArtifactOnly: true,
@@ -195,7 +212,7 @@ export async function runParlayAnalysis(
     runId,
     date: input.date,
     sourceRunId: input.runId,
-    analyzed: rows.length,
+    analyzed: candidates.length,
     top: recommendations,
     diagnostics,
     artifactPath,
@@ -466,6 +483,10 @@ function buildDiagnostics(
   bankrollUnits: number,
   maxPortfolioExposure: number,
   maxParlayExposure: number,
+  profileScope: ParlayAnalysisProfileScope,
+  rawAnalyzed: number,
+  profileScopedAnalyzed: number,
+  cohortSourceRunId: string | undefined,
   candidates: Candidate[],
   recommendations: ParlayAnalysisRecommendation[],
 ): ParlayAnalysisDiagnostics {
@@ -473,6 +494,10 @@ function buildDiagnostics(
     generatedAt: generatedAt.toISOString(),
     analyticalArtifactOnly: true,
     executionCapability: 'none',
+    profileScope,
+    rawAnalyzed,
+    profileScopedAnalyzed,
+    ...(cohortSourceRunId ? { cohortSourceRunId } : {}),
     bankrollPolicy: {
       bankrollUnits,
       maxPortfolioStake: maxPortfolioExposure,
@@ -515,11 +540,15 @@ function emptyDiagnostics(
   bankrollUnits: number,
   maxPortfolioExposure: number,
   maxParlayExposure: number,
+  profileScope: ParlayAnalysisProfileScope,
 ): ParlayAnalysisDiagnostics {
   return {
     generatedAt: generatedAt.toISOString(),
     analyticalArtifactOnly: true,
     executionCapability: 'none',
+    profileScope,
+    rawAnalyzed: 0,
+    profileScopedAnalyzed: 0,
     bankrollPolicy: { bankrollUnits, maxPortfolioStake: maxPortfolioExposure, maxParlayStake: maxParlayExposure, unitLabel: 'analytical-units' },
     universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null },
     selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0 },
@@ -531,6 +560,58 @@ function profileFromMetadata(metadata: unknown): string {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return 'default';
   const value = (metadata as any).portfolioProfile ?? (metadata as any).profile;
   return typeof value === 'string' && value.trim() ? value : 'default';
+}
+
+function parseProfileScope(value: unknown): ParlayAnalysisProfileScope {
+  if (value === undefined || value === null || value === '') return DEFAULT_PROFILE_SCOPE;
+  if (value === 'core' || value === 'all') return value;
+  throw new Error('--profile-scope must be core or all.');
+}
+
+function filterRowsByProfileScope(rows: unknown[], scope: ParlayAnalysisProfileScope): unknown[] {
+  if (scope === 'all') return rows;
+  return rows.filter((row: any) => CORE_ANALYSIS_PROFILES.has(profileFromMetadata(row?.metadata)));
+}
+
+function selectCandidatesForAnalysis(candidates: Candidate[], scope: ParlayAnalysisProfileScope): { candidates: Candidate[]; sourceRunId?: string } {
+  if (scope !== 'core' || candidates.length === 0) return { candidates };
+  const groups = new Map<string, Candidate[]>();
+  for (const candidate of candidates) {
+    const key = logicalSourceRunId(candidate.row);
+    groups.set(key, [...(groups.get(key) ?? []), candidate]);
+  }
+  const [sourceRunId, selected] = [...groups.entries()].sort((a, b) =>
+    eligibleCount(b[1]) - eligibleCount(a[1])
+    || topScoreSum(b[1]) - topScoreSum(a[1])
+    || b[1].length - a[1].length
+    || latestGeneratedAt(b[1].map((candidate) => candidate.row)) - latestGeneratedAt(a[1].map((candidate) => candidate.row)),
+  )[0] ?? ['unknown', candidates];
+  return { candidates: selected, sourceRunId };
+}
+
+function eligibleCount(candidates: Candidate[]): number {
+  return candidates.filter((candidate) => !candidate.rejectedReasons.length).length;
+}
+
+function topScoreSum(candidates: Candidate[]): number {
+  return candidates
+    .filter((candidate) => !candidate.rejectedReasons.length)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, DEFAULT_TOP)
+    .reduce((sum, candidate) => sum + candidate.score, 0);
+}
+
+function logicalSourceRunId(row: unknown): string {
+  const candidate = row as any;
+  const metadata = candidate?.metadata && typeof candidate.metadata === 'object' ? candidate.metadata : {};
+  return typeof metadata.sourceRunId === 'string' && metadata.sourceRunId ? metadata.sourceRunId : String(candidate?.runId ?? 'unknown');
+}
+
+function latestGeneratedAt(rows: unknown[]): number {
+  return Math.max(...rows.map((row: any) => {
+    const value = row?.generatedAt instanceof Date ? row.generatedAt.getTime() : Date.parse(String(row?.generatedAt ?? ''));
+    return Number.isFinite(value) ? value : 0;
+  }));
 }
 
 function latestStatus(items: unknown): string {

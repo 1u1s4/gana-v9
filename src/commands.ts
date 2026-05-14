@@ -471,6 +471,22 @@ function optionalMarketsFlag(flags: Record<string, string | true>): MarketKey[] 
   return [...new Set(marketNames)] as MarketKey[];
 }
 
+function optionalRunIdsFlag(flags: Record<string, string | true>): string[] | undefined {
+  const value = flags['run-ids'];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new Error('--run-ids must be a comma-separated list of run ids.');
+  const runIds = value.split(',').map((runId) => runId.trim()).filter(Boolean);
+  if (!runIds.length) throw new Error('--run-ids must include at least one run id.');
+  return [...new Set(runIds)];
+}
+
+function optionalParlayAnalysisProfileScope(flags: Record<string, string | true>): 'core' | 'all' | undefined {
+  const value = optionalStringFlag(flags, 'profile-scope');
+  if (value === undefined) return undefined;
+  if (value === 'core' || value === 'all') return value;
+  throw new Error('--profile-scope must be core or all.');
+}
+
 function optionalPositiveIntegerFlag(flags: Record<string, string | true>, key: string): number | undefined {
   const value = flags[key];
   if (typeof value !== 'string') return undefined;
@@ -573,6 +589,7 @@ async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: 
   const input = {
     date: requireDateFlag(flags),
     sourceRunId: optionalStringFlag(flags, 'run-id'),
+    sourceRunIds: optionalRunIdsFlag(flags),
     configOverrides: optionalParlayConfig(flags),
   };
   const service = await loadOptionalRunService();
@@ -588,6 +605,7 @@ async function analyzeParlays(ctx: HeadlessCommandContext | CommandContext, flag
     bankrollUnits: optionalPositiveFloatFlag(flags, 'bankroll') ?? optionalPositiveFloatFlag(flags, 'bank'),
     maxPortfolioExposure: optionalFloatFlag(flags, 'max-portfolio-exposure'),
     maxParlayExposure: optionalFloatFlag(flags, 'max-parlay-exposure'),
+    profileScope: optionalParlayAnalysisProfileScope(flags),
   }, ctx.runtime);
 }
 
@@ -835,6 +853,10 @@ function printParlayAnalysisResult(result: ParlayAnalysisRunResult): void {
   printKeyValue('analyzed', result.analyzed);
   printKeyValue('top', result.top.length);
   printKeyValue('artifactType', 'analytical only; not executable');
+  printKeyValue('profileScope', result.diagnostics.profileScope);
+  if (result.diagnostics.rawAnalyzed !== result.analyzed) printKeyValue('rawAnalyzed', result.diagnostics.rawAnalyzed);
+  if (result.diagnostics.profileScopedAnalyzed !== result.analyzed) printKeyValue('profileScopedAnalyzed', result.diagnostics.profileScopedAnalyzed);
+  if (result.diagnostics.cohortSourceRunId) printKeyValue('cohortSourceRunId', result.diagnostics.cohortSourceRunId);
   printKeyValue('bankrollPolicy', `${result.diagnostics.bankrollPolicy.bankrollUnits} analytical units, max portfolio stake ${(result.diagnostics.bankrollPolicy.maxPortfolioStake * 100).toFixed(2)}%`);
   printKeyValue('universeHitRate', result.diagnostics.universe.hitRate === null ? 'n/a' : `${(result.diagnostics.universe.hitRate * 100).toFixed(1)}%`);
   printKeyValue('selectedHitRate', result.diagnostics.selected.hitRate === null ? 'n/a' : `${(result.diagnostics.selected.hitRate * 100).toFixed(1)}%`);
@@ -2047,10 +2069,11 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana research --fixture-id ID --web live --markets h2h,btts${RESET}`);
   console.log(`  ${CYAN}pnpm gana score --fixture-id ID --web live --markets h2h,btts${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro${RESET}`);
-  console.log(`  ${CYAN}pnpm gana parlay analyze --date YYYY-MM-DD --top 5 --bankroll 100${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay analyze --date YYYY-MM-DD --top 9 --bankroll 100 --profile-scope core${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);

@@ -30,21 +30,77 @@ interface RunAgentOptions {
   useStdinPrompt?: boolean;
 }
 
-function installAbortKill(child: ChildProcess, signal?: AbortSignal): () => void {
-  if (!signal) return () => undefined;
+async function waitForChildClose(child: ChildProcess, providerName: string, signal?: AbortSignal): Promise<number | null> {
+  if (!signal) {
+    return new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => {
+        cleanupDetachedProcessGroup(child);
+        resolve(code);
+      });
+    });
+  }
+
   let killTimer: ReturnType<typeof setTimeout> | undefined;
-  const abort = () => {
-    if (child.exitCode === null) child.kill('SIGTERM');
-    killTimer = setTimeout(() => {
-      if (child.exitCode === null) child.kill('SIGKILL');
-    }, 2_000);
-  };
-  signal.addEventListener('abort', abort, { once: true });
-  if (signal.aborted) abort();
-  return () => {
-    signal.removeEventListener('abort', abort);
-    if (killTimer) clearTimeout(killTimer);
-  };
+  let rejectTimer: ReturnType<typeof setTimeout> | undefined;
+
+  return new Promise<number | null>((resolve, reject) => {
+    const cleanup = () => {
+      signal.removeEventListener('abort', abort);
+      child.removeListener('error', onError);
+      child.removeListener('close', onClose);
+      if (killTimer) clearTimeout(killTimer);
+      if (rejectTimer) clearTimeout(rejectTimer);
+    };
+
+    const settle = (fn: () => void) => {
+      cleanup();
+      fn();
+    };
+
+    const onError = (err: Error) => settle(() => reject(err));
+    const onClose = (code: number | null) => settle(() => {
+      cleanupDetachedProcessGroup(child);
+      resolve(code);
+    });
+
+    const abort = () => {
+      killChildProcessGroup(child, 'SIGTERM');
+      killTimer = setTimeout(() => {
+        killChildProcessGroup(child, 'SIGKILL');
+      }, 2_000);
+      rejectTimer = setTimeout(() => {
+        settle(() => reject(new Error(`${providerName} agent aborted before the process closed`)));
+      }, 3_000);
+    };
+
+    signal.addEventListener('abort', abort, { once: true });
+    child.once('error', onError);
+    child.once('close', onClose);
+    if (signal.aborted) abort();
+  });
+}
+
+function killChildProcessGroup(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (!child.pid) return;
+  try {
+    process.kill(-child.pid, signal);
+    return;
+  } catch {
+    // Fall back for platforms or launchers that do not expose a process group.
+  }
+  try {
+    if (child.exitCode === null) child.kill(signal);
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
+function cleanupDetachedProcessGroup(child: ChildProcess): void {
+  if (!child.pid) return;
+  killChildProcessGroup(child, 'SIGTERM');
+  const timer = setTimeout(() => killChildProcessGroup(child, 'SIGKILL'), 2_000);
+  timer.unref?.();
 }
 
 export async function runAgent(
@@ -433,6 +489,7 @@ async function runCodexAgentAttempt(
     useStdinPrompt,
   }), {
     cwd: process.cwd(),
+    detached: true,
     env: {
       ...process.env,
       CODEX_HOME: config.codexHome,
@@ -547,16 +604,7 @@ async function runCodexAgentAttempt(
     stderr += chunk;
   });
 
-  const cleanupAbort = installAbortKill(child, options?.signal);
-  let exitCode: number | null;
-  try {
-    exitCode = await new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('close', resolve);
-    });
-  } finally {
-    cleanupAbort();
-  }
+  const exitCode = await waitForChildClose(child, 'codex', options?.signal);
 
   if (stdoutBuffer.trim()) {
     try {
@@ -589,6 +637,7 @@ async function runGeminiAgent(
   const prompt = inputToGeminiPrompt(config, input, requirement);
   const child = spawn('gemini', geminiArgs(config, prompt), {
     cwd: process.cwd(),
+    detached: true,
     env: {
       ...process.env,
       GEMINI_MODEL: config.model,
@@ -670,16 +719,7 @@ async function runGeminiAgent(
     stderr += chunk;
   });
 
-  const cleanupAbort = installAbortKill(child, options?.signal);
-  let exitCode: number | null;
-  try {
-    exitCode = await new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('close', resolve);
-    });
-  } finally {
-    cleanupAbort();
-  }
+  const exitCode = await waitForChildClose(child, 'gemini', options?.signal);
 
   if (stdoutBuffer.trim()) {
     try {
@@ -708,6 +748,7 @@ async function runCursorAgent(
   const prompt = inputToCursorPrompt(config, input, requirement);
   const child = spawn('cursor-agent', cursorArgs(config, prompt, requirement), {
     cwd: process.cwd(),
+    detached: true,
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -801,16 +842,7 @@ async function runCursorAgent(
     stderr += chunk;
   });
 
-  const cleanupAbort = installAbortKill(child, options?.signal);
-  let exitCode: number | null;
-  try {
-    exitCode = await new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('close', resolve);
-    });
-  } finally {
-    cleanupAbort();
-  }
+  const exitCode = await waitForChildClose(child, 'cursor-agent', options?.signal);
 
   if (stdoutBuffer.trim()) {
     try {

@@ -146,6 +146,43 @@ describe('runParlayBuild', () => {
     ]);
   });
 
+  it('can combine predictions from multiple source runs without date-wide contamination', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let listQuery: any;
+
+    const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunIds: ['codex-run', 'gemini-run'] }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/parlays.json',
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            listQuery = query;
+            return [
+              prediction({ id: 'codex-pick', runId: 'codex-run', fixtureId: 'fixture-1', odds: 1.6, confidence: 0.8 }),
+              prediction({ id: 'gemini-pick', runId: 'gemini-run', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.78 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => {
+            throw new Error('multi-run parlay builds must not read every prediction for the fixture date');
+          },
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-parlays-1' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(listQuery, {
+      runIds: ['codex-run', 'gemini-run'],
+      status: ['candidate', 'promotable'],
+      take: 500,
+    });
+    assert.equal(result.build.parlay.sourceRunId, 'codex-run,gemini-run');
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['codex-pick', 'gemini-pick']);
+  });
+
   it('keeps hard research warning predictions out of the main parlay build', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

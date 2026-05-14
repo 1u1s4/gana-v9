@@ -54,7 +54,7 @@ const MAIN_PARLAY_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'promo
 const PORTFOLIO_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
 const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v3';
 const PARLAY_PORTFOLIO_SCHEMA_PATH = join(process.cwd(), 'skills/parlay-portfolio-v1/output.schema.json');
-const PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS = 120_000;
+const PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS', 120_000);
 const PORTFOLIO_MIN_CONFIDENCE = 0.72;
 const PORTFOLIO_REVIEW_MIN_CONFIDENCE = 0.7;
 const CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE = 0.62;
@@ -110,6 +110,7 @@ type PortfolioValidationResult =
 export interface RunParlayBuildInput {
   date: string;
   sourceRunId?: string;
+  sourceRunIds?: string[];
   portfolio?: 'llm' | 'low-odds-top' | DeterministicParlayProfile;
   configOverrides?: ParlayConfig;
 }
@@ -192,6 +193,7 @@ export interface ParlayServiceRepositories {
   predictions: {
     list(query: {
       runId?: string;
+      runIds?: string[];
       fixtureId?: string;
       status?: PredictionStatus | string | Array<PredictionStatus | string>;
       take?: number;
@@ -269,12 +271,18 @@ export async function runParlayBuild(
     take: 500,
   };
   const predictionSourceRunId = input.sourceRunId;
-  const predictions = predictionSourceRunId
+  const predictionSourceRunIds = normalizeSourceRunIds(input.sourceRunIds, predictionSourceRunId);
+  const sourceScopeLabel = predictionSourceRunIds.length > 1
+    ? predictionSourceRunIds.join(',')
+    : predictionSourceRunId;
+  const predictions = predictionSourceRunIds.length > 1
+    ? await repositories.predictions.list({ ...predictionQuery, runIds: predictionSourceRunIds })
+    : predictionSourceRunId
     ? await repositories.predictions.list({ ...predictionQuery, runId: predictionSourceRunId })
     : await repositories.predictions.listForFixtureDate(input.date, predictionQuery);
   const build = buildParlay({
     id: randomUUID(),
-    sourceRunId: predictionSourceRunId ?? runId,
+    sourceRunId: sourceScopeLabel ?? runId,
     generatedAt,
     predictions: predictions.map(toSourcePrediction),
     config: input.configOverrides,
@@ -318,6 +326,28 @@ export async function runParlayBuild(
     await upsertRun(config, runtime, repositories, runId, 'blocked', 'failed', now(), input.date).catch(() => undefined);
     return result;
   }
+}
+
+function normalizeSourceRunIds(sourceRunIds: string[] | undefined, sourceRunId?: string): string[] {
+  const values = [
+    ...(sourceRunIds ?? []),
+    ...(sourceRunId ? [sourceRunId] : []),
+  ].map((item) => item.trim()).filter(Boolean);
+  return Array.from(new Set(values));
+}
+
+function sourceRunScopeFor(input: RunParlayBuildInput): { sourceRunIds: string[]; sourceRunId: string } {
+  const sourceRunIds = normalizeSourceRunIds(input.sourceRunIds, input.sourceRunId);
+  return {
+    sourceRunIds,
+    sourceRunId: sourceRunIds.join(','),
+  };
+}
+
+function sourcePredictionScopeQuery(sourceRunIds: string[]): { runId?: string; runIds?: string[] } {
+  return sourceRunIds.length > 1
+    ? { runIds: sourceRunIds }
+    : { runId: sourceRunIds[0] };
 }
 
 function defaultRepositories(): ParlayServiceRepositories {
@@ -583,19 +613,19 @@ async function runLowOddsTopPortfolio(
 ): Promise<ParlayBuildRunResult> {
   const runId = runtime.runId ?? randomUUID();
   runtime.runId = runId;
-  const sourceRunId = input.sourceRunId;
+  const { sourceRunId, sourceRunIds } = sourceRunScopeFor(input);
   const generatedAt = now().toISOString();
   const date = input.date;
   if (!sourceRunId) {
     return blockedResult(runId, input, artifactWriter, generatedAt, {
-      error: '--run-id is required when --portfolio low-odds-top is used.',
+      error: '--run-id or --run-ids is required when --portfolio low-odds-top is used.',
       reasons: ['missing source run id'],
     });
   }
 
   const threshold = Math.min(config.apiFootball.lowOddsThreshold, LOW_ODDS_TOP_MAX_LEG_ODDS);
   const records = await repositories.predictions.list({
-    runId: sourceRunId,
+    ...sourcePredictionScopeQuery(sourceRunIds),
     status: PORTFOLIO_PREDICTION_STATUSES,
     take: 500,
   });
@@ -951,6 +981,7 @@ interface DeterministicProfileSpec {
   avoidDrawExposure?: boolean;
   allowFragileLowPriceDc?: boolean;
   requireMarketDiversity?: boolean;
+  minAggregateConfidence?: number;
   riskWeight: number;
 }
 
@@ -961,13 +992,13 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
     case 'balanced':
       return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.8, maxOdds: 4.0, targetParlays: 6, minConfidence: 0.65, minEdge: 0.01, markets: ['h2h', 'btts', 'goals_over_under'], riskWeight: 0.55 };
     case 'totals':
-      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.6, maxOdds: 4.5, targetParlays: 6, minConfidence: 0.62, minEdge: 0.01, markets: ['goals_over_under', 'corners_over_under'], requireLine: true, riskWeight: 0.6 };
+      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.6, maxOdds: 3.2, targetParlays: 4, minConfidence: 0.62, minEdge: 0.01, markets: ['goals_over_under', 'corners_over_under'], requireLine: true, minAggregateConfidence: 0.45, riskWeight: 0.6 };
     case 'high-conviction':
       return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.8, targetParlays: 5, minConfidence: 0.72, minEdge: 0.035, riskWeight: 0.45 };
     case 'market-diverse':
-      return { profile, minLegs: 3, maxLegs: 5, minOdds: 2.0, maxOdds: 5.5, targetParlays: 6, minConfidence: 0.65, minEdge: 0.01, requireMarketDiversity: true, riskWeight: 0.5 };
+      return { profile, minLegs: 3, maxLegs: 4, minOdds: 2.0, maxOdds: 3.8, targetParlays: 4, minConfidence: 0.65, minEdge: 0.01, requireMarketDiversity: true, minAggregateConfidence: 0.45, riskWeight: 0.5 };
     case 'parlay-oro':
-      return { profile, minLegs: 4, maxLegs: 7, minOdds: 1.8, maxOdds: 4.2, maxLegOdds: 1.25, targetParlays: 5, minConfidence: 0.78, minEdge: 0.005, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, riskWeight: 0.75 };
+      return { profile, minLegs: 4, maxLegs: 5, minOdds: 1.8, maxOdds: 3.2, maxLegOdds: 1.25, targetParlays: 3, minConfidence: 0.78, minEdge: 0.005, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.45, riskWeight: 0.75 };
   }
 }
 
@@ -993,11 +1024,12 @@ function deterministicFallbackProfileSpec(
       minLegs: 2,
       maxLegs: 5,
       minOdds: 1.45,
-      maxOdds: 3.5,
+      maxOdds: 3.0,
       maxLegOdds: PARLAY_ORO_FALLBACK_MAX_LEG_ODDS,
       minConfidence: 0.74,
       markets: ['h2h', 'double_chance', 'goals_over_under'],
       allowFragileLowPriceDc: true,
+      minAggregateConfidence: 0.45,
     };
   }
   return undefined;
@@ -1046,6 +1078,12 @@ function deterministicCandidateBlockers(
   if (combinedOdds < spec.minOdds || combinedOdds > spec.maxOdds) blockers.push(`combined odds outside ${spec.minOdds}-${spec.maxOdds}`);
   if (spec.requireMarketDiversity && markets.size < Math.min(3, legs.length)) blockers.push('insufficient market diversity');
   if (spec.requireMarketDiversity && families.size < Math.min(2, legs.length)) blockers.push('insufficient market-family diversity');
+  if (spec.minAggregateConfidence !== undefined) {
+    const aggregateConfidence = calculateAggregateConfidence(legs);
+    if (aggregateConfidence < spec.minAggregateConfidence) {
+      blockers.push(`aggregate confidence below ${spec.minAggregateConfidence}`);
+    }
+  }
   if (correlationPenalty(legs) >= 0.35) blockers.push('correlation penalty too high');
   return [...new Set(blockers)];
 }
@@ -1425,6 +1463,13 @@ function parseJsonObject(text: string): any {
     }
   }
   throw new Error(`invalid-json: portfolio agent output was not valid JSON (${truncateText(text, 160) || 'empty output'})`);
+}
+
+function positiveIntegerFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function validateParsedPortfolioParlay(

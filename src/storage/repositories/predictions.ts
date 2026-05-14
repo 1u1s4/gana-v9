@@ -9,6 +9,7 @@ import { compactData, fixtureDateRange, paginationArgs, redactJson, redactText, 
 
 export interface PredictionQuery {
   runId?: string;
+  runIds?: string[];
   fixtureId?: string;
   status?: PredictionStatus | string | Array<PredictionStatus | string>;
   take?: number;
@@ -53,7 +54,7 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
     list(query: PredictionQuery = {}): Promise<PredictionRecord[]> {
       return db.prediction.findMany({
         where: compactData({
-          runId: query.runId,
+          runId: query.runIds?.length ? { in: query.runIds } : query.runId,
           fixtureId: query.fixtureId,
           status: Array.isArray(query.status) ? { in: query.status } : query.status,
         }),

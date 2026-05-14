@@ -149,9 +149,10 @@ describe('headless parlay command', () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
     assert.match(output, /pnpm gana parlay --date YYYY-MM-DD/);
+    assert.match(output, /pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio llm/);
     assert.match(output, /pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top/);
-    assert.match(output, /pnpm gana parlay analyze --date YYYY-MM-DD --top 5 --bankroll 100/);
+    assert.match(output, /pnpm gana parlay analyze --date YYYY-MM-DD --top 9 --bankroll 100 --profile-scope core/);
   });
 
   it('requires a date or run id before analyzing persisted parlays', async () => {
