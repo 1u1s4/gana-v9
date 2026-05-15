@@ -43,6 +43,7 @@ export interface RunPipelineInput {
   web?: ResearchWebMode;
   validate?: PipelineValidationMode;
   markets?: MarketKey[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface OddsSnapshotView {
@@ -260,7 +261,7 @@ export async function executeRunPipeline(
     verdict: null,
     artifactDir,
     startedAt,
-    metadata: toJsonValue({ date: input.date, validate: input.validate ?? 'auto', marketScope }),
+    metadata: toJsonValue({ date: input.date, validate: input.validate ?? 'auto', marketScope, ...(input.metadata ?? {}) }),
   }).catch(() => undefined);
 
   writeRun(config, runId, {
@@ -282,6 +283,7 @@ export async function executeRunPipeline(
     validate: input.validate ?? 'auto',
     markets: [...marketScope],
     marketScope: [...marketScope],
+    metadata: input.metadata ?? null,
   });
 
   const filtersPayload = {
@@ -766,6 +768,7 @@ export async function executeRunPipeline(
     webSearchCoverage: webSearch,
     marketCoverage,
     calibrationSummary,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
     parlayPortfolioDiagnostics: parlay.portfolio?.diagnostics ?? null,
     parlayAnalysisDiagnostics: parlayAnalysis.diagnostics,
     noParlayReasons: parlay.gateResult.verdict === 'blocked' ? parlay.gateResult.reasons : [],
@@ -800,7 +803,10 @@ export async function executeRunPipeline(
     artifactDir,
     startedAt,
     completedAt,
-    metadata: toJsonValue(evaluation),
+    metadata: toJsonValue({
+      ...evaluation,
+      ...(input.metadata ?? {}),
+    }),
   }).catch(() => undefined);
 
   const exported = await runDurableTask('evidence_pack.export', undefined, async () => (

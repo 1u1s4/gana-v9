@@ -57,6 +57,7 @@ import { runValidation, type RunValidationInput, type ValidationRunResult } from
 import type { ResearchWebMode } from './prediction/prompts.js';
 import { runCertification } from './evals/runner.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from './metrics/daily.js';
+import { runDailyE2E, type DailyE2ERunResult, type DailyE2EProvider, type DailyParlayProfile } from './daily/e2e.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -114,7 +115,7 @@ type OptionalRunService = {
   runFixtureScoring?: typeof runFixtureScoring;
   runParlayBuild?: typeof runParlayBuild;
   runValidation?: typeof runValidation;
-  runPipeline?: (config: AgentConfig, input: { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
+  runPipeline?: (config: AgentConfig, input: { date: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[]; metadata?: Record<string, unknown> }, runtime: RuntimeContext) => Promise<RunPipelineResult>;
   exportRunArtifacts?: (config: AgentConfig, input: { runId: string }, runtime: RuntimeContext) => Promise<RunExportResult>;
 };
 
@@ -128,6 +129,8 @@ type RunPipelineResult = {
   evidencePackPath?: string;
   error?: string;
 };
+
+type DailyE2EValidationMode = 'auto' | 'force' | false;
 
 type RunExportResult = {
   ok: boolean;
@@ -524,6 +527,34 @@ function optionalRunValidationMode(flags: Record<string, string | true>): 'auto'
   throw new Error('--validate must be auto, force, or off.');
 }
 
+function optionalDailyProvidersFlag(flags: Record<string, string | true>): DailyE2EProvider[] | undefined {
+  const value = optionalStringFlag(flags, 'providers');
+  if (value === undefined) return undefined;
+  const providers = value.split(',').map((provider) => provider.trim()).filter(Boolean);
+  const invalid = providers.filter((provider) => provider !== 'codex' && provider !== 'gemini');
+  if (!providers.length || invalid.length) {
+    throw new Error(`--providers must be a comma-separated list using codex,gemini. Invalid: ${invalid.join(',') || value}.`);
+  }
+  return [...new Set(providers)] as DailyE2EProvider[];
+}
+
+function optionalDailyParlayProfileFlag(flags: Record<string, string | true>): DailyParlayProfile | undefined {
+  const value = optionalStringFlag(flags, 'parlay-profile');
+  if (value === undefined) return undefined;
+  if (
+    value === 'safe-consensus'
+    || value === 'balanced'
+    || value === 'aggressive-analytical'
+    || value === 'low-variance'
+    || value === 'high-conviction'
+    || value === 'market-diverse'
+    || value === 'parlay-oro'
+  ) {
+    return value;
+  }
+  throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, or parlay-oro.');
+}
+
 function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] } {
   return {
     date: requireDateFlag(flags),
@@ -619,6 +650,25 @@ async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: 
     throw new Error('run-service is not available yet; expected runPipeline in src/runtime/run-service.ts.');
   }
   return service.runPipeline(ctx.config, input, ctx.runtime);
+}
+
+async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<DailyE2ERunResult> {
+  const persistMetricsFlag = optionalStringFlag(flags, 'persist-metrics');
+  const persistMetrics = flags['persist-metrics'] === true || persistMetricsFlag === undefined
+    ? true
+    : !['false', 'off', 'no', '0'].includes(persistMetricsFlag.toLowerCase());
+  return runDailyE2E(ctx.config, {
+    date: requireDateFlag(flags),
+    providers: optionalDailyProvidersFlag(flags),
+    maxFixtures: optionalPositiveIntegerFlag(flags, 'max-fixtures'),
+    threshold: optionalFloatFlag(flags, 'threshold'),
+    web: optionalResearchWebModeFlag(flags),
+    validate: optionalRunValidationMode(flags) as DailyE2EValidationMode | undefined,
+    markets: optionalMarketsFlag(flags),
+    parlayProfile: optionalDailyParlayProfileFlag(flags),
+    persistMetrics,
+    dailyBatchId: optionalStringFlag(flags, 'daily-batch-id'),
+  }, ctx.runtime);
 }
 
 async function exportRun(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunExportResult> {
@@ -894,6 +944,26 @@ function printRunResult(result: RunPipelineResult): void {
   if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
   if (result.handoffPath) printKeyValue('handoff', result.handoffPath);
   if (result.evidencePackPath) printKeyValue('evidencePack', result.evidencePackPath);
+  if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
+}
+
+function printDailyE2EResult(result: DailyE2ERunResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}daily-e2e${RESET} ${DIM}${result.ok ? 'succeeded' : 'review-required'}${RESET}`);
+  printKeyValue('dailyBatchId', result.dailyBatchId);
+  printKeyValue('date', result.date);
+  printKeyValue('artifact', result.artifactDir);
+  printKeyValue('summary', result.summaryPath);
+  printKeyValue('report', result.reportPath);
+  for (const provider of result.providers) {
+    console.log(`  ${GREEN}•${RESET} ${CYAN}${provider.provider}${RESET} ${DIM}${provider.model} run=${provider.runId ?? 'none'} verdict=${provider.verdict ?? 'n/a'}${RESET}`);
+  }
+  for (const family of result.parlays) {
+    console.log(`  ${GREEN}•${RESET} ${CYAN}${family.family}${RESET} ${DIM}run=${family.runId ?? 'none'} sourceRuns=${family.sourceRunIds.join(',') || 'none'} verdict=${family.verdict ?? 'n/a'}${RESET}`);
+  }
+  if (result.parlayAnalysis) printKeyValue('recommendations', result.parlayAnalysis.top.length);
+  if (result.metrics) printKeyValue('metricsPersisted', result.metrics.persisted);
+  printKeyValue('artifactType', 'analytical only; not executable');
   if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
 }
 
@@ -1557,6 +1627,16 @@ commands.push({
 });
 
 commands.push({
+  name: '/daily-e2e',
+  description: 'Run daily Codex vs Gemini comparative pipeline',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await runDailyE2ECommand(ctx, flags);
+    printDailyE2EResult(result);
+  },
+});
+
+commands.push({
   name: '/certify',
   description: 'Run deterministic harness certification',
   execute: async (args, ctx) => {
@@ -1862,6 +1942,13 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
     }
 
+    if (area === 'daily-e2e') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await runDailyE2ECommand(ctx, flags);
+      printDailyE2EResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
     if (area === 'certify') {
       const flags = parseFlags(argv.slice(1));
       const result = await runCertification({ ...ctx.config, apiFootballKey: '', databaseUrl: '' }, ctx.runtime, optionalStringFlag(flags, 'profile') ?? 'ci-certification');
@@ -2007,6 +2094,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --max-fixtures 100 --threshold 1.20 --web live --parlay-profile balanced${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);
