@@ -33,7 +33,7 @@ export const AGENT_PROVIDER_LABELS: Record<AgentProviderCompat, string> = {
 
 export const AGENT_PROVIDER_DEFAULT_MODELS: Record<AgentProviderCompat, readonly string[]> = {
   codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
-  gemini: ['gemini-3-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+  gemini: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
   openrouter: ['anthropic/claude-sonnet-4.5', 'anthropic/claude-haiku-4.5'],
 };
 

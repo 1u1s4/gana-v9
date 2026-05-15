@@ -84,6 +84,7 @@ export interface AgentConfig extends GanaConfigExtension {
   codexThreadId?: string;
   geminiHome: string;
   geminiModelListPath: string;
+  geminiFallbackModels: string[];
   geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
   geminiSessionId?: string;
 }
@@ -290,6 +291,7 @@ const DEFAULTS: AgentConfig = {
   codexFallbackModels: ['gpt-5.4-mini'],
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
+  geminiFallbackModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
   geminiApprovalMode: 'default',
 };
 
@@ -382,6 +384,7 @@ export function loadConfig(
   if (process.env.AGENT_CODEX_FALLBACK_MODELS) config.codexFallbackModels = parseStringList(process.env.AGENT_CODEX_FALLBACK_MODELS) ?? [];
   if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
   if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
+  if (process.env.AGENT_GEMINI_FALLBACK_MODELS) config.geminiFallbackModels = parseStringList(process.env.AGENT_GEMINI_FALLBACK_MODELS) ?? [];
   if (isGeminiApprovalMode(process.env.AGENT_GEMINI_APPROVAL_MODE)) {
     config.geminiApprovalMode = process.env.AGENT_GEMINI_APPROVAL_MODE;
   }

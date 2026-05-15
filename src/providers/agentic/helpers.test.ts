@@ -200,4 +200,12 @@ describe('agentic provider helpers', () => {
       assert.equal(defaults.some(isFastModelId), false);
     }
   });
+
+  it('defaults Gemini to Pro before Flash fallbacks', () => {
+    assert.deepEqual(
+      AGENT_PROVIDER_DEFAULT_MODELS.gemini.slice(0, 3),
+      ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+    );
+    assert.equal(selectDefaultModelForProvider('gemini'), 'gemini-2.5-pro');
+  });
 });

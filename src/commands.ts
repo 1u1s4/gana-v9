@@ -660,6 +660,7 @@ async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, 
   return runDailyE2E(ctx.config, {
     date: requireDateFlag(flags),
     providers: optionalDailyProvidersFlag(flags),
+    models: optionalDailyProviderModelsFlag(flags),
     maxFixtures: optionalPositiveIntegerFlag(flags, 'max-fixtures'),
     threshold: optionalFloatFlag(flags, 'threshold'),
     web: optionalResearchWebModeFlag(flags),
@@ -669,6 +670,15 @@ async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, 
     persistMetrics,
     dailyBatchId: optionalStringFlag(flags, 'daily-batch-id'),
   }, ctx.runtime);
+}
+
+function optionalDailyProviderModelsFlag(flags: Record<string, string | true>): Partial<Record<DailyE2EProvider, string>> | undefined {
+  const models: Partial<Record<DailyE2EProvider, string>> = {};
+  const codexModel = optionalStringFlag(flags, 'codex-model')?.trim();
+  const geminiModel = optionalStringFlag(flags, 'gemini-model')?.trim();
+  if (codexModel) models.codex = codexModel;
+  if (geminiModel) models.gemini = geminiModel;
+  return Object.keys(models).length ? models : undefined;
 }
 
 async function exportRun(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunExportResult> {
@@ -2094,7 +2104,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --max-fixtures 100 --threshold 1.20 --web live --parlay-profile balanced${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile balanced${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

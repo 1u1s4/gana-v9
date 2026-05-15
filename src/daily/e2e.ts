@@ -32,6 +32,7 @@ export type DailyParlayProfile =
 export interface RunDailyE2EInput {
   date: string;
   providers?: DailyE2EProvider[];
+  models?: Partial<Record<DailyE2EProvider, string>>;
   web?: ResearchWebMode;
   validate?: PipelineValidationMode;
   markets?: MarketKey[];
@@ -128,7 +129,7 @@ export async function runDailyE2E(
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
     providerAgentic,
-    model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
+    model: providers.map((provider) => modelForProvider(effectiveConfig, provider, input.models)).join(','),
     status: 'running',
     verdict: null,
     artifactDir,
@@ -150,7 +151,7 @@ export async function runDailyE2E(
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
     providerAgentic,
-    model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
+    model: providers.map((provider) => modelForProvider(effectiveConfig, provider, input.models)).join(','),
     status: 'running',
     date: input.date,
     startedAt: startedAt.toISOString(),
@@ -168,7 +169,7 @@ export async function runDailyE2E(
   const providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>> = {};
 
   for (const provider of providers) {
-    const providerConfig = configForProvider(effectiveConfig, provider);
+    const providerConfig = configForProvider(effectiveConfig, provider, input.models);
     const providerRuntime = childRuntime(runtime, providerConfig);
     const result = await runner(providerConfig, {
       date: input.date,
@@ -216,8 +217,9 @@ export async function runDailyE2E(
       continue;
     }
     const parlayRunId = boundedDailyChildRunId(dailyBatchId, provider, parlayProfile);
-    const parlayRuntime = childRuntime(runtime, configForProvider(effectiveConfig, provider), parlayRunId);
-    const result = await buildParlay(configForProvider(effectiveConfig, provider), {
+    const providerConfig = configForProvider(effectiveConfig, provider, input.models);
+    const parlayRuntime = childRuntime(runtime, providerConfig, parlayRunId);
+    const result = await buildParlay(providerConfig, {
       date: input.date,
       sourceRunId: runId,
       portfolio: parlayProfile,
@@ -270,7 +272,7 @@ export async function runDailyE2E(
     date: input.date,
     providers: providers.map((provider) => ({
       provider,
-      model: modelForProvider(effectiveConfig, provider),
+      model: modelForProvider(effectiveConfig, provider, input.models),
       runId: providerPipelineResults[provider]?.runId,
       result: providerPipelineResults[provider],
     })),
@@ -334,6 +336,10 @@ export async function runDailyE2E(
     } : null,
     sharedInputs: {
       pairedProviders,
+      providerModels: Object.fromEntries(providers.map((provider) => [
+        provider,
+        modelForProvider(effectiveConfig, provider, input.models),
+      ])),
       marketScope,
       web: input.web ?? effectiveConfig.nativeWebSearchMode,
       maxFixturesPerRun: effectiveConfig.apiFootball.maxFixturesPerRun,
@@ -372,7 +378,7 @@ export async function runDailyE2E(
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
     providerAgentic,
-    model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
+    model: providers.map((provider) => modelForProvider(effectiveConfig, provider, input.models)).join(','),
     status: ok ? 'succeeded' : 'failed',
     verdict,
     date: input.date,
@@ -389,7 +395,7 @@ export async function runDailyE2E(
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
     providerAgentic,
-    model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
+    model: providers.map((provider) => modelForProvider(effectiveConfig, provider, input.models)).join(','),
     status: ok ? 'succeeded' : 'failed',
     verdict,
     artifactDir,
@@ -488,11 +494,15 @@ function withDailyOverrides(config: AgentConfig, input: RunDailyE2EInput): Agent
   };
 }
 
-function configForProvider(config: AgentConfig, provider: DailyE2EProvider): AgentConfig {
+function configForProvider(
+  config: AgentConfig,
+  provider: DailyE2EProvider,
+  models: RunDailyE2EInput['models'] = {},
+): AgentConfig {
   return {
     ...config,
     provider,
-    model: modelForProvider(config, provider),
+    model: modelForProvider(config, provider, models),
     codexThreadId: undefined,
     geminiSessionId: undefined,
   };
@@ -508,7 +518,13 @@ function configForSports(runConfig: AgentConfig, sportsConfig: AgentConfig): Age
   };
 }
 
-function modelForProvider(config: AgentConfig, provider: DailyE2EProvider): string {
+function modelForProvider(
+  config: AgentConfig,
+  provider: DailyE2EProvider,
+  models: RunDailyE2EInput['models'] = {},
+): string {
+  const explicit = models[provider]?.trim();
+  if (explicit) return explicit;
   if (config.provider === provider && config.model) return config.model;
   return selectDefaultModelForProvider(provider);
 }

@@ -998,7 +998,7 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
     case 'low-variance':
       return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.25, maxOdds: 1.8, maxLegOdds: LOW_ODDS_TOP_MAX_LEG_ODDS, targetParlays: 2, minConfidence: 0.78, minEdge: 0.005, markets: ['double_chance'], avoidDrawExposure: true, riskWeight: 0.75 };
     case 'balanced':
-      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.72, minEdge: 0.02, markets: ['h2h', 'btts', 'goals_over_under'], reviewOnly: true, riskWeight: 0.55 };
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.72, minEdge: 0.02, markets: ['h2h', 'double_chance', 'btts', 'goals_over_under'], reviewOnly: true, riskWeight: 0.55 };
     case 'totals':
       return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.5, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.68, minEdge: 0.02, markets: ['goals_over_under', 'btts'], requireLine: true, minAggregateConfidence: 0.48, riskWeight: 0.6 };
     case 'high-conviction':

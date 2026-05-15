@@ -118,7 +118,7 @@ describe('parlay builder', () => {
     );
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'stale-low-liquidity')?.excludedReasons,
-      ['excluded-stale-low-liquidity', 'excluded-low-liquidity', 'excluded-research-not-promotable'],
+      ['excluded-stale-low-liquidity', 'excluded-research-not-promotable'],
     );
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'unverified-corners')?.excludedReasons,
@@ -128,6 +128,25 @@ describe('parlay builder', () => {
       result.evaluations.find((evaluation) => evaluation.predictionId === 'inflated-dc')?.excludedReasons,
       ['excluded-inflated-double-chance-edge', 'excluded-overinflated-edge'],
     );
+  });
+
+  it('keeps promotable low-liquidity legs eligible while carrying review warnings', () => {
+    const result = buildParlay({
+      id: 'parlay-1',
+      generatedAt: '2026-04-25T12:00:00.000Z',
+      predictions: [
+        prediction({ id: 'low-liquidity-1', fixtureId: 'fixture-1', status: 'promotable', odds: 1.4, edge: 0.04, warnings: ['low-liquidity'] }),
+        prediction({ id: 'low-liquidity-2', fixtureId: 'fixture-2', status: 'promotable', odds: 1.35, edge: 0.04, warnings: ['Single-bookmaker quote'] }),
+      ],
+    });
+
+    assert.deepEqual(result.parlay.legs.map((leg) => leg.predictionId), ['low-liquidity-1', 'low-liquidity-2']);
+    assert.deepEqual(
+      result.evaluations.map((evaluation) => evaluation.excludedReasons),
+      [[], []],
+    );
+    assert.equal(result.parlay.status, 'review-required');
+    assert.match(result.parlay.warnings.join('\n'), /warnings/);
   });
 
   it('excludes duplicate fixtures by default', () => {

@@ -141,6 +141,47 @@ console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, o
     }
   });
 
+  it('falls back from Gemini Pro to Flash Lite when Pro and Flash fail', async () => {
+    const originalPath = process.env.PATH;
+    const binDir = mkdtempSync(join(tmpdir(), 'gana-gemini-bin-'));
+    const callsPath = join(binDir, 'calls.jsonl');
+    const geminiPath = join(binDir, 'gemini');
+    writeFileSync(geminiPath, `#!/usr/bin/env node
+const fs = require('fs');
+const args = process.argv.slice(2);
+const model = args[args.indexOf('--model') + 1];
+fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify({ model, args }) + '\\n');
+if (model === 'gemini-2.5-pro') {
+  console.error('404 model not found: gemini-2.5-pro');
+  process.exit(1);
+}
+if (model === 'gemini-2.5-flash') {
+  console.error('503 model unavailable: gemini-2.5-flash');
+  process.exit(1);
+}
+console.log(JSON.stringify({ type: 'message', role: 'assistant', content: 'gemini fallback ok' }));
+console.log(JSON.stringify({ type: 'result', stats: { input_tokens: 3, output_tokens: 4 } }));
+`);
+    chmodSync(geminiPath, 0o755);
+    process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+    try {
+      const cfg = config({
+        provider: 'gemini',
+        model: 'gemini-2.5-pro',
+        geminiFallbackModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+      });
+
+      const result = await runAgent(cfg, 'hello');
+
+      assert.equal(result.text, 'gemini fallback ok');
+      assert.equal(cfg.model, 'gemini-2.5-flash-lite');
+      const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { model: string });
+      assert.deepEqual(calls.map((call) => call.model), ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it('blocks monetary prompts before provider execution', async () => {
     const cfg = config({ provider: 'openrouter' });
 

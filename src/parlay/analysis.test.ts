@@ -48,6 +48,7 @@ function leg(input: {
   fixtureId?: string;
   market: string;
   selection: string;
+  line?: number;
   odds: number;
   confidence?: number;
   validation?: string;
@@ -59,7 +60,7 @@ function leg(input: {
     fixtureId: input.fixtureId ?? `fixture-${input.id}`,
     marketKey: input.market,
     selectionKey: input.selection,
-    line: null,
+    line: input.line ?? null,
     odds: input.odds,
     fixture: {
       id: input.fixtureId ?? `fixture-${input.id}`,
@@ -258,6 +259,41 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.analyzed, 2);
     assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-core-high', 'parlay-core-balanced']);
     assert.equal(result.top.some((item) => item.profile === 'low-odds-top' || item.profile === 'parlay-oro'), false);
+  });
+
+  it('keeps promotable low-liquidity balanced parlays recommendable with reduced stake', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const rows = [
+      parlay({
+        id: 'parlay-balanced-low-liquidity',
+        profile: 'balanced',
+        validation: 'unvalidated',
+        odds: 2.05,
+        confidence: 0.56,
+        status: 'review-required',
+        legs: [
+          leg({ id: 'low-a', market: 'btts', selection: 'yes', odds: 1.55, confidence: 0.74, warnings: ['low-liquidity'] }),
+          leg({ id: 'low-b', market: 'goals_over_under', selection: 'over', line: 1.5, odds: 1.32, confidence: 0.76, warnings: ['Single-bookmaker quote'] }),
+        ],
+      }),
+    ];
+
+    const result = await runParlayAnalysis(cfg, {
+      date: '2026-05-15',
+      top: 3,
+      bankrollUnits: 100,
+      profileScope: 'all',
+    }, runtime, {
+      now: () => now,
+      db: { parlay: { findMany: async () => rows } },
+      writeArtifact: () => '/tmp/parlay-analysis.json',
+    });
+
+    assert.equal(result.top.length, 1);
+    assert.equal(result.top[0]?.parlayId, 'parlay-balanced-low-liquidity');
+    assert.equal(result.top[0]?.riskFlags.includes('low-liquidity'), true);
+    assert.equal((result.top[0]?.stake.units ?? 0) > 0, true);
   });
 
   it('requires a persisted parlay scope', async () => {

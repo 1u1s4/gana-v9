@@ -42,6 +42,7 @@ describe('runDailyE2E', () => {
       parlayProfile: 'balanced',
       persistMetrics: true,
       dailyBatchId: 'daily-2026-05-14',
+      models: { gemini: 'gemini-2.5-pro' },
     }, ctx.runtime, {
       repositories: undefined,
       runPipeline: async (config, input, runtime, deps) => {
@@ -126,6 +127,8 @@ describe('runDailyE2E', () => {
     assert.equal(result.ok, true);
     assert.equal(result.dailyBatchId, 'daily-2026-05-14');
     assert.deepEqual(pipelineCalls.map((call) => call.provider), ['codex', 'gemini']);
+    assert.equal(pipelineCalls[0].model, 'gpt-5.5');
+    assert.equal(pipelineCalls[1].model, 'gemini-2.5-pro');
     assert.equal(pipelineCalls[0].input.metadata.dailyBatchId, 'daily-2026-05-14');
     assert.equal(pipelineCalls[1].input.metadata.dailyRole, 'gemini');
     assert.equal(pipelineCalls[0].input.markets.length > 0, true);
@@ -143,6 +146,7 @@ describe('runDailyE2E', () => {
     assert.equal(summary.executionCapability, 'none');
     assert.equal(summary.sharedInputs.maxFixturesPerRun, 12);
     assert.equal(summary.sharedInputs.lowOddsThreshold, 1.2);
+    assert.deepEqual(summary.sharedInputs.providerModels, { codex: 'gpt-5.5', gemini: 'gemini-2.5-pro' });
     assert.equal(summary.counts.recommendations, 0);
     assert.equal(summary.providerComparison.summary.comparablePredictions, 0);
     assert.match(readFileSync(result.reportPath, 'utf-8'), /Artifact analitico\. No ejecuta apuestas/);

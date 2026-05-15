@@ -502,6 +502,68 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped unknown evidence source "source_3"/);
   });
 
+  it('repairs null source locators before validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      sources: [{
+        id: 'provider-snapshot-odds',
+        type: 'provider-snapshot',
+        url: null,
+        title: 'API-Football odds snapshot',
+        hash: null,
+        metadata: { provider: 'api-football', providerFixtureId: '1001' },
+      }, {
+        id: 'source-web-1',
+        type: 'web-search',
+        url: 'https://example.com/team-news',
+        title: 'Team news',
+        capturedAt: createdAt.toISOString(),
+        hash: null,
+      }],
+      evidenceItems: [{
+        id: 'evidence-1',
+        sourceId: 'provider-snapshot-odds',
+        claimIds: ['claim-1'],
+        summary: 'Provider odds support the claim.',
+        confidence: 0.8,
+      }, {
+        id: 'evidence-2',
+        sourceId: 'source-web-1',
+        claimIds: ['claim-1'],
+        summary: 'Web source supports the claim.',
+        confidence: 0.8,
+      }],
+      claims: [{
+        id: 'claim-1',
+        statement: 'The goals market is priced from current odds and web context.',
+        subject: { type: 'market', id: 'fixture-1', market: 'goals_over_under' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1', 'evidence-2'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    const providerSource = result.bundle?.sources.find((source) => source.id === 'provider-snapshot-odds');
+    const webSource = result.bundle?.sources.find((source) => source.id === 'source-web-1');
+    assert.equal(result.ok, true);
+    assert.equal(providerSource?.url, undefined);
+    assert.equal(providerSource?.hash, undefined);
+    assert.equal(providerSource?.capturedAt, createdAt.toISOString());
+    assert.match(providerSource?.externalId ?? '', /^api-football:\/\//);
+    assert.equal(webSource?.hash, undefined);
+  });
+
   it('repairs source ids accidentally included in claim evidence references', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -590,6 +652,35 @@ describe('runFixtureResearch', () => {
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.claims[0]?.conflictStatus, 'potential');
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped conflictStatus "minor" to "potential"/);
+  });
+
+  it('repairs common supportLevel aliases before validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      claims: [{
+        id: 'claim-1',
+        statement: 'Corners evidence is thinner than the core markets.',
+        subject: { type: 'market', market: 'corners_over_under' },
+        supportLevel: 'partially_supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.claims[0]?.supportLevel, 'partial');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped supportLevel "partially_supported" to "partial"/);
   });
 
   it('repairs human market subject labels such as match winner before validation', async () => {

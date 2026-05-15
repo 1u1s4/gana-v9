@@ -1129,6 +1129,39 @@ describe('runParlayBuild', () => {
     assert.equal(result.portfolio?.profiles[0].profile, 'market-diverse');
   });
 
+  it('lets balanced use promotable double-chance legs as safer h2h-style exposure', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-15',
+      sourceRunId: 'source-run-balanced-dc',
+      portfolio: 'balanced',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-balanced-dc');
+            return [
+              prediction({ id: 'dc-safe', runId: 'source-run-balanced-dc', fixtureId: 'fixture-1', status: 'promotable', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.25, confidence: 0.86, edge: 0.03, estimatedProbability: 0.82, warnings: ['low-liquidity'] }),
+              prediction({ id: 'total-safe', runId: 'source-run-balanced-dc', fixtureId: 'fixture-2', status: 'promotable', marketKey: 'goals_over_under', selectionKey: 'over', line: 1.5, odds: 1.35, confidence: 0.8, edge: 0.04, estimatedProbability: 0.76, warnings: ['low-liquidity'] }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-balanced-dc' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.build.parlay.legs.some((leg) => leg.market === 'double_chance'), true);
+    assert.equal(result.build.parlay.status, 'review-required');
+  });
+
   it('narrows low-variance parlays to low-priced double-chance legs', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

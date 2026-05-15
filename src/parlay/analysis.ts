@@ -419,7 +419,7 @@ function adjustedProbabilityFor(confidence: number, combinedOdds: number, profil
   if (legs > 4) probability *= 0.9;
   for (const flag of riskFlags) {
     if (flag === 'review-required') probability *= 0.94;
-    if (flag === 'low-liquidity') probability *= 0.92;
+    if (flag === 'low-liquidity') probability *= 0.98;
     if (flag === 'stale-source') probability *= 0.7;
     if (flag === 'low-liquidity-h2h-favorite') probability *= 0.55;
     if (flag === 'corners-unverified') probability *= 0.65;
@@ -435,7 +435,7 @@ function profileMultiplier(profile: string): number {
     case 'low-odds-top': return 1.12;
     case 'low-variance': return 1.02;
     case 'high-conviction': return 1.0;
-    case 'balanced': return 0.92;
+    case 'balanced': return 1.0;
     case 'totals': return 0.82;
     case 'review': return 0.78;
     case 'parlay-oro': return 0.78;

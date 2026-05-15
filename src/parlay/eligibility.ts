@@ -13,7 +13,7 @@ export function automaticParlayRiskReasons(prediction: ParlaySourcePrediction): 
   if (hasStaleLowLiquidityRisk(prediction)) {
     reasons.push('stale low-liquidity prediction');
   }
-  if (hasLowLiquidityH2hFavoriteRisk(prediction)) {
+  if (prediction.status !== 'promotable' && hasLowLiquidityH2hFavoriteRisk(prediction)) {
     reasons.push('low-liquidity h2h short favorite');
   }
   if (hasUnverifiedCornersRisk(prediction)) {
@@ -22,7 +22,7 @@ export function automaticParlayRiskReasons(prediction: ParlaySourcePrediction): 
   if (hasInflatedDoubleChanceEdgeRisk(prediction)) {
     reasons.push('inflated double-chance edge');
   }
-  if (hasLowLiquidityRisk(prediction)) {
+  if (prediction.status !== 'promotable' && hasLowLiquidityRisk(prediction)) {
     reasons.push('low-liquidity prediction');
   }
   if (hasLineupPendingRisk(prediction)) {

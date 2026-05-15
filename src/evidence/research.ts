@@ -205,7 +205,7 @@ export async function runFixtureResearch(
       nativeWebSearchTrace,
       config.provider,
       runId,
-    )),
+    ), createdAt),
     input.web,
     createdAt,
     runId,
@@ -463,7 +463,8 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
   const repairedClaims = claims.map((claim: any) => {
     const subject = repairClaimSubject(claim?.subject, claim?.id, claim?.statement, warnings);
     const conflictStatus = repairClaimConflictStatus(claim?.conflictStatus, claim?.id, warnings);
-    if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject, conflictStatus };
+    const supportLevel = repairClaimSupportLevel(claim?.supportLevel, claim?.id, warnings);
+    if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject, conflictStatus, supportLevel };
     const repairedEvidenceIds: string[] = [];
     for (const evidenceId of claim.evidenceIds) {
       if (typeof evidenceId !== 'string') continue;
@@ -479,7 +480,7 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
       }
       warnings.push(`removed unknown evidence reference "${evidenceId}" from claim "${claim.id ?? 'unknown'}"`);
     }
-    return { ...claim, subject, conflictStatus, evidenceIds: uniqueStrings(repairedEvidenceIds) };
+    return { ...claim, subject, conflictStatus, supportLevel, evidenceIds: uniqueStrings(repairedEvidenceIds) };
   });
 
   return {
@@ -492,8 +493,53 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
   };
 }
 
+function repairClaimSupportLevel(
+  value: unknown,
+  claimId: unknown,
+  warnings: string[],
+): 'supported' | 'partial' | 'weak' | 'unsupported' | 'conflicting' {
+  if (
+    value === 'supported'
+    || value === 'partial'
+    || value === 'weak'
+    || value === 'unsupported'
+    || value === 'conflicting'
+  ) {
+    return value;
+  }
+  const normalized = typeof value === 'string'
+    ? value.trim().toLowerCase().replace(/[\s-]+/g, '_')
+    : '';
+  if (/^(partially_supported|partial_supported|partly_supported|limited|partially)$/.test(normalized)) {
+    warnings.push(`mapped supportLevel "${String(value)}" to "partial" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'partial';
+  }
+  if (/^(supporting|well_supported|fully_supported)$/.test(normalized)) {
+    warnings.push(`mapped supportLevel "${String(value)}" to "supported" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'supported';
+  }
+  if (/^(weakly_supported|thin|thinly_supported|low_support)$/.test(normalized)) {
+    warnings.push(`mapped supportLevel "${String(value)}" to "weak" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'weak';
+  }
+  if (/^(not_supported|no_support|unverified)$/.test(normalized)) {
+    warnings.push(`mapped supportLevel "${String(value)}" to "unsupported" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'unsupported';
+  }
+  if (/^(conflict|contradictory|contradicted)$/.test(normalized)) {
+    warnings.push(`mapped supportLevel "${String(value)}" to "conflicting" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'conflicting';
+  }
+  warnings.push(`mapped invalid supportLevel "${String(value ?? 'unknown')}" to "weak" on claim "${String(claimId ?? 'unknown')}"`);
+  return 'weak';
+}
+
 function repairClaimConflictStatus(value: unknown, claimId: unknown, warnings: string[]): 'none' | 'potential' | 'conflict' {
   if (value === 'none' || value === 'potential' || value === 'conflict') return value;
+  if (typeof value === 'string' && /conflict|contradict/i.test(value)) {
+    warnings.push(`mapped conflictStatus "${value}" to "conflict" on claim "${String(claimId ?? 'unknown')}"`);
+    return 'conflict';
+  }
   if (typeof value === 'string' && /minor|partial|possible|uncertain|warning/i.test(value)) {
     warnings.push(`mapped conflictStatus "${value}" to "potential" on claim "${String(claimId ?? 'unknown')}"`);
     return 'potential';
@@ -1168,12 +1214,20 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.trim().length > 0))];
 }
 
-function normalizeSourceRecords(sources: SourceRecord[]): SourceRecord[] {
+function normalizeSourceRecords(sources: SourceRecord[], defaultCapturedAt?: string): SourceRecord[] {
   return sources.map((source) => {
-    const normalized = {
+    const normalized: any = {
       ...source,
-      capturedAt: normalizeIsoDateTime(source.capturedAt),
+      capturedAt: normalizeIsoDateTime(source.capturedAt ?? defaultCapturedAt),
     };
+    if (normalized.url == null) delete normalized.url;
+    if (normalized.hash == null) delete normalized.hash;
+    if (normalized.snapshotId == null) delete normalized.snapshotId;
+    if (normalized.artifactPath == null) delete normalized.artifactPath;
+    if (normalized.externalId == null) delete normalized.externalId;
+    if (!normalized.url && !normalized.snapshotId && !normalized.artifactPath && !normalized.externalId) {
+      normalized.externalId = sourceExternalIdFallback(normalized);
+    }
     if (!normalized.url || isValidUrl(normalized.url)) return normalized;
     return {
       ...normalized,
@@ -1183,7 +1237,17 @@ function normalizeSourceRecords(sources: SourceRecord[]): SourceRecord[] {
   });
 }
 
-function normalizeIsoDateTime(value: string): string {
+function sourceExternalIdFallback(source: SourceRecord & { metadata?: Record<string, unknown> }): string {
+  if (source.type === 'provider-snapshot' || source.type === 'api-football') {
+    const provider = typeof source.metadata?.provider === 'string' ? source.metadata.provider : 'api-football';
+    const providerFixtureId = typeof source.metadata?.providerFixtureId === 'string' ? source.metadata.providerFixtureId : undefined;
+    return providerFixtureId ? `${provider}://${source.id}/${providerFixtureId}` : `${provider}://${source.id}`;
+  }
+  return `${source.type}:${source.id}`;
+}
+
+function normalizeIsoDateTime(value: string | undefined): string | undefined {
+  if (!value) return undefined;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
 }

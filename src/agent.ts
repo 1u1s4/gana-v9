@@ -354,9 +354,20 @@ function codexModelAttempts(config: AgentConfig): string[] {
     .filter((model, index, models) => Boolean(model) && models.indexOf(model) === index);
 }
 
+function geminiModelAttempts(config: AgentConfig): string[] {
+  return [config.model, ...config.geminiFallbackModels]
+    .map((model) => model.trim())
+    .filter((model, index, models) => Boolean(model) && models.indexOf(model) === index);
+}
+
 function isCodexQuotaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /\b(429|quota|rate limit|rate-limit|usage limit|limit exceeded|too many requests|insufficient quota)\b/i.test(message);
+}
+
+function isGeminiFallbackError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(404|429|500|502|503|504|quota|rate limit|rate-limit|usage limit|limit exceeded|too many requests|insufficient quota|not found|not available|unavailable|unsupported model|model .*not.*supported)\b/i.test(message);
 }
 
 async function runCodexAgent(
@@ -545,6 +556,37 @@ async function runCodexAgentAttempt(
 }
 
 async function runGeminiAgent(
+  config: AgentConfig,
+  input: string | ChatMessage[],
+  options?: RunAgentOptions,
+) {
+  const originalModel = config.model;
+  const models = geminiModelAttempts(config);
+  let lastError: unknown;
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    config.model = model;
+    try {
+      return await runGeminiAgentAttempt(config, input, options);
+    } catch (error) {
+      lastError = error;
+      const nextModel = models[index + 1];
+      if (!nextModel || !isGeminiFallbackError(error)) {
+        config.model = model;
+        throw error;
+      }
+      config.geminiSessionId = undefined;
+      options?.onEvent?.({
+        type: 'text',
+        delta: `\n[guardrail] Gemini model ${model} failed; retrying with ${nextModel}.\n`,
+      });
+    }
+  }
+  config.model = originalModel;
+  throw lastError;
+}
+
+async function runGeminiAgentAttempt(
   config: AgentConfig,
   input: string | ChatMessage[],
   options?: RunAgentOptions,
