@@ -78,16 +78,29 @@ describe('parseOverviewQuery', () => {
     assert.equal(query.runId, 'run-1');
   });
 
+  it('parses daily overview filters', () => {
+    const query = parse('tab=daily&dailyBatchId=daily-2026-05-01&provider=codex&model=gpt-5.5&family=consensus-mixed&recommendationTier=promotable&sort=verdict');
+    assert.equal(query.tab, 'daily');
+    assert.equal(query.dailyBatchId, 'daily-2026-05-01');
+    assert.equal(query.provider, 'codex');
+    assert.equal(query.model, 'gpt-5.5');
+    assert.equal(query.family, 'consensus-mixed');
+    assert.equal(query.recommendationTier, 'promotable');
+    assert.equal(query.sort, 'verdict');
+  });
+
   it('loads metadata contract from query module', () => {
     const metadata = createMetadata();
     assert.equal(metadata.tabs.includes('predictions'), true);
     assert.equal(metadata.tabs.includes('runs'), true);
+    assert.equal(metadata.tabs.includes('daily'), true);
     assert.equal(metadata.validationTargets.includes('all'), true);
     assert.equal(metadata.validationTargets.includes('prediction'), true);
     assert.equal(metadata.validationTargets.includes('parlay'), true);
     assert.equal(metadata.takeOptions[0], 25);
     assert.equal(metadata.takeOptions.includes(200), true);
     assert.equal(metadata.sortOptions.predictions.includes('selectionKey'), true);
+    assert.equal(metadata.sortOptions.daily.includes('verdict'), true);
     assert.equal(metadata.sortOptions.predictions.includes('non-valid'), false);
     assert.equal(metadata.directions.includes('asc'), true);
   });

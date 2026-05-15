@@ -143,6 +143,12 @@ function evaluatePrediction(
     else if (reason.includes('corners market')) reasons.push('excluded-corners-unverified');
     else if (reason.includes('stale low-liquidity')) reasons.push('excluded-stale-low-liquidity');
     else if (reason.includes('double-chance')) reasons.push('excluded-inflated-double-chance-edge');
+    else if (reason.includes('low-liquidity')) reasons.push('excluded-low-liquidity');
+    else if (reason.includes('lineup-pending')) reasons.push('excluded-lineup-pending');
+    else if (reason.includes('selection-level')) reasons.push('excluded-selection-evidence-missing');
+    else if (reason.includes('h2h away')) reasons.push('excluded-h2h-away-risk');
+    else if (reason.includes('fragile low-priced total over')) reasons.push('excluded-fragile-low-total-over');
+    else if (reason.includes('overinflated edge')) reasons.push('excluded-overinflated-edge');
     else reasons.push('excluded-parlay-ineligible');
   }
   if (hasHardResearchWarning(prediction)) reasons.push('excluded-research-not-promotable');

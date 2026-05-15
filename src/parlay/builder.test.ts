@@ -118,7 +118,7 @@ describe('parlay builder', () => {
     );
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'stale-low-liquidity')?.excludedReasons,
-      ['excluded-stale-low-liquidity', 'excluded-research-not-promotable'],
+      ['excluded-stale-low-liquidity', 'excluded-low-liquidity', 'excluded-research-not-promotable'],
     );
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'unverified-corners')?.excludedReasons,
@@ -126,7 +126,7 @@ describe('parlay builder', () => {
     );
     assert.deepEqual(
       result.evaluations.find((evaluation) => evaluation.predictionId === 'inflated-dc')?.excludedReasons,
-      ['excluded-inflated-double-chance-edge'],
+      ['excluded-inflated-double-chance-edge', 'excluded-overinflated-edge'],
     );
   });
 
@@ -136,7 +136,7 @@ describe('parlay builder', () => {
       generatedAt: '2026-04-25T12:00:00.000Z',
       predictions: [
         prediction({ id: 'prediction-1', fixtureId: 'fixture-1', selection: 'home' }),
-        prediction({ id: 'prediction-2', fixtureId: 'fixture-1', selection: 'away' }),
+        prediction({ id: 'prediction-2', fixtureId: 'fixture-1', selection: 'home' }),
         prediction({ id: 'prediction-3', fixtureId: 'fixture-2', selection: 'home' }),
       ],
     });
@@ -152,7 +152,7 @@ describe('parlay builder', () => {
       config: { allowMultipleLegsPerFixture: true },
       predictions: [
         prediction({ id: 'prediction-1', fixtureId: 'fixture-1', selection: 'home' }),
-        prediction({ id: 'prediction-2', fixtureId: 'fixture-1', selection: 'away' }),
+        prediction({ id: 'prediction-2', fixtureId: 'fixture-1', selection: 'home' }),
       ],
     });
 

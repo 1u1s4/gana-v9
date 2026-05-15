@@ -862,6 +862,7 @@ export function dashboardHtml(): string {
               <button class="icon-btn" data-quick-tab="validations" type="button">Validaciones</button>
               <button class="icon-btn" data-quick-tab="runs" type="button">Runs</button>
               <button class="icon-btn" data-quick-tab="metrics" type="button">Métricas</button>
+              <button class="icon-btn" data-quick-tab="daily" type="button">Daily</button>
             </div>
             <div class="quick-grid wide">
               <button class="icon-btn" data-quick-view="top-edge" type="button">Top edge</button>
@@ -880,6 +881,7 @@ export function dashboardHtml(): string {
         <button class="tab" data-tab="validations">Validaciones</button>
         <button class="tab" data-tab="runs">Runs</button>
         <button class="tab" data-tab="metrics">Métricas</button>
+        <button class="tab" data-tab="daily">Daily</button>
       </nav>
       <section class="content">
         <div class="panel module-shell">
@@ -914,6 +916,7 @@ export function dashboardHtml(): string {
         validations: 'Validaciones',
         runs: 'Runs',
         metrics: 'Métricas',
+        daily: 'Daily',
       };
       const KIND_TO_TAB = {
         fixture: 'fixtures',
@@ -965,8 +968,15 @@ export function dashboardHtml(): string {
           ['Zona', 'timezone'],
           ['Generado', 'generatedAt'],
         ],
+        daily: [
+          ['Creado', 'createdAt'],
+          ['Estado', 'status'],
+          ['Veredicto', 'verdict'],
+          ['Inicio', 'startedAt'],
+          ['Fin', 'completedAt'],
+        ],
       };
-      const ALLOWED_TABS = ['fixtures', 'predictions', 'parlays', 'validations', 'runs', 'metrics'];
+      const ALLOWED_TABS = ['fixtures', 'predictions', 'parlays', 'validations', 'runs', 'metrics', 'daily'];
       const DEFAULT_SORT_BY = {
         fixtures: 'scheduledAt',
         predictions: 'generatedAt',
@@ -974,6 +984,7 @@ export function dashboardHtml(): string {
         validations: 'evaluatedAt',
         runs: 'createdAt',
         metrics: 'metricDate',
+        daily: 'createdAt',
       };
       const state = {
         tab: 'fixtures',
@@ -1417,6 +1428,7 @@ export function dashboardHtml(): string {
           cards.push('<article class="stat' + (state.tab === 'validations' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="validations"><span class="muted">Validaciones</span><b>' + state.data.counts.validations + '</b></article>');
           cards.push('<article class="stat' + (state.tab === 'runs' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="runs"><span class="muted">Runs</span><b>' + state.data.counts.runs + '</b></article>');
           cards.push('<article class="stat' + (state.tab === 'metrics' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="metrics"><span class="muted">Métricas</span><b>' + state.data.counts.metrics + '</b></article>');
+          cards.push('<article class="stat' + (state.tab === 'daily' ? ' active' : '') + '" data-metric-kind="tab" data-metric-value="daily"><span class="muted">Daily</span><b>' + state.data.counts.daily + '</b></article>');
         }
         $('#stats').innerHTML = cards.join('');
       }
@@ -1618,6 +1630,7 @@ export function dashboardHtml(): string {
         if (state.tab === 'validations') return renderValidationRows(rows);
         if (state.tab === 'runs') return renderRunRows(rows);
         if (state.tab === 'metrics') return renderMetricRows(rows);
+        if (state.tab === 'daily') return renderDailyRows(rows);
       }
 
       function renderPager() {
@@ -1638,6 +1651,7 @@ export function dashboardHtml(): string {
         if (state.tab === 'parlays') return state.data.parlays || [];
         if (state.tab === 'validations') return state.data.validations || [];
         if (state.tab === 'metrics') return state.data.metrics || [];
+        if (state.tab === 'daily') return state.data.daily || [];
         return state.data.runs || [];
       }
 
@@ -1771,9 +1785,55 @@ export function dashboardHtml(): string {
       function renderMetricCharts(charts) {
         return '<div class="metric-charts">' +
           renderBarChart('Parlay perfil', charts.parlayHitRateByProfile || []) +
+          renderBarChart('Parlay provider', charts.parlayHitRateByProvider || []) +
           renderBarChart('Parlay odds', charts.parlayHitRateByOddsBucket || []) +
+          renderBarChart('Pred. provider', charts.predictionHitRateByProvider || []) +
           renderBarChart('Pred. mercado', charts.predictionHitRateByMarket || []) +
           '</div>';
+      }
+
+      function renderDailyRows(rows) {
+        const headers = TAB_SORT_HEADERS.daily;
+        const sort = state.sort;
+        $('#list').className = 'table-host daily-host';
+        $('#list').innerHTML = '<div class="daily-grid">' + rows.map((row) => {
+          const counts = row.counts || {};
+          const comparison = row.providerComparison?.summary || {};
+          const consensus = row.providerConsensus || {};
+          const recs = row.recommendations || [];
+          const familyCounts = counts.parlayFamilies || {};
+          const familyText = Object.entries(familyCounts).map(([family, value]) => family + ': ' + ((value && value.persistedParlays) || 0)).join(' · ');
+          const cards = recs.slice(0, 6).map((rec) => '<article class="recommendation-card">' +
+            '<div class="card-kicker">#' + esc(rec.rank) + ' ' + esc(rec.profile || rec.family || 'parlay') + '</div>' +
+            '<b>Odds ' + fmtNum(rec.combinedOdds) + '</b>' +
+            '<div class="sub">conf. ' + fmtPct(rec.aggregateConfidence, 1) + ' · edge ' + fmtPct(rec.expectedEdge, 1) + '</div>' +
+            '<div>' + badge(rec.status || 'review-required') + '</div>' +
+            '<div class="sub">' + esc((rec.riskFlags || []).slice(0, 3).join(' · ') || 'sin flags') + '</div>' +
+            '</article>').join('');
+          return '<article class="daily-card" data-kind="run" data-id="' + esc(row.id) + '">' +
+            '<div class="daily-card-head"><div><b>' + esc(row.date || row.id) + '</b><div class="sub mono">' + esc(row.id) + '</div></div><div>' + badge(row.status) + ' ' + esc(row.verdict || '') + '</div></div>' +
+            '<div class="daily-meta">' +
+              '<span>providers <b>' + esc(row.providerAgentic || 'n/a') + '</b></span>' +
+              '<span>consenso <b>' + esc(consensus.consensusPredictions ?? 0) + '</b></span>' +
+              '<span>agreement <b>' + fmtRate(comparison.agreementRate == null ? null : comparison.agreementRate * 100) + '</b></span>' +
+              '<span>recs <b>' + esc(recs.length) + '</b></span>' +
+            '</div>' +
+            '<div class="sub">' + esc(familyText || 'sin familias de parlay') + '</div>' +
+            '<div class="recommendation-grid">' + (cards || '<span class="muted-inline">Sin recomendaciones</span>') + '</div>' +
+            '<div class="sub">Artifact analítico. No ejecuta apuestas ni garantiza resultados.</div>' +
+          '</article>';
+        }).join('') + '</div><div class="table-wrap daily-table"><table><thead><tr>' +
+          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
+            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
+          '<th>Batch</th><th>Comparación</th></tr></thead><tbody>' +
+          rows.map((row) => {
+            const comparison = row.providerComparison?.summary || {};
+            return '<tr data-kind="run" data-id="' + esc(row.id) + '"><td>' + fmtDate(row.createdAt) + '</td><td>' + badge(row.status) +
+              '</td><td>' + esc(row.verdict || '—') + '</td><td>' + fmtDate(row.startedAt) + '</td><td>' + fmtDate(row.completedAt) +
+              '</td><td><div>' + esc(row.date || '—') + '</div><div class="sub">' + esc(row.providerAgentic || '—') + '</div></td><td>' +
+              esc((comparison.sameSelection ?? 0) + ' same · ' + (comparison.sameMarketDifferentSelection ?? 0) + ' diff · ' + (comparison.onlyCodex ?? 0) + '/' + (comparison.onlyGemini ?? 0) + ' solo') +
+              '</td></tr>';
+          }).join('') + '</tbody></table></div>';
       }
 
       function renderBarChart(title, rows) {

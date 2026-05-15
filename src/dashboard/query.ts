@@ -2,7 +2,7 @@ import type { DashboardStatusOptions } from './types.js';
 import { PREDICTION_QUALITIES, PREDICTION_STATUSES } from '../prediction/types.js';
 import { MARKET_KEYS } from '../domain/markets.js';
 
-export type DashboardTab = 'fixtures' | 'predictions' | 'parlays' | 'validations' | 'runs' | 'metrics';
+export type DashboardTab = 'fixtures' | 'predictions' | 'parlays' | 'validations' | 'runs' | 'metrics' | 'daily';
 
 export type DashboardDirection = 'asc' | 'desc';
 
@@ -18,6 +18,11 @@ export interface ParsedOverviewQuery {
   dateFrom?: string;
   dateTo?: string;
   runId?: string;
+  dailyBatchId?: string;
+  provider?: string;
+  model?: string;
+  family?: string;
+  recommendationTier?: string;
   statuses: string[];
   market?: string;
   team?: string;
@@ -53,6 +58,7 @@ export interface DashboardMetadata {
     validations: readonly string[];
     runs: readonly string[];
     metrics: readonly string[];
+    daily: readonly string[];
   };
 }
 
@@ -61,7 +67,7 @@ export interface DashboardMetadataOption {
   name: string;
 }
 
-export const DASHBOARD_TABS: DashboardTab[] = ['fixtures', 'predictions', 'parlays', 'validations', 'runs', 'metrics'];
+export const DASHBOARD_TABS: DashboardTab[] = ['fixtures', 'predictions', 'parlays', 'validations', 'runs', 'metrics', 'daily'];
 export const MAX_TAKE = 200;
 export const DEFAULT_TAKE = 50;
 export const TAKE_OPTIONS = [25, 50, 100, 200] as const;
@@ -73,6 +79,7 @@ export const OVERVIEW_SORT_OPTIONS = {
   validations: ['evaluatedAt', 'status', 'createdAt'] as const,
   runs: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'] as const,
   metrics: ['metricDate', 'generatedAt', 'timezone', 'scope'] as const,
+  daily: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'] as const,
 } as const;
 
 export const DIRECTION_OPTIONS: readonly DashboardDirection[] = ['asc', 'desc'];
@@ -127,6 +134,11 @@ export function parseOverviewQuery(params: URLSearchParams, options: DashboardQu
     dateFrom: normalizedDateFrom,
     dateTo: normalizedDateTo,
     runId: cleanText(params.get('runId')) ?? undefined,
+    dailyBatchId: cleanText(params.get('dailyBatchId')) ?? undefined,
+    provider: cleanText(params.get('provider')) ?? undefined,
+    model: cleanText(params.get('model')) ?? undefined,
+    family: cleanText(params.get('family')) ?? undefined,
+    recommendationTier: cleanText(params.get('recommendationTier')) ?? undefined,
     statuses: mergedStatuses,
     market,
     team,
@@ -150,6 +162,7 @@ export function createMetadata(): DashboardMetadata {
       validations: ['pending', 'won', 'lost', 'push', 'voided', 'error', 'blocked'],
       runs: ['created', 'queued', 'running', 'succeeded', 'failed', 'cancelled'],
       metrics: ['all'],
+      daily: ['created', 'queued', 'running', 'succeeded', 'failed', 'cancelled'],
     },
     validationTargets: VALID_VALIDATION_TARGETS,
     markets: MARKET_KEYS,
@@ -165,6 +178,7 @@ export function createMetadata(): DashboardMetadata {
       validations: OVERVIEW_SORT_OPTIONS.validations,
       runs: OVERVIEW_SORT_OPTIONS.runs,
       metrics: OVERVIEW_SORT_OPTIONS.metrics,
+      daily: OVERVIEW_SORT_OPTIONS.daily,
     },
   };
 }

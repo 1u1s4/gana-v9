@@ -15,6 +15,7 @@ import { createRunArtifactDir, writeArtifact, writeRunJson } from '../runtime/ar
 import { updateRuntimeContext, type RuntimeContext } from '../runtime/context.js';
 import { runPipeline, type RunPipelineResult } from '../runtime/run-service.js';
 import type { PipelineValidationMode, RunPipelineDependencies, RunPipelineInput } from '../runtime/pipeline.js';
+import { buildDailyProviderComparison, type DailyProviderComparison, type DailyProviderConsensus } from './comparison.js';
 
 export type DailyE2EProvider = Extract<AgentProvider, 'codex' | 'gemini'>;
 
@@ -67,6 +68,8 @@ export interface DailyE2ERunResult {
   date: string;
   providers: DailyProviderRunResult[];
   parlays: DailyParlayFamilyResult[];
+  providerComparison?: DailyProviderComparison;
+  providerConsensus?: DailyProviderConsensus;
   parlayAnalysis?: ParlayAnalysisRunResult;
   metrics?: DailyMetricsRunResult;
   artifactDir: string;
@@ -115,6 +118,7 @@ export async function runDailyE2E(
   const analyzeParlays = deps.analyzeParlays ?? runParlayAnalysis;
   const buildDailyMetrics = deps.buildDailyMetrics ?? runDailyMetrics;
   const pairedProviders = providers;
+  const providerAgentic = providers.join(',');
   const marketScope = normalizeMarketScope(input.markets, effectiveConfig.apiFootball.defaultMarkets);
 
   await repositories?.harnessRuns?.upsertForRun?.({
@@ -122,7 +126,7 @@ export async function runDailyE2E(
     runtime: effectiveConfig.runtime,
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
-    providerAgentic: 'codex,gemini',
+    providerAgentic,
     model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
     status: 'running',
     verdict: null,
@@ -144,7 +148,7 @@ export async function runDailyE2E(
     runtime: effectiveConfig.runtime,
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
-    providerAgentic: 'codex,gemini',
+    providerAgentic,
     model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
     status: 'running',
     date: input.date,
@@ -259,11 +263,43 @@ export async function runDailyE2E(
   }, metricsRuntime);
 
   const completedAt = (deps.now ?? (() => new Date()))();
+  const { comparison: providerComparison, consensus: providerConsensus } = buildDailyProviderComparison({
+    dailyBatchId,
+    date: input.date,
+    providers: providers.map((provider) => ({
+      provider,
+      model: modelForProvider(effectiveConfig, provider),
+      runId: providerPipelineResults[provider]?.runId,
+      result: providerPipelineResults[provider],
+    })),
+  });
+  const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
+  const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
   const ok = providerRuns.every((run) => run.ok)
-    && parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok)
+    && hasAnyValidParlayFamily
     && (parlayAnalysis?.ok ?? false)
     && metrics.ok;
-  const verdict = ok ? 'promotable' : providerRuns.some((run) => !run.ok) ? 'blocked' : 'review-required';
+  const verdict = ok && hasConsensus
+    ? 'promotable'
+    : ok
+      ? 'review-required'
+      : providerRuns.some((run) => !run.ok)
+        ? 'blocked'
+        : 'review-required';
+  const providerCounts = Object.fromEntries(providerRuns.map((run) => [run.provider, {
+    ok: run.ok,
+    runId: run.runId ?? null,
+    verdict: run.verdict ?? null,
+    predictions: providerPipelineResults[run.provider]?.scoring.reduce((sum, item) => sum + item.predictions.length, 0) ?? 0,
+    parlays: providerPipelineResults[run.provider]?.parlay?.persistedParlayIds?.length
+      ?? (providerPipelineResults[run.provider]?.parlay?.persistedParlayId ? 1 : 0),
+  }]));
+  const parlayFamilyCounts = Object.fromEntries(parlayFamilies.map((family) => [family.family, {
+    ok: family.ok,
+    runId: family.runId ?? null,
+    verdict: family.verdict ?? null,
+    persistedParlays: family.persistedParlayIds?.length ?? 0,
+  }]));
   const summary = {
     dailyBatchId,
     date: input.date,
@@ -273,6 +309,11 @@ export async function runDailyE2E(
     completedAt: completedAt.toISOString(),
     providers: providerRuns,
     parlays: parlayFamilies,
+    providerComparison: {
+      summary: providerComparison.summary,
+      providerSummaries: providerComparison.providerSummaries,
+    },
+    providerConsensus: providerConsensus.summary,
     parlayAnalysis: parlayAnalysis ? {
       runId: parlayAnalysis.runId,
       ok: parlayAnalysis.ok,
@@ -297,9 +338,18 @@ export async function runDailyE2E(
       lowOddsThreshold: effectiveConfig.apiFootball.lowOddsThreshold,
       parlayProfile: input.parlayProfile ?? null,
     },
+    counts: {
+      providers: providerCounts,
+      parlayFamilies: parlayFamilyCounts,
+      recommendations: parlayAnalysis?.top?.length ?? 0,
+      comparisonItems: providerComparison.items.length,
+      consensusPredictions: providerConsensus.summary.consensusPredictions,
+    },
     analyticalArtifactOnly: true,
     executionCapability: 'none',
   };
+  const providerComparisonPath = writeJsonArtifact(dailyBatchId, 'daily-provider-comparison.json', providerComparison);
+  const providerConsensusPath = writeJsonArtifact(dailyBatchId, 'daily-provider-consensus.json', providerConsensus);
   const summaryPath = writeJsonArtifact(dailyBatchId, 'daily-e2e-summary.json', summary);
   const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', {
     dailyBatchId,
@@ -307,6 +357,8 @@ export async function runDailyE2E(
     sourceRunIds: parlayAnalysisRunIds,
     recommendations: parlayAnalysis?.top ?? [],
     diagnostics: parlayAnalysis?.diagnostics ?? null,
+    providerComparisonPath,
+    providerConsensusPath,
     analyticalArtifactOnly: true,
     executionCapability: 'none',
   });
@@ -317,7 +369,7 @@ export async function runDailyE2E(
     runtime: effectiveConfig.runtime,
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
-    providerAgentic: 'codex,gemini',
+    providerAgentic,
     model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
     status: ok ? 'succeeded' : 'failed',
     verdict,
@@ -334,7 +386,7 @@ export async function runDailyE2E(
     runtime: effectiveConfig.runtime,
     profile: effectiveConfig.profile,
     providerSports: runtime.providerSports,
-    providerAgentic: 'codex,gemini',
+    providerAgentic,
     model: providers.map((provider) => modelForProvider(effectiveConfig, provider)).join(','),
     status: ok ? 'succeeded' : 'failed',
     verdict,
@@ -350,6 +402,8 @@ export async function runDailyE2E(
     date: input.date,
     providers: providerRuns,
     parlays: parlayFamilies,
+    providerComparison,
+    providerConsensus,
     parlayAnalysis,
     metrics,
     artifactDir,

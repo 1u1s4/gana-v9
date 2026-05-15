@@ -286,9 +286,9 @@ describe('runParlayBuild', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.sourceRunId, 'source-run-1');
-    assert.equal(result.portfolio?.parlays.length, 8);
-    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3', 'parlay-4', 'parlay-5', 'parlay-6', 'parlay-7', 'parlay-8']);
-    assert.equal(persisted.length, 8);
+    assert.equal(result.portfolio?.parlays.length, 3);
+    assert.deepEqual(result.persistedParlayIds, ['parlay-1', 'parlay-2', 'parlay-3']);
+    assert.equal(persisted.length, 3);
     assert.equal(persisted[0].parlay.metadata.portfolioId, result.portfolio?.id);
     assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'conservative');
     assert.equal(persisted[0].legs.length, 2);
@@ -345,8 +345,8 @@ describe('runParlayBuild', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.profiles[0]?.profile, 'low-odds-top');
-    assert.equal(result.portfolio?.profiles[0]?.included, 6);
-    assert.equal(result.portfolio?.parlays.length, 6);
+    assert.equal(result.portfolio?.profiles[0]?.included, 2);
+    assert.equal(result.portfolio?.parlays.length, 2);
     assert.deepEqual(
       result.portfolio?.parlays[0]?.build.parlay.legs.map((leg) => leg.predictionId),
       ['top-1', 'top-2'],
@@ -431,8 +431,8 @@ describe('runParlayBuild', () => {
       repositories: {
         predictions: {
           list: async () => [
-            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.8, status: 'promotable', edge: 0.03 }),
-            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, status: 'promotable', edge: 0.03 }),
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.45, confidence: 0.8, status: 'promotable', edge: 0.03 }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.45, confidence: 0.8, status: 'promotable', edge: 0.03 }),
           ] as any[],
           listForFixtureDate: async () => [],
         },
@@ -470,10 +470,10 @@ describe('runParlayBuild', () => {
       repositories: {
         predictions: {
           list: async () => [
-            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.86, status: 'promotable', edge: 0.03, warnings: ['low-liquidity odds market'] }),
-            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.4, confidence: 0.85, status: 'promotable', edge: 0.03, warnings: ['low-liquidity odds market'] }),
-            prediction({ id: 'prediction-3', runId: 'source-run-1', fixtureId: 'fixture-3', odds: 1.45, confidence: 0.84, status: 'promotable', edge: 0.03, warnings: ['low-liquidity odds market'] }),
-            prediction({ id: 'prediction-4', runId: 'source-run-1', fixtureId: 'fixture-4', odds: 1.55, confidence: 0.83, status: 'promotable', edge: 0.03, warnings: ['lineup pending'] }),
+            prediction({ id: 'prediction-1', runId: 'source-run-1', fixtureId: 'fixture-1', odds: 1.5, confidence: 0.86, status: 'promotable', edge: 0.03, warnings: ['market liquidity warning'] }),
+            prediction({ id: 'prediction-2', runId: 'source-run-1', fixtureId: 'fixture-2', odds: 1.4, confidence: 0.85, status: 'promotable', edge: 0.03, warnings: ['market liquidity warning'] }),
+            prediction({ id: 'prediction-3', runId: 'source-run-1', fixtureId: 'fixture-3', odds: 1.45, confidence: 0.84, status: 'promotable', edge: 0.03, warnings: ['market liquidity warning'] }),
+            prediction({ id: 'prediction-4', runId: 'source-run-1', fixtureId: 'fixture-4', odds: 1.55, confidence: 0.83, status: 'promotable', edge: 0.03, warnings: ['market liquidity warning'] }),
           ] as any[],
           listForFixtureDate: async () => [],
         },
@@ -490,11 +490,11 @@ describe('runParlayBuild', () => {
 
     const conservative = result.portfolio?.profiles.find((profile) => profile.profile === 'conservative');
     assert.equal(result.ok, true);
-    assert.equal(conservative?.included, 5);
-    assert.match(conservative?.warnings.join('\n') ?? '', /deterministic portfolio fallback filled 5 conservative parlay/);
-    assert.equal(result.portfolio?.parlays.filter((entry) => entry.profile === 'conservative').length, 5);
+    assert.equal(conservative?.included, 1);
+    assert.match(conservative?.warnings.join('\n') ?? '', /deterministic portfolio fallback filled 1 conservative parlay/);
+    assert.equal(result.portfolio?.parlays.filter((entry) => entry.profile === 'conservative').length, 1);
     assert.equal(result.portfolio?.parlays.some((entry) => entry.build.parlay.status === 'review-required'), false);
-    assert.equal(persisted.length >= 3, true);
+    assert.equal(persisted.length >= 1, true);
   });
 
   it('blocks with diagnostics when portfolio LLM prompts fail', async () => {
@@ -590,7 +590,7 @@ describe('runParlayBuild', () => {
     assert.equal(result.gateResult.verdict, 'blocked');
     assert.equal(result.portfolio?.parlays.length, 0);
     assert.equal(result.portfolio?.profiles[0].included, 0);
-    assert.match(result.gateResult.warnings.join('\n'), /Reading additional input from stdin/);
+    assert.match(result.gateResult.warnings.join('\n'), /empty-pool/);
     assert.doesNotMatch(result.gateResult.warnings.join('\n'), /deterministic portfolio fallback/);
     assert.equal(persisted.length, 0);
     assert.deepEqual(artifactNames, ['parlay-portfolio-blocked.json']);
@@ -665,11 +665,11 @@ describe('runParlayBuild', () => {
     const review = result.portfolio?.profiles.find((profile) => profile.profile === 'review');
     assert.equal(result.ok, true);
     assert.equal(result.gateResult.verdict, 'review-required');
-    assert.equal(review?.included, 3);
-    assert.match(review?.warnings.join('\n') ?? '', /deterministic portfolio fallback filled 3 review parlay/);
+    assert.equal(review?.included, 1);
+    assert.match(review?.warnings.join('\n') ?? '', /deterministic portfolio fallback filled 1 review parlay/);
     assert.equal(result.portfolio?.parlays.every((entry) => entry.profile === 'review'), true);
     assert.equal(result.portfolio?.parlays.every((entry) => entry.build.parlay.status === 'review-required'), true);
-    assert.equal(persisted.length, 3);
+    assert.equal(persisted.length, 1);
   });
 
   it('lets the review profile use weaker warning legs as review-required LLM output', async () => {
@@ -812,13 +812,11 @@ describe('runParlayBuild', () => {
     assert.match(reviewPrompt, /Minimum leg confidence for this profile: 0.7/);
     assert.equal(result.ok, true);
     assert.equal(result.gateResult.verdict, 'review-required');
-    assert.equal(result.portfolio?.parlays.length, 3);
+    assert.equal(result.portfolio?.parlays.length, 1);
     assert.equal(result.portfolio?.parlays[0].profile, 'review');
-    assert.equal(result.portfolio?.parlays[1].profile, 'review');
-    assert.equal(result.portfolio?.parlays[2].profile, 'review');
     assert.equal(result.portfolio?.parlays[0].build.parlay.status, 'review-required');
     assert.equal(result.portfolio?.parlays[0].build.config.minPredictionConfidence, 0.7);
-    assert.equal(persisted.length, 3);
+    assert.equal(persisted.length, 1);
   });
 
   it('rejects LLM portfolio parlays that duplicate a fixture without justification', async () => {
@@ -1051,9 +1049,9 @@ describe('runParlayBuild', () => {
           list: async (query) => {
             assert.equal(query.runId, 'source-run-diverse');
             return [
-              prediction({ id: 'prediction-h2h', runId: 'source-run-diverse', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.35, confidence: 0.84, edge: 0.05, estimatedProbability: 0.82 }),
-              prediction({ id: 'prediction-btts', runId: 'source-run-diverse', fixtureId: 'fixture-2', marketKey: 'btts', selectionKey: 'yes', odds: 1.48, confidence: 0.8, edge: 0.04, estimatedProbability: 0.76 }),
-              prediction({ id: 'prediction-goals', runId: 'source-run-diverse', fixtureId: 'fixture-3', marketKey: 'goals_over_under', selectionKey: 'over', line: 2.5, odds: 1.55, confidence: 0.79, edge: 0.04, estimatedProbability: 0.74 }),
+              prediction({ id: 'prediction-h2h', runId: 'source-run-diverse', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.2, confidence: 0.84, edge: 0.05, estimatedProbability: 0.82 }),
+              prediction({ id: 'prediction-btts', runId: 'source-run-diverse', fixtureId: 'fixture-2', marketKey: 'btts', selectionKey: 'yes', odds: 1.25, confidence: 0.8, edge: 0.04, estimatedProbability: 0.76 }),
+              prediction({ id: 'prediction-goals', runId: 'source-run-diverse', fixtureId: 'fixture-3', marketKey: 'goals_over_under', selectionKey: 'over', line: 2.5, odds: 1.3, confidence: 0.79, edge: 0.04, estimatedProbability: 0.74 }),
               prediction({ id: 'prediction-corners', runId: 'source-run-diverse', fixtureId: 'fixture-4', marketKey: 'corners_over_under', selectionKey: 'under', line: 9.5, odds: 1.5, confidence: 0.78, edge: 0.04, estimatedProbability: 0.73, warnings: ['corners-settlement-reliable'] }),
               prediction({ id: 'prediction-correlated-total', runId: 'source-run-diverse', fixtureId: 'fixture-1', marketKey: 'goals_over_under', selectionKey: 'over', line: 1.5, odds: 1.42, confidence: 0.79, edge: 0.04, estimatedProbability: 0.74 }),
             ] as any[];
@@ -1075,7 +1073,7 @@ describe('runParlayBuild', () => {
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.profiles[0].profile, 'market-diverse');
     assert.equal(result.portfolio?.promptVersion, 'deterministic-market-diverse-v1');
-    assert.equal(markets.size >= 3, true);
+    assert.equal(markets.size >= 2, true);
     assert.match(result.build.parlay.rationale, /candidate-generator, ranker, diversifier, and correlation checks/);
     assert.equal(result.portfolio?.rejected.some((entry) => entry.reasons.some((reason) => /same-fixture h2h\/totals correlation/.test(reason))), true);
     assert.equal(persisted.length, result.portfolio?.parlays.length);
@@ -1109,7 +1107,7 @@ describe('runParlayBuild', () => {
                 marketKey: market,
                 selectionKey: market === 'h2h' ? 'home' : market === 'btts' ? 'yes' : 'over',
                 line: market === 'goals_over_under' ? 2.5 : null,
-                odds: 1.4,
+                odds: 1.31,
                 confidence: 0.8,
                 edge: 0.05,
                 estimatedProbability: 0.74,
@@ -1126,8 +1124,8 @@ describe('runParlayBuild', () => {
 
     const selectedMarkets = new Set(result.build.parlay.legs.map((leg) => leg.market));
     assert.equal(result.ok, true);
-    assert.equal(result.build.parlay.legs.length >= 3, true);
-    assert.equal(selectedMarkets.size >= 3, true);
+    assert.equal(result.build.parlay.legs.length >= 2, true);
+    assert.equal(selectedMarkets.size >= 2, true);
     assert.equal(result.portfolio?.profiles[0].profile, 'market-diverse');
   });
 
@@ -1202,7 +1200,7 @@ describe('runParlayBuild', () => {
           list: async (query) => {
             assert.equal(query.runId, 'source-run-low-variance-fallback');
             return [
-              prediction({ id: 'strict-dc', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.9, edge: 0.015, estimatedProbability: 0.86, warnings: ['low-liquidity'] }),
+              prediction({ id: 'strict-dc', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.9, edge: 0.015, estimatedProbability: 0.86 }),
               prediction({ id: 'fallback-h2h', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'home', odds: 1.29, confidence: 0.91, edge: 0.08, estimatedProbability: 0.84 }),
               prediction({ id: 'low-liquidity-short', runId: 'source-run-low-variance-fallback', fixtureId: 'fixture-3', marketKey: 'h2h', selectionKey: 'home', odds: 1.12, confidence: 0.96, edge: 0.05, estimatedProbability: 0.9, warnings: ['low-liquidity'] }),
             ] as any[];
@@ -1251,8 +1249,8 @@ describe('runParlayBuild', () => {
             assert.equal(query.runId, 'source-run-oro');
             return [
               prediction({ id: 'low-liquidity-h2h', runId: 'source-run-oro', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.12, confidence: 0.95, edge: 0.03, estimatedProbability: 0.9, warnings: ['low-liquidity'] }),
-              prediction({ id: 'safe-2', runId: 'source-run-oro', fixtureId: 'fixture-2', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.92, edge: 0.025, estimatedProbability: 0.88 }),
-              prediction({ id: 'safe-3', runId: 'source-run-oro', fixtureId: 'fixture-3', marketKey: 'double_chance', selectionKey: 'away_or_draw', odds: 1.2, confidence: 0.91, edge: 0.02, estimatedProbability: 0.87 }),
+              prediction({ id: 'safe-2', runId: 'source-run-oro', fixtureId: 'fixture-2', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.24, confidence: 0.92, edge: 0.025, estimatedProbability: 0.88 }),
+              prediction({ id: 'safe-3', runId: 'source-run-oro', fixtureId: 'fixture-3', marketKey: 'double_chance', selectionKey: 'away_or_draw', odds: 1.24, confidence: 0.91, edge: 0.02, estimatedProbability: 0.87 }),
               prediction({ id: 'safe-4', runId: 'source-run-oro', fixtureId: 'fixture-4', marketKey: 'h2h', selectionKey: 'away', odds: 1.08, confidence: 0.94, edge: 0.03, estimatedProbability: 0.91 }),
               prediction({ id: 'safe-5', runId: 'source-run-oro', fixtureId: 'fixture-5', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.17, confidence: 0.9, edge: 0.02, estimatedProbability: 0.86 }),
               prediction({ id: 'safe-6', runId: 'source-run-oro', fixtureId: 'fixture-6', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.16, confidence: 0.89, edge: 0.02, estimatedProbability: 0.84 }),
@@ -1278,9 +1276,9 @@ describe('runParlayBuild', () => {
     assert.equal(result.ok, true);
     assert.equal(result.portfolio?.profiles[0].profile, 'parlay-oro');
     assert.equal(result.portfolio?.promptVersion, 'deterministic-parlay-oro-v1');
-    assert.equal(result.build.parlay.legs.length, 5);
-    assert.equal((result.build.parlay.combinedOdds ?? 0) > 1.8, true);
-    assert.deepEqual(new Set(firstLegIds), new Set(['safe-2', 'safe-3', 'safe-4', 'safe-5', 'safe-6']));
+    assert.equal(result.build.parlay.legs.length, 2);
+    assert.equal((result.build.parlay.combinedOdds ?? 0) > 1.45, true);
+    assert.deepEqual(new Set(firstLegIds), new Set(['safe-2', 'safe-3']));
     assert.equal(firstLegIds.includes('low-liquidity-h2h'), false);
     assert.equal(firstLegIds.includes('too-expensive'), false);
     assert.equal(firstLegIds.includes('too-weak'), false);

@@ -7,6 +7,7 @@ export interface DashboardStatusOptions {
   validations: string[];
   runs: string[];
   metrics: string[];
+  daily: string[];
 }
 
 export type FixtureFilterDateWindow = {
@@ -32,6 +33,7 @@ export interface DashboardCounts {
   validations: number;
   runs: number;
   metrics: number;
+  daily: number;
 }
 
 export interface DashboardPagination {
@@ -159,6 +161,40 @@ export interface DashboardMetricRow extends DashboardOverviewRow {
   createdAt: string;
 }
 
+export interface DashboardDailyRecommendationRow {
+  rank: number;
+  parlayId?: string;
+  profile?: string;
+  family?: string;
+  status?: string;
+  combinedOdds?: string | number | null;
+  aggregateConfidence?: string | number | null;
+  expectedEdge?: string | number | null;
+  riskFlags?: string[];
+  reasons?: string[];
+  legs?: unknown[];
+}
+
+export interface DashboardDailyRow extends DashboardOverviewRow {
+  id: string;
+  date: string | null;
+  status: string;
+  verdict: string | null;
+  providerAgentic: string | null;
+  model: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  providers: unknown[];
+  parlays: unknown[];
+  providerComparison: unknown;
+  providerConsensus: unknown;
+  counts: unknown;
+  recommendations: DashboardDailyRecommendationRow[];
+  recommendationDiagnostics: unknown;
+  artifactDir: string | null;
+}
+
 export interface DashboardFixtureRow {
   id: string;
   providerFixtureId: string;
@@ -215,6 +251,11 @@ export interface DashboardOverviewResponse {
     dateTo?: string;
     fixtureStatus?: string[];
     runId?: string;
+    dailyBatchId?: string;
+    provider?: string;
+    model?: string;
+    family?: string;
+    recommendationTier?: string;
     status: string[];
     market?: string;
     team?: string;
@@ -234,4 +275,5 @@ export interface DashboardOverviewResponse {
   validations: DashboardValidationRow[];
   runs: DashboardRunRow[];
   metrics: DashboardMetricRow[];
+  daily: DashboardDailyRow[];
 }

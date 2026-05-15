@@ -177,6 +177,51 @@ const DAILY_METRIC = {
   createdAt: new Date('2026-05-01T18:00:00.000Z'),
 };
 
+const DAILY_RUN = {
+  ...RUN,
+  id: 'daily-2026-05-01',
+  providerAgentic: 'codex,gemini',
+  model: 'gpt-5.5,gemini-2.5-pro',
+  metadata: {
+    dailyBatchId: 'daily-2026-05-01',
+    dailyRole: 'batch',
+    date: '2026-05-01',
+    providers: [{ provider: 'codex', ok: true }, { provider: 'gemini', ok: true }],
+    parlays: [{ family: 'codex-only', ok: true }, { family: 'consensus-mixed', ok: true }],
+    providerComparison: {
+      summary: {
+        sameSelection: 2,
+        sameMarketDifferentSelection: 1,
+        onlyCodex: 1,
+        onlyGemini: 0,
+        agreementRate: 0.6667,
+      },
+    },
+    providerConsensus: { consensusPredictions: 2, providers: ['codex', 'gemini'] },
+    counts: {
+      parlayFamilies: {
+        'codex-only': { persistedParlays: 1 },
+        'consensus-mixed': { persistedParlays: 1 },
+      },
+      recommendations: 1,
+    },
+    parlayAnalysis: {
+      top: [{
+        rank: 1,
+        parlayId: 'parlay-1',
+        profile: 'low-odds-top',
+        harnessStatus: 'promotable',
+        combinedOdds: 1.42,
+        aggregateConfidence: 0.82,
+        expectedEdge: 0.08,
+        riskFlags: ['low-liquidity'],
+        reasons: ['test recommendation'],
+      }],
+      diagnostics: { selected: { totalExposureUnits: 2.2 } },
+    },
+  },
+};
+
 function createDashboardDb() {
   return {
     team: {
@@ -243,7 +288,10 @@ function createDashboardDb() {
       count: async () => 5,
     },
     harnessRun: {
-      findMany: async () => [RUN],
+      findMany: async (args?: any) => {
+        const where = JSON.stringify(args?.where ?? {});
+        return where.includes('daily') ? [DAILY_RUN] : [RUN];
+      },
       findUnique: async ({ where }: { where: { id?: string } }) => {
         if (where?.id === 'run-1') {
           return {
@@ -258,7 +306,7 @@ function createDashboardDb() {
       groupBy: async () => [
         { status: 'succeeded', _count: { _all: 1 } },
       ],
-      count: async () => 1,
+      count: async (args?: any) => JSON.stringify(args?.where ?? {}).includes('daily') ? 1 : 1,
     },
     dailyMetric: {
       findMany: async () => [DAILY_METRIC],
@@ -510,6 +558,22 @@ describe('dashboard api queries', () => {
       lost: 1,
       hitRate: 50,
     });
+  });
+
+  it('reads daily overview batches with comparison and parlay recommendations', async () => {
+    const overview = await readOverview(createDashboardDb() as any, config, new URLSearchParams('tab=daily&dailyBatchId=daily-2026-05-01&provider=codex&family=consensus-mixed'));
+
+    assert.equal(overview.activeTab, 'daily');
+    assert.equal(overview.counts.daily, 1);
+    assert.equal(overview.daily.length, 1);
+    assert.equal(overview.daily[0]?.id, 'daily-2026-05-01');
+    assert.equal(overview.daily[0]?.date, '2026-05-01');
+    assert.equal((overview.daily[0]?.providerComparison as any).summary.sameSelection, 2);
+    assert.equal((overview.daily[0]?.providerConsensus as any).consensusPredictions, 2);
+    assert.equal(overview.daily[0]?.recommendations[0]?.profile, 'low-odds-top');
+    assert.equal(overview.filters.dailyBatchId, 'daily-2026-05-01');
+    assert.equal(overview.filters.provider, 'codex');
+    assert.equal(overview.filters.family, 'consensus-mixed');
   });
 
   it('returns entity not found for missing validation id', async () => {

@@ -5,7 +5,7 @@ import type {
   ResolvedParlayConfig,
 } from './types.js';
 
-export const PARLAY_BUILDER_RULE_VERSION = 'parlay-builder-v1';
+export const PARLAY_BUILDER_RULE_VERSION = 'parlay-builder-v2';
 
 export const DEFAULT_PARLAY_CONFIG = {
   minLegs: 2,

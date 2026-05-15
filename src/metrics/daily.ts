@@ -51,6 +51,8 @@ export interface TargetMetrics {
   byStatus: MetricBucket[];
   byMarket?: MetricBucket[];
   byProfile?: MetricBucket[];
+  byProvider?: MetricBucket[];
+  byModel?: MetricBucket[];
   byOddsBucket: MetricBucket[];
   byConfidenceBucket: MetricBucket[];
 }
@@ -79,6 +81,10 @@ export interface DailyChartMetrics {
   parlayHitRateByProfile: MetricBucket[];
   parlayHitRateByOddsBucket: MetricBucket[];
   parlayHitRateByConfidenceBucket: MetricBucket[];
+  predictionHitRateByProvider: MetricBucket[];
+  predictionHitRateByModel: MetricBucket[];
+  parlayHitRateByProvider: MetricBucket[];
+  parlayHitRateByModel: MetricBucket[];
 }
 
 export interface DailyMetricsDependencies {
@@ -107,6 +113,8 @@ type SourceRow = {
   edge?: number | null;
   market?: string;
   profile?: string;
+  provider?: string;
+  model?: string;
 };
 
 const VALIDATION_STATUSES = ['won', 'lost', 'voided', 'pending', 'blocked', 'unvalidated'] as const;
@@ -218,6 +226,7 @@ async function computeDailyMetricSnapshot(
       include: {
         validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
         legs: { select: { id: true, marketKey: true, fixtureId: true } },
+        run: { select: { providerAgentic: true, model: true } },
       },
     }),
   ]);
@@ -227,11 +236,15 @@ async function computeDailyMetricSnapshot(
   const predictionMetrics = summarizeTargets(predictionRows, {
     market: true,
     profile: false,
+    provider: true,
+    model: true,
     edge: true,
   });
   const parlayMetrics = summarizeTargets(parlayRows, {
     market: false,
     profile: true,
+    provider: true,
+    model: true,
     edge: false,
   });
 
@@ -250,6 +263,10 @@ async function computeDailyMetricSnapshot(
       parlayHitRateByProfile: cloneBuckets(parlayMetrics.byProfile ?? []),
       parlayHitRateByOddsBucket: cloneBuckets(parlayMetrics.byOddsBucket),
       parlayHitRateByConfidenceBucket: cloneBuckets(parlayMetrics.byConfidenceBucket),
+      predictionHitRateByProvider: cloneBuckets(predictionMetrics.byProvider ?? []),
+      predictionHitRateByModel: cloneBuckets(predictionMetrics.byModel ?? []),
+      parlayHitRateByProvider: cloneBuckets(parlayMetrics.byProvider ?? []),
+      parlayHitRateByModel: cloneBuckets(parlayMetrics.byModel ?? []),
     },
     generatedAt: input.generatedAt.toISOString(),
   };
@@ -264,6 +281,8 @@ function mapPredictionMetricRow(item: unknown): SourceRow {
     confidence: toNumberOrNull(row.confidence),
     edge: toNumberOrNull(row.edge),
     market: typeof row.marketKey === 'string' ? row.marketKey : 'unknown',
+    provider: typeof row.providerAgentic === 'string' ? row.providerAgentic : 'unknown',
+    model: typeof row.model === 'string' ? row.model : 'unknown',
   };
 }
 
@@ -280,10 +299,20 @@ function mapParlayMetricRow(item: unknown): SourceRow {
       : typeof metadata.profile === 'string'
         ? metadata.profile
         : 'default',
+    provider: typeof row.run?.providerAgentic === 'string'
+      ? row.run.providerAgentic
+      : typeof metadata.providerAgentic === 'string'
+        ? metadata.providerAgentic
+        : 'unknown',
+    model: typeof row.run?.model === 'string'
+      ? row.run.model
+      : typeof metadata.model === 'string'
+        ? metadata.model
+        : 'unknown',
   };
 }
 
-function summarizeTargets(rows: SourceRow[], options: { market: boolean; profile: boolean; edge: boolean }): TargetMetrics {
+function summarizeTargets(rows: SourceRow[], options: { market: boolean; profile: boolean; provider: boolean; model: boolean; edge: boolean }): TargetMetrics {
   const base = summarizeBucket('all', rows, options.edge);
   return {
     total: base.total,
@@ -301,6 +330,8 @@ function summarizeTargets(rows: SourceRow[], options: { market: boolean; profile
     byStatus: groupRows(rows, (row) => row.status, options.edge),
     ...(options.market ? { byMarket: groupRows(rows, (row) => row.market ?? 'unknown', options.edge) } : {}),
     ...(options.profile ? { byProfile: groupRows(rows, (row) => row.profile ?? 'default', options.edge) } : {}),
+    ...(options.provider ? { byProvider: groupRows(rows, (row) => row.provider ?? 'unknown', options.edge) } : {}),
+    ...(options.model ? { byModel: groupRows(rows, (row) => row.model ?? 'unknown', options.edge) } : {}),
     byOddsBucket: groupRows(rows, (row) => oddsBucket(row.odds), options.edge),
     byConfidenceBucket: groupRows(rows, (row) => confidenceBucket(row.confidence), options.edge),
   };

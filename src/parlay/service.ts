@@ -26,8 +26,14 @@ import {
   AUTOMATIC_PARLAY_MAX_LEG_ODDS,
   LOW_ODDS_TOP_MAX_LEG_ODDS,
   automaticParlayRiskReasons,
+  hasFragileLowTotalOverRisk,
+  hasH2hAwayRisk,
   hasInflatedDoubleChanceEdgeRisk,
+  hasLineupPendingRisk,
+  hasLowLiquidityRisk,
   hasLowLiquidityH2hFavoriteRisk,
+  hasOverinflatedEdgeRisk,
+  hasSelectionEvidenceMissingRisk,
   hasStaleLowLiquidityRisk,
   hasUnverifiedCornersRisk,
 } from './eligibility.js';
@@ -60,20 +66,20 @@ const PORTFOLIO_REVIEW_MIN_CONFIDENCE = 0.7;
 const CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE = 0.62;
 const BALANCED_MIN_AGGREGATE_CONFIDENCE = 0.55;
 const PORTFOLIO_PROFILES = [
-  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 3, minOdds: 1.8, maxOdds: 2.3, targetParlays: 5, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
-  { key: 'balanced', label: 'Balanceado', minLegs: 3, maxLegs: 3, minOdds: 2.3, maxOdds: 3.5, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 1, allowDrawExposure: false, reviewOnly: false },
+  { key: 'conservative', label: 'Conservador', minLegs: 2, maxLegs: 2, minOdds: 1.5, maxOdds: 2.2, targetParlays: 3, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 0, allowDrawExposure: false, reviewOnly: false },
+  { key: 'balanced', label: 'Balanceado', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: PORTFOLIO_MIN_CONFIDENCE, maxReviewOrWarningLegs: 0, allowDrawExposure: false, reviewOnly: true },
   { key: 'review', label: 'Revision', minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.2, targetParlays: 3, minConfidence: PORTFOLIO_REVIEW_MIN_CONFIDENCE, maxReviewOrWarningLegs: 99, allowDrawExposure: true, reviewOnly: true },
 ] as const;
 const LOW_ODDS_TOP_PROFILE = {
   key: 'low-odds-top',
   label: 'Low odds top',
   minLegs: 2,
-  maxLegs: 5,
+  maxLegs: 2,
   minOdds: 1.25,
-  maxOdds: 3.5,
-  targetParlays: 6,
+  maxOdds: 1.8,
+  targetParlays: 2,
   minConfidence: 0.7,
-  maxReviewOrWarningLegs: 1,
+  maxReviewOrWarningLegs: 0,
   allowDrawExposure: false,
   reviewOnly: false,
 } as const;
@@ -837,7 +843,8 @@ async function runDeterministicParlayProfile(
       ? ranked.filter((candidate) => !candidate.blockers.length).slice(0, spec.targetParlays)
       : diversifyParlays(ranked).concat(ranked.filter((candidate) => !candidate.blockers.length)).slice(0, spec.targetParlays);
   const accepted = uniqueCandidates(diversified).filter((candidate) => !candidate.blockers.length).slice(0, spec.targetParlays);
-  const builds = accepted.map((candidate) => ({
+  const exposureCappedAccepted = selectCandidatesWithExposureCap(accepted, pool, spec.targetParlays);
+  const builds = exposureCappedAccepted.map((candidate) => ({
     profile,
     build: buildFromCandidate(candidate, pool, profile, sourceRunId, generatedAt, spec),
   }));
@@ -936,8 +943,8 @@ async function runDeterministicParlayProfile(
           sourceRunId,
           promptVersion: `deterministic-${profile}-v1`,
           candidateDiagnostics: {
-            expectedEdge: candidateMetricForBuild(entry.build, accepted, 'expectedEdge'),
-            correlationPenalty: candidateMetricForBuild(entry.build, accepted, 'correlationPenalty'),
+            expectedEdge: candidateMetricForBuild(entry.build, exposureCappedAccepted, 'expectedEdge'),
+            correlationPenalty: candidateMetricForBuild(entry.build, exposureCappedAccepted, 'correlationPenalty'),
           },
         }),
         legs: entry.build.parlay.legs.map(toParlayLegInput),
@@ -982,23 +989,24 @@ interface DeterministicProfileSpec {
   allowFragileLowPriceDc?: boolean;
   requireMarketDiversity?: boolean;
   minAggregateConfidence?: number;
+  reviewOnly?: boolean;
   riskWeight: number;
 }
 
 function deterministicProfileSpec(profile: DeterministicParlayProfile): DeterministicProfileSpec {
   switch (profile) {
     case 'low-variance':
-      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.25, maxOdds: 1.8, maxLegOdds: LOW_ODDS_TOP_MAX_LEG_ODDS, targetParlays: 6, minConfidence: 0.78, minEdge: 0.005, markets: ['double_chance'], avoidDrawExposure: true, riskWeight: 0.75 };
+      return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.25, maxOdds: 1.8, maxLegOdds: LOW_ODDS_TOP_MAX_LEG_ODDS, targetParlays: 2, minConfidence: 0.78, minEdge: 0.005, markets: ['double_chance'], avoidDrawExposure: true, riskWeight: 0.75 };
     case 'balanced':
-      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.8, maxOdds: 4.0, targetParlays: 6, minConfidence: 0.65, minEdge: 0.01, markets: ['h2h', 'btts', 'goals_over_under'], riskWeight: 0.55 };
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.72, minEdge: 0.02, markets: ['h2h', 'btts', 'goals_over_under'], reviewOnly: true, riskWeight: 0.55 };
     case 'totals':
-      return { profile, minLegs: 2, maxLegs: 4, minOdds: 1.6, maxOdds: 3.2, targetParlays: 4, minConfidence: 0.62, minEdge: 0.01, markets: ['goals_over_under', 'corners_over_under'], requireLine: true, minAggregateConfidence: 0.45, riskWeight: 0.6 };
+      return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.5, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.68, minEdge: 0.02, markets: ['goals_over_under', 'btts'], requireLine: true, minAggregateConfidence: 0.48, riskWeight: 0.6 };
     case 'high-conviction':
-      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 3.8, targetParlays: 5, minConfidence: 0.72, minEdge: 0.035, riskWeight: 0.45 };
+      return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.5, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.78, minEdge: 0.04, reviewOnly: true, riskWeight: 0.45 };
     case 'market-diverse':
-      return { profile, minLegs: 3, maxLegs: 4, minOdds: 2.0, maxOdds: 3.8, targetParlays: 4, minConfidence: 0.65, minEdge: 0.01, requireMarketDiversity: true, minAggregateConfidence: 0.45, riskWeight: 0.5 };
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.72, minEdge: 0.02, requireMarketDiversity: true, minAggregateConfidence: 0.5, reviewOnly: true, riskWeight: 0.5 };
     case 'parlay-oro':
-      return { profile, minLegs: 4, maxLegs: 5, minOdds: 1.8, maxOdds: 3.2, maxLegOdds: 1.25, targetParlays: 3, minConfidence: 0.78, minEdge: 0.005, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.45, riskWeight: 0.75 };
+      return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.45, maxOdds: 2.2, maxLegOdds: 1.25, targetParlays: 1, minConfidence: 0.82, minEdge: 0.02, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.55, reviewOnly: true, riskWeight: 0.75 };
   }
 }
 
@@ -1235,7 +1243,7 @@ function buildFromCandidate(
     `included by deterministic ${profile}: ${candidate.reason}`,
     ...(candidate.correlationPenalty > 0 ? [`correlation penalty ${round(candidate.correlationPenalty)}`] : []),
   ]);
-  const status: PredictionStatus = selected.some((prediction) => prediction.status === 'review-required' || prediction.warnings?.length)
+  const status: PredictionStatus = spec.reviewOnly || selected.some((prediction) => prediction.status === 'review-required' || prediction.warnings?.length)
     ? 'review-required'
     : selected.every((prediction) => prediction.status === 'promotable')
       ? 'promotable'
@@ -1309,6 +1317,33 @@ function uniqueCandidates(candidates: ParlayCandidate[]): ParlayCandidate[] {
     result.push(candidate);
   }
   return result;
+}
+
+function selectCandidatesWithExposureCap(
+  candidates: readonly ParlayCandidate[],
+  pool: readonly ParlaySourcePrediction[],
+  take: number,
+): ParlayCandidate[] {
+  const byId = new Map(pool.map((prediction) => [prediction.id, prediction]));
+  const usedPredictions = new Set<string>();
+  const usedFixtures = new Set<string>();
+  const selected: ParlayCandidate[] = [];
+  for (const candidate of candidates) {
+    const legs = candidate.legs.flatMap((id) => {
+      const prediction = byId.get(id);
+      return prediction ? [prediction] : [];
+    });
+    if (legs.some((prediction) => usedPredictions.has(prediction.id) || usedFixtures.has(prediction.fixtureId))) {
+      continue;
+    }
+    selected.push(candidate);
+    for (const prediction of legs) {
+      usedPredictions.add(prediction.id);
+      usedFixtures.add(prediction.fixtureId);
+    }
+    if (selected.length >= take) break;
+  }
+  return selected;
 }
 
 function candidateMetricForBuild(
@@ -1620,15 +1655,37 @@ function generateDeterministicPortfolioFills(input: {
   for (let size = input.profile.minLegs; size <= input.profile.maxLegs; size++) {
     collectCombinations(sortedPool, size, 0, [], combinations, 500);
   }
-  return combinations
+  const validations = combinations
     .sort((a, b) => scorePortfolioCombination(b) - scorePortfolioCombination(a))
     .map((combination) => validateParsedPortfolioParlay({
       title: `Deterministic ${input.profile.label}`,
       predictionIds: combination.map((prediction) => prediction.id),
       rationale: 'Deterministic fallback selected independent high-confidence, positive-edge legs inside the profile odds range.',
     }, input.profile, new Map(input.pool.map((prediction) => [prediction.id, prediction])), input.usedSignatures, input.generatedAt, input.sourceRunId))
-    .filter((validation): validation is Extract<PortfolioValidationResult, { ok: true }> => validation.ok)
-    .slice(0, input.needed);
+    .filter((validation): validation is Extract<PortfolioValidationResult, { ok: true }> => validation.ok);
+  return selectPortfolioBuildsWithExposureCap(validations, input.needed);
+}
+
+function selectPortfolioBuildsWithExposureCap(
+  validations: readonly Extract<PortfolioValidationResult, { ok: true }>[],
+  take: number,
+): Array<Extract<PortfolioValidationResult, { ok: true }>> {
+  const selected: Array<Extract<PortfolioValidationResult, { ok: true }>> = [];
+  const usedPredictions = new Set<string>();
+  const usedFixtures = new Set<string>();
+  for (const validation of validations) {
+    const legs = validation.build.parlay.legs;
+    if (legs.some((leg) => usedPredictions.has(leg.predictionId) || usedFixtures.has(leg.fixtureId))) {
+      continue;
+    }
+    selected.push(validation);
+    for (const leg of legs) {
+      usedPredictions.add(leg.predictionId);
+      usedFixtures.add(leg.fixtureId);
+    }
+    if (selected.length >= take) break;
+  }
+  return selected;
 }
 
 function shouldGenerateDeterministicPortfolioFills(input: {
@@ -1899,7 +1956,7 @@ function hasPortfolioHardOrResearchWarning(prediction: ParlaySourcePrediction): 
 }
 
 function isSoftPortfolioWarning(warning: string): boolean {
-  return /low[- ]liquidity|low liquidity|lineup pending|market liquidity warning/i.test(warning);
+  return /market liquidity warning/i.test(warning);
 }
 
 function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] {
@@ -1914,9 +1971,14 @@ function portfolioRiskTags(prediction: ParlaySourcePrediction): ParlayRiskTag[] 
   if (prediction.status === 'review-required') tags.push('review_required');
   if (hasPortfolioHardOrResearchWarning(prediction)) tags.push('research_warning');
   if (hasStaleLowLiquidityRisk(prediction)) tags.push('stale_low_liquidity');
+  if (hasLowLiquidityRisk(prediction)) tags.push('low_liquidity');
+  if (hasLineupPendingRisk(prediction)) tags.push('lineup_pending');
+  if (hasSelectionEvidenceMissingRisk(prediction)) tags.push('selection_evidence_missing');
+  if (hasH2hAwayRisk(prediction)) tags.push('h2h_away');
   if (hasLowLiquidityH2hFavoriteRisk(prediction)) tags.push('low_liquidity_h2h_favorite');
   if (hasUnverifiedCornersRisk(prediction)) tags.push('corners_unverified');
   if (hasInflatedDoubleChanceEdgeRisk(prediction)) tags.push('inflated_double_chance_edge');
+  if (hasOverinflatedEdgeRisk(prediction)) tags.push('overinflated_edge');
   if (prediction.market === 'goals_over_under' && prediction.selection === 'over' && (prediction.line ?? 0) <= 1.5 && prediction.odds <= 1.4) {
     tags.push('fragile_low_total_over');
   }

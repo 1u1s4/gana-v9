@@ -15,6 +15,7 @@ import {
 } from './query.js';
 import type {
   DashboardCounts,
+  DashboardDailyRow,
   DashboardFixtureRow,
   DashboardMetricRow,
   DashboardOverviewResponse,
@@ -65,6 +66,7 @@ type SortCandidateMap = {
   validations: ReadonlyArray<string>;
   runs: ReadonlyArray<string>;
   metrics: ReadonlyArray<string>;
+  daily: ReadonlyArray<string>;
 };
 
 const SORTABLE_FIELDS: SortCandidateMap = {
@@ -74,6 +76,7 @@ const SORTABLE_FIELDS: SortCandidateMap = {
   validations: ['evaluatedAt', 'status', 'createdAt'],
   runs: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'],
   metrics: ['metricDate', 'generatedAt', 'timezone', 'scope'],
+  daily: ['createdAt', 'startedAt', 'completedAt', 'status', 'verdict'],
 };
 
 const DEFAULT_SORT_BY = {
@@ -83,6 +86,7 @@ const DEFAULT_SORT_BY = {
   validations: 'evaluatedAt',
   runs: 'createdAt',
   metrics: 'metricDate',
+  daily: 'createdAt',
 } as const;
 
 export async function startDashboardServer(
@@ -205,6 +209,11 @@ export async function readOverview(
       dateTo: query.dateTo,
       fixtureStatus: query.fixtureStatuses,
       runId: query.runId,
+      dailyBatchId: query.dailyBatchId,
+      provider: query.provider,
+      model: query.model,
+      family: query.family,
+      recommendationTier: query.recommendationTier,
       status: statusFilter,
       market: query.market,
       team: query.team,
@@ -236,6 +245,7 @@ export async function readOverview(
     validations: rows.validations,
     runs: rows.runs,
     metrics: rows.metrics,
+    daily: rows.daily,
   };
 }
 
@@ -462,7 +472,32 @@ function buildFilters(query: ReturnType<typeof parseOverviewQuery>, dateWindow: 
     validations: buildValidationWhere(query, fixtureFilter, statusFilter, dateWindow),
     runs: buildRunWhere(query, statusFilter, dateWindow),
     metrics: buildMetricWhere(query, dateWindow),
+    daily: buildDailyWhere(query, statusFilter, dateWindow),
   };
+}
+
+function buildDailyWhere(
+  query: ReturnType<typeof parseOverviewQuery>,
+  statusFilter: string[],
+  dateWindow: DateWindow | undefined,
+): QueryArgs {
+  const clauses: QueryArgs[] = [{
+    OR: [
+      { id: { startsWith: 'daily-' } },
+      { metadata: { path: ['dailyRole'], equals: 'batch' } },
+    ],
+  }];
+  if (query.dailyBatchId) clauses.push({ id: query.dailyBatchId });
+  if (query.runId) clauses.push({ id: query.runId });
+  if (statusFilter.length) clauses.push({ status: inFilter(statusFilter) });
+  if (dateWindow) clauses.push({ createdAt: dateRangeFilter(dateWindow) });
+  if (query.provider) clauses.push({ providerAgentic: { contains: query.provider } });
+  if (query.model) clauses.push({ model: { contains: query.model } });
+  if (query.family) clauses.push({ metadata: { path: ['counts', 'parlayFamilies', query.family], not: Prisma.JsonNull } });
+  if (query.recommendationTier && query.recommendationTier !== 'top') {
+    clauses.push({ metadata: { path: ['parlayAnalysis', 'top'], array_contains: [{ harnessStatus: query.recommendationTier }] } });
+  }
+  return clauses.length === 1 ? clauses[0] as QueryArgs : { AND: clauses };
 }
 
 function buildFixtureWhere(
@@ -660,6 +695,7 @@ async function readActiveRows(
       validations: [],
       runs: [],
       metrics: [],
+      daily: [],
     };
   }
 
@@ -685,6 +721,7 @@ async function readActiveRows(
       validations: [],
       runs: [],
       metrics: [],
+      daily: [],
     };
   }
 
@@ -723,6 +760,7 @@ async function readActiveRows(
       validations: [],
       runs: [],
       metrics: [],
+      daily: [],
     };
   }
 
@@ -761,6 +799,7 @@ async function readActiveRows(
       validations: validations.map((row) => mapValidation(row)),
       runs: [],
       metrics: [],
+      daily: [],
     };
   }
 
@@ -779,6 +818,26 @@ async function readActiveRows(
       validations: [],
       runs: [],
       metrics: metrics.map((row) => mapMetric(row)),
+      daily: [],
+    };
+  }
+
+  if (tab === 'daily') {
+    const daily = (await db.harnessRun.findMany({
+      where: where as unknown as Prisma.HarnessRunWhereInput,
+      orderBy: orderBy as Prisma.HarnessRunFindManyArgs['orderBy'],
+      skip,
+      take,
+    }) as unknown[]);
+
+    return {
+      fixtures: [],
+      predictions: [],
+      parlays: [],
+      validations: [],
+      runs: [],
+      metrics: [],
+      daily: daily.map((row) => mapDaily(row)),
     };
   }
 
@@ -801,6 +860,7 @@ async function readActiveRows(
     validations: [],
     runs: runs.map((row) => mapRun(row)),
     metrics: [],
+    daily: [],
   };
 }
 
@@ -860,6 +920,15 @@ async function readStatusFacets(
     return facets;
   }
 
+  if (tab === 'daily') {
+    const rows = (await (db.harnessRun as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
+      by: ['status'],
+      where: where.daily as unknown as Prisma.HarnessRunWhereInput,
+      _count: { _all: true },
+    })) as Array<{ status: string | null; _count: { _all: number | bigint } }>;
+    return statusFacetFromRows(rows);
+  }
+
   const rows = (await (db.harnessRun as unknown as { groupBy: (query: unknown) => Promise<unknown[]> }).groupBy({
     by: ['status'],
     where: where.runs as unknown as Prisma.HarnessRunWhereInput,
@@ -889,6 +958,7 @@ async function countActive(db: DashboardDb, tab: DashboardTab, where: QueryArgs)
   if (tab === 'parlays') return db.parlay.count({ where });
   if (tab === 'validations') return db.validationArtifact.count({ where });
   if (tab === 'metrics') return db.dailyMetric.count({ where });
+  if (tab === 'daily') return db.harnessRun.count({ where });
   return db.harnessRun.count({ where });
 }
 
@@ -900,6 +970,7 @@ async function countAllTabs(db: DashboardDb, where: ReturnType<typeof buildFilte
     validations: await db.validationArtifact.count({ where: omitStatus(where.validations) }),
     runs: await db.harnessRun.count({ where: omitStatus(where.runs) }),
     metrics: await db.dailyMetric.count({ where: omitStatus(where.metrics) }),
+    daily: await db.harnessRun.count({ where: omitStatus(where.daily) }),
   };
 }
 
@@ -1047,6 +1118,53 @@ function mapMetric(row: unknown): DashboardMetricRow {
     chartMetrics: item.chartMetrics ?? null,
     generatedAt: toDateString(item.generatedAt),
     createdAt: toDateString(item.createdAt),
+  };
+}
+
+function mapDaily(row: unknown): DashboardDailyRow {
+  const item = toRecord(row);
+  const metadata = toRecord(item.metadata);
+  const parlayAnalysis = toRecord(metadata.parlayAnalysis);
+  const recommendations = toArray(parlayAnalysis.top)
+    .map((recommendation, index) => mapDailyRecommendation(recommendation, index))
+    .filter((recommendation): recommendation is DashboardDailyRow['recommendations'][number] => Boolean(recommendation));
+
+  return {
+    id: toStringValue(item.id),
+    date: toNullableString(metadata.date),
+    status: toStringValue(item.status),
+    verdict: toNullableString(item.verdict),
+    providerAgentic: toNullableString(item.providerAgentic),
+    model: toNullableString(item.model),
+    startedAt: toNullableDateString(item.startedAt),
+    completedAt: toNullableDateString(item.completedAt),
+    createdAt: toDateString(item.createdAt),
+    providers: toArray(metadata.providers),
+    parlays: toArray(metadata.parlays),
+    providerComparison: metadata.providerComparison ?? null,
+    providerConsensus: metadata.providerConsensus ?? null,
+    counts: metadata.counts ?? null,
+    recommendations,
+    recommendationDiagnostics: parlayAnalysis.diagnostics ?? null,
+    artifactDir: toNullableString(item.artifactDir),
+  };
+}
+
+function mapDailyRecommendation(row: unknown, index: number): DashboardDailyRow['recommendations'][number] | null {
+  const item = toRecord(row);
+  if (!Object.keys(item).length) return null;
+  return {
+    rank: toIntegerOrUndefined(item.rank) ?? index + 1,
+    parlayId: toNullableString(item.parlayId) ?? undefined,
+    profile: toNullableString(item.profile) ?? undefined,
+    family: toNullableString(item.family) ?? undefined,
+    status: toNullableString(item.harnessStatus) ?? toNullableString(item.validationStatus) ?? undefined,
+    combinedOdds: toNumberOrNull(item.combinedOdds),
+    aggregateConfidence: toNumberOrNull(item.aggregateConfidence),
+    expectedEdge: toNumberOrNull(item.expectedEdge),
+    riskFlags: toArray(item.riskFlags).map((value) => String(value)),
+    reasons: toArray(item.reasons).map((value) => String(value)),
+    legs: toArray(item.legs),
   };
 }
 

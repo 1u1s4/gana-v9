@@ -30,6 +30,8 @@ describe('daily metrics service', () => {
         findMany: async () => [
           {
             marketKey: 'h2h',
+            providerAgentic: 'codex',
+            model: 'gpt-5.5',
             odds: 1.8,
             confidence: 0.72,
             edge: 0.06,
@@ -37,6 +39,8 @@ describe('daily metrics service', () => {
           },
           {
             marketKey: 'h2h',
+            providerAgentic: 'gemini',
+            model: 'gemini-2.5-pro',
             odds: 2.1,
             confidence: 0.61,
             edge: -0.02,
@@ -44,6 +48,8 @@ describe('daily metrics service', () => {
           },
           {
             marketKey: 'btts',
+            providerAgentic: 'codex',
+            model: 'gpt-5.5',
             odds: 1.95,
             confidence: 0.64,
             edge: 0.03,
@@ -57,6 +63,7 @@ describe('daily metrics service', () => {
             combinedOdds: 1.42,
             aggregateConfidence: 0.82,
             metadata: { portfolioProfile: 'low-odds-top' },
+            run: { providerAgentic: 'codex', model: 'gpt-5.5' },
             validationArtifacts: [{ status: 'won' }],
             legs: [{ marketKey: 'double_chance' }],
           },
@@ -64,6 +71,7 @@ describe('daily metrics service', () => {
             combinedOdds: 2.35,
             aggregateConfidence: 0.58,
             metadata: { profile: 'balanced' },
+            run: { providerAgentic: 'gemini', model: 'gemini-2.5-pro' },
             validationArtifacts: [{ status: 'lost' }],
             legs: [{ marketKey: 'h2h' }],
           },
@@ -103,15 +111,20 @@ describe('daily metrics service', () => {
     assert.equal(snapshot?.predictionMetrics.avgEdge, 0.0233);
     assert.equal(snapshot?.predictionMetrics.byMarket?.some((item) => item.key === 'h2h' && item.total === 2), true);
     assert.equal(snapshot?.predictionMetrics.byMarket?.some((item) => item.label === 'h2h'), true);
+    assert.equal(snapshot?.predictionMetrics.byProvider?.some((item) => item.key === 'codex' && item.total === 2), true);
+    assert.equal(snapshot?.predictionMetrics.byModel?.some((item) => item.key === 'gpt-5.5' && item.total === 2), true);
     assert.equal(snapshot?.parlayMetrics.total, 2);
     assert.equal(snapshot?.parlayMetrics.hitRate, 50);
     assert.equal(snapshot?.parlayMetrics.byProfile?.some((item) => item.key === 'low-odds-top'), true);
+    assert.equal(snapshot?.parlayMetrics.byProvider?.some((item) => item.key === 'gemini' && item.total === 1), true);
+    assert.equal(snapshot?.parlayMetrics.byModel?.some((item) => item.key === 'gemini-2.5-pro' && item.total === 1), true);
     assert.equal(snapshot?.chartMetrics.parlayHitRateByProfile.length, 2);
 
     const payload = writes[0]?.payload as any;
     assert.equal(payload.analyticalArtifactOnly, true);
     assert.equal(payload.executionCapability, 'none');
     assert.equal(payload.metrics[0].chartMetrics.parlayHitRateByProfile.some((item: any) => item.label === 'low-odds-top'), true);
+    assert.equal(payload.metrics[0].chartMetrics.predictionHitRateByProvider.some((item: any) => item.key === 'codex'), true);
   });
 
   it('supports no-persist analytical snapshots without requiring the daily_metrics table', async () => {

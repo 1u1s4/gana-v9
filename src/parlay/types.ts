@@ -35,7 +35,13 @@ export type ParlayExclusionReason =
   | 'excluded-high-odds-risk'
   | 'excluded-corners-unverified'
   | 'excluded-stale-low-liquidity'
-  | 'excluded-inflated-double-chance-edge';
+  | 'excluded-inflated-double-chance-edge'
+  | 'excluded-low-liquidity'
+  | 'excluded-lineup-pending'
+  | 'excluded-selection-evidence-missing'
+  | 'excluded-h2h-away-risk'
+  | 'excluded-fragile-low-total-over'
+  | 'excluded-overinflated-edge';
 
 export type ParlayRiskTag =
   | 'low_edge'
@@ -51,7 +57,12 @@ export type ParlayRiskTag =
   | 'stale_low_liquidity'
   | 'low_liquidity_h2h_favorite'
   | 'inflated_double_chance_edge'
-  | 'uncalibrated_high_confidence';
+  | 'uncalibrated_high_confidence'
+  | 'low_liquidity'
+  | 'lineup_pending'
+  | 'selection_evidence_missing'
+  | 'h2h_away'
+  | 'overinflated_edge';
 
 export interface ParlayConfig {
   minLegs?: number;
@@ -186,6 +197,11 @@ export const parlaySourcePredictionSchema = z.object({
     'low_liquidity_h2h_favorite',
     'inflated_double_chance_edge',
     'uncalibrated_high_confidence',
+    'low_liquidity',
+    'lineup_pending',
+    'selection_evidence_missing',
+    'h2h_away',
+    'overinflated_edge',
   ])).optional(),
   riskScore: z.number().min(0).optional(),
 });

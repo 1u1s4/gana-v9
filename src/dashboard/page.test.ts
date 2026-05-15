@@ -12,6 +12,7 @@ describe('dashboard page UX affordances', () => {
     assert.match(html, /data-quick-tab="parlays"/);
     assert.match(html, /data-quick-tab="validations"/);
     assert.match(html, /data-quick-tab="metrics"/);
+    assert.match(html, /data-quick-tab="daily"/);
     assert.match(html, /data-quick-view="top-edge"/);
     assert.match(html, /id="exploration-strip"/);
   });
@@ -37,5 +38,14 @@ describe('dashboard page UX affordances', () => {
     assert.match(html, /function renderBarChart/);
     assert.match(html, /Parlay perfil/);
     assert.match(html, /Pred\. mercado/);
+  });
+
+  it('renders daily overview and recommendation card helpers', () => {
+    const html = dashboardHtml();
+
+    assert.match(html, /data-tab="daily"/);
+    assert.match(html, /function renderDailyRows/);
+    assert.match(html, /recommendation-card/);
+    assert.match(html, /Artifact analítico\. No ejecuta apuestas/);
   });
 });
