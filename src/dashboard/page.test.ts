@@ -48,4 +48,11 @@ describe('dashboard page UX affordances', () => {
     assert.match(html, /recommendation-card/);
     assert.match(html, /Artifact analítico\. No ejecuta apuestas/);
   });
+
+  it('does not schedule automatic overview refreshes', () => {
+    const html = dashboardHtml();
+
+    assert.doesNotMatch(html, /setInterval/);
+    assert.doesNotMatch(html, /30000/);
+  });
 });

@@ -484,7 +484,7 @@ function buildDailyWhere(
   const clauses: QueryArgs[] = [{
     OR: [
       { id: { startsWith: 'daily-' } },
-      { metadata: { path: ['dailyRole'], equals: 'batch' } },
+      { metadata: { path: '$.dailyRole', equals: 'batch' } },
     ],
   }];
   if (query.dailyBatchId) clauses.push({ id: query.dailyBatchId });
@@ -493,9 +493,9 @@ function buildDailyWhere(
   if (dateWindow) clauses.push({ createdAt: dateRangeFilter(dateWindow) });
   if (query.provider) clauses.push({ providerAgentic: { contains: query.provider } });
   if (query.model) clauses.push({ model: { contains: query.model } });
-  if (query.family) clauses.push({ metadata: { path: ['counts', 'parlayFamilies', query.family], not: Prisma.JsonNull } });
+  if (query.family) clauses.push({ metadata: { path: `$.counts.parlayFamilies.${query.family}`, not: Prisma.JsonNull } });
   if (query.recommendationTier && query.recommendationTier !== 'top') {
-    clauses.push({ metadata: { path: ['parlayAnalysis', 'top'], array_contains: [{ harnessStatus: query.recommendationTier }] } });
+    clauses.push({ metadata: { path: '$.parlayAnalysis.top', array_contains: [{ harnessStatus: query.recommendationTier }] } });
   }
   return clauses.length === 1 ? clauses[0] as QueryArgs : { AND: clauses };
 }

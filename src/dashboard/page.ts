@@ -2385,9 +2385,6 @@ export function dashboardHtml(): string {
         if (state.selectedKind && state.selectedId) {
           await loadEntity(state.selectedKind, state.selectedId).catch(() => {});
         }
-        window.setInterval(function() {
-          if (!state.loading) load().catch(function() {});
-        }, 30000);
       }
 
       boot().catch(() => {});

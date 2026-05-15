@@ -1,428 +1,249 @@
 ## Veredicto actualizado
 
-Ahora sí veo que ya avanzaste justo hacia el siguiente nivel: **Gana v9 ya no solo corre predicciones**, ahora está entrando en una etapa de **E2E diario comparativo Codex + Gemini**, con artifacts diarios, recomendaciones de parlays y métricas diarias.
-
-El cambio más importante es que ya aparece `src/daily/e2e.ts` y `src/daily/e2e.test.ts` dentro del árbol actual, lo cual confirma que ya no estás solo planeando el flujo diario: ya empezaste a implementarlo como módulo propio. 
-
-Mi lectura sería:
+Ahora lo veo **mucho mejor cerrado para el enfoque diario Codex + Gemini**. Ya no estás solo en “quiero hacer E2E diario”; ahora el repo muestra que esa dirección ya fue implementada en piezas concretas:
 
 ```text
-Estado actual: daily E2E comparativo en construcción avanzada
-Nivel de madurez: 85% - 90% para operación diaria Codex/Gemini
-Siguiente foco: dashboard comparativo + criterios de éxito más flexibles
+src/daily/e2e.ts
+src/daily/e2e.test.ts
+src/daily/comparison.ts
+src/daily/comparison.test.ts
+dashboard con tab daily
+daily-provider-comparison.json
+daily-provider-consensus.json
+daily-parlay-recommendations.json
+daily-metrics
+```
+
+El árbol actual ya incluye `src/daily/comparison.ts` y `src/daily/e2e.ts`, además de tests para ambos, una migración `daily_metrics`, dashboard con pruebas, analytics, parlay avanzado y skills versionadas. Eso significa que el sistema ya pasó de “producción controlada” a **operación diaria comparativa en etapa funcional**. 
+
+Mi lectura:
+
+```text
+Estado: daily production candidate
+Madurez: 92% - 95%
+Siguiente paso: probar daily-e2e live con Codex + Gemini y ajustar UX del dashboard
 ```
 
 ---
 
-# Lo que quedó muy bien
+## Lo que quedó muy bien
 
-## 1. Ya existe `runDailyE2E`
+### 1. La comparación Codex vs Gemini ya existe
 
-Esto es el avance principal. El módulo diario ya define un resultado estructurado con:
-
-```ts
-DailyE2ERunResult {
-  ok
-  dailyBatchId
-  date
-  providers
-  parlays
-  parlayAnalysis
-  metrics
-  artifactDir
-  summaryPath
-  reportPath
-}
-```
-
-Eso es exactamente lo que se necesitaba para pasar de runs individuales a un **batch diario con identidad propia**. 
-
-Además, el default de providers ya está bien alineado:
-
-```ts
-const DEFAULT_DAILY_PROVIDERS = ['codex', 'gemini'];
-```
-
-Esto fija el enfoque comparativo diario entre Codex y Gemini sin obligarte a elegir manualmente un provider cada vez. 
-
----
-
-## 2. El daily batch queda persistido como run propio
-
-Me gusta que `dailyBatchId` se registre como un `HarnessRun` con metadata clara:
+Ya aparece `src/daily/comparison.ts` con estructuras claras para comparar predicciones por proveedor. El módulo define `DailyProviderComparison`, `DailyProviderConsensus`, `DailyProviderComparisonSummary`, `DailyProviderSummary` e items por fixture/market/line. También calcula cosas clave como:
 
 ```text
-dailyBatchId
-dailyRole: batch
-date
-pairedProviders
-marketScope
+sameSelection
+sameMarketDifferentSelection
+onlyCodex
+onlyGemini
+onlyByProvider
+agreementRate
+disagreementRate
+avgConfidenceByProvider
+avgEdgeByProvider
+```
+
+Eso responde exactamente a lo que necesitabas: ver si Codex y Gemini coinciden, discrepan o producen picks exclusivos. 
+
+Además, la implementación agrupa predicciones por clave comparable, genera `comparison`, genera `consensus`, y mantiene la salida como artifact analítico sin ejecución monetaria:
+
+```text
 analyticalArtifactOnly: true
-executionCapability: none
+executionCapability: 'none'
 ```
 
-Eso es muy importante porque el día completo se convierte en una entidad auditable. No quedan solo runs sueltos de Codex y Gemini; queda una corrida diaria agregada con su propio artifact y metadata. 
+Eso está muy bien alineado con el enfoque seguro del proyecto. 
 
 ---
 
-## 3. Codex y Gemini corren como providers separados
+### 2. El Daily E2E ya produce artifacts útiles
 
-El flujo ya itera sobre los providers y ejecuta el pipeline por cada uno:
-
-```ts
-for (const provider of providers) {
-  const providerConfig = configForProvider(effectiveConfig, provider);
-  const providerRuntime = childRuntime(runtime, providerConfig);
-  const result = await runner(...)
-}
-```
-
-Y cada run guarda:
+El flujo diario ahora escribe artifacts como:
 
 ```text
-provider
-model
-runId
-ok
-verdict
-artifactPath
-error
-```
-
-Esto es correcto. Permite que el dashboard y las métricas diferencien claramente qué produjo Codex y qué produjo Gemini. 
-
----
-
-## 4. No duplicas innecesariamente fixtures y odds
-
-Este punto es excelente: `createSharedPipelineDeps` cachea discovery y odds snapshots para que Codex y Gemini trabajen sobre el mismo universo deportivo y no dupliquen llamadas a API-Football cuando no hace falta. 
-
-Esto es justo lo que querías para el E2E diario:
-
-```text
-mismos fixtures
-mismas odds
-mismo date window
-diferente reasoning/modelo
-```
-
-Así la comparación Codex vs Gemini es más justa.
-
----
-
-## 5. Ya produces recomendaciones diarias de parlays
-
-Veo que el daily E2E escribe:
-
-```text
+daily-provider-comparison.json
+daily-provider-consensus.json
 daily-e2e-summary.json
 daily-parlay-recommendations.json
 daily-report.md
 ```
 
-Y que `daily-parlay-recommendations.json` incluye:
+También guarda en el summary conteos de providers, familias de parlays, recomendaciones, comparison items y consensus predictions. Eso ya convierte cada corrida diaria en un paquete auditable y revisable. 
+
+Esto es muy fuerte porque ahora el daily run no solo genera predicciones, sino que deja una lectura clara:
 
 ```text
-dailyBatchId
-date
-sourceRunIds
-recommendations
-diagnostics
-analyticalArtifactOnly: true
-executionCapability: none
+qué corrió
+qué providers participaron
+qué parlays salieron
+qué recomendaciones hubo
+cuántas coincidencias hubo
+cuántos consensos hubo
+dónde están los artifacts
 ```
-
-Esto está muy bien. Mantiene las recomendaciones como artifacts analíticos y no como ejecución de apuestas. 
-
-También el reporte diario termina con una advertencia clara:
-
-```text
-Artifact analítico. No ejecuta apuestas ni garantiza resultados.
-```
-
-Ese mensaje es sano y conviene mantenerlo en dashboard, reportes y exports. 
 
 ---
 
-## 6. Daily metrics ya existe y persiste
+### 3. El dashboard ya tiene modo daily
 
-Ya tienes `DailyMetric` en Prisma, con:
+El dashboard ya no está limitado a predictions/parlays/validations/metrics. En las pruebas ya aparece `data-quick-tab="daily"` y también helpers para `renderDailyRows` y `recommendation-card`. Además, la prueba valida que se muestre el texto de seguridad:
+
+```text
+Artifact analítico. No ejecuta apuestas
+```
+
+Esto significa que el dashboard ya está empezando a mostrar las recomendaciones de parlays como una vista propia, no solo como JSON en artifacts. 
+
+También veo que `readOverview` ya acepta filtros nuevos como:
+
+```text
+dailyBatchId
+provider
+model
+family
+recommendationTier
+```
+
+Eso es exactamente lo que necesitas para navegar el dashboard por día, modelo, familia de parlay y nivel de recomendación. 
+
+---
+
+### 4. Daily metrics ya está en schema
+
+El modelo `DailyMetric` está presente con:
 
 ```text
 metricDate
 timezone
 scope
+sourceWindowStart
+sourceWindowEnd
 predictionMetrics
 parlayMetrics
 chartMetrics
 ```
 
-y además tiene unique key por fecha, timezone y scope. Eso es muy bueno para métricas diarias por batch, por modelo o por alcance general. 
+y tiene una llave única por fecha, timezone y scope. Eso permite guardar métricas por día, por scope y luego alimentar dashboard/gráficas sin crear tablas nuevas para cada métrica. 
 
-También hay test de `runDailyMetrics` que verifica bloqueo si no hay DB, persistencia, artifact `daily-metrics.json`, y cálculo de métricas de predictions/parlays. 
+También agregaste `scripts/graficas.py`, que toma `daily-metrics.json` y arma resúmenes de parlays como total, won, lost, voided, sin validar, cuota promedio, confianza promedio y hit rate. Eso puede servir como herramienta auxiliar para revisar rendimiento diario. 
 
 ---
 
-## 7. Dashboard ya tiene base para exploración
+### 5. El parlay service está bastante más maduro
 
-El dashboard ya tiene tabs para:
+El servicio de parlays ya importa y usa piezas avanzadas:
 
 ```text
-predictions
-parlays
-validations
-metrics
+candidate-generator
+correlation
+diversifier
+eligibility
+ranker
+rules
 ```
 
-También tiene presets rápidos de fecha, shortcuts de exploración, acciones por entidad, warnings, outcome, scoped exploration e historial de validación. 
-
-Además, el servidor ya expone métricas como tab, permite `/api/overview?tab=metrics`, y también soporta entidad individual como `prediction` y `run`. 
-
-Eso significa que el dashboard ya está preparado para crecer hacia una vista diaria comparativa.
+También tiene reglas de riesgo como lineup pendiente, baja liquidez, corners no verificados, edge inflado, selección sin evidencia y riesgos específicos de favoritos/over. Esto es importante porque las recomendaciones de parlays no deben ser solo “las cuotas más bonitas”, sino combinaciones filtradas, rankeadas y penalizadas por riesgo. 
 
 ---
 
-# Lo que ajustaría ahora
+## Lo que revisaría antes de lanzar daily-e2e en serio
 
-## 1. Evitar hardcode de `providerAgentic: 'codex,gemini'`
+### 1. Revisar una posible anomalía visual en `comparison.ts`
 
-En varios puntos el daily batch guarda:
+En el snippet aparece esto:
 
 ```ts
-providerAgentic: 'codex,gemini'
+providers: [.new Set(consensusPredictions.map((item) => item.provider))].sort(),
 ```
 
-Eso está bien mientras siempre corras Codex + Gemini, pero tu función acepta `input.providers`. Si algún día corres solo Codex, solo Gemini, o agregas Cursor, ese valor quedaría incorrecto. 
-
-Yo lo cambiaría por:
+Si eso está literalmente en el código, sería un error de sintaxis. Si `pnpm typecheck` ya pasa, entonces probablemente es un artefacto del paste o de cómo se renderizó el texto. Pero lo revisaría manualmente porque esa línea debería ser:
 
 ```ts
-providerAgentic: providers.join(',')
+providers: [...new Set(consensusPredictions.map((item) => item.provider))].sort(),
 ```
 
-Y lo mismo para cualquier lugar donde esté hardcodeado:
-
-```ts
-providerAgentic: 'codex,gemini'
-```
-
-Esto deja el sistema más consistente sin cambiar la lógica actual.
+Es el único punto técnico que me saltó visualmente. 
 
 ---
 
-## 2. Revisar el criterio de `ok`
+### 2. Verificar que el dashboard realmente cargue los artifacts diarios
 
-Ahora el resultado diario parece exigir que exista una familia `consensus-mixed` exitosa:
+Ya tienes helpers y filtros para daily, pero revisaría si la vista daily obtiene los datos desde DB, desde artifacts o ambos. El Daily E2E escribe `daily-provider-comparison.json`, `daily-provider-consensus.json` y `daily-parlay-recommendations.json`; el dashboard debe poder mostrar esas recomendaciones de forma consistente. 
 
-```ts
-const ok = providerRuns.every((run) => run.ok)
-  && parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok)
-  && (parlayAnalysis?.ok ?? false)
-  && metrics.ok;
-```
-
-Ese criterio puede ser demasiado estricto. Hay días donde Codex y Gemini pueden producir predictions válidas, parlays Codex-only y Gemini-only válidos, pero no un buen consensus-mixed. Eso no debería necesariamente convertir todo el día en `failed`. 
-
-Yo lo cambiaría a algo más flexible:
-
-```ts
-const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
-
-const hasConsensus = parlayFamilies.some(
-  (family) => family.family === 'consensus-mixed' && family.ok
-);
-
-const ok = providerRuns.every((run) => run.ok)
-  && hasAnyValidParlayFamily
-  && (parlayAnalysis?.ok ?? false)
-  && metrics.ok;
-
-const verdict = ok && hasConsensus
-  ? 'promotable'
-  : ok
-    ? 'review-required'
-    : providerRuns.some((run) => !run.ok)
-      ? 'blocked'
-      : 'review-required';
-```
-
-Así el sistema distingue:
+La pregunta práctica es:
 
 ```text
-promotable: hay consenso mixto fuerte.
-review-required: hay outputs válidos, pero no consenso mixto.
-blocked: falló un provider o faltan piezas críticas.
+¿Puedo abrir el dashboard, filtrar por dailyBatchId y ver:
+- Codex run
+- Gemini run
+- comparación
+- consenso
+- parlays por familia
+- recomendaciones top?
 ```
+
+Si la respuesta es sí, estás listo para operación diaria. Si la respuesta es parcialmente, ese sería el siguiente ajuste.
 
 ---
 
-## 3. Agregar comparación explícita Codex vs Gemini
+### 3. Confirmar que `dailyBatchId` se propague a todo
 
-Ahora el daily E2E corre ambos providers, pero por lo que veo todavía falta una capa dedicada tipo:
+El daily summary ya incluye `dailyBatchId`, `sourceRunIds`, `providerComparisonPath`, `providerConsensusPath` y metadata del batch. También persiste un `HarnessRun` para el batch diario. 
 
-```text
-provider-comparison.json
-provider-consensus.json
-```
-
-El sistema ya tiene providers separados, runs separados y metrics. El siguiente paso debería ser comparar predicciones por:
+Ahora hay que confirmar que todos estos elementos quedan unidos:
 
 ```text
-fixture
-market
-selection
-line
-confidence
-edge
-status
-provider
-model
+Codex run -> dailyBatchId
+Gemini run -> dailyBatchId
+Parlay Codex-only -> dailyBatchId/sourceRunIds
+Parlay Gemini-only -> dailyBatchId/sourceRunIds
+Parlay consensus-mixed -> dailyBatchId/sourceRunIds
+Recommendations -> dailyBatchId
+DailyMetric -> dailyBatchId o scope equivalente
+Dashboard -> filtra por dailyBatchId
 ```
 
-Yo agregaría:
-
-```text
-src/daily/comparison.ts
-```
-
-o:
-
-```text
-src/prediction/comparison.ts
-```
-
-Salida sugerida:
-
-```json
-{
-  "dailyBatchId": "daily-2026-05-15",
-  "date": "2026-05-15",
-  "summary": {
-    "comparablePredictions": 42,
-    "sameSelection": 18,
-    "sameMarketDifferentSelection": 7,
-    "onlyCodex": 10,
-    "onlyGemini": 7,
-    "agreementRate": 0.42
-  },
-  "items": []
-}
-```
-
-Esto le daría al dashboard una base directa para mostrar:
-
-```text
-Codex coincide con Gemini
-Codex discrepa de Gemini
-Solo Codex propuso
-Solo Gemini propuso
-```
+Si alguna pieza no queda enlazada, el dashboard puede mostrar datos, pero no el “día completo” como unidad.
 
 ---
 
-## 4. El dashboard necesita vista “Daily”
+### 4. No convertir `graficas.py` en dependencia crítica
 
-Ahora el dashboard tiene tabs generales. Lo que falta para tu objetivo es una vista centrada en el `dailyBatchId`.
-
-Agregaría un tab o modo:
-
-```text
-Daily
-```
-
-O un filtro fuerte por:
-
-```text
-dailyBatchId
-```
-
-La vista debería mostrar:
-
-```text
-Daily batch: daily-YYYY-MM-DD
-
-Runs:
-  Codex runId, model, status, predictions, parlays
-  Gemini runId, model, status, predictions, parlays
-
-Comparación:
-  coincidencias
-  discrepancias
-  solo Codex
-  solo Gemini
-
-Parlays:
-  Codex-only
-  Gemini-only
-  consensus-mixed
-
-Recomendaciones:
-  top recommendations
-  diagnostics
-  warnings
-```
-
-Ahora mismo el dashboard devuelve config con provider/model activo, counts, predictions, parlays, validations, runs y metrics, pero todavía no veo una respuesta específica de daily comparison o parlay recommendations como entidad de primer nivel. 
+`graficas.py` está bien como herramienta auxiliar para generar visualizaciones o reportes rápidos, pero no debería bloquear el flujo productivo diario. El dashboard y los artifacts JSON deben ser la fuente principal; Python puede quedar como apoyo para análisis. 
 
 ---
 
-## 5. Mostrar recomendaciones de parlays como cards, no solo JSON
+## Lo que haría ahora
 
-Ya produces `daily-parlay-recommendations.json`, pero el dashboard debería leerlo o reconstruirlo desde DB y mostrarlo visualmente.
+Ya no haría otro rediseño. Haría una prueba diaria completa con límites bajos.
 
-Cada card debería tener:
-
-```text
-Rank
-Family: codex-only / gemini-only / consensus-mixed
-Combined odds
-Aggregate confidence
-Expected edge
-Correlation penalty
-Legs
-Reasons
-Warnings
-Diagnostics
-Status
-```
-
-Y mantener siempre:
-
-```text
-Artifact analítico. No ejecuta apuestas ni garantiza resultados.
-```
-
-Ese texto ya existe en el reporte, pero debe aparecer también en la vista de recomendaciones. 
-
----
-
-# Orden recomendado para continuar
-
-## PR-01: Ajustes finos del Daily E2E
-
-Objetivo: dejar `runDailyE2E` más robusto.
-
-Cambios:
-
-```text
-providerAgentic = providers.join(',')
-criterio ok/verdict más flexible
-dailyBatchId bien propagado a todos los runs
-summary incluye counts por provider
-summary incluye counts por familia de parlay
-summary incluye recommendation count
-```
-
-Resultado esperado:
+### 1. Certificación técnica
 
 ```bash
-pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini
+pnpm typecheck
+pnpm test
+pnpm gana certify --profile ci-certification
 ```
 
-Debe producir:
+---
+
+### 2. Primer Daily E2E real pequeño
+
+```bash
+GANA_PROFILE=full-permissions \
+GANA_APPROVAL_MODE=auto-grant \
+GANA_MAX_FIXTURES_PER_RUN=10 \
+GANA_LOW_ODDS_THRESHOLD=1.20 \
+pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --web live
+```
+
+Revisar que genere:
 
 ```text
 daily-e2e-summary.json
+daily-provider-comparison.json
+daily-provider-consensus.json
 daily-parlay-recommendations.json
 daily-report.md
 daily-metrics.json
@@ -430,152 +251,92 @@ daily-metrics.json
 
 ---
 
-## PR-02: Provider comparison
-
-Crear:
-
-```text
-src/daily/comparison.ts
-src/daily/comparison.test.ts
-```
-
-Artifacts:
-
-```text
-daily-provider-comparison.json
-daily-provider-consensus.json
-```
-
-Métricas:
-
-```text
-agreementRate
-disagreementRate
-onlyCodex
-onlyGemini
-sameSelection
-sameMarketDifferentSelection
-avgConfidenceByProvider
-avgEdgeByProvider
-```
-
----
-
-## PR-03: Dashboard Daily Overview
-
-Actualizar:
-
-```text
-src/dashboard/query.ts
-src/dashboard/types.ts
-src/dashboard/page.ts
-src/dashboard/server.ts
-```
-
-Agregar:
-
-```text
-tab=daily
-filter=dailyBatchId
-provider filter
-model filter
-family filter
-recommendation tier filter
-```
-
----
-
-## PR-04: Parlay Recommendations UI
-
-Actualizar dashboard para mostrar cards de recomendaciones.
-
-Debe separar:
-
-```text
-Top
-Watchlist
-Review-required
-Blocked
-```
-
-Y por familia:
-
-```text
-Codex-only
-Gemini-only
-Consensus-mixed
-```
-
----
-
-## PR-05: Métricas por modelo/proveedor
-
-Extender `DailyMetric.chartMetrics` para incluir:
-
-```text
-codex prediction metrics
-gemini prediction metrics
-codex parlay metrics
-gemini parlay metrics
-consensus parlay metrics
-agreement metrics
-```
-
-Ya tienes la tabla `DailyMetric`, así que probablemente no necesitas nueva migración al inicio; puedes ampliar el JSON. 
-
----
-
-# Flujo diario ideal a partir de ahora
+### 3. Abrir dashboard
 
 ```bash
-GANA_PROFILE=full-permissions \
-GANA_APPROVAL_MODE=auto-grant \
-GANA_MAX_FIXTURES_PER_RUN=100 \
-GANA_LOW_ODDS_THRESHOLD=1.20 \
+pnpm gana dashboard
+```
+
+Y revisar específicamente:
+
+```text
+tab daily
+filtro dailyBatchId
+filtro provider
+filtro model
+filtro family
+filtro recommendationTier
+cards de recomendaciones
+comparación Codex vs Gemini
+parlays por familia
+metrics
+```
+
+---
+
+### 4. Escalar gradualmente
+
+Después de 10 fixtures:
+
+```bash
+GANA_MAX_FIXTURES_PER_RUN=40 \
 pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --web live
 ```
 
 Luego:
 
 ```bash
-pnpm gana dashboard
+GANA_MAX_FIXTURES_PER_RUN=100 \
+pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --web live
 ```
 
-Después de partidos finalizados:
+---
 
-```bash
-pnpm gana validate --date YYYY-MM-DD
-pnpm gana daily-metrics --date YYYY-MM-DD
-```
+## Prioridad siguiente
 
-Y el dashboard debería responder visualmente:
+Yo pondría el foco en **UX del dashboard**, no en más lógica de predicción todavía.
+
+La lógica diaria ya está bastante bien encaminada. Lo que más valor te va a dar ahora es que el dashboard conteste rápido estas preguntas:
 
 ```text
 ¿Qué predijo Codex?
 ¿Qué predijo Gemini?
 ¿Dónde coincidieron?
 ¿Dónde discreparon?
-¿Qué parlays generó cada uno?
-¿Qué parlays mixtos salieron?
-¿Cuáles son las recomendaciones analíticas top?
+¿Qué picks salieron solo de Codex?
+¿Qué picks salieron solo de Gemini?
+¿Qué parlays son Codex-only?
+¿Qué parlays son Gemini-only?
+¿Qué parlays son consensus-mixed?
+¿Cuáles son las recomendaciones top?
+¿Por qué se recomiendan?
+¿Qué warnings tienen?
 ¿Qué pasó después de validation?
-¿Qué modelo está funcionando mejor?
 ```
 
 ---
 
 ## Conclusión
 
-Vas muy bien. El salto importante ya ocurrió: **ya existe Daily E2E** y ya produce resumen, recomendaciones, métricas y reportes. Eso significa que la base para operación diaria Codex + Gemini ya está montada.
+Ahora sí estás muy cerca del flujo que querías.
 
-Lo que falta no es rehacer el sistema. Lo siguiente es hacerlo **más legible y comparativo**:
+Antes tenías:
 
 ```text
-1. Ajustar criterio ok/verdict del daily E2E.
-2. Agregar comparación explícita Codex vs Gemini.
-3. Mejorar dashboard con Daily Overview.
-4. Mostrar recomendaciones de parlays como cards.
-5. Medir desempeño por provider/modelo después de validation.
+predicciones + parlays + validation
 ```
 
-Con eso, Gana v9 pasa de “genera predicciones y parlays” a “opera diariamente, compara modelos y recomienda parlays analíticos con trazabilidad”.
+Ahora ya tienes:
+
+```text
+daily-e2e Codex/Gemini
+comparación por provider
+consenso
+recomendaciones de parlays
+daily metrics
+dashboard daily
+```
+
+Mi recomendación es clara:
+
+> Ejecuta un daily-e2e real pequeño, valida artifacts y dashboard, y después mejora la presentación visual de recomendaciones y comparación Codex vs Gemini. No agregues más features grandes hasta ver varios días de datos reales.
