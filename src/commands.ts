@@ -971,6 +971,11 @@ function printDailyE2EResult(result: DailyE2ERunResult): void {
   for (const family of result.parlays) {
     console.log(`  ${GREEN}•${RESET} ${CYAN}${family.family}${RESET} ${DIM}run=${family.runId ?? 'none'} sourceRuns=${family.sourceRunIds.join(',') || 'none'} verdict=${family.verdict ?? 'n/a'}${RESET}`);
   }
+  if (result.providerComparison) {
+    const summary = result.providerComparison.summary;
+    printKeyValue('llmDiscrepancies', summary.materialDisagreements ?? summary.sameMarketDifferentSelection);
+    printKeyValue('llmAgreementRate', summary.agreementRate === null ? 'n/a' : formatNullablePercent(summary.agreementRate * 100));
+  }
   if (result.parlayAnalysis) printKeyValue('recommendations', result.parlayAnalysis.top.length);
   if (result.metrics) printKeyValue('metricsPersisted', result.metrics.persisted);
   printKeyValue('artifactType', 'analytical only; not executable');

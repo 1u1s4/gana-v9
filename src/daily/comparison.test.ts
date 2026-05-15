@@ -46,6 +46,49 @@ describe('daily provider comparison', () => {
     assert.deepEqual(consensus.summary.providers, ['codex', 'gemini']);
     assert.equal(consensus.items[0]?.classification, 'same-selection');
   });
+
+  it('keeps same-market line disagreements together for LLM review', () => {
+    const { comparison, consensus } = buildDailyProviderComparison({
+      dailyBatchId: 'daily-2026-05-14',
+      date: '2026-05-14',
+      providers: [
+        {
+          provider: 'codex',
+          model: 'gpt-5.5',
+          runId: 'codex-run',
+          result: pipelineResult('codex-run', [
+            prediction({ id: 'c-1', fixtureId: 'fixture-a', providerFixtureId: '100', market: 'goals_over_under', selection: 'under', line: 2.5 }),
+            prediction({ id: 'c-2', fixtureId: 'fixture-b', providerFixtureId: '101', market: 'goals_over_under', selection: 'under', line: 2.5 }),
+          ]),
+        },
+        {
+          provider: 'gemini',
+          model: 'gemini-2.5-pro',
+          runId: 'gemini-run',
+          result: pipelineResult('gemini-run', [
+            prediction({ id: 'g-1', fixtureId: 'fixture-a', providerFixtureId: '100', market: 'goals_over_under', selection: 'over', line: 2.5 }),
+            prediction({ id: 'g-2', fixtureId: 'fixture-b', providerFixtureId: '101', market: 'goals_over_under', selection: 'under', line: 1.5 }),
+          ]),
+        },
+      ],
+    });
+
+    assert.equal(comparison.summary.matchedGroups, 2);
+    assert.equal(comparison.summary.sameSelection, 0);
+    assert.equal(comparison.summary.sameMarketDifferentSelection, 1);
+    assert.equal(comparison.summary.sameSelectionDifferentLine, 1);
+    assert.equal(comparison.summary.materialDisagreements, 2);
+    assert.equal(comparison.summary.disagreementRate, 1);
+    assert.deepEqual(comparison.items.map((item) => item.classification), [
+      'same-selection-different-line',
+      'same-market-different-selection',
+    ]);
+    assert.deepEqual(comparison.items[0]?.providers.map((provider) => `${provider.provider}:${provider.selection}:${provider.line}`), [
+      'codex:under:2.5',
+      'gemini:under:1.5',
+    ]);
+    assert.equal(consensus.summary.consensusPredictions, 0);
+  });
 });
 
 function pipelineResult(runId: string, predictions: PredictionRecordView[]): RunPipelineResult {

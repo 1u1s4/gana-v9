@@ -37,7 +37,10 @@ export interface DailyProviderComparisonSummary {
   comparablePredictions: number;
   matchedGroups: number;
   sameSelection: number;
+  sameSelectionDifferentLine: number;
   sameMarketDifferentSelection: number;
+  sameMarketDifferentSelectionAndLine: number;
+  materialDisagreements: number;
   onlyCodex: number;
   onlyGemini: number;
   onlyByProvider: Record<string, number>;
@@ -65,7 +68,12 @@ export interface DailyProviderComparisonItem {
   providerFixtureId?: string;
   market: string;
   line: number | null;
-  classification: 'same-selection' | 'same-market-different-selection' | 'only-provider';
+  classification:
+    | 'same-selection'
+    | 'same-selection-different-line'
+    | 'same-market-different-selection'
+    | 'same-market-different-selection-and-line'
+    | 'only-provider';
   providers: DailyProviderPredictionSummary[];
 }
 
@@ -75,6 +83,7 @@ export interface DailyProviderPredictionSummary {
   runId?: string;
   predictionId: string;
   selection: string;
+  line: number | null;
   odds: number;
   confidence: number;
   edge: number | null;
@@ -107,18 +116,24 @@ export function buildDailyProviderComparison(input: {
       || (a.line ?? -1) - (b.line ?? -1));
 
   const sameSelection = items.filter((item) => item.classification === 'same-selection').length;
+  const sameSelectionDifferentLine = items.filter((item) => item.classification === 'same-selection-different-line').length;
   const sameMarketDifferentSelection = items.filter((item) => item.classification === 'same-market-different-selection').length;
+  const sameMarketDifferentSelectionAndLine = items.filter((item) => item.classification === 'same-market-different-selection-and-line').length;
   const onlyByProvider = countOnlyProvider(items);
-  const matchedGroups = sameSelection + sameMarketDifferentSelection;
+  const materialDisagreements = sameSelectionDifferentLine + sameMarketDifferentSelection + sameMarketDifferentSelectionAndLine;
+  const matchedGroups = sameSelection + materialDisagreements;
   const agreementRate = matchedGroups ? round(sameSelection / matchedGroups, 4) : null;
-  const disagreementRate = matchedGroups ? round(sameMarketDifferentSelection / matchedGroups, 4) : null;
+  const disagreementRate = matchedGroups ? round(materialDisagreements / matchedGroups, 4) : null;
   const allPredictionSummaries = items.flatMap((item) => item.providers);
 
   const summary: DailyProviderComparisonSummary = {
     comparablePredictions: allPredictionSummaries.length,
     matchedGroups,
     sameSelection,
+    sameSelectionDifferentLine,
     sameMarketDifferentSelection,
+    sameMarketDifferentSelectionAndLine,
+    materialDisagreements,
     onlyCodex: onlyByProvider.codex ?? 0,
     onlyGemini: onlyByProvider.gemini ?? 0,
     onlyByProvider,
@@ -160,8 +175,7 @@ function collectPredictions(result: RunPipelineResult | undefined): PredictionRe
 }
 
 function comparisonKey(prediction: PredictionRecordView): string {
-  const line = prediction.line ?? 'none';
-  return `${prediction.fixtureId}|${prediction.providerFixtureId ?? 'none'}|${prediction.market}|${line}`;
+  return `${prediction.fixtureId}|${prediction.providerFixtureId ?? 'none'}|${prediction.market}`;
 }
 
 function toPredictionSummary(
@@ -174,6 +188,7 @@ function toPredictionSummary(
     runId: provider.runId,
     predictionId: prediction.id,
     selection: prediction.selection,
+    line: prediction.line ?? null,
     odds: prediction.odds,
     confidence: prediction.confidence,
     edge: prediction.edge ?? null,
@@ -200,22 +215,32 @@ function summarizeProvider(
 }
 
 function toComparisonItem(key: string, providers: DailyProviderPredictionSummary[]): DailyProviderComparisonItem {
-  const [fixtureId, providerFixtureId, market, lineRaw] = key.split('|');
+  const [fixtureId, providerFixtureId, market] = key.split('|');
   const selections = new Set(providers.map((provider) => provider.selection));
+  const lines = new Set(providers.map((provider) => lineKey(provider.line)));
   const uniqueProviders = new Set(providers.map((provider) => provider.provider));
+  const classification = uniqueProviders.size === 1
+    ? 'only-provider'
+    : selections.size === 1 && lines.size === 1
+      ? 'same-selection'
+      : selections.size === 1
+        ? 'same-selection-different-line'
+        : lines.size === 1
+          ? 'same-market-different-selection'
+          : 'same-market-different-selection-and-line';
   return {
     key,
     fixtureId: fixtureId ?? '',
     ...(providerFixtureId && providerFixtureId !== 'none' ? { providerFixtureId } : {}),
     market: market ?? 'unknown',
-    line: lineRaw && lineRaw !== 'none' ? Number(lineRaw) : null,
-    classification: uniqueProviders.size === 1
-      ? 'only-provider'
-      : selections.size === 1
-        ? 'same-selection'
-        : 'same-market-different-selection',
+    line: lines.size === 1 ? providers[0]?.line ?? null : null,
+    classification,
     providers: providers.sort((a, b) => a.provider.localeCompare(b.provider)),
   };
+}
+
+function lineKey(line: number | null): string {
+  return line === null ? 'none' : String(line);
 }
 
 function countOnlyProvider(items: DailyProviderComparisonItem[]): Record<string, number> {
@@ -251,8 +276,10 @@ function average(values: number[]): number | null {
 
 function classificationOrder(classification: DailyProviderComparisonItem['classification']): number {
   if (classification === 'same-selection') return 0;
-  if (classification === 'same-market-different-selection') return 1;
-  return 2;
+  if (classification === 'same-selection-different-line') return 1;
+  if (classification === 'same-market-different-selection') return 2;
+  if (classification === 'same-market-different-selection-and-line') return 3;
+  return 4;
 }
 
 function round(value: number, digits: number): number {
