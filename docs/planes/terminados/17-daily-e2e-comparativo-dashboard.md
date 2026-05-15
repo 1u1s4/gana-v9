@@ -24,12 +24,48 @@ Origen: `docs/planes/por_hacer/goal.md`
   - `family`
   - `recommendationTier`
 - Dashboard Daily muestra batches diarios, comparacion, consenso y cards de recomendaciones de parlays.
+- Dashboard Daily ya no hace auto-refresh periodico; la vista queda estable hasta que el usuario refresque o cambie filtros.
 - Daily metrics ahora incluye buckets por provider/model:
   - predictionMetrics.byProvider
   - predictionMetrics.byModel
   - parlayMetrics.byProvider
   - parlayMetrics.byModel
   - chartMetrics provider/model para predicciones y parlays.
+- CLI registra `daily-e2e` como comando headless valido.
+- Los run ids derivados de Daily E2E quedan acotados a 36 caracteres para respetar el schema DB.
+
+## Smoke live con `.env`
+
+Se ejecuto un Daily E2E real pequeno con web live y providers Codex/Gemini:
+
+```bash
+GANA_PROFILE=full-permissions \
+GANA_APPROVAL_MODE=auto-grant \
+GANA_MAX_FIXTURES_PER_RUN=1 \
+GANA_LOW_ODDS_THRESHOLD=1.20 \
+npm run gana -- daily-e2e \
+  --date 2026-05-15 \
+  --providers codex,gemini \
+  --web live \
+  --max-fixtures 1 \
+  --threshold 1.20 \
+  --parlay-profile balanced \
+  --daily-batch-id daily-2026-05-15-v2
+```
+
+Resultado:
+
+- Batch: `daily-2026-05-15-v2`
+- Artifact: `.artifacts/gana-v9/runs/daily-2026-05-15-v2`
+- Codex run: `d71ca351-4ad1-4d70-819a-07ae5df2f95b`, `review-required`, 5 predicciones.
+- Gemini run: `ea1eb25c-53e6-468a-8078-b64e50aec505`, `review-required`, 5 predicciones.
+- Comparacion: 10 predicciones comparables, 4 grupos, 3 mismas selecciones, 1 misma market con seleccion distinta, agreement rate `0.75`.
+- Consenso: 3 predicciones, providers `codex,gemini`, confianza media `0.5933`, edge medio `0.0393`.
+- Metrics: `daily-2026-05-15-v2-metrics`, persistido `1`.
+- Parlays: familias `codex-only`, `gemini-only` y `consensus-mixed` quedaron `blocked` porque el smoke uso `--max-fixtures 1` y no habia suficientes legs para construir parlays validos.
+- Dashboard: `GET /api/overview?tab=daily&dailyBatchId=daily-2026-05-15-v2&take=5` devuelve el batch, providers, parlays bloqueados, comparacion, consenso y metrics.
+
+Durante el primer intento live se encontro un bug productivo: ids derivados como `daily-2026-05-15-smoke-codex-balanced` excedian `HarnessRun.id CHAR(36)`. Se corrigio con ids diarios acotados y hash estable.
 
 ## Archivos principales
 
@@ -53,6 +89,8 @@ Origen: `docs/planes/por_hacer/goal.md`
 ## Verificacion
 
 - `npm run typecheck`: passed
-- `npm test`: passed, 359/359
+- `npm test`: passed, 361/361
+- `npm run gana -- certify --profile ci-certification`: passed, manifest hash `8535d1b35dae2b25217df94a529ebb831ccccdb82d76903d338e43929c25207d`
+- Smoke live `.env`: completed con artifacts y dashboard; verdict `review-required` por parlays insuficientes en `--max-fixtures 1`, sin resultados inventados.
 
 Todos los artifacts nuevos se mantienen como `analyticalArtifactOnly: true` y `executionCapability: none`.

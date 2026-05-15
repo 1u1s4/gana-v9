@@ -584,6 +584,7 @@ async function main() {
     || command === 'validate'
     || command === 'metrics'
     || command === 'run'
+    || command === 'daily-e2e'
     || command === 'certify'
     || command === 'leaderboard'
     || command === 'stats'

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { AgentConfig } from '../config.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { normalizeMarketScope, type MarketKey } from '../domain/markets.js';
@@ -214,7 +215,8 @@ export async function runDailyE2E(
       });
       continue;
     }
-    const parlayRuntime = childRuntime(runtime, configForProvider(effectiveConfig, provider), `${dailyBatchId}-${provider}-${parlayProfile}`);
+    const parlayRunId = boundedDailyChildRunId(dailyBatchId, provider, parlayProfile);
+    const parlayRuntime = childRuntime(runtime, configForProvider(effectiveConfig, provider), parlayRunId);
     const result = await buildParlay(configForProvider(effectiveConfig, provider), {
       date: input.date,
       sourceRunId: runId,
@@ -224,7 +226,7 @@ export async function runDailyE2E(
   }
 
   if (successfulProviderRunIds.length >= 2) {
-    const mixedRuntime = childRuntime(runtime, effectiveConfig, `${dailyBatchId}-mixed`);
+    const mixedRuntime = childRuntime(runtime, effectiveConfig, boundedDailyChildRunId(dailyBatchId, 'mixed'));
     const mixed = await buildParlay(effectiveConfig, {
       date: input.date,
       sourceRunIds: successfulProviderRunIds,
@@ -245,7 +247,7 @@ export async function runDailyE2E(
     ...successfulProviderRunIds,
     ...parlayFamilies.map((family) => family.runId).filter((runId): runId is string => Boolean(runId)),
   ]);
-  const analysisRuntime = childRuntime(runtime, effectiveConfig, `${dailyBatchId}-recommendations`);
+  const analysisRuntime = childRuntime(runtime, effectiveConfig, boundedDailyChildRunId(dailyBatchId, 'recommendations'));
   const parlayAnalysis = parlayAnalysisRunIds.length
     ? await analyzeParlays(effectiveConfig, {
       date: input.date,
@@ -254,7 +256,7 @@ export async function runDailyE2E(
     }, analysisRuntime)
     : undefined;
 
-  const metricsRuntime = childRuntime(runtime, effectiveConfig, `${dailyBatchId}-metrics`);
+  const metricsRuntime = childRuntime(runtime, effectiveConfig, boundedDailyChildRunId(dailyBatchId, 'metrics'));
   const metrics = await buildDailyMetrics(effectiveConfig, {
     date: input.date,
     days: 1,
@@ -553,6 +555,13 @@ function oddsCacheKey(fixtureId: string, markets: readonly MarketKey[] | undefin
 
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function boundedDailyChildRunId(dailyBatchId: string, ...parts: string[]): string {
+  const raw = [dailyBatchId, ...parts].filter(Boolean).join('-').replace(/[^a-zA-Z0-9._-]/g, '-');
+  if (raw.length <= 36) return raw;
+  const hash = createHash('sha256').update(raw).digest('hex').slice(0, 8);
+  return `${raw.slice(0, 27)}-${hash}`;
 }
 
 function defaultRepositories(config: AgentConfig): ReturnType<typeof createStorageRepositories> | undefined {
