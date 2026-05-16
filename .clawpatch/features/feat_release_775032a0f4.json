@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "featureId": "feat_release_775032a0f4",
   "title": "Package script start",
-  "summary": "Package script 'start': tsx src/cli.ts",
+  "summary": "Package script 'start': node dist/cli.js",
   "kind": "release",
   "source": "package-json-script",
   "confidence": "medium",
@@ -30,7 +30,7 @@
     "process-exec",
     "filesystem"
   ],
-  "status": "fixed",
+  "status": "reviewed",
   "lock": null,
   "findingIds": [
     "fnd_sig-feat-release-775032a0f4-3507_1a0c650bfe"
@@ -44,8 +44,16 @@
       "provider": "codex",
       "model": null,
       "createdAt": "2026-05-16T22:48:37.364Z"
+    },
+    {
+      "runId": "20260516T230031-a6fd2e",
+      "kind": "review",
+      "summary": "0 finding(s)",
+      "provider": "codex",
+      "model": null,
+      "createdAt": "2026-05-16T23:01:23.538Z"
     }
   ],
   "createdAt": "2026-05-16T22:48:03.829Z",
-  "updatedAt": "2026-05-16T22:57:38.419Z"
+  "updatedAt": "2026-05-16T23:01:23.538Z"
 }
