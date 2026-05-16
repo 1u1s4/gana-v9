@@ -549,10 +549,11 @@ function optionalDailyParlayProfileFlag(flags: Record<string, string | true>): D
     || value === 'high-conviction'
     || value === 'market-diverse'
     || value === 'parlay-oro'
+    || value === 'portfolio-v2'
   ) {
     return value;
   }
-  throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, or parlay-oro.');
+  throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, parlay-oro, or portfolio-v2.');
 }
 
 function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] } {
@@ -660,6 +661,7 @@ async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, 
   return runDailyE2E(ctx.config, {
     date: requireDateFlag(flags),
     providers: optionalDailyProvidersFlag(flags),
+    providerConcurrency: optionalPositiveIntegerFlag(flags, 'provider-concurrency'),
     models: optionalDailyProviderModelsFlag(flags),
     maxFixtures: optionalPositiveIntegerFlag(flags, 'max-fixtures'),
     threshold: optionalFloatFlag(flags, 'threshold'),
@@ -2109,7 +2111,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile balanced${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

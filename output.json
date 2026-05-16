@@ -1,125 +1,81 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "b58e2f82-dece-4e05-a9ae-be9b28dbfc1b",
+      "oddsQuoteId": "bbc7f0cc-64a7-463f-b3fc-086b0e4925d2",
       "market": "h2h",
-      "selection": "home",
+      "selection": "away",
       "line": null,
-      "odds": 1.67,
-      "probability": 0.599,
-      "modelProbability": 0.600,
-      "marketFairProbability": 0.572,
-      "edge": 0.028,
+      "odds": 1.5,
+      "probability": 0.68,
+      "modelProbability": 0.68,
+      "marketFairProbability": 0.612695,
+      "edge": 0.067305,
+      "confidence": 0.87,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_1",
+        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_2"
+      ],
+      "claimIds": [
+        "313602a2-b152-4385-bb22-83b3ce60738e:claim_1"
+      ],
+      "rationale": "Bolívar has a strong head-to-head record against Universitario de Vinto and is favored to win according to bookmaker odds.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "94a0b712-18ab-48f2-acf9-742572313e27",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.5,
+      "odds": 1.44,
+      "probability": 0.78,
+      "modelProbability": 0.78,
+      "marketFairProbability": 0.652174,
+      "edge": 0.127826,
+      "confidence": 0.77,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_3",
+        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_4"
+      ],
+      "claimIds": [
+        "313602a2-b152-4385-bb22-83b3ce60738e:claim_3"
+      ],
+      "rationale": "Bookmaker odds indicate a high probability for over 2.5 goals, supported by historical match averages.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "08e009bc-a244-4075-abd3-f4ee0d6f2917",
+      "market": "btts",
+      "selection": "yes",
+      "line": null,
+      "odds": 1.5,
+      "probability": 0.75,
+      "modelProbability": 0.75,
+      "marketFairProbability": 0.625,
+      "edge": 0.125,
       "confidence": 0.75,
       "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_h2h_outlook",
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_h2h_odds_bet365"
+        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_5",
+        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_6"
       ],
       "claimIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_h2h_rosenborg_favorite",
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_h2h_home_bet365"
+        "313602a2-b152-4385-bb22-83b3ce60738e:claim_4"
       ],
-      "rationale": "Rosenborg is favored to win with a 60% probability, as supported by win probability models. Bet365 offers competitive odds.",
+      "rationale": "Bet365 odds suggest both teams will score, further supported by Universitario de Vinto's home scoring record.",
       "warnings": []
-    },
-    {
-      "oddsQuoteId": "1f2d8d01-967b-4346-a02b-dbfc77afdd3f",
-      "market": "double_chance",
-      "selection": "home_or_draw",
-      "line": null,
-      "odds": 1.18,
-      "probability": 0.847,
-      "modelProbability": 0.804,
-      "marketFairProbability": 0.397,
-      "edge": 0.407,
-      "confidence": 0.60,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_h2h_outlook",
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_double_chance_odds_bet365"
-      ],
-      "claimIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_h2h_rosenborg_favorite",
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_double_chance_home_or_draw_bet365"
-      ],
-      "rationale": "Rosenborg is favored to win, making home or draw a strong candidate. Market shows low liquidity.",
-      "warnings": ["Low liquidity and high overround in this market, resulting in a large calculated edge against market fair probability. Model probability is derived from H2H win and draw probabilities."]
-    },
-    {
-      "oddsQuoteId": "319fb9b7-4273-48bc-b8f3-026a632c368d",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 1.60,
-      "probability": 0.625,
-      "modelProbability": 0.600,
-      "marketFairProbability": 0.594,
-      "edge": 0.006,
-      "confidence": 0.50,
-      "confidenceBand": "low",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_goals_over_under_25_pinnacle"
-      ],
-      "claimIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_goals_over_25_pinnacle"
-      ],
-      "rationale": "Market odds suggest a moderate chance of over 2.5 goals. No strong model-specific claims are available to adjust this further.",
-      "warnings": ["No specific model claim for goals over/under; model probability is estimated based on implied probability and market fair probability."]
-    },
-    {
-      "oddsQuoteId": "1e806a22-6d9a-494e-9460-f753efdd5e99",
-      "market": "corners_over_under",
-      "selection": "over",
-      "line": 10.5,
-      "odds": 1.71,
-      "probability": 0.585,
-      "modelProbability": 0.570,
-      "marketFairProbability": 0.552,
-      "edge": 0.018,
-      "confidence": 0.55,
-      "confidenceBand": "low",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_corners_over_under_105_bet365"
-      ],
-      "claimIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_corners_over_105_bet365"
-      ],
-      "rationale": "Market odds indicate a slight lean towards over 10.5 corners. No specific model claims are available for corners.",
-      "warnings": ["No specific model claim for corners over/under; model probability is estimated based on implied probability and market fair probability."]
-    },
-    {
-      "oddsQuoteId": "21ec9df5-8a49-40fe-8b84-18356d59af92",
-      "market": "btts",
-      "selection": "yes",
-      "line": null,
-      "odds": 1.57,
-      "probability": 0.637,
-      "modelProbability": 0.620,
-      "marketFairProbability": 0.589,
-      "edge": 0.031,
-      "confidence": 0.60,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:evidence_btts_bet365"
-      ],
-      "claimIds": [
-        "95fa6a61-2577-4990-9367-67798531cb5b:claim_btts_yes_bet365"
-      ],
-      "rationale": "Market odds indicate a likelihood of both teams scoring. No specific model claims for BTTS.",
-      "warnings": ["No specific model claim for both teams to score; model probability is estimated based on implied probability and market fair probability."]
     }
   ],
-  "warnings": [],
+  "warnings": [
+    "market double_chance skipped/review-required: missing odds quotes for requested market",
+    "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+  ],
   "metadata": {}
 }

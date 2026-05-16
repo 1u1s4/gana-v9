@@ -312,7 +312,7 @@ describe('headless daily-e2e command', () => {
     const names = listCommands().map((command) => command.name);
 
     assert.ok(names.includes('/daily-e2e'));
-    assert.match(output, /pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --gemini-model gemini-2.5-pro/);
+    assert.match(output, /pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-2.5-pro/);
   });
 });
 

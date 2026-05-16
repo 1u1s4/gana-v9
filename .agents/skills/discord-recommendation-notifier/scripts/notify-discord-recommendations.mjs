@@ -437,12 +437,37 @@ function recommendationTitle(recommendation) {
   }
   if (recommendationKind(recommendation) === 'atomic-prediction') {
     const leg = recommendation.legs[0];
-    return `${compactFixtureName(leg.fixture ?? leg.fixtureId)} · ${formatCompactSelection(leg)}`;
+    return `${displayFixtureName(leg)} · ${formatCompactSelection(leg)}`;
   }
   return recommendation.legs
     .slice(0, 3)
-    .map((leg) => compactFixtureName(leg.fixture ?? leg.fixtureId))
+    .map(displayFixtureName)
     .join(' + ');
+}
+
+function displayFixtureName(leg) {
+  const display = leg?.display && typeof leg.display === 'object' ? leg.display : {};
+  const fromDisplay = display.fixtureLabel
+    || buildLabelFromTeams(display.homeTeamName, display.awayTeamName)
+    || buildLabelFromTeams(leg?.homeTeamName, leg?.awayTeamName)
+    || leg?.fixtureLabel;
+  if (typeof fromDisplay === 'string' && fromDisplay.trim() && !isUuidFixtureLabel(fromDisplay)) {
+    return compactFixtureName(fromDisplay);
+  }
+
+  const fixture = typeof leg?.fixture === 'string' ? leg.fixture.trim() : '';
+  if (fixture && !isUuidFixtureLabel(fixture)) return compactFixtureName(fixture);
+
+  const fixtureId = typeof leg?.fixtureId === 'string' ? leg.fixtureId.trim() : '';
+  return fixtureId ? `Fixture ${shortId(fixtureId)}` : 'fixture unknown';
+}
+
+function buildLabelFromTeams(homeTeamName, awayTeamName) {
+  if (typeof homeTeamName !== 'string' || typeof awayTeamName !== 'string') return undefined;
+  const home = homeTeamName.trim();
+  const away = awayTeamName.trim();
+  if (!home || !away || isUuidLike(home) || isUuidLike(away)) return undefined;
+  return `${home} vs ${away}`;
 }
 
 function compactFixtureName(value) {
@@ -454,7 +479,7 @@ function compactFixtureName(value) {
 }
 
 function formatCompactLeg(leg) {
-  return `${compactFixtureName(leg.fixture ?? leg.fixtureId)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
+  return `${displayFixtureName(leg)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
 }
 
 function formatCompactSelection(leg) {
@@ -513,7 +538,7 @@ function formatMetricLine(recommendation) {
 }
 
 function formatLeg(leg) {
-  const fixture = stringOrFallback(leg.fixture, stringOrFallback(leg.fixtureId, 'fixture unknown'));
+  const fixture = displayFixtureName(leg);
   const market = stringOrFallback(leg.market, 'market unknown');
   const selection = stringOrFallback(leg.selection, 'selection unknown');
   const line = Number.isFinite(leg.line) ? ` ${formatNumber(leg.line, 2)}` : '';
@@ -521,6 +546,22 @@ function formatLeg(leg) {
   const confidence = Number.isFinite(leg.confidence) ? ` | conf ${formatPercent(leg.confidence)}` : '';
   const banker = leg.banker ? ' | banker' : '';
   return `${fixture}: ${market} ${selection}${line}${odds}${confidence}${banker}`;
+}
+
+function isUuidFixtureLabel(value) {
+  const normalized = value.trim();
+  if (isUuidLike(normalized)) return true;
+  const parts = normalized.split(/\s+vs\.?\s+/i);
+  return parts.length === 2 && parts.every(isUuidLike);
+}
+
+function isUuidLike(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value).trim());
+}
+
+function shortId(value) {
+  const text = String(value).trim();
+  return text.length > 8 ? `${text.slice(0, 8)}...` : text || 'unknown';
 }
 
 function requireValue(argv, index, flag) {

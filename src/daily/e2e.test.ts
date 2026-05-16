@@ -36,6 +36,7 @@ describe('runDailyE2E', () => {
     const result = await runDailyE2E(ctx.config, {
       date: '2026-05-14',
       providers: ['codex', 'gemini'],
+      providerConcurrency: 2,
       maxFixtures: 12,
       threshold: 1.2,
       web: 'live',
@@ -163,10 +164,91 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.executionCapability, 'none');
     assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');
     assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team A vs Team B');
+    assert.deepEqual(recommendations.atomicRecommendations[0].legs[0].display, {
+      awayTeamName: 'Team B',
+      fixtureLabel: 'Team A vs Team B',
+      homeTeamName: 'Team A',
+      kickoffLocal: '2026-05-14T16:00:00.000Z',
+    });
+    assert.equal(recommendations.recommendationPolicy.portfolioBuckets.includes('corners-watchlist'), true);
+    const progress = JSON.parse(readFileSync(join(result.artifactDir, 'daily-progress.json'), 'utf-8'));
+    assert.equal(progress.phase, 'completed');
+    assert.equal(progress.providerConcurrency, 2);
+    assert.equal(progress.providers.codex.predictions, 1);
+    assert.equal(progress.providers.codex.promotable, 1);
     const comparison = JSON.parse(readFileSync(join(result.artifactDir, 'daily-provider-comparison.json'), 'utf-8'));
     assert.equal(comparison.executionCapability, 'none');
     const consensus = JSON.parse(readFileSync(join(result.artifactDir, 'daily-provider-consensus.json'), 'utf-8'));
     assert.equal(consensus.analyticalArtifactOnly, true);
+  });
+
+  it('keeps useful output when one parallel provider throws', async () => {
+    const ctx = context();
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-05-14',
+      providers: ['codex', 'gemini'],
+      providerConcurrency: 2,
+      persistMetrics: false,
+      dailyBatchId: 'daily-partial-provider',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        if (config.provider === 'codex') throw new Error('codex provider blocked');
+        return {
+          ok: true,
+          runId: `${config.provider}-run`,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'promotable',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', `${config.provider}-run`),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', `${config.provider}-run`),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures: [],
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [],
+          parlay: {
+            ok: true,
+            runId: `${config.provider}-run`,
+            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: ['gemini-parlay'],
+          },
+        } as any;
+      },
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: 1,
+        top: [],
+        diagnostics: { generatedAt: '2026-05-14T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 1, profileScopedAnalyzed: 1, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 1, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.providers.find((provider) => provider.provider === 'codex')?.ok, false);
+    assert.equal(result.providers.find((provider) => provider.provider === 'gemini')?.ok, true);
+    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
+    assert.equal(summary.verdict, 'review-required');
+    assert.equal(summary.parlays.some((family: any) => family.family === 'gemini-only' && family.ok), true);
+    const progress = JSON.parse(readFileSync(join(result.artifactDir, 'daily-progress.json'), 'utf-8'));
+    assert.equal(progress.providers.codex.status, 'blocked');
+    assert.equal(progress.providers.gemini.status, 'completed');
   });
 
   it('keeps a valid provider-only daily run review-required when mixed consensus is unavailable', async () => {

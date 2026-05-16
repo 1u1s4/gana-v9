@@ -29,11 +29,13 @@ export type DailyParlayProfile =
   | 'low-variance'
   | 'high-conviction'
   | 'market-diverse'
-  | 'parlay-oro';
+  | 'parlay-oro'
+  | 'portfolio-v2';
 
 export interface RunDailyE2EInput {
   date: string;
   providers?: DailyE2EProvider[];
+  providerConcurrency?: number;
   models?: Partial<Record<DailyE2EProvider, string>>;
   web?: ResearchWebMode;
   validate?: PipelineValidationMode;
@@ -55,8 +57,36 @@ export interface DailyProviderRunResult {
   error?: string;
 }
 
+type DailyProviderProgressStatus = 'queued' | 'running' | 'completed' | 'blocked';
+
+interface DailyProviderProgress {
+  provider: DailyE2EProvider;
+  model: string;
+  status: DailyProviderProgressStatus;
+  phase: string;
+  runId?: string | null;
+  verdict?: string | null;
+  predictions: number;
+  promotable: number;
+  updatedAt: string;
+  error?: string;
+}
+
+interface DailyProgressSnapshot {
+  batchId: string;
+  date: string;
+  status: 'running' | 'succeeded' | 'failed';
+  phase: string;
+  providerConcurrency: number;
+  startedAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  providers: Partial<Record<DailyE2EProvider, DailyProviderProgress>>;
+}
+
 export interface DailyParlayFamilyResult {
   family: 'codex-only' | 'gemini-only' | 'consensus-mixed';
+  profile?: string | null;
   runId?: string;
   sourceRunIds: string[];
   ok: boolean;
@@ -158,9 +188,26 @@ export async function runDailyE2E(
   const buildParlay = deps.buildParlay ?? runParlayBuild;
   const analyzeParlays = deps.analyzeParlays ?? runParlayAnalysis;
   const buildDailyMetrics = deps.buildDailyMetrics ?? runDailyMetrics;
+  const providerConcurrency = normalizeProviderConcurrency(input.providerConcurrency, providers.length);
   const pairedProviders = providers;
   const providerAgentic = providers.join(',');
   const marketScope = normalizeMarketScope(input.markets, effectiveConfig.apiFootball.defaultMarkets);
+  const progress = createDailyProgressSnapshot({
+    dailyBatchId,
+    date: input.date,
+    startedAt,
+    providers,
+    providerConcurrency,
+    config: effectiveConfig,
+    models: input.models,
+  });
+  const writeProgress = (phase: string, status: DailyProgressSnapshot['status'] = 'running', completedAt?: Date) => {
+    progress.phase = phase;
+    progress.status = status;
+    progress.updatedAt = (deps.now ?? (() => new Date()))().toISOString();
+    if (completedAt) progress.completedAt = completedAt.toISOString();
+    writeJsonArtifact(dailyBatchId, 'daily-progress.json', jsonValue(progress));
+  };
 
   await repositories?.harnessRuns?.upsertForRun?.({
     id: dailyBatchId,
@@ -206,8 +253,17 @@ export async function runDailyE2E(
 
   const providerRuns: DailyProviderRunResult[] = [];
   const providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>> = {};
+  writeProgress(providers.length > 1 && providerConcurrency > 1 ? 'providers.parallel' : 'providers.serial');
 
-  for (const provider of providers) {
+  const providerSettled = await allSettledWithConcurrency(providers, providerConcurrency, async (provider) => {
+    const previousProgress = progress.providers[provider] as DailyProviderProgress;
+    progress.providers[provider] = {
+      ...previousProgress,
+      status: 'running',
+      phase: 'pipeline',
+      updatedAt: (deps.now ?? (() => new Date()))().toISOString(),
+    };
+    writeProgress(`provider.${provider}.running`);
     const providerConfig = configForProvider(effectiveConfig, provider, input.models);
     const providerRuntime = childRuntime(runtime, providerConfig);
     const result = await runner(providerConfig, {
@@ -222,29 +278,66 @@ export async function runDailyE2E(
         pairedProviders,
       },
     }, providerRuntime, sharedDeps);
-    providerPipelineResults[provider] = result;
-    providerRuns.push({
+    progress.providers[provider] = progressFromProviderRun(provider, providerConfig.model, result, deps.now);
+    writeProgress(`provider.${provider}.${result.ok ? 'completed' : 'blocked'}`);
+    return {
       provider,
       model: providerConfig.model,
-      runId: result.runId,
-      ok: result.ok,
-      verdict: result.verdict,
-      artifactPath: result.artifactPath,
-      error: result.error,
+      result,
+    };
+  });
+
+  for (const [index, item] of providerSettled.entries()) {
+    const provider = providers[index] as DailyE2EProvider;
+    if (item.status === 'fulfilled') {
+      const { result, model } = item.value;
+      providerPipelineResults[provider] = result;
+      providerRuns.push({
+        provider,
+        model,
+        runId: result.runId,
+        ok: result.ok,
+        verdict: result.verdict,
+        artifactPath: result.artifactPath,
+        error: result.error,
+      });
+      continue;
+    }
+    const model = modelForProvider(effectiveConfig, provider, input.models);
+    const error = errorMessage(item.reason);
+    const previousProgress = progress.providers[provider] as DailyProviderProgress;
+    providerRuns.push({
+      provider,
+      model,
+      ok: false,
+      verdict: 'blocked',
+      error,
     });
+    progress.providers[provider] = {
+      ...previousProgress,
+      status: 'blocked',
+      phase: 'failed',
+      verdict: 'blocked',
+      predictions: 0,
+      promotable: 0,
+      updatedAt: (deps.now ?? (() => new Date()))().toISOString(),
+      error,
+    };
+    writeProgress(`provider.${provider}.blocked`);
   }
 
   const successfulProviderRunIds = providerRuns
     .filter((run) => run.ok && run.runId)
     .map((run) => run.runId as string);
-  const parlayProfile = profileToPortfolio(input.parlayProfile);
+  const parlayProfiles = profilesToPortfolios(input.parlayProfile);
   const parlayFamilies: DailyParlayFamilyResult[] = [];
 
   for (const provider of providers) {
     const runId = providerPipelineResults[provider]?.runId;
-    if (!runId || !parlayProfile) {
+    if (!runId || parlayProfiles.length === 0) {
       parlayFamilies.push({
         family: provider === 'codex' ? 'codex-only' : 'gemini-only',
+        profile: null,
         runId,
         sourceRunIds: runId ? [runId] : [],
         ok: Boolean(providerPipelineResults[provider]?.parlay?.ok),
@@ -255,28 +348,36 @@ export async function runDailyE2E(
       });
       continue;
     }
-    const parlayRunId = boundedDailyChildRunId(dailyBatchId, provider, parlayProfile);
-    const providerConfig = configForProvider(effectiveConfig, provider, input.models);
-    const parlayRuntime = childRuntime(runtime, providerConfig, parlayRunId);
-    const result = await buildParlay(providerConfig, {
-      date: input.date,
-      sourceRunId: runId,
-      portfolio: parlayProfile,
-    }, parlayRuntime);
-    parlayFamilies.push(toParlayFamily(provider === 'codex' ? 'codex-only' : 'gemini-only', [runId], result));
+    for (const parlayProfile of parlayProfiles) {
+      const parlayRunId = boundedDailyChildRunId(dailyBatchId, provider, parlayProfile);
+      const providerConfig = configForProvider(effectiveConfig, provider, input.models);
+      const parlayRuntime = childRuntime(runtime, providerConfig, parlayRunId);
+      const result = await buildParlay(providerConfig, {
+        date: input.date,
+        sourceRunId: runId,
+        portfolio: parlayProfile,
+      }, parlayRuntime);
+      parlayFamilies.push(toParlayFamily(provider === 'codex' ? 'codex-only' : 'gemini-only', [runId], result, parlayProfile));
+    }
   }
 
   if (successfulProviderRunIds.length >= 2) {
-    const mixedRuntime = childRuntime(runtime, effectiveConfig, boundedDailyChildRunId(dailyBatchId, 'mixed'));
-    const mixed = await buildParlay(effectiveConfig, {
-      date: input.date,
-      sourceRunIds: successfulProviderRunIds,
-      ...(parlayProfile ? { portfolio: parlayProfile } : {}),
-    } satisfies RunParlayBuildInput, mixedRuntime);
-    parlayFamilies.push(toParlayFamily('consensus-mixed', successfulProviderRunIds, mixed));
+    for (const parlayProfile of (parlayProfiles.length ? parlayProfiles : [undefined])) {
+      const mixedRunId = parlayProfile
+        ? boundedDailyChildRunId(dailyBatchId, 'mixed', parlayProfile)
+        : boundedDailyChildRunId(dailyBatchId, 'mixed');
+      const mixedRuntime = childRuntime(runtime, effectiveConfig, mixedRunId);
+      const mixed = await buildParlay(effectiveConfig, {
+        date: input.date,
+        sourceRunIds: successfulProviderRunIds,
+        ...(parlayProfile ? { portfolio: parlayProfile } : {}),
+      } satisfies RunParlayBuildInput, mixedRuntime);
+      parlayFamilies.push(toParlayFamily('consensus-mixed', successfulProviderRunIds, mixed, parlayProfile ?? null));
+    }
   } else {
     parlayFamilies.push({
       family: 'consensus-mixed',
+      profile: null,
       sourceRunIds: successfulProviderRunIds,
       ok: false,
       verdict: 'blocked',
@@ -317,7 +418,7 @@ export async function runDailyE2E(
     })),
   });
   const parlayRecommendations: DailyFinalRecommendation[] = (parlayAnalysis?.top ?? [])
-    .map((recommendation) => ({ ...recommendation, kind: 'parlay' as const }));
+    .map((recommendation) => hydrateRecommendationDisplay({ ...recommendation, kind: 'parlay' as const }, providerPipelineResults));
   const atomicRecommendations = buildAtomicPredictionRecommendations(
     providerPipelineResults,
     providers,
@@ -328,15 +429,17 @@ export async function runDailyE2E(
   const finalRecommendations: DailyFinalRecommendation[] = [...parlayRecommendations, ...atomicRecommendations];
   const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
   const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
-  const ok = providerRuns.every((run) => run.ok)
+  const hasAnySuccessfulProvider = providerRuns.some((run) => run.ok);
+  const allProvidersSucceeded = providerRuns.every((run) => run.ok);
+  const ok = hasAnySuccessfulProvider
     && hasAnyValidParlayFamily
     && (parlayAnalysis?.ok ?? false)
     && metrics.ok;
-  const verdict = ok && hasConsensus
+  const verdict = ok && hasConsensus && allProvidersSucceeded
     ? 'promotable'
     : ok
       ? 'review-required'
-      : providerRuns.some((run) => !run.ok)
+      : !hasAnySuccessfulProvider
         ? 'blocked'
         : 'review-required';
   const providerCounts = Object.fromEntries(providerRuns.map((run) => [run.provider, {
@@ -347,7 +450,7 @@ export async function runDailyE2E(
     parlays: providerPipelineResults[run.provider]?.parlay?.persistedParlayIds?.length
       ?? (providerPipelineResults[run.provider]?.parlay?.persistedParlayId ? 1 : 0),
   }]));
-  const parlayFamilyCounts = Object.fromEntries(parlayFamilies.map((family) => [family.family, {
+  const parlayFamilyCounts = Object.fromEntries(parlayFamilies.map((family) => [parlayFamilyCountKey(family), {
     ok: family.ok,
     runId: family.runId ?? null,
     verdict: family.verdict ?? null,
@@ -394,6 +497,7 @@ export async function runDailyE2E(
       maxFixturesPerRun: effectiveConfig.apiFootball.maxFixturesPerRun,
       lowOddsThreshold: effectiveConfig.apiFootball.lowOddsThreshold,
       parlayProfile: input.parlayProfile ?? null,
+      providerConcurrency,
     },
     counts: {
       providers: providerCounts,
@@ -422,6 +526,14 @@ export async function runDailyE2E(
       atomicEdgeFloor: ATOMIC_RECOMMENDATION_EDGE_FLOOR,
       atomicStatuses: ['promotable'],
       atomicProfile: ATOMIC_RECOMMENDATION_PROFILE,
+      portfolioBuckets: [
+        'single-top',
+        'two-leg-safe',
+        'three-leg-balanced',
+        'four-leg-aggressive-analytical',
+        'corners-watchlist',
+        'corners-mixed',
+      ],
     },
     diagnostics: parlayAnalysis?.diagnostics ?? null,
     providerComparisonPath,
@@ -430,6 +542,7 @@ export async function runDailyE2E(
     executionCapability: 'none',
   }));
   const reportPath = writeJsonArtifact(dailyBatchId, 'daily-report.md', buildDailyReport(summary, recommendationsPath));
+  writeProgress('completed', ok ? 'succeeded' : 'failed', completedAt);
 
   writeRun(effectiveConfig, dailyBatchId, {
     id: dailyBatchId,
@@ -529,6 +642,9 @@ function validateDailyInput(input: RunDailyE2EInput): void {
   if (input.threshold !== undefined && (!Number.isFinite(input.threshold) || input.threshold <= 1)) {
     throw new Error('--threshold must be greater than 1.');
   }
+  if (input.providerConcurrency !== undefined && (!Number.isInteger(input.providerConcurrency) || input.providerConcurrency < 1)) {
+    throw new Error('--provider-concurrency must be a positive integer.');
+  }
 }
 
 function normalizeProviders(providers: DailyE2EProvider[] | undefined): DailyE2EProvider[] {
@@ -536,6 +652,97 @@ function normalizeProviders(providers: DailyE2EProvider[] | undefined): DailyE2E
   const invalid = values.filter((provider) => provider !== 'codex' && provider !== 'gemini');
   if (invalid.length) throw new Error(`--providers only supports codex,gemini for daily-e2e. Invalid: ${invalid.join(',')}`);
   return Array.from(new Set(values));
+}
+
+function normalizeProviderConcurrency(inputConcurrency: number | undefined, providerCount: number): number {
+  const envValue = process.env.GANA_DAILY_PROVIDER_CONCURRENCY;
+  const parsedEnv = envValue === undefined ? undefined : Number(envValue);
+  if (parsedEnv !== undefined && (!Number.isInteger(parsedEnv) || parsedEnv < 1)) {
+    throw new Error('GANA_DAILY_PROVIDER_CONCURRENCY must be a positive integer.');
+  }
+  const requested = inputConcurrency ?? parsedEnv ?? 2;
+  return Math.min(Math.max(1, requested), Math.max(1, providerCount));
+}
+
+async function allSettledWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<Array<PromiseSettledResult<R>>> {
+  const results: Array<PromiseSettledResult<R>> = new Array(items.length);
+  let nextIndex = 0;
+  async function runWorker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      try {
+        results[index] = { status: 'fulfilled', value: await worker(items[index] as T, index) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => runWorker()));
+  return results;
+}
+
+function createDailyProgressSnapshot(input: {
+  dailyBatchId: string;
+  date: string;
+  startedAt: Date;
+  providers: DailyE2EProvider[];
+  providerConcurrency: number;
+  config: AgentConfig;
+  models: RunDailyE2EInput['models'];
+}): DailyProgressSnapshot {
+  return {
+    batchId: input.dailyBatchId,
+    date: input.date,
+    status: 'running',
+    phase: 'created',
+    providerConcurrency: input.providerConcurrency,
+    startedAt: input.startedAt.toISOString(),
+    updatedAt: input.startedAt.toISOString(),
+    providers: Object.fromEntries(input.providers.map((provider) => [provider, {
+      provider,
+      model: modelForProvider(input.config, provider, input.models),
+      status: 'queued',
+      phase: 'queued',
+      runId: null,
+      verdict: null,
+      predictions: 0,
+      promotable: 0,
+      updatedAt: input.startedAt.toISOString(),
+    } satisfies DailyProviderProgress])),
+  };
+}
+
+function progressFromProviderRun(
+  provider: DailyE2EProvider,
+  model: string,
+  result: RunPipelineResult,
+  now: (() => Date) | undefined,
+): DailyProviderProgress {
+  const counts = providerPredictionCounts(result);
+  return {
+    provider,
+    model,
+    status: result.ok ? 'completed' : 'blocked',
+    phase: result.ok ? 'completed' : 'blocked',
+    runId: result.runId ?? null,
+    verdict: result.verdict ?? null,
+    predictions: counts.predictions,
+    promotable: counts.promotable,
+    updatedAt: (now ?? (() => new Date()))().toISOString(),
+    ...(result.error ? { error: result.error } : {}),
+  };
+}
+
+function providerPredictionCounts(result: RunPipelineResult | undefined): { predictions: number; promotable: number } {
+  const predictions = result?.scoring.flatMap((item) => item.predictions) ?? [];
+  return {
+    predictions: predictions.length,
+    promotable: predictions.filter((prediction) => prediction.status === 'promotable').length,
+  };
 }
 
 function withDailyOverrides(config: AgentConfig, input: RunDailyE2EInput): AgentConfig {
@@ -599,21 +806,24 @@ function childRuntime(runtime: RuntimeContext, config: AgentConfig, runId?: stri
   }, config, { runId });
 }
 
-function profileToPortfolio(profile: DailyParlayProfile | undefined): RunParlayBuildInput['portfolio'] | undefined {
-  if (!profile) return undefined;
-  if (profile === 'safe-consensus') return 'low-variance';
-  if (profile === 'aggressive-analytical') return 'high-conviction';
-  if (profile === 'balanced') return 'balanced';
-  return profile;
+function profilesToPortfolios(profile: DailyParlayProfile | undefined): Array<NonNullable<RunParlayBuildInput['portfolio']>> {
+  if (!profile) return [];
+  if (profile === 'safe-consensus') return ['low-variance'];
+  if (profile === 'aggressive-analytical') return ['high-conviction'];
+  if (profile === 'portfolio-v2') return ['low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
+  if (profile === 'balanced') return ['balanced'];
+  return [profile];
 }
 
 function toParlayFamily(
   family: DailyParlayFamilyResult['family'],
   sourceRunIds: string[],
   result: ParlayBuildRunResult,
+  profile?: string | null,
 ): DailyParlayFamilyResult {
   return {
     family,
+    profile: profile ?? null,
     runId: result.runId,
     sourceRunIds,
     ok: result.ok,
@@ -622,6 +832,10 @@ function toParlayFamily(
     persistedParlayIds: result.persistedParlayIds ?? (result.persistedParlayId ? [result.persistedParlayId] : undefined),
     error: result.error,
   };
+}
+
+function parlayFamilyCountKey(family: DailyParlayFamilyResult): string {
+  return family.profile ? `${family.family}:${family.profile}` : family.family;
 }
 
 function oddsCacheKey(fixtureId: string, markets: readonly MarketKey[] | undefined): string {
@@ -638,7 +852,16 @@ interface AtomicPredictionCandidate {
   runId: string;
   prediction: PredictionRecordView;
   fixture: string;
+  display?: RecommendationLegDisplay;
   edge: number;
+}
+
+interface RecommendationLegDisplay {
+  fixtureLabel: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  leagueName?: string;
+  kickoffLocal?: string;
 }
 
 function buildAtomicPredictionRecommendations(
@@ -652,18 +875,20 @@ function buildAtomicPredictionRecommendations(
   for (const provider of providers) {
     const result = providerPipelineResults[provider];
     if (!result?.ok) continue;
-    const fixtureNames = fixtureNameMap(result.fixtures);
+    const fixtureDisplays = fixtureDisplayMap(result.fixtures);
     for (const scoring of result.scoring) {
       for (const prediction of scoring.predictions) {
         const edge = atomicPredictionEdge(prediction);
         if (!isAtomicRecommendationEligible(prediction, edge)) continue;
         const key = atomicPredictionKey(prediction);
+        const display = fixtureDisplays.get(prediction.fixtureId);
         groups.set(key, [...(groups.get(key) ?? []), {
           provider,
           model: modelForProvider(config, provider, models),
           runId: result.runId,
           prediction,
-          fixture: fixtureNames.get(prediction.fixtureId) ?? scoring.fixtureId ?? prediction.fixtureId,
+          fixture: display?.fixtureLabel ?? scoring.fixtureId ?? prediction.fixtureId,
+          display,
           edge,
         }]);
       }
@@ -694,6 +919,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     predictionId: primary.prediction.id,
     fixtureId: primary.prediction.fixtureId,
     fixture: primary.fixture,
+    ...(primary.display ? { display: primary.display } : {}),
     market: primary.prediction.market,
     selection: primary.prediction.selection,
     line: primary.prediction.line ?? null,
@@ -733,6 +959,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
       predictionId: leg.predictionId,
       fixtureId: leg.fixtureId,
       fixture: leg.fixture,
+      ...(primary.display ? { display: primary.display } : {}),
       market: leg.market,
       selection: leg.selection,
       line: leg.line,
@@ -789,11 +1016,49 @@ function atomicPredictionKey(prediction: PredictionRecordView): string {
   ].join('|');
 }
 
-function fixtureNameMap(fixtures: Fixture[]): Map<string, string> {
-  return new Map(fixtures.map((fixture) => [
-    fixture.id,
-    `${fixture.homeTeamName ?? fixture.homeTeamId} vs ${fixture.awayTeamName ?? fixture.awayTeamId}`,
-  ]));
+function hydrateRecommendationDisplay<T extends DailyFinalRecommendation>(
+  recommendation: T,
+  providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>,
+): T {
+  const displays = fixtureDisplayMap(Object.values(providerPipelineResults).flatMap((result) => result?.fixtures ?? []));
+  const hydrateLeg = (leg: any) => {
+    const display = displays.get(String(leg.fixtureId ?? ''));
+    if (!display) return leg;
+    return {
+      ...leg,
+      fixture: shouldReplaceFixtureLabel(leg.fixture) ? display.fixtureLabel : leg.fixture,
+      display,
+    };
+  };
+  return {
+    ...recommendation,
+    legs: Array.isArray(recommendation.legs) ? recommendation.legs.map(hydrateLeg) : recommendation.legs,
+    bankerLegs: Array.isArray(recommendation.bankerLegs) ? recommendation.bankerLegs.map(hydrateLeg) : recommendation.bankerLegs,
+  };
+}
+
+function fixtureDisplayMap(fixtures: Fixture[]): Map<string, RecommendationLegDisplay> {
+  return new Map(fixtures.map((fixture) => {
+    const homeTeamName = fixture.homeTeamName ?? fixture.homeTeamId;
+    const awayTeamName = fixture.awayTeamName ?? fixture.awayTeamId;
+    return [fixture.id, {
+      fixtureLabel: `${homeTeamName} vs ${awayTeamName}`,
+      homeTeamName,
+      awayTeamName,
+      ...(fixture.competitionId ? { leagueName: String(fixture.competitionId) } : {}),
+      kickoffLocal: fixture.scheduledAt,
+    }];
+  }));
+}
+
+function shouldReplaceFixtureLabel(value: unknown): boolean {
+  if (typeof value !== 'string' || !value.trim()) return true;
+  const normalized = value.trim();
+  return isUuidLike(normalized) || normalized.split(/\s+vs\.?\s+/i).every(isUuidLike);
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
 }
 
 function average(values: number[]): number {
@@ -822,6 +1087,10 @@ function defaultRepositories(config: AgentConfig): ReturnType<typeof createStora
 
 function jsonValue(value: unknown): JsonValue {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function firstError(

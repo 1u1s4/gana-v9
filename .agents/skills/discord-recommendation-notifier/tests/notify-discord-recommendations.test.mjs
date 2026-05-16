@@ -61,6 +61,31 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
   });
 
+  it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
+    const artifact = sampleArtifactWithAtomic();
+    const uuidA = 'a28f3e87-bc59-4e9e-b1fd-062759061d86';
+    const uuidB = 'badde2e5-bc59-4e9e-b1fd-062759061d86';
+    artifact.recommendations[1].legs[0] = {
+      ...artifact.recommendations[1].legs[0],
+      fixtureId: uuidA,
+      fixture: `${uuidA} vs ${uuidB}`,
+      display: {
+        fixtureLabel: 'Fluminense vs Sao Paulo',
+        homeTeamName: 'Fluminense',
+        awayTeamName: 'Sao Paulo',
+        leagueName: 'Brazil Serie A',
+      },
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 2 });
+    const message = buildGatewayMessage(artifact, { max: 2 });
+
+    assert.match(payload.embeds[2].title, /Fluminense vs Sao Paulo/);
+    assert.match(payload.embeds[2].description, /Fluminense vs Sao Paulo: h2h away @ 1.18/);
+    assert.doesNotMatch(JSON.stringify(payload), new RegExp(uuidA));
+    assert.doesNotMatch(message, new RegExp(uuidB));
+  });
+
   it('caps native Discord embeds at the platform limit', () => {
     const artifact = sampleArtifact();
     artifact.recommendations = Array.from({ length: 12 }, (_, index) => ({

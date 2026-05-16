@@ -64,6 +64,7 @@ export interface ParlayAnalysisBankerLeg {
   predictionId: string;
   fixtureId: string;
   fixture: string;
+  display?: ParlayAnalysisLegDisplay;
   market: string;
   selection: string;
   line: number | null;
@@ -76,6 +77,7 @@ export interface ParlayAnalysisLeg {
   predictionId: string;
   fixtureId: string;
   fixture: string;
+  display?: ParlayAnalysisLegDisplay;
   market: string;
   selection: string;
   line: number | null;
@@ -85,6 +87,14 @@ export interface ParlayAnalysisLeg {
   warnings: string[];
   banker: boolean;
   bankerReason?: string;
+}
+
+export interface ParlayAnalysisLegDisplay {
+  fixtureLabel: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  leagueName?: string;
+  kickoffLocal?: string;
 }
 
 export interface ParlayAnalysisDiagnostics {
