@@ -5,8 +5,10 @@
   "type": "module",
   "main": "dist/cli.js",
   "scripts": {
+    "build": "tsc --rootDir src",
+    "prepack": "npm run build",
     "gana": "tsx src/cli.ts",
-    "start": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
     "dev": "tsx watch src/cli.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",

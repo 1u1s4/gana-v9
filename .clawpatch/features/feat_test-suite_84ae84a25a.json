@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "featureId": "feat_test-suite_84ae84a25a",
+  "title": "Package script test",
+  "summary": "Package script 'test': node --import tsx --test \"src/**/*.test.ts\"",
+  "kind": "test-suite",
+  "source": "package-json-script",
+  "confidence": "medium",
+  "entrypoints": [
+    {
+      "path": "package.json",
+      "symbol": "test",
+      "route": null,
+      "command": "test"
+    }
+  ],
+  "ownedFiles": [
+    {
+      "path": "package.json",
+      "reason": "entrypoint"
+    }
+  ],
+  "contextFiles": [],
+  "tests": [],
+  "tags": [
+    "node",
+    "package-script"
+  ],
+  "trustBoundaries": [],
+  "status": "reviewed",
+  "lock": null,
+  "findingIds": [],
+  "patchAttemptIds": [],
+  "analysisHistory": [
+    {
+      "runId": "20260516T224812-2636d3",
+      "kind": "review",
+      "summary": "0 finding(s)",
+      "provider": "codex",
+      "model": null,
+      "createdAt": "2026-05-16T22:48:34.008Z"
+    }
+  ],
+  "createdAt": "2026-05-16T22:48:03.829Z",
+  "updatedAt": "2026-05-16T22:50:45.415Z"
+}

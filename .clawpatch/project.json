@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "projectId": "prj_https-github-com-1u1s4-gana-v9-g_1100054a55",
+  "name": "gana-agent-tui",
+  "rootPath": "/Users/luisalvarado/Documents/GitHub/gana-v9",
+  "git": {
+    "remoteUrl": "https://github.com/1u1s4/gana-v9.git",
+    "defaultBranch": "main",
+    "currentBranch": "main",
+    "headSha": "c93109e660b5fb6333b59aa3ed9cc826b48766f6"
+  },
+  "detected": {
+    "languages": [
+      "typescript",
+      "javascript"
+    ],
+    "frameworks": [],
+    "packageManagers": [
+      "pnpm",
+      "npm"
+    ],
+    "commands": {
+      "typecheck": "pnpm typecheck",
+      "lint": null,
+      "format": null,
+      "test": "pnpm test"
+    }
+  },
+  "createdAt": "2026-05-16T22:47:58.609Z",
+  "updatedAt": "2026-05-16T22:47:58.609Z"
+}

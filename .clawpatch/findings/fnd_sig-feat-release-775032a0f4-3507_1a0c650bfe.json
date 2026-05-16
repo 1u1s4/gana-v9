@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "findingId": "fnd_sig-feat-release-775032a0f4-3507_1a0c650bfe",
+  "featureId": "feat_release_775032a0f4",
+  "title": "start script depends on dev-only tsx runtime",
+  "category": "build-release",
+  "severity": "medium",
+  "confidence": "high",
+  "triage": "risk",
+  "evidence": [
+    {
+      "path": "package.json",
+      "startLine": 9,
+      "endLine": 9,
+      "symbol": "scripts.start",
+      "quote": "\"start\": \"tsx src/cli.ts\""
+    },
+    {
+      "path": "package.json",
+      "startLine": 38,
+      "endLine": 43,
+      "symbol": "devDependencies",
+      "quote": "\"tsx\": \"^4.21.0\""
+    },
+    {
+      "path": "package.json",
+      "startLine": 6,
+      "endLine": 6,
+      "symbol": "main",
+      "quote": "\"main\": \"dist/cli.js\""
+    }
+  ],
+  "reasoning": "The package declares a compiled entrypoint at dist/cli.js, but npm start executes the TypeScript source through tsx. Since tsx is only in devDependencies, installs that omit dev dependencies, which is common for production or release environments, will not have the tsx binary available and npm start will fail before the CLI starts.",
+  "reproduction": "Run `npm install --omit=dev` or `pnpm install --prod`, then run `npm start`; the script requires the dev-only `tsx` executable.",
+  "recommendation": "Make the release start path use a runtime artifact such as `node dist/cli.js` and add/verify a build step that produces it, or move `tsx` into dependencies if this package intentionally starts from TypeScript source in production.",
+  "whyTestsDoNotAlreadyCoverThis": "No tests were linked for this package script, and the configured test command exercises TypeScript tests rather than a production install with devDependencies omitted.",
+  "suggestedRegressionTest": "Add a release smoke check that installs production dependencies only and runs the start command, or at minimum validates that `scripts.start` does not reference binaries declared only in devDependencies.",
+  "minimumFixScope": "Update package.json scripts and, if needed, package build metadata so `npm start` works in production/release installs.",
+  "status": "fixed",
+  "history": [
+    {
+      "runId": "20260516T225631-75fe55",
+      "kind": "revalidate",
+      "status": "fixed",
+      "note": null,
+      "reasoning": "The original start-script evidence no longer exists: package.json now has scripts.start as \"node dist/cli.js\" at line 11, while \"tsx\" remains only in devDependencies at line 42. The compiled entrypoint dist/cli.js exists, package.json main still points to dist/cli.js, and npm start -- --help ran successfully through node dist/cli.js without invoking tsx. npm run typecheck also passed. npm test failed in this read-only sandbox because many tests attempt mkdtemp under /var/folders and receive EPERM, which is unrelated to the start script/runtime dependency finding.",
+      "commands": [
+        "nl -ba package.json | sed -n '1,90p'",
+        "rg -n '\"start\"|\"main\"|\"tsx\"|\"build\"|dist/cli|src/cli' package.json pnpm-lock.yaml package-lock.json yarn.lock npm-shrinkwrap.json 2>/dev/null",
+        "rg --files | rg '(^|/)(dist/cli\\.js|src/cli\\.ts|package\\.json|tsconfig.*|vitest|jest|test)'",
+        "test -e dist/cli.js && ls -l dist/cli.js || true",
+        "nl -ba package-lock.json | sed -n '1,40p'",
+        "npm run typecheck",
+        "npm test",
+        "node dist/cli.js --help",
+        "head -40 dist/cli.js",
+        "rg -n 'from .tsx|tsx|src/cli|dist/cli|#!/usr/bin/env' dist/cli.js src/cli.ts package.json",
+        "npm start -- --help"
+      ],
+      "createdAt": "2026-05-16T22:57:38.414Z"
+    }
+  ],
+  "signature": "sig_feat-release-775032a0f4_3507fd836e",
+  "linkedPatchAttemptIds": [],
+  "createdByRunId": "20260516T224812-2636d3",
+  "createdAt": "2026-05-16T22:48:37.362Z",
+  "updatedAt": "2026-05-16T22:57:38.413Z"
+}
