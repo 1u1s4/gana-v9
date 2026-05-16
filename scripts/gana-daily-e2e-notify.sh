@@ -50,6 +50,7 @@ export GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN="${GANA_CRON_MAX_AGENTIC_RESEARCH
 export GANA_MAX_PROVIDER_REQUESTS_PER_RUN="${GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN:-10000}"
 export GANA_LOW_ODDS_THRESHOLD="${GANA_LOW_ODDS_THRESHOLD:-1.20}"
 
+set +e
 pnpm gana daily-e2e \
   --date "$DATE" \
   --providers "${GANA_DAILY_PROVIDERS:-codex,gemini}" \
@@ -57,10 +58,12 @@ pnpm gana daily-e2e \
   --max-fixtures "${GANA_MAX_FIXTURES_PER_RUN}" \
   --threshold "${GANA_LOW_ODDS_THRESHOLD}" \
   --parlay-profile "${GANA_PARLAY_PROFILE:-balanced}"
+E2E_STATUS=$?
+set -e
 
 if [[ ! -f "$RECOMMENDATIONS_ARTIFACT" ]]; then
   echo "Missing recommendations artifact: $RECOMMENDATIONS_ARTIFACT" >&2
-  exit 1
+  exit "$E2E_STATUS"
 fi
 
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
@@ -68,3 +71,9 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
   --transport discord-native \
   --gateway-target "$DISCORD_TARGET" \
   --max "${GANA_DISCORD_MAX_SELECTIONS:-5}"
+
+if [[ "$E2E_STATUS" -ne 0 ]]; then
+  echo "daily-e2e exited with status $E2E_STATUS after producing recommendations; Discord notification sent." >&2
+fi
+
+exit 0

@@ -11,6 +11,8 @@ const DEFAULT_GATEWAY_TARGET = 'discord';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DISCORD_FIELD_LIMIT = 1024;
 const DISCORD_DESCRIPTION_LIMIT = 4096;
+const DISCORD_EMBED_LIMIT = 10;
+const DISCORD_NON_SELECTION_EMBEDS = 2;
 
 export function parseArgs(argv) {
   const args = {
@@ -70,7 +72,8 @@ export function loadRecommendations(path) {
 
 export function buildDiscordPayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
-  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const selectionLimit = Math.min(max, DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS);
+  const recommendations = selectRecommendations(artifact).slice(0, selectionLimit);
   const counts = recommendationCounts(recommendations);
   const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
   const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');

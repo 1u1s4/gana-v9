@@ -55,13 +55,13 @@ try {
   writeLogLine(logFd, `completed ${completedAt.toISOString()} status=${result.status} signal=${result.signal ?? 'none'}`);
   if (result.error) writeLogLine(logFd, `error ${result.error.message}`);
 
-  if (result.status === 0 && existsSync(recommendationsPath)) {
+  if (existsSync(recommendationsPath)) {
     const notify = spawnSync('node', [
       '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs',
       '--artifact', recommendationsPath,
       '--transport', 'discord-native',
       '--gateway-target', gatewayTarget,
-      '--max', String(args.max ?? 10),
+      '--max', String(args.max ?? 8),
     ], {
       cwd: REPO_ROOT,
       env,
@@ -72,6 +72,9 @@ try {
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
     console.log(notify.stdout.trim());
+    if (result.status !== 0) {
+      writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
+    }
     process.exitCode = 0;
     handled = true;
   }

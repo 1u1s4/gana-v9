@@ -61,6 +61,20 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
   });
 
+  it('caps native Discord embeds at the platform limit', () => {
+    const artifact = sampleArtifact();
+    artifact.recommendations = Array.from({ length: 12 }, (_, index) => ({
+      ...sampleArtifact().recommendations[0],
+      rank: index + 1,
+      parlayId: `parlay-${index + 1}`,
+    }));
+
+    const payload = buildDiscordPayload(artifact, { max: 10 });
+
+    assert.equal(payload.embeds.length, 10);
+    assert.match(payload.embeds.at(-1).description, /Revisión manual requerida/);
+  });
+
   it('loads artifacts and resolves the newest recommendations file', () => {
     const root = join(tmpdir(), `gana-discord-notifier-${Date.now()}`);
     const older = join(root, 'older');
