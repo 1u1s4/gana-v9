@@ -1,0 +1,650 @@
+#!/usr/bin/env node
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
+
+const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
+const DEFAULT_MAX_SELECTIONS = 5;
+const DEFAULT_TRANSPORT = 'discord-native';
+const DEFAULT_GATEWAY_TARGET = 'discord';
+const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
+const DISCORD_FIELD_LIMIT = 1024;
+const DISCORD_DESCRIPTION_LIMIT = 4096;
+
+export function parseArgs(argv) {
+  const args = {
+    artifact: undefined,
+    artifactRoot: DEFAULT_ARTIFACT_ROOT,
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+    transport: DEFAULT_TRANSPORT,
+    gatewayTarget: DEFAULT_GATEWAY_TARGET,
+    hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
+    dryRun: false,
+    latest: false,
+    max: DEFAULT_MAX_SELECTIONS,
+    username: 'Gana Hermes',
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--artifact') args.artifact = requireValue(argv, ++index, arg);
+    else if (arg === '--artifact-root') args.artifactRoot = requireValue(argv, ++index, arg);
+    else if (arg === '--webhook-url') args.webhookUrl = requireValue(argv, ++index, arg);
+    else if (arg === '--transport') args.transport = parseTransport(requireValue(argv, ++index, arg));
+    else if (arg === '--gateway-target') args.gatewayTarget = requireValue(argv, ++index, arg);
+    else if (arg === '--hermes-python') args.hermesPython = requireValue(argv, ++index, arg);
+    else if (arg === '--dry-run') args.dryRun = true;
+    else if (arg === '--latest') args.latest = true;
+    else if (arg === '--max') args.max = parseMax(requireValue(argv, ++index, arg));
+    else if (arg === '--username') args.username = requireValue(argv, ++index, arg);
+    else if (arg === '--help' || arg === '-h') args.help = true;
+    else throw new Error(`Unknown argument: ${arg}`);
+  }
+
+  return args;
+}
+
+export function resolveArtifactPath(options) {
+  if (options.artifact) return resolve(options.artifact);
+  return findLatestRecommendationsArtifact(options.artifactRoot);
+}
+
+export function findLatestRecommendationsArtifact(root = DEFAULT_ARTIFACT_ROOT) {
+  const absoluteRoot = resolve(root);
+  const matches = [];
+  collectRecommendationArtifacts(absoluteRoot, matches);
+  matches.sort((a, b) => b.mtimeMs - a.mtimeMs || b.path.localeCompare(a.path));
+  if (!matches.length) {
+    throw new Error(`No daily-parlay-recommendations.json artifacts found under ${absoluteRoot}`);
+  }
+  return matches[0].path;
+}
+
+export function loadRecommendations(path) {
+  const artifact = JSON.parse(readFileSync(path, 'utf8'));
+  if (!artifact || typeof artifact !== 'object') throw new Error(`Invalid recommendations artifact: ${path}`);
+  const recommendations = selectRecommendations(artifact);
+  return { artifact, recommendations };
+}
+
+export function buildDiscordPayload(artifact, options = {}) {
+  const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
+  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const counts = recommendationCounts(recommendations);
+  const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
+  const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
+  const risk = commonRiskFlag(recommendations, 'low-liquidity');
+  const embeds = [{
+    title: '🏆 Gana v9 · Recomendaciones en revisión',
+    description: [
+      `📦 ${counts.parlay} parlays · 🎯 ${counts.atomic} simples`,
+      `🟡 ${status} · ${validation} · 💧 ${risk}`,
+      '⚠️ Sin ejecución monetaria · Sin garantía',
+    ].join('\n'),
+    color: 0x2f80ed,
+    footer: { text: 'Gana Hermes · Discord native embeds' },
+    timestamp: new Date().toISOString(),
+  }];
+
+  if (recommendations.length) {
+    embeds.push(...recommendations.map((recommendation, index) => recommendationEmbed(recommendation, index)));
+  } else {
+    embeds.push({
+      title: 'Sin selecciones',
+      description: '> El artifact no contiene selecciones para notificar.',
+      color: 0x828282,
+    });
+  }
+
+  embeds.push({
+    description: '🛡️ Revisión manual requerida antes de promoción.',
+    color: 0x56ccf2,
+  });
+
+  return {
+    username: stringOrFallback(options.username, 'Gana Hermes'),
+    allowed_mentions: { parse: [] },
+    content: '',
+    embeds,
+  };
+}
+
+export function buildGatewayMessage(artifact, options = {}) {
+  const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
+  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const counts = recommendationCounts(recommendations);
+  const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
+  const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
+  const risk = commonRiskFlag(recommendations, 'low-liquidity');
+
+  const lines = [
+    '🏆 Gana v9 · Recomendaciones en revisión',
+    '',
+    `📦 ${counts.parlay} parlays · 🎯 ${counts.atomic} simples`,
+    `🟡 ${status} · ${validation} · 💧 ${risk}`,
+    '⚠️ Sin ejecución monetaria · Sin garantía',
+    '',
+    '━━━━━━━━━━━━━━━━━━',
+    '',
+  ];
+
+  if (!recommendations.length) {
+    lines.push('> Sin selecciones: el artifact no contiene selecciones para notificar.', '');
+  } else {
+    for (const [index, recommendation] of recommendations.entries()) {
+      lines.push(...formatCompactRecommendationLines(recommendation, index));
+    }
+  }
+
+  lines.push('━━━━━━━━━━━━━━━━━━', '', '🛡️ Revisión manual requerida antes de promoción.');
+  return lines.join('\n');
+}
+
+export async function sendDiscordPayload(webhookUrl, payload, fetchImpl = globalThis.fetch) {
+  if (!webhookUrl) throw new Error('DISCORD_WEBHOOK_URL or --webhook-url is required unless --dry-run is used.');
+  if (typeof fetchImpl !== 'function') throw new Error('fetch is not available in this Node runtime.');
+
+  const response = await fetchImpl(webhookUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.text().catch(() => '');
+  if (!response.ok) {
+    throw new Error(`Discord webhook failed with HTTP ${response.status}${body ? `: ${body.slice(0, 300)}` : ''}`);
+  }
+
+  return { status: response.status, body };
+}
+
+export function sendHermesGatewayMessage(target, message, options = {}, spawnImpl = spawnSync) {
+  if (!target) throw new Error('--gateway-target is required for Hermes gateway transport.');
+  if (!message) throw new Error('Cannot send an empty gateway message.');
+  const hermesPython = options.hermesPython || process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON;
+
+  const python = [
+    'import json, os, sys',
+    'from pathlib import Path',
+    'env_path = Path.home() / ".hermes" / ".env"',
+    'if env_path.exists():',
+    '    for line in env_path.read_text().splitlines():',
+    '        line = line.strip()',
+    '        if not line or line.startswith("#") or "=" not in line:',
+    '            continue',
+    '        key, value = line.split("=", 1)',
+    '        os.environ.setdefault(key.strip(), value.strip().strip("\\\'\\""))',
+    'from tools.send_message_tool import send_message_tool',
+    'payload = json.load(sys.stdin)',
+    'result = send_message_tool({"action": "send", "target": payload["target"], "message": payload["message"]})',
+    'print(result)',
+  ].join('\n');
+  const env = {
+    ...process.env,
+    PYTHONPATH: [
+      '/Users/luisalvarado/.hermes/hermes-agent',
+      process.env.PYTHONPATH,
+    ].filter(Boolean).join(':'),
+  };
+  const child = spawnImpl(hermesPython, ['-c', python], {
+    input: JSON.stringify({ target, message }),
+    encoding: 'utf8',
+    env,
+  });
+
+  if (child.error) throw child.error;
+  if (child.status !== 0) {
+    throw new Error(`Hermes gateway send failed with exit ${child.status}: ${(child.stderr || child.stdout || '').trim()}`);
+  }
+
+  const raw = String(child.stdout ?? '').trim();
+  let result;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    throw new Error(`Hermes gateway returned non-JSON output: ${raw.slice(0, 300)}`);
+  }
+  if (result?.error) throw new Error(`Hermes gateway send failed: ${result.error}`);
+  return result;
+}
+
+export function sendDiscordNativePayload(target, payload, options = {}, spawnImpl = spawnSync) {
+  if (!target) throw new Error('--gateway-target is required for Discord native transport.');
+  const hermesPython = options.hermesPython || process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON;
+  const python = [
+    'import asyncio, json, os, re, sys',
+    'from pathlib import Path',
+    'env_path = Path.home() / ".hermes" / ".env"',
+    'if env_path.exists():',
+    '    for line in env_path.read_text().splitlines():',
+    '        line = line.strip()',
+    '        if not line or line.startswith("#") or "=" not in line:',
+    '            continue',
+    '        key, value = line.split("=", 1)',
+    '        os.environ.setdefault(key.strip(), value.strip().strip("\\\'\\""))',
+    'from gateway.config import load_gateway_config, Platform',
+    'from gateway.platforms.base import resolve_proxy_url, proxy_kwargs_for_aiohttp',
+    'import aiohttp',
+    'payload = json.load(sys.stdin)',
+    'target = payload["target"]',
+    'message_payload = payload["payload"]',
+    'config = load_gateway_config()',
+    'pconfig = config.platforms.get(Platform.DISCORD)',
+    'if not pconfig or not pconfig.enabled or not pconfig.token:',
+    '    raise SystemExit("Discord platform is not configured in Hermes gateway")',
+    'target_ref = target.split(":", 1)[1] if ":" in target else ""',
+    'chat_id = None',
+    'thread_id = None',
+    'if target_ref:',
+    '    m = re.fullmatch(r"(\\d+)(?::(\\d+))?", target_ref)',
+    '    if m:',
+    '        chat_id, thread_id = m.group(1), m.group(2)',
+    '    else:',
+    '        from gateway.channel_directory import resolve_channel_name',
+    '        resolved = resolve_channel_name("discord", target_ref)',
+    '        if resolved:',
+    '            m = re.fullmatch(r"(\\d+)(?::(\\d+))?", resolved)',
+    '            if m:',
+    '                chat_id, thread_id = m.group(1), m.group(2)',
+    'if not chat_id:',
+    '    home = config.get_home_channel(Platform.DISCORD)',
+    '    if home:',
+    '        chat_id = home.chat_id',
+    'if not chat_id:',
+    '    raise SystemExit("Could not resolve Discord target")',
+    'async def main():',
+    '    proxy = resolve_proxy_url(platform_env_var="DISCORD_PROXY")',
+    '    sess_kw, req_kw = proxy_kwargs_for_aiohttp(proxy)',
+    '    channel_id = thread_id or chat_id',
+    '    url = f"https://discord.com/api/v10/channels/{channel_id}/messages"',
+    '    headers = {"Authorization": f"Bot {pconfig.token}", "Content-Type": "application/json"}',
+    '    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30), **sess_kw) as session:',
+    '        async with session.post(url, headers=headers, json=message_payload, **req_kw) as resp:',
+    '            body = await resp.text()',
+    '            if resp.status not in {200, 201}:',
+    '                raise SystemExit(f"Discord API error ({resp.status}): {body[:500]}")',
+    '            data = json.loads(body)',
+    '            print(json.dumps({"success": True, "platform": "discord", "chat_id": chat_id, "thread_id": thread_id, "message_id": data.get("id"), "embeds": len(message_payload.get("embeds", []))}))',
+    'asyncio.run(main())',
+  ].join('\n');
+  const env = {
+    ...process.env,
+    PYTHONPATH: [
+      '/Users/luisalvarado/.hermes/hermes-agent',
+      process.env.PYTHONPATH,
+    ].filter(Boolean).join(':'),
+  };
+  const child = spawnImpl(hermesPython, ['-c', python], {
+    input: JSON.stringify({ target, payload }),
+    encoding: 'utf8',
+    env,
+  });
+  if (child.error) throw child.error;
+  if (child.status !== 0) {
+    throw new Error(`Discord native send failed with exit ${child.status}: ${(child.stderr || child.stdout || '').trim()}`);
+  }
+  const raw = String(child.stdout ?? '').trim();
+  let result;
+  try {
+    result = JSON.parse(raw);
+  } catch {
+    throw new Error(`Discord native send returned non-JSON output: ${raw.slice(0, 300)}`);
+  }
+  if (result?.error) throw new Error(`Discord native send failed: ${result.error}`);
+  return result;
+}
+
+function collectRecommendationArtifacts(dir, matches) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectRecommendationArtifacts(path, matches);
+      continue;
+    }
+    if (entry.isFile() && basename(path) === 'daily-parlay-recommendations.json') {
+      matches.push({ path, mtimeMs: statSync(path).mtimeMs });
+    }
+  }
+}
+
+function selectRecommendations(artifact) {
+  if (Array.isArray(artifact?.recommendations)) return artifact.recommendations;
+  return [
+    ...(Array.isArray(artifact?.parlayRecommendations) ? artifact.parlayRecommendations : []),
+    ...(Array.isArray(artifact?.atomicRecommendations) ? artifact.atomicRecommendations : []),
+  ];
+}
+
+function recommendationCounts(recommendations) {
+  return recommendations.reduce((counts, recommendation) => {
+    if (recommendationKind(recommendation) === 'atomic-prediction') counts.atomic += 1;
+    else counts.parlay += 1;
+    return counts;
+  }, { parlay: 0, atomic: 0 });
+}
+
+function recommendationKind(recommendation) {
+  return recommendation?.kind === 'atomic-prediction' ? 'atomic-prediction' : 'parlay';
+}
+
+function recommendationField(recommendation, index) {
+  const rank = numberOrFallback(recommendation.rank, index + 1);
+  const nameParts = [
+    `#${rank}`,
+    recommendationKind(recommendation) === 'atomic-prediction' ? 'simple' : undefined,
+    stringOrFallback(recommendation.profile, 'profile unknown'),
+    Number.isFinite(recommendation.combinedOdds) ? `odds ${formatNumber(recommendation.combinedOdds, 2)}` : undefined,
+  ].filter(Boolean);
+
+  const legLines = Array.isArray(recommendation.legs)
+    ? recommendation.legs.slice(0, 8).map(formatLeg)
+    : [];
+  const hiddenLegs = Array.isArray(recommendation.legs) && recommendation.legs.length > 8
+    ? `+${recommendation.legs.length - 8} legs adicionales`
+    : undefined;
+
+  const value = [
+    formatMetricLine(recommendation),
+    recommendation.harnessStatus ? `Status: ${recommendation.harnessStatus}` : undefined,
+    recommendation.validationStatus ? `Validation: ${recommendation.validationStatus}` : undefined,
+    legLines.length ? `Legs:\n${legLines.map((line) => `- ${line}`).join('\n')}` : undefined,
+    hiddenLegs,
+    Array.isArray(recommendation.riskFlags) && recommendation.riskFlags.length
+      ? `Risk flags: ${recommendation.riskFlags.slice(0, 5).join(', ')}`
+      : undefined,
+  ].filter(Boolean).join('\n');
+
+  return {
+    name: truncate(nameParts.join(' | '), 256),
+    value: truncate(value || 'Sin detalle disponible.', DISCORD_FIELD_LIMIT),
+    inline: false,
+  };
+}
+
+function recommendationEmbed(recommendation, index) {
+  const rank = numberOrFallback(recommendation.rank, index + 1);
+  const kind = recommendationKind(recommendation);
+  const legLines = Array.isArray(recommendation.legs) && recommendation.legs.length
+    ? recommendation.legs.slice(0, 8).map((leg) => `> ⚽ ${formatCompactLeg(leg)}`)
+    : ['> Sin detalle de selecciones.'];
+  if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
+    legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
+  }
+  legLines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  return {
+    title: `${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '🎯 Simple · ' : ''}${recommendationTitle(recommendation)}`,
+    description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
+    color: kind === 'atomic-prediction' ? 0x9b51e0 : rank === 1 ? 0xf2c94c : 0x27ae60,
+  };
+}
+
+function formatRecommendationLines(recommendation, index) {
+  const rank = numberOrFallback(recommendation.rank, index + 1);
+  const header = [
+    `#${rank}`,
+    stringOrFallback(recommendation.profile, 'profile unknown'),
+    Number.isFinite(recommendation.combinedOdds) ? `odds ${formatNumber(recommendation.combinedOdds, 2)}` : undefined,
+  ].filter(Boolean).join(' | ');
+  const lines = ['', header];
+  const metrics = formatMetricLine(recommendation);
+  if (metrics) lines.push(metrics);
+  if (recommendation.harnessStatus) lines.push(`Status: ${recommendation.harnessStatus}`);
+  if (recommendation.validationStatus) lines.push(`Validation: ${recommendation.validationStatus}`);
+  if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
+    lines.push('Legs:');
+    for (const leg of recommendation.legs.slice(0, 8)) lines.push(`- ${formatLeg(leg)}`);
+    if (recommendation.legs.length > 8) lines.push(`+${recommendation.legs.length - 8} legs adicionales`);
+  }
+  if (Array.isArray(recommendation.riskFlags) && recommendation.riskFlags.length) {
+    lines.push(`Risk flags: ${recommendation.riskFlags.slice(0, 5).join(', ')}`);
+  }
+  return lines;
+}
+
+function formatCompactRecommendationLines(recommendation, index) {
+  const rank = numberOrFallback(recommendation.rank, index + 1);
+  const kind = recommendationKind(recommendation);
+  const lines = [`${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '🎯 Simple · ' : ''}${recommendationTitle(recommendation)}`];
+
+  if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
+    for (const leg of recommendation.legs.slice(0, 8)) {
+      lines.push(`> ⚽ ${formatCompactLeg(leg)}`);
+    }
+    if (recommendation.legs.length > 8) lines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
+  } else {
+    lines.push('> Sin detalle de selecciones.');
+  }
+
+  lines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  lines.push('');
+  return lines;
+}
+
+function recommendationTitle(recommendation) {
+  if (!Array.isArray(recommendation.legs) || !recommendation.legs.length) {
+    return stringOrFallback(recommendation.parlayId, 'Parlay sin titulo');
+  }
+  if (recommendationKind(recommendation) === 'atomic-prediction') {
+    const leg = recommendation.legs[0];
+    return `${compactFixtureName(leg.fixture ?? leg.fixtureId)} · ${formatCompactSelection(leg)}`;
+  }
+  return recommendation.legs
+    .slice(0, 3)
+    .map((leg) => compactFixtureName(leg.fixture ?? leg.fixtureId))
+    .join(' + ');
+}
+
+function compactFixtureName(value) {
+  const fixture = stringOrFallback(value, 'fixture unknown');
+  return fixture
+    .replace(/\s+vs\.?\s+/i, ' vs ')
+    .replace(/\s+United\s+II\b/i, ' Utd II')
+    .trim();
+}
+
+function formatCompactLeg(leg) {
+  return `${compactFixtureName(leg.fixture ?? leg.fixtureId)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
+}
+
+function formatCompactSelection(leg) {
+  const market = stringOrFallback(leg.market, 'market');
+  const selection = stringOrFallback(leg.selection, 'selection');
+  const line = Number.isFinite(leg.line) ? ` ${formatMetricNumber(leg.line, 2)}` : '';
+  if (market === 'btts') return `BTTS ${selection}`;
+  if (market.endsWith('over_under')) return `${selection}${line}`;
+  return `${market} ${selection}${line}`;
+}
+
+function formatExposurePercent(recommendation) {
+  const candidates = [
+    recommendation.exposure?.percentOfAnalyticalBankroll,
+    recommendation.stake?.percentOfBankroll,
+    recommendation.exposurePercent,
+  ];
+  const value = candidates.find((candidate) => Number.isFinite(candidate));
+  return Number.isFinite(value) ? formatPercent(value) : 'n/a';
+}
+
+function commonRecommendationValue(recommendations, key, fallback) {
+  const values = recommendations
+    .map((recommendation) => recommendation?.[key])
+    .filter((value) => typeof value === 'string' && value.trim());
+  if (!values.length) return fallback;
+  const first = values[0];
+  return values.every((value) => value === first) ? first : 'mixed';
+}
+
+function commonRiskFlag(recommendations, fallback) {
+  const values = recommendations
+    .flatMap((recommendation) => Array.isArray(recommendation?.riskFlags) ? recommendation.riskFlags : [])
+    .map(String)
+    .filter(Boolean);
+  if (!values.length) return fallback;
+  const first = values[0];
+  return values.every((value) => value === first) ? first : 'mixed-risk';
+}
+
+function formatMetricLine(recommendation) {
+  const parts = [];
+  if (Number.isFinite(recommendation.aggregateConfidence)) {
+    parts.push(`Confidence ${formatPercent(recommendation.aggregateConfidence)}`);
+  }
+  if (Number.isFinite(recommendation.adjustedProbability)) {
+    parts.push(`Adj prob ${formatPercent(recommendation.adjustedProbability)}`);
+  }
+  if (Number.isFinite(recommendation.expectedEdge)) {
+    parts.push(`Edge ${formatPercent(recommendation.expectedEdge)}`);
+  }
+  if (Number.isFinite(recommendation.score)) {
+    parts.push(`Score ${formatNumber(recommendation.score, 3)}`);
+  }
+  return parts.join(' | ');
+}
+
+function formatLeg(leg) {
+  const fixture = stringOrFallback(leg.fixture, stringOrFallback(leg.fixtureId, 'fixture unknown'));
+  const market = stringOrFallback(leg.market, 'market unknown');
+  const selection = stringOrFallback(leg.selection, 'selection unknown');
+  const line = Number.isFinite(leg.line) ? ` ${formatNumber(leg.line, 2)}` : '';
+  const odds = Number.isFinite(leg.odds) ? ` @ ${formatNumber(leg.odds, 2)}` : '';
+  const confidence = Number.isFinite(leg.confidence) ? ` | conf ${formatPercent(leg.confidence)}` : '';
+  const banker = leg.banker ? ' | banker' : '';
+  return `${fixture}: ${market} ${selection}${line}${odds}${confidence}${banker}`;
+}
+
+function requireValue(argv, index, flag) {
+  const value = argv[index];
+  if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value.`);
+  return value;
+}
+
+function parseMax(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) {
+    throw new Error('--max must be an integer between 1 and 10.');
+  }
+  return parsed;
+}
+
+function parseTransport(value) {
+  if (value === 'discord-native' || value === 'hermes-gateway' || value === 'webhook') return value;
+  throw new Error('--transport must be "discord-native", "hermes-gateway", or "webhook".');
+}
+
+function numberOrFallback(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function stringOrFallback(value, fallback) {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function formatNumber(value, digits) {
+  return Number(value).toFixed(digits).replace(/\.?0+$/, '');
+}
+
+function formatMetricNumber(value, digits) {
+  return Number.isFinite(value) ? formatNumber(value, digits) : 'n/a';
+}
+
+function formatPercent(value) {
+  return Number.isFinite(value) ? `${formatNumber(Number(value) * 100, 2)}%` : 'n/a';
+}
+
+function rankEmoji(rank) {
+  const ranks = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+  return ranks[rank] ?? `${rank}.`;
+}
+
+function truncate(value, limit) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, Math.max(0, limit - 1))}…`;
+}
+
+function usage() {
+  return [
+    'Usage:',
+    '  notify-discord-recommendations.mjs --artifact PATH [--max 5] [--gateway-target discord] [--dry-run]',
+    '  notify-discord-recommendations.mjs --artifact PATH --transport discord-native --gateway-target discord:CHANNEL_ID',
+    '  notify-discord-recommendations.mjs --artifact PATH --transport hermes-gateway --gateway-target discord:CHANNEL_ID',
+    '  notify-discord-recommendations.mjs --latest [--artifact-root .artifacts/gana-v9/runs] [--dry-run]',
+    '  notify-discord-recommendations.mjs --artifact PATH --transport webhook [--max 5]',
+    '',
+    'Environment:',
+    '  HERMES_GATEWAY_PYTHON may override the Python used for Hermes gateway delivery.',
+    '  DISCORD_WEBHOOK_URL is required only for --transport webhook.',
+  ].join('\n');
+}
+
+async function main() {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    console.log(usage());
+    return;
+  }
+
+  const artifactPath = resolveArtifactPath(options);
+  const { artifact, recommendations } = loadRecommendations(artifactPath);
+  const payload = buildDiscordPayload(artifact, options);
+  const gatewayMessage = buildGatewayMessage(artifact, options);
+
+  if (options.dryRun) {
+    console.log(JSON.stringify({
+      artifactPath,
+      selectionCount: recommendations.length,
+      transport: options.transport,
+      gatewayTarget: options.gatewayTarget,
+      hermesPython: options.hermesPython,
+      payload,
+      gatewayMessage,
+    }, null, 2));
+    return;
+  }
+
+  if (options.transport === 'hermes-gateway') {
+    const result = sendHermesGatewayMessage(options.gatewayTarget, gatewayMessage, { hermesPython: options.hermesPython });
+    console.log(JSON.stringify({
+      artifactPath,
+      selectionCount: recommendations.length,
+      transport: options.transport,
+      gatewayTarget: options.gatewayTarget,
+      gatewayResult: result,
+    }, null, 2));
+    return;
+  }
+
+  if (options.transport === 'discord-native') {
+    const result = sendDiscordNativePayload(options.gatewayTarget, payload, { hermesPython: options.hermesPython });
+    console.log(JSON.stringify({
+      artifactPath,
+      selectionCount: recommendations.length,
+      transport: options.transport,
+      gatewayTarget: options.gatewayTarget,
+      discordResult: result,
+    }, null, 2));
+    return;
+  }
+
+  const result = await sendDiscordPayload(options.webhookUrl, payload);
+  console.log(JSON.stringify({
+    artifactPath,
+    selectionCount: recommendations.length,
+    transport: options.transport,
+    discordStatus: result.status,
+  }, null, 2));
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

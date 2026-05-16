@@ -1,0 +1,257 @@
+# Discord recommendation notifications
+
+Esta guia documenta el envio de recomendaciones finales de Gana v9 a Discord desde Hermes: parlays rankeados y predicciones atomicas de muy alta confianza.
+
+## Ubicacion
+
+La skill de Hermes vive en:
+
+```text
+.agents/skills/discord-recommendation-notifier/
+```
+
+No usa `skills/`, porque esa carpeta es para contratos del harness.
+
+Archivos principales:
+
+- `.agents/skills/discord-recommendation-notifier/SKILL.md`
+- `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs`
+- `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs`
+- `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-validation-stats.mjs`
+- `.agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs`
+- `.agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs`
+
+## Formato canonico
+
+El formato canonico para Discord usa cajas nativas de Discord (`embeds`), no texto plano con bordes.
+
+Estructura visual:
+
+```text
+🏆 Gana v9 · Recomendaciones en revisión
+
+📦 N parlays · 🎯 M simples
+🟡 review-required · unvalidated · 💧 low-liquidity
+⚠️ Sin ejecución monetaria · Sin garantía
+
+1️⃣ Parlay title
+> ⚽ Fixture: selection @ odds
+> ⚽ Fixture: selection @ odds
+> 📊 Odds X · 🧠 Conf Y% · 📈 Edge Z% · 📌 Expo W%
+
+2️⃣ 🎯 Simple · Fixture · selection
+> ⚽ Fixture: selection @ odds
+> 📊 Odds X · 🧠 Conf Y% · 📈 Edge Z% · 📌 Expo 0%
+
+🛡️ Revisión manual requerida antes de promoción.
+```
+
+En Discord esto se renderiza como:
+
+- Un embed de encabezado.
+- Un embed por parlay o prediccion atomica.
+- Un embed final de cierre/control.
+
+Reglas:
+
+- Mantener `allowed_mentions: { "parse": [] }`.
+- Usar emojis en titulos/campos para escaneo rapido.
+- Mantener cada recomendacion compacta: selecciones en blockquote y metricas en una linea.
+- Renderizar `kind: "atomic-prediction"` como `🎯 Simple · ...`; son "parlays de una sola seleccion" analiticos, no instrucciones de ejecucion.
+- No enviar instrucciones monetarias, enlaces de pago, automatizacion de apuesta ni promesas de resultado.
+- Usar "exposicion analitica" / `Expo`, no lenguaje operativo de ejecucion.
+
+## Persistencia del estilo
+
+El estilo persiste en codigo, no en instrucciones sueltas del chat:
+
+- Fuente de verdad de formato: `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs`
+- Instrucciones de Hermes: `.agents/skills/discord-recommendation-notifier/SKILL.md`
+- Pruebas de regresion: `.agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs`
+
+Para conservar lo acordado, todo envio operativo debe usar el script de la skill. El transporte por defecto es `discord-native`, por lo que mantiene embeds/cajas nativas de Discord sin tener que rearmar el mensaje manualmente.
+
+Si se cambia el estilo en el futuro, actualizar juntos el script, `SKILL.md`, esta documentacion y las pruebas. No enviar variantes manuales por gateway salvo para depuracion explicita.
+
+## Transporte
+
+El transporte por defecto es:
+
+```text
+--transport discord-native
+```
+
+`discord-native` lee la configuracion del gateway de Hermes y manda el payload a Discord con la API oficial, preservando embeds nativos.
+
+Transportes disponibles:
+
+- `discord-native`: recomendado; usa cajas nativas de Discord.
+- `hermes-gateway`: fallback de texto plano via `send_message`.
+- `webhook`: fallback con `DISCORD_WEBHOOK_URL`.
+
+## Envio
+
+Preview sin enviar:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
+  --latest \
+  --dry-run \
+  --gateway-target discord:1494071165453467721 \
+  --max 3
+```
+
+Envio real con embeds nativos:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
+  --latest \
+  --transport discord-native \
+  --gateway-target discord:1494071165453467721 \
+  --max 3
+```
+
+Envio de un artifact especifico:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
+  --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json \
+  --transport discord-native \
+  --gateway-target discord:1494071165453467721 \
+  --max 3
+```
+
+## Validaciones y estadisticas
+
+Las validaciones del dia anterior usan el mismo transporte `discord-native` y cajas nativas de Discord.
+
+Preview:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
+  --date YYYY-MM-DD \
+  --gateway-target discord:1494071165453467721 \
+  --dry-run
+```
+
+Envio real:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
+  --date YYYY-MM-DD \
+  --transport discord-native \
+  --gateway-target discord:1494071165453467721
+```
+
+`notify-discord-daily-stats.mjs` busca el `daily-metrics.json` mas reciente para la fecha indicada y, si existe, el artifact `validations.json` o `validations-blocked.json` correspondiente. `notify-discord-validation-stats.mjs` queda disponible para envios con paths explicitos de artifacts.
+
+El formato canonico de validaciones es:
+
+```text
+📊 Gana v9 · Validación diaria
+
+📅 YYYY-MM-DD · America/Guatemala
+✅ N resueltas · ⏳ M pendientes · ⚪ U sin validar
+⚠️ Tracking analítico · Sin ejecución monetaria
+
+🎯 Predicciones
+> ✅ W · ❌ L · ➖ V · ⏳ P · 🚫 B · ⚪ U
+> 📌 Total N · 📈 Hit X% · 🎲 Odds X · 🧠 Conf Y% · 📊 Edge Z%
+
+🧩 Parlays
+> ✅ W · ❌ L · ➖ V · ⏳ P · 🚫 B · ⚪ U
+> 📌 Total N · 📈 Hit X% · 🎲 Odds X · 🧠 Conf Y%
+```
+
+## Operacion diaria y cron
+
+Wrappers versionados:
+
+- `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, corre `pnpm gana validate --date DATE`, corre `pnpm gana metrics daily --date DATE --scope daily-DATE`, y notifica las estadisticas a Discord.
+- `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de hoy en `America/Guatemala`, corre E2E completo Codex+Gemini con low-odds threshold `1.20`, y notifica recomendaciones.
+- `scripts/gana-previous-day-validation-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
+- `scripts/gana-daily-e2e-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
+- `scripts/install-gana-hermes-cron.sh`: instala los jobs en Hermes cron.
+- `scripts/install-gana-cron.mjs`: instala un bloque de crontab del sistema como fallback.
+
+Hermes cron recomendado:
+
+```bash
+scripts/install-gana-hermes-cron.sh
+```
+
+Jobs esperados:
+
+```text
+gana-v9-validate-yesterday-discord  0 7 * * *
+gana-v9-daily-e2e-discord           0 10 * * *
+```
+
+Detalles adicionales: `docs/daily-operations-cron.md`.
+
+## Canal y runtime
+
+El target usado en pruebas fue:
+
+```text
+discord:1494071165453467721
+```
+
+Evitar depender del home channel si Hermes reporta `Unknown Channel`; usar el ID numerico del canal.
+
+El runtime Python estable para el gateway es:
+
+```text
+/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3
+```
+
+El script lo usa por defecto. Si fuera necesario sobrescribirlo:
+
+```bash
+HERMES_GATEWAY_PYTHON=/path/to/hermes/venv/bin/python3 node ...
+```
+
+## Validacion
+
+Pruebas de la skill:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs
+node .agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs
+```
+
+La cobertura valida:
+
+- Payload con embeds nativos.
+- `allowed_mentions` deshabilitado.
+- Formato canonico del texto dentro de embeds.
+- Formato de predicciones atomicas como simples.
+- Fallback de texto plano via Hermes gateway.
+- Fallback webhook.
+- Descubrimiento del artifact mas reciente.
+
+## Artifact esperado
+
+El script lee:
+
+```text
+daily-parlay-recommendations.json
+```
+
+Campos usados por el formato:
+
+- `recommendations[].kind` (`parlay` legacy/default o `atomic-prediction`)
+- `recommendations[].rank`
+- `recommendations[].harnessStatus`
+- `recommendations[].validationStatus`
+- `recommendations[].riskFlags`
+- `recommendations[].combinedOdds`
+- `recommendations[].aggregateConfidence`
+- `recommendations[].expectedEdge`
+- `recommendations[].exposure.percentOfAnalyticalBankroll`
+- `recommendations[].stake.percentOfBankroll` como fallback legacy
+- `recommendations[].legs[].fixture`
+- `recommendations[].legs[].market`
+- `recommendations[].legs[].selection`
+- `recommendations[].legs[].line`
+- `recommendations[].legs[].odds`

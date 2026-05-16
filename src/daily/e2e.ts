@@ -2,12 +2,14 @@ import { createHash } from 'node:crypto';
 import type { AgentConfig } from '../config.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { normalizeMarketScope, type MarketKey } from '../domain/markets.js';
+import type { Fixture } from '../domain/fixtures.js';
 import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
 import { selectDefaultModelForProvider } from '../providers/agentic/helpers.js';
 import type { AgentProvider } from '../providers/agentic/types.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from '../metrics/daily.js';
-import { runParlayAnalysis, type ParlayAnalysisRunResult } from '../parlay/analysis.js';
+import { runParlayAnalysis, type ParlayAnalysisRecommendation, type ParlayAnalysisRunResult } from '../parlay/analysis.js';
 import { runParlayBuild, type ParlayBuildRunResult, type RunParlayBuildInput } from '../parlay/service.js';
+import type { PredictionRecordView } from '../prediction/types.js';
 import type { ResearchWebMode } from '../prediction/prompts.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import { getPrismaClient } from '../storage/db.js';
@@ -98,6 +100,43 @@ export interface DailyE2EDependencies {
 }
 
 const DEFAULT_DAILY_PROVIDERS: DailyE2EProvider[] = ['codex', 'gemini'];
+const ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR = 0.9;
+const ATOMIC_RECOMMENDATION_EDGE_FLOOR = 0;
+const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
+
+export type DailyFinalRecommendation =
+  | (ParlayAnalysisRecommendation & { kind: 'parlay' })
+  | AtomicPredictionRecommendation;
+
+export interface AtomicPredictionRecommendation {
+  kind: 'atomic-prediction';
+  rank: number;
+  parlayId: string;
+  predictionId: string;
+  predictionIds: string[];
+  sourceRunId: string | null;
+  sourceRunIds: string[];
+  provider: DailyE2EProvider;
+  providers: DailyE2EProvider[];
+  model: string;
+  profile: typeof ATOMIC_RECOMMENDATION_PROFILE;
+  validationStatus: 'unvalidated';
+  harnessStatus: string;
+  combinedOdds: number;
+  aggregateConfidence: number;
+  adjustedProbability: number;
+  expectedEdge: number;
+  score: number;
+  exposure: {
+    units: 0;
+    percentOfAnalyticalBankroll: 0;
+    policy: 'single-selection-analytical-watchlist';
+  };
+  bankerLegs: ParlayAnalysisRecommendation['bankerLegs'];
+  reasons: string[];
+  riskFlags: string[];
+  legs: ParlayAnalysisRecommendation['legs'];
+}
 
 export async function runDailyE2E(
   config: AgentConfig,
@@ -277,6 +316,16 @@ export async function runDailyE2E(
       result: providerPipelineResults[provider],
     })),
   });
+  const parlayRecommendations: DailyFinalRecommendation[] = (parlayAnalysis?.top ?? [])
+    .map((recommendation) => ({ ...recommendation, kind: 'parlay' as const }));
+  const atomicRecommendations = buildAtomicPredictionRecommendations(
+    providerPipelineResults,
+    providers,
+    effectiveConfig,
+    input.models,
+    parlayRecommendations.length,
+  );
+  const finalRecommendations: DailyFinalRecommendation[] = [...parlayRecommendations, ...atomicRecommendations];
   const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
   const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
   const ok = providerRuns.every((run) => run.ok)
@@ -349,7 +398,9 @@ export async function runDailyE2E(
     counts: {
       providers: providerCounts,
       parlayFamilies: parlayFamilyCounts,
-      recommendations: parlayAnalysis?.top?.length ?? 0,
+      recommendations: finalRecommendations.length,
+      parlayRecommendations: parlayRecommendations.length,
+      atomicRecommendations: atomicRecommendations.length,
       comparisonItems: providerComparison.items.length,
       consensusPredictions: providerConsensus.summary.consensusPredictions,
     },
@@ -359,17 +410,25 @@ export async function runDailyE2E(
   const providerComparisonPath = writeJsonArtifact(dailyBatchId, 'daily-provider-comparison.json', providerComparison);
   const providerConsensusPath = writeJsonArtifact(dailyBatchId, 'daily-provider-consensus.json', providerConsensus);
   const summaryPath = writeJsonArtifact(dailyBatchId, 'daily-e2e-summary.json', summary);
-  const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', {
+  const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', jsonValue({
     dailyBatchId,
     date: input.date,
     sourceRunIds: parlayAnalysisRunIds,
-    recommendations: parlayAnalysis?.top ?? [],
+    recommendations: finalRecommendations,
+    parlayRecommendations,
+    atomicRecommendations,
+    recommendationPolicy: {
+      atomicConfidenceFloor: ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR,
+      atomicEdgeFloor: ATOMIC_RECOMMENDATION_EDGE_FLOOR,
+      atomicStatuses: ['promotable'],
+      atomicProfile: ATOMIC_RECOMMENDATION_PROFILE,
+    },
     diagnostics: parlayAnalysis?.diagnostics ?? null,
     providerComparisonPath,
     providerConsensusPath,
     analyticalArtifactOnly: true,
     executionCapability: 'none',
-  });
+  }));
   const reportPath = writeJsonArtifact(dailyBatchId, 'daily-report.md', buildDailyReport(summary, recommendationsPath));
 
   writeRun(effectiveConfig, dailyBatchId, {
@@ -571,6 +630,182 @@ function oddsCacheKey(fixtureId: string, markets: readonly MarketKey[] | undefin
 
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+interface AtomicPredictionCandidate {
+  provider: DailyE2EProvider;
+  model: string;
+  runId: string;
+  prediction: PredictionRecordView;
+  fixture: string;
+  edge: number;
+}
+
+function buildAtomicPredictionRecommendations(
+  providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>,
+  providers: DailyE2EProvider[],
+  config: AgentConfig,
+  models: RunDailyE2EInput['models'],
+  rankOffset: number,
+): AtomicPredictionRecommendation[] {
+  const groups = new Map<string, AtomicPredictionCandidate[]>();
+  for (const provider of providers) {
+    const result = providerPipelineResults[provider];
+    if (!result?.ok) continue;
+    const fixtureNames = fixtureNameMap(result.fixtures);
+    for (const scoring of result.scoring) {
+      for (const prediction of scoring.predictions) {
+        const edge = atomicPredictionEdge(prediction);
+        if (!isAtomicRecommendationEligible(prediction, edge)) continue;
+        const key = atomicPredictionKey(prediction);
+        groups.set(key, [...(groups.get(key) ?? []), {
+          provider,
+          model: modelForProvider(config, provider, models),
+          runId: result.runId,
+          prediction,
+          fixture: fixtureNames.get(prediction.fixtureId) ?? scoring.fixtureId ?? prediction.fixtureId,
+          edge,
+        }]);
+      }
+    }
+  }
+
+  return [...groups.values()]
+    .map(toAtomicRecommendationDraft)
+    .sort((a, b) => b.score - a.score || b.aggregateConfidence - a.aggregateConfidence || a.combinedOdds - b.combinedOdds)
+    .map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
+}
+
+function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): AtomicPredictionRecommendation {
+  const ordered = [...candidates].sort((a, b) =>
+    b.prediction.confidence - a.prediction.confidence
+    || b.edge - a.edge
+    || a.prediction.odds - b.prediction.odds,
+  );
+  const primary = ordered[0] as AtomicPredictionCandidate;
+  const providers = uniqueStrings(ordered.map((candidate) => candidate.provider)) as DailyE2EProvider[];
+  const sourceRunIds = uniqueStrings(ordered.map((candidate) => candidate.runId));
+  const predictionIds = uniqueStrings(ordered.map((candidate) => candidate.prediction.id));
+  const confidence = round(average(ordered.map((candidate) => candidate.prediction.confidence)), 6);
+  const edge = round(average(ordered.map((candidate) => candidate.edge)), 6);
+  const adjustedProbability = round(clamp(confidence * (providers.length > 1 ? 1.02 : 1), 0.01, 0.99), 6);
+  const riskFlags = atomicRiskFlags(primary.prediction, providers.length);
+  const leg = {
+    predictionId: primary.prediction.id,
+    fixtureId: primary.prediction.fixtureId,
+    fixture: primary.fixture,
+    market: primary.prediction.market,
+    selection: primary.prediction.selection,
+    line: primary.prediction.line ?? null,
+    odds: round(primary.prediction.odds, 6),
+    confidence: round(primary.prediction.confidence, 6),
+    validationStatus: 'unvalidated',
+    warnings: primary.prediction.warnings ?? [],
+    banker: true,
+    bankerReason: `atomic high-confidence selection ${round(primary.prediction.confidence, 3)}`,
+  };
+
+  return {
+    kind: 'atomic-prediction',
+    rank: 0,
+    parlayId: `atomic-${primary.prediction.id}`,
+    predictionId: primary.prediction.id,
+    predictionIds,
+    sourceRunId: primary.runId,
+    sourceRunIds,
+    provider: primary.provider,
+    providers,
+    model: primary.model,
+    profile: ATOMIC_RECOMMENDATION_PROFILE,
+    validationStatus: 'unvalidated',
+    harnessStatus: primary.prediction.status,
+    combinedOdds: round(primary.prediction.odds, 6),
+    aggregateConfidence: confidence,
+    adjustedProbability,
+    expectedEdge: edge,
+    score: atomicRecommendationScore(confidence, edge, providers.length, riskFlags.length),
+    exposure: {
+      units: 0,
+      percentOfAnalyticalBankroll: 0,
+      policy: 'single-selection-analytical-watchlist',
+    },
+    bankerLegs: [{
+      predictionId: leg.predictionId,
+      fixtureId: leg.fixtureId,
+      fixture: leg.fixture,
+      market: leg.market,
+      selection: leg.selection,
+      line: leg.line,
+      odds: leg.odds,
+      confidence: leg.confidence,
+      reason: leg.bankerReason,
+    }],
+    reasons: [
+      `profile ${ATOMIC_RECOMMENDATION_PROFILE}`,
+      `confidence ${round(confidence, 3)}`,
+      `edge ${round(edge, 3)}`,
+      providers.length > 1 ? `provider agreement: ${providers.join(', ')}` : `provider: ${primary.provider}`,
+    ],
+    riskFlags,
+    legs: [leg],
+  };
+}
+
+function isAtomicRecommendationEligible(prediction: PredictionRecordView, edge: number): boolean {
+  if (prediction.status !== 'promotable') return false;
+  if (!Number.isFinite(prediction.confidence) || prediction.confidence < ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR) return false;
+  if (!Number.isFinite(prediction.odds) || prediction.odds <= 1) return false;
+  if (!Number.isFinite(edge) || edge <= ATOMIC_RECOMMENDATION_EDGE_FLOOR) return false;
+  const warnings = prediction.warnings ?? [];
+  if (warnings.some((warning) => /stale (?:news|source|odds) source|stale odds|unverified corners|low[-_ ]liquidity h2h short favorite|low_liquidity_h2h_favorite/i.test(warning))) {
+    return false;
+  }
+  return true;
+}
+
+function atomicPredictionEdge(prediction: PredictionRecordView): number {
+  if (Number.isFinite(prediction.edge)) return prediction.edge as number;
+  const probability = prediction.probability ?? prediction.modelProbability ?? prediction.marketFairProbability;
+  return Number.isFinite(probability) ? prediction.odds * (probability as number) - 1 : 0;
+}
+
+function atomicRiskFlags(prediction: PredictionRecordView, providerCount: number): string[] {
+  const flags: string[] = ['single-selection'];
+  if (providerCount > 1) flags.push('provider-consensus');
+  if (prediction.market === 'corners_over_under') flags.push('corners-market');
+  return flags;
+}
+
+function atomicRecommendationScore(confidence: number, edge: number, providerCount: number, riskFlagCount: number): number {
+  return round((confidence * 0.7) + (Math.max(0, edge) * 0.22) + (providerCount > 1 ? 0.06 : 0) - (riskFlagCount * 0.01), 6);
+}
+
+function atomicPredictionKey(prediction: PredictionRecordView): string {
+  return [
+    prediction.fixtureId,
+    prediction.market,
+    prediction.selection,
+    prediction.line ?? 'none',
+  ].join('|');
+}
+
+function fixtureNameMap(fixtures: Fixture[]): Map<string, string> {
+  return new Map(fixtures.map((fixture) => [
+    fixture.id,
+    `${fixture.homeTeamName ?? fixture.homeTeamId} vs ${fixture.awayTeamName ?? fixture.awayTeamId}`,
+  ]));
+}
+
+function average(values: number[]): number {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function round(value: number, digits: number): number {
+  return Number(value.toFixed(digits));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function boundedDailyChildRunId(dailyBatchId: string, ...parts: string[]): string {

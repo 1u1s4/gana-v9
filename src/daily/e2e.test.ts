@@ -48,6 +48,7 @@ describe('runDailyE2E', () => {
       runPipeline: async (config, input, runtime, deps) => {
         pipelineCalls.push({ provider: config.provider, model: config.model, input, runtime, deps });
         const runId = `${config.provider}-run`;
+        const predictions = config.provider === 'codex' ? [highConfidencePrediction(runId)] : [];
         return {
           ok: true,
           runId,
@@ -59,11 +60,18 @@ describe('runDailyE2E', () => {
           evidencePackPath: join(ctx.config.artifactRoot, 'evidence-packs', runId, 'manifest.json'),
           handoffPath: join(ctx.config.artifactRoot, 'handoffs', `${runId}.md`),
           steps: [],
-          fixtures: [],
+          fixtures: [fixture()],
           lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
           oddsSnapshots: [],
           research: [],
-          scoring: [],
+          scoring: [{
+            ok: true,
+            runId,
+            fixtureId: 'fixture-1',
+            providerFixtureId: 'provider-fixture-1',
+            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+            predictions,
+          }],
           parlay: {
             ok: true,
             runId,
@@ -147,11 +155,14 @@ describe('runDailyE2E', () => {
     assert.equal(summary.sharedInputs.maxFixturesPerRun, 12);
     assert.equal(summary.sharedInputs.lowOddsThreshold, 1.2);
     assert.deepEqual(summary.sharedInputs.providerModels, { codex: 'gpt-5.5', gemini: 'gemini-2.5-pro' });
-    assert.equal(summary.counts.recommendations, 0);
-    assert.equal(summary.providerComparison.summary.comparablePredictions, 0);
+    assert.equal(summary.counts.recommendations, 1);
+    assert.equal(summary.counts.atomicRecommendations, 1);
+    assert.equal(summary.providerComparison.summary.comparablePredictions, 1);
     assert.match(readFileSync(result.reportPath, 'utf-8'), /Artifact analitico\. No ejecuta apuestas/);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.executionCapability, 'none');
+    assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');
+    assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team A vs Team B');
     const comparison = JSON.parse(readFileSync(join(result.artifactDir, 'daily-provider-comparison.json'), 'utf-8'));
     assert.equal(comparison.executionCapability, 'none');
     const consensus = JSON.parse(readFileSync(join(result.artifactDir, 'daily-provider-consensus.json'), 'utf-8'));
@@ -322,3 +333,48 @@ describe('runDailyE2E', () => {
     );
   });
 });
+
+function fixture() {
+  return {
+    id: 'fixture-1',
+    provider: 'api-football',
+    providerFixtureId: 'provider-fixture-1',
+    homeTeamId: 'home-1',
+    awayTeamId: 'away-1',
+    homeTeamName: 'Team A',
+    awayTeamName: 'Team B',
+    scheduledAt: '2026-05-14T16:00:00.000Z',
+    status: 'scheduled',
+    includedByFilters: [],
+    createdAt: '2026-05-14T00:00:00.000Z',
+    updatedAt: '2026-05-14T00:00:00.000Z',
+  };
+}
+
+function highConfidencePrediction(runId: string) {
+  return {
+    id: 'prediction-atomic-1',
+    runId,
+    fixtureId: 'fixture-1',
+    providerFixtureId: 'provider-fixture-1',
+    market: 'h2h',
+    selection: 'home',
+    odds: 1.24,
+    impliedProbability: 0.806,
+    marketFairProbability: 0.82,
+    modelProbability: 0.91,
+    edge: 0.12,
+    confidence: 0.93,
+    quality: 'high',
+    confidenceBand: 'high',
+    status: 'promotable',
+    oddsSnapshotId: 'odds-snapshot-1',
+    oddsQuoteId: 'odds-quote-1',
+    evidenceIds: ['evidence-1'],
+    claimIds: [],
+    warnings: [],
+    blockers: [],
+    promptVersion: 'score-prediction-v2',
+    scoringRuleVersion: 'scoring-v2',
+  };
+}

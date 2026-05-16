@@ -17,8 +17,8 @@
   "showBanner": true,
   "display": {
     "inputStyle": "block",
-    "toolDisplay": "grouped",
-    "reasoning": false,
+    "toolDisplay": "emoji",
+    "reasoning": true,
     "loader": {
       "text": "Pensando",
       "style": "spinner"

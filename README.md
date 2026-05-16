@@ -46,6 +46,23 @@ pnpm gana dashboard --port 4317
 
 Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini` u `openrouter`). La DB canonica del RC actual es DigitalOcean MySQL via Prisma; PostgreSQL queda como migracion futura documentada, no como requisito operativo actual. El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
 
+## Operacion diaria Discord
+
+La operacion diaria usa hora Guatemala (`America/Guatemala`) y notifica por Discord con embeds nativos:
+
+```bash
+node scripts/gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD
+node scripts/gana-daily-e2e-and-notify.mjs --date YYYY-MM-DD
+node scripts/install-gana-cron.mjs --gateway-target discord:1494071165453467721
+```
+
+Cron operativo:
+
+- 7:00: valida el dia anterior, calcula `daily-metrics`, y envia estadisticas.
+- 10:00: corre E2E diario full para el dia siguiente y envia parlays/recomendaciones.
+
+Documentacion: `docs/discord-recommendation-notifications.md`.
+
 ## Configuracion
 
 Puedes ajustar el provider, modelo, estilo visual, presupuesto y carpeta de sesiones en `agent.config.json`.
@@ -129,3 +146,23 @@ pnpm gana dashboard --port 4317
 ```
 
 Abre `http://127.0.0.1:4317`. La interfaz permite filtrar por fecha, run id, estado y limite; muestra partidos/resultados, predicciones, parlays, validaciones y runs con detalle lateral. Requiere `DATABASE_URL` y usa solo lectura sobre los datos persistidos.
+
+## Notificaciones Discord
+
+El envio de parlays/recomendaciones a Discord desde Hermes esta documentado en `docs/discord-recommendation-notifications.md`. La skill vive en `.agents/skills/discord-recommendation-notifier/`, no en `skills/` del harness.
+
+El formato canonico persiste en el script de la skill y usa cajas nativas de Discord (`embeds`) con emojis, estado/riesgo, selecciones en blockquote, metricas compactas y cierre de revision manual.
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
+  --latest \
+  --transport discord-native \
+  --gateway-target discord:1494071165453467721 \
+  --max 3
+```
+
+Las validaciones/estadisticas del dia anterior y los cron jobs de 7am/10am Guatemala estan documentados en `docs/daily-operations-cron.md`.
+
+```bash
+scripts/install-gana-hermes-cron.sh
+```
