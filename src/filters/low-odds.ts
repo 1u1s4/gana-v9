@@ -1,6 +1,6 @@
 import type { AgentConfig } from '../config.js';
 import { isMarketKey } from '../domain/markets.js';
-import { getApiFootballDateOddsSlate } from '../providers/sports/api-football.js';
+import { getApiFootballDateOddsSlate, getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
 import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import type { RuntimeContext } from '../runtime/context.js';
@@ -119,21 +119,46 @@ export async function scanLowOdds(
 
   try {
     const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime, undefined, selectorMarketScope);
-    fixtureDiscovery = {
-      fixtures: slate.fixtures,
-      evaluations: slate.fixtures.map((fixture) => ({
-        fixtureId: fixture.id,
-        providerFixtureId: fixture.providerFixtureId,
-        includedReasons: ['included-by-manual-query' as const],
-        excludedReasons: [],
-        eligible: true as const,
-      })),
-      requestedLeagues: [],
-      requestedTeams: [],
-    };
+    fixtureDiscovery = slate.fixtures.length
+      ? {
+        fixtures: slate.fixtures,
+        evaluations: slate.fixtures.map((fixture) => ({
+          fixtureId: fixture.id,
+          providerFixtureId: fixture.providerFixtureId,
+          includedReasons: ['included-by-manual-query' as const],
+          excludedReasons: [],
+          eligible: true as const,
+        })),
+        requestedLeagues: [],
+        requestedTeams: [],
+      }
+      : await discoverFixtures({
+        ...config,
+        apiFootball: {
+          ...config.apiFootball,
+          maxFixturesPerRun: Number.MAX_SAFE_INTEGER,
+        },
+      }, {
+        date: filters.date,
+      }, runtime);
     fixtureEvaluations = [...fixtureDiscovery.evaluations];
 
-    const snapshotsByProviderFixtureId = new Map(slate.snapshots.map((snapshot) => [snapshot.providerFixtureId, snapshot]));
+    const snapshots = slate.fixtures.length
+      ? slate.snapshots
+      : await mapWithConcurrency(fixtureDiscovery.fixtures, 6, async (fixture) => {
+        try {
+          return await getApiFootballOddsSnapshot(config, fixture.providerFixtureId, runtime, selectorMarketScope);
+        } catch (err: any) {
+          return {
+            fixtureId: fixture.id,
+            providerFixtureId: fixture.providerFixtureId,
+            quoteRecordIds: undefined,
+            quotes: [],
+            error: err?.message ?? String(err),
+          };
+        }
+      });
+    const snapshotsByProviderFixtureId = new Map(snapshots.map((snapshot) => [snapshot.providerFixtureId, snapshot]));
 
     for (const fixture of fixtureDiscovery.fixtures.slice(0, filters.maxFixturesPerRun)) {
       try {
@@ -353,6 +378,23 @@ function addEvaluationReason(
   if (!evaluation) return;
   if (!evaluation.excludedReasons.includes(reason)) evaluation.excludedReasons.push(reason);
   evaluation.eligible = false;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  async function runWorker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await worker(items[index] as T, index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => runWorker()));
+  return results;
 }
 
 function toJsonValue(value: unknown): JsonValue {

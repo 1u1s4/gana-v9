@@ -1307,8 +1307,8 @@ describe('executeRunPipeline', () => {
       }),
     });
 
-    assert.deepEqual(researched, ['1001', '1002']);
-    assert.deepEqual(scored, ['1001', '1002']);
+    assert.deepEqual(researched, ['9001', '1001']);
+    assert.deepEqual(scored, ['9001', '1001']);
 
     const selected = JSON.parse(readFileSync(join(result.artifactDir, 'selected-fixtures.json'), 'utf-8'));
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
@@ -1454,8 +1454,8 @@ describe('executeRunPipeline', () => {
       }),
     });
 
-    assert.deepEqual(researched, ['1001', '9002']);
-    assert.deepEqual(scored, ['1001', '9002']);
+    assert.deepEqual(researched, ['9002', '1001']);
+    assert.deepEqual(scored, ['9002', '1001']);
 
     const selected = JSON.parse(readFileSync(join(result.artifactDir, 'selected-fixtures.json'), 'utf-8'));
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
@@ -1465,7 +1465,7 @@ describe('executeRunPipeline', () => {
     assert.equal(selected.selectedFixtures, 2);
     assert.equal(selected.capped, false);
     assert.match(selected.warnings.join('\n'), /excluded 1 fixtures outside local date 2026-04-29 in timezone America\/Guatemala/);
-    assert.deepEqual(selected.fixtures.map((item: { providerFixtureId: string }) => item.providerFixtureId), ['1001', '9002']);
+    assert.deepEqual(selected.fixtures.map((item: { providerFixtureId: string }) => item.providerFixtureId), ['9002', '1001']);
     assert.equal(evaluation.counts.selectedFixtures, 2);
     assert.equal(evaluation.fixtureSelection.localDateExcludedFixtures, 1);
     assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);

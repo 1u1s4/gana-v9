@@ -57,7 +57,7 @@ pnpm gana daily-e2e \
   --web "${GANA_WEB_MODE:-live}" \
   --max-fixtures "${GANA_MAX_FIXTURES_PER_RUN}" \
   --threshold "${GANA_LOW_ODDS_THRESHOLD}" \
-  --parlay-profile "${GANA_PARLAY_PROFILE:-balanced}"
+  --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}"
 E2E_STATUS=$?
 set -e
 

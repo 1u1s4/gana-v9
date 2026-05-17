@@ -203,7 +203,7 @@ const STORAGE_RETRY_DELAY_MS = 2_000;
 const RESEARCH_CONCURRENCY = 4;
 const SCORING_CONCURRENCY = 4;
 const ODDS_SCAN_CONCURRENCY = 6;
-const LOW_ODDS_GLOBAL_MAX_FIXTURES = Number.MAX_SAFE_INTEGER;
+const LOW_ODDS_GLOBAL_MAX_FIXTURES = positiveInteger(process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES) ?? Number.MAX_SAFE_INTEGER;
 const AGENT_FIXTURE_TIMEOUT_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_TIMEOUT_MS) ?? 420_000;
 const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXTURE_ABORT_GRACE_MS) ?? 30_000;
 const RESEARCH_AGENT_TIMEOUT_MS = positiveInteger(process.env.GANA_RESEARCH_AGENT_TIMEOUT_MS)
@@ -405,10 +405,11 @@ export async function executeRunPipeline(
       const providerDateSlate = useProviderDateSlate
         ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime, undefined, lowOddsSelectorMarkets))
         : undefined;
-      const lowOddsDiscovery = providerDateSlate
+      const hasProviderDateSlate = Boolean(providerDateSlate?.fixtures.length);
+      const lowOddsDiscovery = hasProviderDateSlate
         ? {
-          fixtures: providerDateSlate.fixtures,
-          evaluations: providerDateSlate.fixtures.map((fixture) => ({
+          fixtures: providerDateSlate!.fixtures,
+          evaluations: providerDateSlate!.fixtures.map((fixture) => ({
             fixtureId: fixture.id,
             providerFixtureId: fixture.providerFixtureId,
             includedReasons: ['included-by-manual-query' as const],
@@ -423,8 +424,8 @@ export async function executeRunPipeline(
         }, runtime);
       lowOddsCandidateFixtures = lowOddsDiscovery.fixtures;
       const fetchLowOddsSnapshotsForDate = deps.fetchLowOddsSnapshotsForDate;
-      const rawLowOddsSnapshots = providerDateSlate
-        ? providerDateSlate.snapshots
+      const rawLowOddsSnapshots = hasProviderDateSlate
+        ? providerDateSlate!.snapshots
         : fetchLowOddsSnapshotsForDate
           ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime, lowOddsSelectorMarkets))
           : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
@@ -496,9 +497,10 @@ export async function executeRunPipeline(
   });
   writeStepSpan(config, runtime, 'low_odds.scan', 'gate', lowOddsScanStepWarning ? 'blocked' : 'ok', lowOddsScanStepWarning ? { ...lowOddsScan, error: lowOddsScanStepWarning } : lowOddsScan);
 
+  const lowOddsHitFixtures = selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan);
   const mergedSelectedFixtures = mergeFixtureSlates(
+    lowOddsHitFixtures,
     fixtureDiscovery.fixtures,
-    selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan),
   );
   const localDateSelectedFixtures = mergedSelectedFixtures.filter((fixture) => (
     fixtureLocalDateKey(fixture.scheduledAt, config.apiFootball.timezone) === input.date
@@ -523,7 +525,7 @@ export async function executeRunPipeline(
   ];
   const fixtureSelection = {
     primaryFixtures: fixtureDiscovery.fixtures.length,
-    lowOddsUniqueFixtures: uniqueFixtureCount(selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan)),
+    lowOddsUniqueFixtures: uniqueFixtureCount(lowOddsHitFixtures),
     mergedFixtures: mergedSelectedFixtures.length,
     localDateEligibleFixtures: localDateSelectedFixtures.length,
     localDateExcludedFixtures,
@@ -1464,8 +1466,25 @@ function buildLowOddsMarketCoverage(
 
 function selectLowOddsHitFixtures(fixtures: Fixture[], lowOddsScan: LowOddsScanView): Fixture[] {
   if (!fixtures.length || !lowOddsScan.hits.length) return [];
-  const hitProviderFixtureIds = new Set(lowOddsScan.hits.map((hit) => hit.providerFixtureId));
-  return fixtures.filter((fixture) => hitProviderFixtureIds.has(fixture.providerFixtureId));
+  const hitStats = new Map<string, { hitCount: number; minOdds: number }>();
+  for (const hit of lowOddsScan.hits) {
+    const existing = hitStats.get(hit.providerFixtureId);
+    hitStats.set(hit.providerFixtureId, {
+      hitCount: (existing?.hitCount ?? 0) + 1,
+      minOdds: Math.min(existing?.minOdds ?? Number.POSITIVE_INFINITY, hit.odds),
+    });
+  }
+  return fixtures
+    .filter((fixture) => hitStats.has(fixture.providerFixtureId))
+    .sort((left, right) => {
+      const leftStats = hitStats.get(left.providerFixtureId);
+      const rightStats = hitStats.get(right.providerFixtureId);
+      const oddsDelta = (leftStats?.minOdds ?? Number.POSITIVE_INFINITY) - (rightStats?.minOdds ?? Number.POSITIVE_INFINITY);
+      if (oddsDelta !== 0) return oddsDelta;
+      const hitDelta = (rightStats?.hitCount ?? 0) - (leftStats?.hitCount ?? 0);
+      if (hitDelta !== 0) return hitDelta;
+      return left.scheduledAt.localeCompare(right.scheduledAt);
+    });
 }
 
 function uniqueFixtureCount(fixtures: Fixture[]): number {

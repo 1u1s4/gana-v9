@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260516T231153-67feea",
+  "command": "review",
+  "args": [
+    "review",
+    "--limit",
+    "10"
+  ],
+  "rootPath": "/Users/luisalvarado/Documents/GitHub/gana-v9",
+  "headSha": "2591b764d13f4ef6486b2e50248cfec7592c9cde",
+  "startedAt": "2026-05-16T23:11:53.925Z",
+  "finishedAt": "2026-05-16T23:11:53.926Z",
+  "status": "completed",
+  "claimedFeatureIds": [],
+  "findingIds": [],
+  "patchAttemptIds": [],
+  "errors": []
+}

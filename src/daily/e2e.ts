@@ -624,14 +624,47 @@ export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDai
     },
     fetchLowOddsSnapshot: async (runConfig, fixtureId, runRuntime, markets) => {
       const key = oddsCacheKey(fixtureId, markets);
-      let snapshot = oddsSnapshots.get(key);
+      let snapshot = oddsSnapshots.get(key) ?? findCompatibleOddsSnapshot(oddsSnapshots, fixtureId, markets);
       if (!snapshot) {
         snapshot = getApiFootballOddsSnapshot(configForSports(runConfig, config), fixtureId, runRuntime, markets);
+        oddsSnapshots.set(key, snapshot);
+      } else {
         oddsSnapshots.set(key, snapshot);
       }
       return snapshot;
     },
   };
+}
+
+function findCompatibleOddsSnapshot(
+  oddsSnapshots: Map<string, Promise<Awaited<ReturnType<typeof getApiFootballOddsSnapshot>>>>,
+  fixtureId: string,
+  markets: readonly MarketKey[] | undefined,
+): Promise<Awaited<ReturnType<typeof getApiFootballOddsSnapshot>>> | undefined {
+  const requestedMarkets = new Set(markets ?? []);
+  if (!requestedMarkets.size) return undefined;
+  for (const [key, snapshot] of oddsSnapshots) {
+    const cached = parseOddsCacheKey(key);
+    if (cached.fixtureId !== fixtureId) continue;
+    if (isMarketSuperset(cached.markets, requestedMarkets)) return snapshot;
+  }
+  return undefined;
+}
+
+function parseOddsCacheKey(key: string): { fixtureId: string; markets: Set<string> } {
+  const delimiter = key.indexOf(':');
+  if (delimiter < 0) return { fixtureId: key, markets: new Set() };
+  return {
+    fixtureId: key.slice(0, delimiter),
+    markets: new Set(key.slice(delimiter + 1).split(',').filter(Boolean)),
+  };
+}
+
+function isMarketSuperset(cachedMarkets: Set<string>, requestedMarkets: Set<MarketKey>): boolean {
+  for (const market of requestedMarkets) {
+    if (!cachedMarkets.has(market)) return false;
+  }
+  return true;
 }
 
 function validateDailyInput(input: RunDailyE2EInput): void {
@@ -810,7 +843,7 @@ function profilesToPortfolios(profile: DailyParlayProfile | undefined): Array<No
   if (!profile) return [];
   if (profile === 'safe-consensus') return ['low-variance'];
   if (profile === 'aggressive-analytical') return ['high-conviction'];
-  if (profile === 'portfolio-v2') return ['low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
+  if (profile === 'portfolio-v2') return ['low-odds-top', 'low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
   if (profile === 'balanced') return ['balanced'];
   return [profile];
 }

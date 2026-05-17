@@ -25,7 +25,7 @@ const command = [
   '--providers', 'codex,gemini',
   '--threshold', String(args.threshold ?? 1.2),
   '--web', 'live',
-  '--parlay-profile', args.parlayProfile ?? 'balanced',
+  '--parlay-profile', args.parlayProfile ?? 'portfolio-v2',
   '--daily-batch-id', dailyBatchId,
 ];
 

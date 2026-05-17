@@ -381,7 +381,7 @@ function recommendationEmbed(recommendation, index) {
   if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
     legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
   }
-  legLines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  legLines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)}`);
   return {
     title: `${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '🎯 Simple · ' : ''}${recommendationTitle(recommendation)}`,
     description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
@@ -426,7 +426,7 @@ function formatCompactRecommendationLines(recommendation, index) {
     lines.push('> Sin detalle de selecciones.');
   }
 
-  lines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  lines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)}`);
   lines.push('');
   return lines;
 }

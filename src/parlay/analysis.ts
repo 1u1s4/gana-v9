@@ -180,6 +180,9 @@ const DEFAULT_MAX_PORTFOLIO_EXPOSURE = 0.08;
 const DEFAULT_MAX_PARLAY_EXPOSURE = 0.025;
 const DEFAULT_PROFILE_SCOPE: ParlayAnalysisProfileScope = 'core';
 const CORE_ANALYSIS_PROFILES = new Set(['default', 'balanced', 'high-conviction']);
+const PURGED_ANALYSIS_PROFILES = new Set(['default', 'review', 'totals', 'market-diverse', 'parlay-oro', 'aggressive']);
+const MAX_RECOMMENDABLE_COMBINED_ODDS = 3.0;
+const MAX_RECOMMENDABLE_LEGS = 3;
 
 export async function runParlayAnalysis(
   config: AgentConfig,
@@ -313,7 +316,7 @@ function toCandidate(row: unknown): Candidate {
   const adjustedProbability = adjustedProbabilityFor(aggregateConfidence, combinedOdds, profile, riskFlags, legs.length);
   const expectedEdge = combinedOdds * adjustedProbability - 1;
   const rawStakeFraction = kellyFraction(adjustedProbability, combinedOdds);
-  const rejectedReasons = rejectionReasonsFor(combinedOdds, aggregateConfidence, expectedEdge, riskFlags, legs.length);
+  const rejectedReasons = rejectionReasonsFor(profile, combinedOdds, aggregateConfidence, expectedEdge, riskFlags, legs.length);
   const reasons = reasonsFor(profile, combinedOdds, aggregateConfidence, adjustedProbability, expectedEdge, riskFlags);
 
   return {
@@ -405,6 +408,7 @@ function riskFlagsFor(parlay: any, profile: string, legs: ParlayAnalysisLeg[]): 
   ].join('\n');
 
   if (parlay.status === 'review-required') flags.push('review-required');
+  if (PURGED_ANALYSIS_PROFILES.has(profile)) flags.push('historically-weak-profile');
   if (profile === 'parlay-oro' && (metadata?.candidateDiagnostics as any)?.expectedEdge < 0) flags.push('negative-portfolio-edge');
   if (/low[-_ ]liquidity|low liquidity/i.test(text)) flags.push('low-liquidity');
   if (/stale (?:news|source|odds) source|stale odds/i.test(text)) flags.push('stale-source');
@@ -442,8 +446,8 @@ function adjustedProbabilityFor(confidence: number, combinedOdds: number, profil
 
 function profileMultiplier(profile: string): number {
   switch (profile) {
-    case 'low-odds-top': return 1.12;
-    case 'low-variance': return 1.02;
+    case 'low-odds-top': return 1.16;
+    case 'low-variance': return 1.06;
     case 'high-conviction': return 1.0;
     case 'balanced': return 1.0;
     case 'totals': return 0.82;
@@ -454,11 +458,14 @@ function profileMultiplier(profile: string): number {
   }
 }
 
-function rejectionReasonsFor(odds: number, confidence: number, expectedEdge: number, riskFlags: string[], legs: number): string[] {
+function rejectionReasonsFor(profile: string, odds: number, confidence: number, expectedEdge: number, riskFlags: string[], legs: number): string[] {
   const reasons: string[] = [];
   if (!Number.isFinite(odds) || odds <= 1) reasons.push('invalid combined odds');
   if (!Number.isFinite(confidence) || confidence <= 0) reasons.push('invalid aggregate confidence');
   if (legs < 2) reasons.push('less than two legs');
+  if (legs > MAX_RECOMMENDABLE_LEGS) reasons.push(`more than ${MAX_RECOMMENDABLE_LEGS} legs after parlay purge`);
+  if (odds > MAX_RECOMMENDABLE_COMBINED_ODDS) reasons.push(`combined odds above purge ceiling ${MAX_RECOMMENDABLE_COMBINED_ODDS}`);
+  if (PURGED_ANALYSIS_PROFILES.has(profile)) reasons.push(`profile ${profile} is purged from final recommendations`);
   if (expectedEdge <= 0) reasons.push('non-positive adjusted edge');
   if (riskFlags.includes('stale-source')) reasons.push('stale source risk');
   if (riskFlags.includes('corners-unverified')) reasons.push('unverified corners risk');
