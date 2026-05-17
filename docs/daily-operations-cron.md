@@ -5,7 +5,7 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 ## Horarios
 
 - `07:00` Guatemala: validar el dia anterior, recalcular daily metrics y notificar estadisticas a Discord.
-- `10:00` Guatemala: correr Daily E2E del dia actual con Codex + Gemini, low-odds elegibles y notificar recomendaciones/parlays a Discord.
+- `10:00` Guatemala: correr Daily E2E del dia actual con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, y notificar recomendaciones/parlays a Discord.
 
 ## Scripts operativos
 
@@ -31,10 +31,11 @@ scripts/gana-daily-e2e-notify.sh
 Este script:
 
 1. Calcula hoy en `America/Guatemala`.
-2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --web live`.
-3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`) para cubrir el universo diario disponible y low-odds elegibles.
-4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto.
-5. Envia `daily-parlay-recommendations.json` a Discord con embeds nativos usando Hermes gateway.
+2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --web live --parlay-profile portfolio-v2`.
+3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`, `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES=10000`) para cubrir el universo diario disponible y low-odds elegibles.
+4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto; low-odds significa exclusivamente mercado `h2h` casa/visitante con cuota menor o igual al umbral.
+5. Genera `portfolio-v2`, que incluye `parlay-diamante` como perfil conservador diario objetivo 1.10-1.20.
+6. Envia `daily-parlay-recommendations.json` a Discord con embeds nativos usando Hermes gateway.
 
 ## Variables
 
@@ -49,9 +50,13 @@ Variables utiles:
 - `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN`.
 - `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_PROVIDER_REQUESTS_PER_RUN`.
 - `GANA_LOW_ODDS_THRESHOLD`: default `1.20`.
+- `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES`: default `10000`; permite que el barrido low-odds revise la pizarra diaria completa.
 - `GANA_DAILY_PROVIDERS`: default `codex,gemini`.
+- `GANA_DAILY_PROVIDER_CONCURRENCY`: default `2`.
 - `GANA_WEB_MODE`: default `live`.
-- `GANA_PARLAY_PROFILE`: default `balanced`.
+- `GANA_PARLAY_PROFILE`: default `portfolio-v2`; incluye `parlay-diamante`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`.
+- `AGENT_CODEX_FALLBACK_MODELS`: default cron `gpt-5.4-mini`.
+- `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
 - `GANA_DISCORD_MAX_SELECTIONS`: default `5`.
 - `GANA_METRICS_PERSIST`: default `true`.
 

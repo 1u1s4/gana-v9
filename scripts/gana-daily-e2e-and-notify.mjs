@@ -13,6 +13,11 @@ const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(0);
 const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
 const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
+const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
+const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
+if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
+  throw new Error('--provider-concurrency must be a positive integer.');
+}
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}.log`);
 const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
 
@@ -23,9 +28,10 @@ const command = [
   'daily-e2e',
   '--date', date,
   '--providers', 'codex,gemini',
+  '--provider-concurrency', String(providerConcurrency),
   '--threshold', String(args.threshold ?? 1.2),
   '--web', 'live',
-  '--parlay-profile', args.parlayProfile ?? 'portfolio-v2',
+  '--parlay-profile', parlayProfile,
   '--daily-batch-id', dailyBatchId,
 ];
 
@@ -34,9 +40,13 @@ const env = {
   GANA_PROFILE: process.env.GANA_PROFILE ?? 'full-permissions',
   GANA_APPROVAL_MODE: process.env.GANA_APPROVAL_MODE ?? 'auto-grant',
   AGENT_PROVIDER: process.env.AGENT_PROVIDER ?? 'codex',
+  AGENT_CODEX_FALLBACK_MODELS: process.env.AGENT_CODEX_FALLBACK_MODELS ?? 'gpt-5.4-mini',
+  AGENT_CODEX_SANDBOX: process.env.AGENT_CODEX_SANDBOX ?? 'danger-full-access',
   AGENT_NATIVE_WEB_SEARCH_MODE: process.env.AGENT_NATIVE_WEB_SEARCH_MODE ?? 'live',
   GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,
+  GANA_DAILY_PROVIDER_CONCURRENCY: process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? String(providerConcurrency),
   GANA_LOW_ODDS_THRESHOLD: process.env.GANA_LOW_ODDS_THRESHOLD ?? String(args.threshold ?? 1.2),
+  GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES: process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? process.env.GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? '10000',
   GANA_MAX_FIXTURES_PER_RUN: process.env.GANA_MAX_FIXTURES_PER_RUN ?? '10000',
   GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN: process.env.GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN ?? '10000',
   GANA_MAX_PROVIDER_REQUESTS_PER_RUN: process.env.GANA_MAX_PROVIDER_REQUESTS_PER_RUN ?? '10000',
@@ -107,6 +117,7 @@ function parseArgs(argv) {
     else if (arg === '--daily-batch-id') parsed.dailyBatchId = requireValue(argv, ++index, arg);
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
+    else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));
     else throw new Error(`Unknown argument: ${arg}`);

@@ -31,6 +31,7 @@ export type DailyParlayProfile =
   | 'high-conviction'
   | 'market-diverse'
   | 'parlay-oro'
+  | 'parlay-diamante'
   | 'portfolio-v2';
 
 export interface RunDailyE2EInput {
@@ -528,6 +529,7 @@ export async function runDailyE2E(
       atomicStatuses: ['promotable'],
       atomicProfile: ATOMIC_RECOMMENDATION_PROFILE,
       portfolioBuckets: [
+        'parlay-diamante',
         'single-top',
         'two-leg-safe',
         'three-leg-balanced',
@@ -853,7 +855,7 @@ function profilesToPortfolios(profile: DailyParlayProfile | undefined): Array<No
   if (!profile) return [];
   if (profile === 'safe-consensus') return ['low-variance'];
   if (profile === 'aggressive-analytical') return ['high-conviction'];
-  if (profile === 'portfolio-v2') return ['low-odds-top', 'low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
+  if (profile === 'portfolio-v2') return ['parlay-diamante', 'low-odds-top', 'low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
   if (profile === 'balanced') return ['balanced'];
   return [profile];
 }

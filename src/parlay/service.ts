@@ -87,7 +87,7 @@ const LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS = 1.35;
 const LOW_VARIANCE_FALLBACK_MAX_LEG_ODDS = 1.35;
 const PARLAY_ORO_FALLBACK_MAX_LEG_ODDS = 1.45;
 
-type DeterministicParlayProfile = 'low-variance' | 'balanced' | 'totals' | 'high-conviction' | 'market-diverse' | 'parlay-oro';
+type DeterministicParlayProfile = 'low-variance' | 'balanced' | 'totals' | 'high-conviction' | 'market-diverse' | 'parlay-oro' | 'parlay-diamante';
 type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'] | typeof LOW_ODDS_TOP_PROFILE['key'] | DeterministicParlayProfile;
 type ParlayPortfolioProfileSpec = typeof PORTFOLIO_PROFILES[number] | typeof LOW_ODDS_TOP_PROFILE;
 
@@ -784,7 +784,8 @@ function isDeterministicParlayProfile(value: unknown): value is DeterministicPar
     || value === 'totals'
     || value === 'high-conviction'
     || value === 'market-diverse'
-    || value === 'parlay-oro';
+    || value === 'parlay-oro'
+    || value === 'parlay-diamante';
 }
 
 async function runDeterministicParlayProfile(
@@ -836,10 +837,12 @@ async function runDeterministicParlayProfile(
     }));
   const ranked = profile === 'parlay-oro'
     ? rankParlayOroCandidates(generatedCandidates)
+    : profile === 'parlay-diamante'
+      ? rankParlayDiamanteCandidates(generatedCandidates)
     : rankParlayCandidates(generatedCandidates, spec.riskWeight);
   const diversified = profile === 'market-diverse'
     ? diversifyMarketDiverseCandidates(ranked, pool, spec.targetParlays)
-    : profile === 'parlay-oro'
+    : profile === 'parlay-oro' || profile === 'parlay-diamante'
       ? ranked.filter((candidate) => !candidate.blockers.length).slice(0, spec.targetParlays)
       : diversifyParlays(ranked).concat(ranked.filter((candidate) => !candidate.blockers.length)).slice(0, spec.targetParlays);
   const accepted = uniqueCandidates(diversified).filter((candidate) => !candidate.blockers.length).slice(0, spec.targetParlays);
@@ -1007,6 +1010,8 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
       return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.72, minEdge: 0.02, requireMarketDiversity: true, minAggregateConfidence: 0.5, reviewOnly: true, riskWeight: 0.5 };
     case 'parlay-oro':
       return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.45, maxOdds: 2.2, maxLegOdds: 1.25, targetParlays: 1, minConfidence: 0.82, minEdge: 0.02, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.55, reviewOnly: true, riskWeight: 0.75 };
+    case 'parlay-diamante':
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.1, maxOdds: 1.2, maxLegOdds: 1.13, targetParlays: 1, minConfidence: 0.88, minEdge: 0, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.78, reviewOnly: false, riskWeight: 0.9 };
   }
 }
 
@@ -1104,7 +1109,46 @@ function deterministicCandidatesForProfile(
   if (profile === 'parlay-oro') {
     return generateParlayOroCandidates(pool, spec);
   }
+  if (profile === 'parlay-diamante') {
+    return generateParlayDiamanteCandidates(pool, spec);
+  }
   return generateParlayCandidatesForLegRange([...pool], spec.minLegs, spec.maxLegs);
+}
+
+function generateParlayDiamanteCandidates(
+  pool: readonly ParlaySourcePrediction[],
+  spec: DeterministicProfileSpec,
+): ParlayCandidate[] {
+  const eligible = pool
+    .filter((prediction) => (prediction.status === 'promotable' || prediction.status === 'candidate') && !(prediction.blockers?.length))
+    .sort((a, b) =>
+      probabilityForParlayOroLeg(b) - probabilityForParlayOroLeg(a)
+      || b.confidence - a.confidence
+      || (b.edge ?? 0) - (a.edge ?? 0)
+      || a.odds - b.odds,
+    )
+    .slice(0, 32);
+  const candidates: ParlayCandidate[] = [];
+  for (let size = spec.minLegs; size <= Math.min(spec.maxLegs, eligible.length); size += 1) {
+    collectParlayOroCombinations(eligible, spec, size, 0, [], candidates, 1200);
+  }
+  return candidates.length ? candidates : [buildRejectedDiamanteCandidate(pool)];
+}
+
+function buildRejectedDiamanteCandidate(pool: readonly ParlaySourcePrediction[]): ParlayCandidate {
+  return {
+    parlayId: randomUUID(),
+    legs: [],
+    combinedFairProbability: 0,
+    combinedMarketOdds: 0,
+    combinedFairOdds: Infinity,
+    expectedEdge: 0,
+    correlationPenalty: 0,
+    diversityScore: 0,
+    riskScore: 1,
+    reason: 'rejected',
+    blockers: pool.length ? ['no-parlay-diamante-combinations-within-odds-window'] : ['no-predictions'],
+  };
 }
 
 function generateParlayOroCandidates(
@@ -1214,6 +1258,17 @@ function rankParlayOroCandidates(candidates: ParlayCandidate[]): ParlayCandidate
   );
 }
 
+function rankParlayDiamanteCandidates(candidates: ParlayCandidate[]): ParlayCandidate[] {
+  return [...candidates].sort((a, b) =>
+    Number(a.blockers.length > 0) - Number(b.blockers.length > 0)
+    || b.combinedFairProbability - a.combinedFairProbability
+    || a.correlationPenalty - b.correlationPenalty
+    || a.riskScore - b.riskScore
+    || Math.abs(a.combinedMarketOdds - 1.1) - Math.abs(b.combinedMarketOdds - 1.1)
+    || b.expectedEdge - a.expectedEdge,
+  );
+}
+
 function buildFromCandidate(
   candidate: ParlayCandidate,
   pool: readonly ParlaySourcePrediction[],
@@ -1282,7 +1337,7 @@ function buildFromCandidate(
 }
 
 function deterministicArtifactName(profile: DeterministicParlayProfile, blocked: boolean): string {
-  const base = profile === 'parlay-oro' ? 'parlay-oro' : `parlay-${profile}`;
+  const base = profile === 'parlay-oro' || profile === 'parlay-diamante' ? profile : `parlay-${profile}`;
   return blocked ? `${base}-blocked.json` : `${base}.json`;
 }
 

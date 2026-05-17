@@ -261,6 +261,57 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.top.some((item) => item.profile === 'low-odds-top' || item.profile === 'parlay-oro'), false);
   });
 
+  it('keeps parlay-diamante in core recommendations despite low-liquidity h2h favorite flags', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const rows = [
+      parlay({
+        id: 'parlay-diamante-safe',
+        profile: 'parlay-diamante',
+        validation: 'unvalidated',
+        odds: 1.113,
+        confidence: 0.9312,
+        status: 'promotable',
+        legs: [
+          leg({ id: 'diamond-a', market: 'h2h', selection: 'home', odds: 1.05, confidence: 0.97, warnings: ['low-liquidity h2h short favorite'] }),
+          leg({ id: 'diamond-b', market: 'h2h', selection: 'away', odds: 1.06, confidence: 0.96 }),
+        ],
+      }),
+      parlay({
+        id: 'parlay-low-odds-top',
+        profile: 'low-odds-top',
+        validation: 'unvalidated',
+        odds: 1.404,
+        confidence: 0.84,
+        status: 'promotable',
+        legs: [
+          leg({ id: 'low-a', market: 'double_chance', selection: 'home_or_draw', odds: 1.18, confidence: 0.92 }),
+          leg({ id: 'low-b', market: 'double_chance', selection: 'home_or_draw', odds: 1.19, confidence: 0.91 }),
+        ],
+      }),
+    ];
+
+    const result = await runParlayAnalysis(cfg, {
+      date: '2026-05-17',
+      top: 3,
+      bankrollUnits: 100,
+    }, runtime, {
+      now: () => now,
+      db: { parlay: { findMany: async () => rows } },
+      writeArtifact: () => '/tmp/parlay-analysis.json',
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.diagnostics.profileScope, 'core');
+    assert.equal(result.diagnostics.profileScopedAnalyzed, 1);
+    assert.equal(result.top[0]?.parlayId, 'parlay-diamante-safe');
+    assert.equal(result.top[0]?.profile, 'parlay-diamante');
+    assert.equal(result.top[0]?.riskFlags.includes('low-liquidity-h2h-favorite'), true);
+    assert.equal(result.top[0]?.riskFlags.includes('low-liquidity'), true);
+    assert.equal((result.top[0]?.expectedEdge ?? 0) > 0, true);
+    assert.equal(result.diagnostics.rejected.some((item) => item.parlayId === 'parlay-diamante-safe'), false);
+  });
+
   it('keeps promotable low-liquidity balanced parlays recommendable with reduced stake', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

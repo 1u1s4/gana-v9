@@ -321,6 +321,86 @@ describe('runDailyE2E', () => {
     assert.equal(runJson.providerAgentic, 'codex');
   });
 
+  it('expands portfolio-v2 with parlay-diamante as the first daily profile', async () => {
+    const ctx = context();
+    const parlayCalls: any[] = [];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-05-17',
+      providers: ['codex'],
+      parlayProfile: 'portfolio-v2',
+      persistMetrics: false,
+      dailyBatchId: 'daily-portfolio-v2',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => ({
+        ok: true,
+        runId: `${config.provider}-run`,
+        date: input.date,
+        status: 'succeeded',
+        verdict: 'promotable',
+        artifactDir: join(ctx.config.artifactRoot, 'runs', `${config.provider}-run`),
+        artifactPath: join(ctx.config.artifactRoot, 'runs', `${config.provider}-run`),
+        evidencePackPath: '/tmp/evidence.json',
+        handoffPath: '/tmp/handoff.md',
+        steps: [],
+        fixtures: [],
+        lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
+        oddsSnapshots: [],
+        research: [],
+        scoring: [],
+        parlay: {
+          ok: true,
+          runId: `${config.provider}-run`,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          build: { parlay: { legs: [] } },
+          persistedParlayIds: ['codex-parlay'],
+        },
+      }) as any,
+      buildParlay: async (_config, input, runtime) => {
+        parlayCalls.push({ input, runId: runtime.runId });
+        return {
+          ok: true,
+          runId: runtime.runId ?? 'portfolio-v2-parlay-run',
+          date: input.date,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 1.12, aggregateConfidence: 0.9, aggregateQuality: 1 } },
+          persistedParlayIds: [`${runtime.runId}-persisted`],
+        } as any;
+      },
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: input.runIds?.length ?? 0,
+        top: [],
+        diagnostics: { generatedAt: '2026-05-17T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 1, profileScopedAnalyzed: 1, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 1, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(parlayCalls.map((call) => call.input.portfolio), [
+      'parlay-diamante',
+      'low-odds-top',
+      'low-variance',
+      'balanced',
+      'market-diverse',
+      'high-conviction',
+      'parlay-oro',
+    ]);
+    assert.equal(result.parlays[0]?.profile, 'parlay-diamante');
+  });
+
   it('keeps derived daily child run ids inside database id limits', async () => {
     const ctx = context();
     const parlayRuntimeIds: string[] = [];

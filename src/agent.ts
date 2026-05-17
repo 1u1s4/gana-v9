@@ -542,7 +542,11 @@ async function runCodexAgentAttempt(
   }
 
   if (exitCode !== 0) {
-    throw new Error((stderr.trim() || providerError || `codex exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
+    const stderrTail = stderr.trim().split('\n').filter(Boolean).slice(-8).join('\n');
+    const errorText = providerError.trim()
+      ? [providerError.trim(), stderrTail].filter(Boolean).join('\n')
+      : (stderrTail || `codex exited with code ${exitCode}`);
+    throw new Error(errorText);
   }
   if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
     throw new Error(formatNativeWebSearchEnforcementError(requirement));

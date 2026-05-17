@@ -1331,6 +1331,75 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames.slice(0, 2), ['parlay-oro.json', 'parlays.json']);
   });
 
+  it('builds parlay-diamante inside the 1.10-1.20 conservative odds window', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    const artifactNames: string[] = [];
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-17',
+      sourceRunId: 'source-run-diamante',
+      portfolio: 'parlay-diamante',
+    }, runtime, {
+      now: () => now,
+      writeArtifact: (_runId, name) => {
+        artifactNames.push(name);
+        return `/tmp/${name}`;
+      },
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-diamante');
+            return [
+              prediction({ id: 'diamond-1', runId: 'source-run-diamante', fixtureId: 'fixture-d1', marketKey: 'h2h', selectionKey: 'home', odds: 1.05, confidence: 0.97, edge: 0.025, estimatedProbability: 0.95, status: 'promotable', warnings: ['low-liquidity h2h short favorite'] }),
+              prediction({ id: 'diamond-2', runId: 'source-run-diamante', fixtureId: 'fixture-d2', marketKey: 'h2h', selectionKey: 'away', odds: 1.06, confidence: 0.96, edge: 0.02, estimatedProbability: 0.94, status: 'promotable' }),
+              prediction({ id: 'diamond-3', runId: 'source-run-diamante', fixtureId: 'fixture-d3', marketKey: 'h2h', selectionKey: 'home', odds: 1.08, confidence: 0.95, edge: 0.02, estimatedProbability: 0.93, status: 'promotable' }),
+              prediction({ id: 'too-expensive', runId: 'source-run-diamante', fixtureId: 'fixture-d4', marketKey: 'h2h', selectionKey: 'home', odds: 1.14, confidence: 0.99, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
+              prediction({ id: 'too-weak', runId: 'source-run-diamante', fixtureId: 'fixture-d5', marketKey: 'h2h', selectionKey: 'home', odds: 1.04, confidence: 0.82, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
+              prediction({ id: 'draw-risk', runId: 'source-run-diamante', fixtureId: 'fixture-d6', marketKey: 'double_chance', selectionKey: 'home_or_away', odds: 1.05, confidence: 0.97, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-parlay-diamante' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-diamante-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    const firstLegIds = result.build.parlay.legs.map((leg) => leg.predictionId);
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.profiles[0].profile, 'parlay-diamante');
+    assert.equal(result.portfolio?.promptVersion, 'deterministic-parlay-diamante-v1');
+    assert.equal(result.build.parlay.legs.length >= 2, true);
+    assert.equal(result.build.parlay.legs.length <= 3, true);
+    assert.equal((result.build.parlay.combinedOdds ?? 0) >= 1.1, true);
+    assert.equal((result.build.parlay.combinedOdds ?? 0) <= 1.2, true);
+    assert.equal(firstLegIds.includes('diamond-1'), true);
+    assert.equal(firstLegIds.includes('diamond-2'), true);
+    assert.equal(firstLegIds.includes('too-expensive'), false);
+    assert.equal(firstLegIds.includes('too-weak'), false);
+    assert.equal(firstLegIds.includes('draw-risk'), false);
+    assert.equal(result.build.parlay.legs.every((leg) => leg.odds <= 1.13), true);
+    assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'parlay-diamante');
+    assert.equal(persisted[0].parlay.metadata.promptVersion, 'deterministic-parlay-diamante-v1');
+    assert.equal(
+      result.portfolio?.diagnostics?.pool[0].excludedReasons.some((item) => item.predictionId === 'too-expensive' && item.reasons.some((reason) => /leg odds ceiling/.test(reason))),
+      true,
+    );
+    assert.equal(
+      result.portfolio?.diagnostics?.pool[0].excludedReasons.some((item) => item.predictionId === 'draw-risk' && item.reasons.some((reason) => /draw exposure/.test(reason))),
+      true,
+    );
+    assert.deepEqual(artifactNames.slice(0, 2), ['parlay-diamante.json', 'parlays.json']);
+  });
+
   it('falls back for parlay-oro when the strict low-odds pool is empty', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

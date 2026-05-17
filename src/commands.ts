@@ -549,11 +549,12 @@ function optionalDailyParlayProfileFlag(flags: Record<string, string | true>): D
     || value === 'high-conviction'
     || value === 'market-diverse'
     || value === 'parlay-oro'
+    || value === 'parlay-diamante'
     || value === 'portfolio-v2'
   ) {
     return value;
   }
-  throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, parlay-oro, or portfolio-v2.');
+  throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, parlay-oro, parlay-diamante, or portfolio-v2.');
 }
 
 function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] } {
@@ -579,9 +580,9 @@ async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags:
 
 async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
   const portfolio = optionalStringFlag(flags, 'portfolio');
-  const deterministicPortfolios = new Set(['low-variance', 'balanced', 'totals', 'high-conviction', 'market-diverse', 'parlay-oro']);
+  const deterministicPortfolios = new Set(['low-variance', 'balanced', 'totals', 'high-conviction', 'market-diverse', 'parlay-oro', 'parlay-diamante']);
   if (portfolio !== undefined && portfolio !== 'llm' && portfolio !== 'low-odds-top' && !deterministicPortfolios.has(portfolio)) {
-    throw new Error('--portfolio must be llm, low-odds-top, low-variance, balanced, totals, high-conviction, market-diverse, or parlay-oro when provided.');
+    throw new Error('--portfolio must be llm, low-odds-top, low-variance, balanced, totals, high-conviction, market-diverse, parlay-oro, or parlay-diamante when provided.');
   }
   if (portfolio === 'llm' || portfolio === 'low-odds-top' || deterministicPortfolios.has(portfolio ?? '')) {
     const selectedPortfolio = portfolio as NonNullable<Parameters<typeof runParlayBuild>[1]['portfolio']>;
@@ -2103,7 +2104,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio llm${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-odds-top${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay --date YYYY-MM-DD --run-ids RUN_ID_A,RUN_ID_B --portfolio low-variance${RESET}`);
-  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro${RESET}`);
+  console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro|parlay-diamante${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay analyze --date YYYY-MM-DD --top 9 --bankroll 100 --profile-scope core${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay analyze --run-ids RUN_ID_A,RUN_ID_B --top 9 --bankroll 100 --profile-scope all${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
