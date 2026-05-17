@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { AgentConfig } from '../config.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
+import { lowOddsScanProviderConfig } from '../filters/low-odds.js';
 import { normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import type { Fixture } from '../domain/fixtures.js';
-import { getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
+import { getApiFootballDateOddsSlate, getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
 import { selectDefaultModelForProvider } from '../providers/agentic/helpers.js';
 import type { AgentProvider } from '../providers/agentic/types.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from '../metrics/daily.js';
@@ -596,6 +597,7 @@ export async function runDailyE2E(
 export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDailyE2EInput, 'date'>): RunPipelineDependencies {
   let primaryDiscovery: Promise<FixtureDiscoveryResult> | undefined;
   let lowOddsDiscovery: Promise<FixtureDiscoveryResult> | undefined;
+  let lowOddsSlate: Promise<Awaited<ReturnType<typeof getApiFootballDateOddsSlate>>> | undefined;
   const oddsSnapshots = new Map<string, Promise<Awaited<ReturnType<typeof getApiFootballOddsSnapshot>>>>();
 
   return {
@@ -613,6 +615,14 @@ export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDai
       }
       return discoverFixtures(runConfig, discoveryInput, runRuntime);
     },
+    fetchLowOddsSlate: async (runConfig, date, runRuntime, fixtures, markets) => {
+      const sportsConfig = lowOddsScanProviderConfig(configForSports(runConfig, config));
+      if (date === input.date && !fixtures?.length) {
+        lowOddsSlate ??= getApiFootballDateOddsSlate(sportsConfig, date, runRuntime, fixtures, markets);
+        return lowOddsSlate;
+      }
+      return getApiFootballDateOddsSlate(sportsConfig, date, runRuntime, fixtures, markets);
+    },
     fetchOddsSnapshot: async (runConfig, fixtureId, runRuntime, markets) => {
       const key = oddsCacheKey(fixtureId, markets);
       let snapshot = oddsSnapshots.get(key);
@@ -626,7 +636,7 @@ export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDai
       const key = oddsCacheKey(fixtureId, markets);
       let snapshot = oddsSnapshots.get(key) ?? findCompatibleOddsSnapshot(oddsSnapshots, fixtureId, markets);
       if (!snapshot) {
-        snapshot = getApiFootballOddsSnapshot(configForSports(runConfig, config), fixtureId, runRuntime, markets);
+        snapshot = getApiFootballOddsSnapshot(lowOddsScanProviderConfig(configForSports(runConfig, config)), fixtureId, runRuntime, markets);
         oddsSnapshots.set(key, snapshot);
       } else {
         oddsSnapshots.set(key, snapshot);

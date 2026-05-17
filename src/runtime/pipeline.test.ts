@@ -779,7 +779,14 @@ describe('executeRunPipeline', () => {
           payloadHash: `hash-${target.providerFixtureId}`,
           quotes: isFijiTarget
             ? [lowOddsQuoteFor(fijiTarget, { selection: 'away', price: 1.14, impliedProbability: 1 / 1.14 })]
-            : [lowOddsQuoteFor(defaultTarget, { price: 1.8, impliedProbability: 1 / 1.8 })],
+            : [
+              lowOddsQuoteFor(defaultTarget, {
+                market: 'double_chance',
+                selection: 'home_or_draw',
+                price: 1.1,
+                impliedProbability: 1 / 1.1,
+              }),
+            ],
         };
       },
       scoreFixture: async (_cfg, input) => {
@@ -806,10 +813,11 @@ describe('executeRunPipeline', () => {
     }));
 
     assert.equal(result.verdict, 'review-required');
-    assert.deepEqual(discoveryQueries, [{ date: '2026-04-29' }]);
+    assert.deepEqual(discoveryQueries, [{ date: '2026-04-29', fullDay: true }]);
     assert.equal(result.lowOddsScan.fixtureCount, 2);
     assert.equal(result.lowOddsScan.hitCount, 1);
     assert.equal(result.lowOddsScan.hits[0]?.providerFixtureId, '9001');
+    assert.equal(result.lowOddsScan.hits[0]?.market, 'h2h');
     assert.equal(result.lowOddsScan.hits[0]?.oddsQuoteId, 'odds-quote-fiji-ba');
 
     const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
@@ -1023,7 +1031,7 @@ describe('executeRunPipeline', () => {
     assert.equal(evaluation.counts.predictions, 1);
   });
 
-  it('uses requested markets as low-odds selector and analysis scope', async () => {
+  it('uses h2h favorites as low-odds selector while preserving requested analysis scope', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const target = fixture();
@@ -1087,13 +1095,13 @@ describe('executeRunPipeline', () => {
           oddsSnapshotId: 'odds-snapshot-1',
           providerSnapshotId: 'provider-snapshot-1',
           quoteRecordIds: {
-            'test-book|double_chance|home_or_draw|': 'odds-quote-low-favorite',
+            'test-book|h2h|home|': 'odds-quote-low-favorite',
           },
           capturedAt: '2026-04-29T12:00:00.000Z',
           bookmakerCount: 1,
           payloadHash: 'hash',
           quotes: [
-            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+            lowOddsQuoteFor(target, { market: 'h2h', selection: 'home', price: 1.12, impliedProbability: 1 / 1.12 }),
           ],
         };
       },
@@ -1161,12 +1169,12 @@ describe('executeRunPipeline', () => {
     });
 
     assert.deepEqual(observed.odds, ['double_chance']);
-    assert.deepEqual(observed.lowOdds, ['double_chance']);
+    assert.deepEqual(observed.lowOdds, ['h2h']);
     assert.deepEqual(observed.research, ['double_chance']);
     assert.deepEqual(observed.score, ['double_chance']);
     assert.equal(result.lowOddsScan.hitCount, 1);
-    assert.equal(result.lowOddsScan.hits[0]?.market, 'double_chance');
-    assert.deepEqual(result.lowOddsScan.selectorMarketScope, ['double_chance']);
+    assert.equal(result.lowOddsScan.hits[0]?.market, 'h2h');
+    assert.deepEqual(result.lowOddsScan.selectorMarketScope, ['h2h']);
     assert.deepEqual(result.lowOddsScan.analysisMarketScope, ['double_chance']);
 
     const inputArtifact = JSON.parse(readFileSync(join(result.artifactDir, 'input.json'), 'utf-8'));
@@ -1175,12 +1183,12 @@ describe('executeRunPipeline', () => {
     const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
     const handoff = readFileSync(result.handoffPath, 'utf-8');
     assert.deepEqual(inputArtifact.marketScope, ['double_chance']);
-    assert.deepEqual(lowOddsScan.selectorMarketScope, ['double_chance']);
+    assert.deepEqual(lowOddsScan.selectorMarketScope, ['h2h']);
     assert.deepEqual(lowOddsScan.analysisMarketScope, ['double_chance']);
     assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
     assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 1);
     assert.deepEqual(evaluation.marketCoverage.requestedMarkets, ['double_chance']);
-    assert.deepEqual(evaluation.marketCoverage.lowOddsSelectorMarkets, ['double_chance']);
+    assert.deepEqual(evaluation.marketCoverage.lowOddsSelectorMarkets, ['h2h']);
     assert.deepEqual(evaluation.marketCoverage.lowOddsAnalysisMarkets, ['double_chance']);
     assert.equal(evaluation.webSearchCoverage.required, false);
     assert.deepEqual(manifest.marketCoverage.requestedMarkets, ['double_chance']);

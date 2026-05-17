@@ -112,7 +112,8 @@ export class ApiFootballProvider implements SportsDataProvider {
       .flatMap((response) => mapApiFootballFixtures(response.payload, response.capturedAt)))
       .slice(0, maxFixtures);
     const persisted = await this.persistence.upsertFixtures?.(normalized);
-    return persisted?.map((item) => item.fixture) ?? normalized.map(fallbackFixtureFromNormalized);
+    return persisted?.map((item) => fixtureWithNormalizedNames(item.fixture, item.normalized))
+      ?? normalized.map(fallbackFixtureFromNormalized);
   }
 
   async getFixture(input: FixtureByIdQuery): Promise<Fixture> {
@@ -337,7 +338,8 @@ export class ApiFootballProvider implements SportsDataProvider {
       const response = await this.request('fixtures', '/fixtures', { ids: chunk.join('-') });
       const normalized = mapApiFootballFixtures(response.payload, response.capturedAt);
       const persisted = await this.persistence.upsertFixtures?.(normalized);
-      fixtures.push(...(persisted?.map((item) => item.fixture) ?? normalized.map(fallbackFixtureFromNormalized)));
+      fixtures.push(...(persisted?.map((item) => fixtureWithNormalizedNames(item.fixture, item.normalized))
+        ?? normalized.map(fallbackFixtureFromNormalized)));
     }
     return fixtures;
   }
@@ -1119,6 +1121,8 @@ function fixtureFromRecord(record: {
     season: record.season ?? undefined,
     homeTeamId: record.homeTeamId ?? normalized.homeTeam?.providerTeamId ?? 'unknown-home-team',
     awayTeamId: record.awayTeamId ?? normalized.awayTeam?.providerTeamId ?? 'unknown-away-team',
+    homeTeamName: normalized.homeTeam?.name,
+    awayTeamName: normalized.awayTeam?.name,
     scheduledAt: (record.scheduledAt ?? normalized.scheduledAt ?? new Date(0)).toISOString(),
     status: normalized.status,
     scoreHome: record.scoreHome ?? undefined,
@@ -1128,6 +1132,14 @@ function fixtureFromRecord(record: {
       : normalized.includedByFilters,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+function fixtureWithNormalizedNames(fixture: Fixture, normalized: NormalizedFixture): Fixture {
+  return {
+    ...fixture,
+    homeTeamName: fixture.homeTeamName ?? normalized.homeTeam?.name,
+    awayTeamName: fixture.awayTeamName ?? normalized.awayTeam?.name,
   };
 }
 

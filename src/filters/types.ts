@@ -30,6 +30,7 @@ export interface FixtureFilterQuery {
   leaguesDefault?: boolean;
   teamsDefault?: boolean;
   combineMode?: FilterCombineMode;
+  fullDay?: boolean;
 }
 
 export interface FixtureFilterEvaluation {

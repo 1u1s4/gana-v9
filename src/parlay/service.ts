@@ -669,7 +669,7 @@ async function runLowOddsTopPortfolio(
     ? [
       fallbackEnabled
         ? `deterministic low-odds-top fallback selected ${builds.length} parlay(s) from h2h/double_chance/goals_over_under predictions with odds <= ${LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS}`
-        : `deterministic low-odds-top selected ${builds.length} parlay(s) from double_chance predictions with odds <= ${threshold}`,
+        : `deterministic low-odds-top selected ${builds.length} parlay(s) from h2h home/away predictions with odds <= ${threshold}`,
     ]
     : [`low-odds-top pool has ${pool.length} eligible prediction(s); ${LOW_ODDS_TOP_PROFILE.minLegs} required`];
   const portfolio: ParlayPortfolio = {
@@ -1920,7 +1920,8 @@ function lowOddsTopPoolExclusionReasons(
   threshold: number,
 ): string[] {
   const reasons = portfolioPoolExclusionReasons(prediction, profile);
-  if (prediction.market !== 'double_chance') reasons.push('not double_chance for low-odds-top');
+  if (prediction.market !== 'h2h') reasons.push('not h2h for low-odds-top');
+  if (prediction.selection !== 'home' && prediction.selection !== 'away') reasons.push('not home/away for low-odds-top');
   if (prediction.odds > threshold) reasons.push(`above low-odds threshold ${threshold}`);
   if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
   if (prediction.parlayEligible === false) reasons.push('not parlay eligible');

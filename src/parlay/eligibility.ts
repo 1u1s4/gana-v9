@@ -56,7 +56,9 @@ export function hasSelectionEvidenceMissingRisk(prediction: ParlaySourcePredicti
 }
 
 export function hasH2hAwayRisk(prediction: ParlaySourcePrediction): boolean {
-  return prediction.market === 'h2h' && prediction.selection === 'away';
+  return prediction.market === 'h2h'
+    && prediction.selection === 'away'
+    && prediction.odds > LOW_ODDS_TOP_MAX_LEG_ODDS;
 }
 
 export function hasFragileLowTotalOverRisk(prediction: ParlaySourcePrediction): boolean {

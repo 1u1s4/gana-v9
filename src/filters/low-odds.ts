@@ -19,6 +19,9 @@ import type {
 } from './types.js';
 import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from './low-odds-selector.js';
 
+const LOW_ODDS_GLOBAL_MAX_FIXTURES = positiveInteger(process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES)
+  ?? Number.MAX_SAFE_INTEGER;
+
 export interface LowOddsPersistenceRepositories {
   lowOddsScans: {
     create(input: {
@@ -71,6 +74,16 @@ export interface PersistLowOddsScanInput {
   requestedTeams?: RequestedTeamPresetView[];
 }
 
+export function lowOddsScanProviderConfig(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    apiFootball: {
+      ...config.apiFootball,
+      bookmakerAllowlist: undefined,
+    },
+  };
+}
+
 export async function scanLowOdds(
   config: AgentConfig,
   input: {
@@ -91,6 +104,7 @@ export async function scanLowOdds(
     combineMode: input.combineMode,
   });
   const selectorMarketScope = lowOddsSelectorMarketScope(filters.markets);
+  const oddsConfig = lowOddsScanProviderConfig(config);
   const db = getPrismaClient() as unknown as StoragePrismaClient;
   const repositories = createStorageRepositories(db);
   const scan = await repositories.lowOddsScans.create({
@@ -104,7 +118,7 @@ export async function scanLowOdds(
       marketScope: filters.markets,
       selectorMarketScope,
       analysisMarketScope: filters.markets,
-      bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
+      bookmakerAllowlist: [],
     }),
   });
 
@@ -118,7 +132,7 @@ export async function scanLowOdds(
   let fixtureEvaluations: LowOddsScanView['fixtureEvaluations'] = [];
 
   try {
-    const slate = await getApiFootballDateOddsSlate(config, filters.date, runtime, undefined, selectorMarketScope);
+    const slate = await getApiFootballDateOddsSlate(oddsConfig, filters.date, runtime, undefined, selectorMarketScope);
     fixtureDiscovery = slate.fixtures.length
       ? {
         fixtures: slate.fixtures,
@@ -136,10 +150,11 @@ export async function scanLowOdds(
         ...config,
         apiFootball: {
           ...config.apiFootball,
-          maxFixturesPerRun: Number.MAX_SAFE_INTEGER,
+          maxFixturesPerRun: LOW_ODDS_GLOBAL_MAX_FIXTURES,
         },
       }, {
         date: filters.date,
+        fullDay: true,
       }, runtime);
     fixtureEvaluations = [...fixtureDiscovery.evaluations];
 
@@ -147,7 +162,7 @@ export async function scanLowOdds(
       ? slate.snapshots
       : await mapWithConcurrency(fixtureDiscovery.fixtures, 6, async (fixture) => {
         try {
-          return await getApiFootballOddsSnapshot(config, fixture.providerFixtureId, runtime, selectorMarketScope);
+          return await getApiFootballOddsSnapshot(oddsConfig, fixture.providerFixtureId, runtime, selectorMarketScope);
         } catch (err: any) {
           return {
             fixtureId: fixture.id,
@@ -168,9 +183,7 @@ export async function scanLowOdds(
           continue;
         }
         const marketQuotes = snapshot.quotes.filter((quote) => isLowOddsFixtureSelectorQuote(quote, selectorMarketScope));
-        const bookmakerQuotes = filters.bookmakerAllowlist?.length
-          ? marketQuotes.filter((quote) => quote.bookmaker && filters.bookmakerAllowlist?.includes(quote.bookmaker))
-          : marketQuotes;
+        const bookmakerQuotes = marketQuotes;
 
         if (!snapshot.quotes.length) {
           addEvaluationReason(fixtureEvaluations, fixture.providerFixtureId, 'excluded-missing-odds');
@@ -245,7 +258,7 @@ export async function scanLowOdds(
         marketScope: filters.markets,
         selectorMarketScope,
         analysisMarketScope: filters.markets,
-        bookmakerAllowlist: filters.bookmakerAllowlist ?? [],
+        bookmakerAllowlist: [],
         requestedLeagues: fixtureDiscovery.requestedLeagues,
         requestedTeams: fixtureDiscovery.requestedTeams,
         fixtureEvaluations,
@@ -408,4 +421,9 @@ function toJsonValue(value: unknown): JsonValue {
     );
   }
   return null;
+}
+
+function positiveInteger(value: string | undefined): number | undefined {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }

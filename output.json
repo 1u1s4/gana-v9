@@ -1,81 +1,132 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "bbc7f0cc-64a7-463f-b3fc-086b0e4925d2",
+      "oddsQuoteId": "e02d8f4d-1e84-4b12-b8b9-5ed0688268f5",
       "market": "h2h",
-      "selection": "away",
+      "selection": "draw",
       "line": null,
+      "odds": 3,
+      "probability": 0.35,
+      "modelProbability": 0.35,
+      "marketFairProbability": 0.3193,
+      "edge": 0.0307,
+      "confidence": 0.65,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_2",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_3",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_5"
+      ],
+      "claimIds": [
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_h2h_2"
+      ],
+      "rationale": "Web prediction suggests a 1-1 draw. Elche has a strong home record (W3, D3), and Getafe has good away form (W2, D1) and is unbeaten against Elche in the last three encounters.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "e1868b89-e5f1-4f02-bfa1-ba043f01b7d0",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": null,
+      "odds": 1.28,
+      "probability": 0.79,
+      "modelProbability": 0.79,
+      "marketFairProbability": 0.366126,
+      "edge": 0.423874,
+      "confidence": 0.7,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_2",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9"
+      ],
+      "claimIds": [
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_double_chance_1"
+      ],
+      "rationale": "Elche has a strong home record (W3, D3) and web predictions suggest a draw, making 'Home or Draw' a strong candidate.",
+      "warnings": [
+        "Calculated edge is unusually high, possibly due to marketFairProbability being lower than expected for a double chance market."
+      ]
+    },
+    {
+      "oddsQuoteId": "eb1cd090-52ef-4539-a9f7-345f6e2ab6ae",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.5,
       "odds": 1.5,
       "probability": 0.68,
       "modelProbability": 0.68,
-      "marketFairProbability": 0.612695,
-      "edge": 0.067305,
-      "confidence": 0.87,
+      "marketFairProbability": 0.649165,
+      "edge": 0.030835,
+      "confidence": 0.75,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_1",
-        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_2"
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_7",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9"
       ],
       "claimIds": [
-        "313602a2-b152-4385-bb22-83b3ce60738e:claim_1"
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_goals_1",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_goals_2"
       ],
-      "rationale": "Bolívar has a strong head-to-head record against Universitario de Vinto and is favored to win according to bookmaker odds.",
+      "rationale": "Getafe's recent games consistently feature Under 2.5 goals (6 of last 7), and web predictions strongly suggest 'Under 2.5 Goals'.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "94a0b712-18ab-48f2-acf9-742572313e27",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 1.44,
-      "probability": 0.78,
-      "modelProbability": 0.78,
-      "marketFairProbability": 0.652174,
-      "edge": 0.127826,
-      "confidence": 0.77,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_3",
-        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_4"
-      ],
-      "claimIds": [
-        "313602a2-b152-4385-bb22-83b3ce60738e:claim_3"
-      ],
-      "rationale": "Bookmaker odds indicate a high probability for over 2.5 goals, supported by historical match averages.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "08e009bc-a244-4075-abd3-f4ee0d6f2917",
+      "oddsQuoteId": "b1cebecf-e4ce-4674-948f-0e893451a48b",
       "market": "btts",
       "selection": "yes",
       "line": null,
-      "odds": 1.5,
-      "probability": 0.75,
-      "modelProbability": 0.75,
-      "marketFairProbability": 0.625,
-      "edge": 0.125,
+      "odds": 2.2,
+      "probability": 0.48,
+      "modelProbability": 0.48,
+      "marketFairProbability": 0.424084,
+      "edge": 0.055916,
       "confidence": 0.75,
-      "confidenceBand": "medium",
+      "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_5",
-        "313602a2-b152-4385-bb22-83b3ce60738e:evidence_6"
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_6",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9"
       ],
       "claimIds": [
-        "313602a2-b152-4385-bb22-83b3ce60738e:claim_4"
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_btts_1",
+        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_btts_2"
       ],
-      "rationale": "Bet365 odds suggest both teams will score, further supported by Universitario de Vinto's home scoring record.",
+      "rationale": "Elche's recent matches consistently feature both teams scoring, and web predictions indicate 'Both Teams to Score (Yes)'.",
       "warnings": []
+    },
+    {
+      "oddsQuoteId": "98ee1d99-19b3-436b-b214-bfa5f4be6f50",
+      "market": "corners_over_under",
+      "selection": "under",
+      "line": 9.5,
+      "odds": 1.72,
+      "probability": 0.55,
+      "modelProbability": 0.55,
+      "marketFairProbability": 0.547368,
+      "edge": 0.002632,
+      "confidence": 0.4,
+      "confidenceBand": "low",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [],
+      "claimIds": [],
+      "rationale": "No specific market-specific research evidence available for corners. This prediction is based on general market trends.",
+      "warnings": [
+        "market corners_over_under skipped/review-required: missing market-specific research evidence",
+        "Prediction based on limited evidence and general market trends."
+      ]
     }
   ],
   "warnings": [
-    "market double_chance skipped/review-required: missing odds quotes for requested market",
-    "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+    "market corners_over_under skipped/review-required: missing market-specific research evidence"
   ],
   "metadata": {}
 }

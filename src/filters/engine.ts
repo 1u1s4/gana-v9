@@ -85,6 +85,7 @@ export async function discoverFixtures(
     const excludedReasons = evaluateExclusions(fixture, config, {
       date: filters.date,
       timezone: filters.timezone,
+      fullDay: filters.fullDay,
     });
     const maxReached = excludedReasons.length === 0 && fixtures.length >= filters.maxFixturesPerRun;
     const eligible = excludedReasons.length === 0 && !maxReached;
@@ -180,7 +181,7 @@ export function buildFixtureDiscoveryRequests(
 export function evaluateExclusions(
   fixture: Fixture,
   config: Pick<AgentConfig, 'apiFootball'>,
-  options: { date?: string; timezone?: string; now?: Date } = {},
+  options: { date?: string; timezone?: string; now?: Date; fullDay?: boolean } = {},
 ): FilterReason[] {
   const reasons: FilterReason[] = [];
   if (fixture.status === 'completed' && !config.apiFootball.includeCompletedFixtures) {
@@ -193,7 +194,7 @@ export function evaluateExclusions(
     const timezone = options.timezone ?? config.apiFootball.timezone;
     if (options.date && localDateKey(fixture.scheduledAt, timezone) !== options.date) {
       reasons.push('excluded-outside-window');
-    } else if (!withinKickoffWindow(fixture.scheduledAt, config.apiFootball.kickoffWindowHours, options.now)) {
+    } else if (!options.fullDay && !withinKickoffWindow(fixture.scheduledAt, config.apiFootball.kickoffWindowHours, options.now)) {
       reasons.push('excluded-outside-window');
     }
   }

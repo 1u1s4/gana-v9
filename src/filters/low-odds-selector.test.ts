@@ -3,21 +3,21 @@ import assert from 'node:assert/strict';
 import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from './low-odds-selector.js';
 
 describe('low odds selector', () => {
-  it('uses requested markets instead of hardcoding h2h', () => {
-    assert.deepEqual(lowOddsSelectorMarketScope(['double_chance']), ['double_chance']);
+  it('always scopes fixture selection to h2h favorites', () => {
+    assert.deepEqual(lowOddsSelectorMarketScope(['double_chance']), ['h2h']);
     assert.equal(
       isLowOddsFixtureSelectorQuote(
         { market: 'double_chance', selection: 'home_or_draw' },
-        ['double_chance'],
+        lowOddsSelectorMarketScope(['double_chance']),
       ),
-      true,
+      false,
     );
     assert.equal(
       isLowOddsFixtureSelectorQuote(
         { market: 'h2h', selection: 'home' },
-        ['double_chance'],
+        lowOddsSelectorMarketScope(['double_chance']),
       ),
-      false,
+      true,
     );
   });
 

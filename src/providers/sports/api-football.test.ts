@@ -53,6 +53,23 @@ describe('api-football provider', () => {
     assert.equal(fixtureRequest.searchParams.has('season'), false);
   });
 
+  it('preserves provider team names when returning persisted fixtures', async () => {
+    globalThis.fetch = (async () => jsonResponse({ response: [apiFixture({ providerFixtureId: 1001 })] })) as typeof fetch;
+
+    const provider = createApiFootballProvider(testConfig(), {
+      upsertFixtures: async (fixtures) => fixtures.map((normalized) => ({
+        normalized,
+        fixture: fixtureFromNormalized(normalized),
+      })),
+    });
+
+    const fixtures = await provider.listFixtures({ date: '2026-05-01', league: 39 });
+
+    assert.equal(fixtures.length, 1);
+    assert.equal(fixtures[0].homeTeamName, 'Manchester United');
+    assert.equal(fixtures[0].awayTeamName, 'Liverpool');
+  });
+
   it('blocks provider calls after the per-run request limit is reached', async () => {
     const requests: URL[] = [];
     globalThis.fetch = (async (input) => {

@@ -6,7 +6,7 @@ import type { Fixture } from '../domain/fixtures.js';
 import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import type { OddsQuote } from '../domain/odds.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
-import { persistLowOddsScanResult, type LowOddsPersistenceRepositories } from '../filters/low-odds.js';
+import { lowOddsScanProviderConfig, persistLowOddsScanResult, type LowOddsPersistenceRepositories } from '../filters/low-odds.js';
 import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from '../filters/low-odds-selector.js';
 import type { LowOddsHitView, LowOddsScanView } from '../filters/types.js';
 import { runFixtureResearch, type FixtureResearchResult } from '../evidence/research.js';
@@ -241,6 +241,7 @@ export async function executeRunPipeline(
   const startedAt = now();
   const marketScope = normalizeMarketScope(input.markets, config.apiFootball.defaultMarkets);
   const lowOddsSelectorMarkets = lowOddsSelectorMarketScope(marketScope);
+  const lowOddsOddsConfig = lowOddsScanProviderConfig(config);
   const steps: PipelineStepResult[] = [];
   const durableTasks = await initializeDurableTasks(config, runId, {
     date: input.date,
@@ -398,12 +399,13 @@ export async function executeRunPipeline(
   try {
     lowOddsScan = await runDurableTask('low_odds.scan', 'low-odds-scan.json', async () => {
       return await withAbortableTimeout(async () => {
-      const useProviderDateSlate = !deps.discoverLowOddsFixtures
+      const useProviderDateSlate = Boolean(deps.fetchLowOddsSlate)
+        || (!deps.discoverLowOddsFixtures
         && !deps.fetchLowOddsSnapshot
         && !deps.fetchOddsSnapshot
-        && !deps.fetchLowOddsSnapshotsForDate;
+        && !deps.fetchLowOddsSnapshotsForDate);
       const providerDateSlate = useProviderDateSlate
-        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(config, input.date, runtime, undefined, lowOddsSelectorMarkets))
+        ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(lowOddsOddsConfig, input.date, runtime, undefined, lowOddsSelectorMarkets))
         : undefined;
       const hasProviderDateSlate = Boolean(providerDateSlate?.fixtures.length);
       const lowOddsDiscovery = hasProviderDateSlate
@@ -421,18 +423,19 @@ export async function executeRunPipeline(
         }
         : await (deps.discoverLowOddsFixtures ?? deps.discoverFixtures ?? discoverFixtures)(lowOddsGlobalDiscoveryConfig(config), {
           date: input.date,
+          fullDay: true,
         }, runtime);
       lowOddsCandidateFixtures = lowOddsDiscovery.fixtures;
       const fetchLowOddsSnapshotsForDate = deps.fetchLowOddsSnapshotsForDate;
       const rawLowOddsSnapshots = hasProviderDateSlate
         ? providerDateSlate!.snapshots
         : fetchLowOddsSnapshotsForDate
-          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(config, input.date, lowOddsDiscovery.fixtures, runtime, lowOddsSelectorMarkets))
+          ? await retryStorageConnection(() => fetchLowOddsSnapshotsForDate(lowOddsOddsConfig, input.date, lowOddsDiscovery.fixtures, runtime, lowOddsSelectorMarkets))
           : await mapWithConcurrency(lowOddsDiscovery.fixtures, ODDS_SCAN_CONCURRENCY, async (fixture) => {
             try {
               return await retryStorageConnection(() => (
                 deps.fetchLowOddsSnapshot ?? deps.fetchOddsSnapshot ?? getApiFootballOddsSnapshot
-              )(config, fixture.providerFixtureId, runtime, lowOddsSelectorMarkets));
+              )(lowOddsOddsConfig, fixture.providerFixtureId, runtime, lowOddsSelectorMarkets));
             } catch (err: any) {
               return {
                 fixtureId: fixture.id,
@@ -461,7 +464,7 @@ export async function executeRunPipeline(
             markets: marketScope,
             selectorMarketScope: scan.selectorMarketScope,
             analysisMarketScope: scan.analysisMarketScope,
-            bookmakerAllowlist: config.apiFootball.bookmakerAllowlist,
+            bookmakerAllowlist: [],
             fixtureCount: lowOddsDiscovery.fixtures.length,
             hits: scan.hits,
             fixtureEvaluations: scan.fixtureEvaluations,
@@ -1412,7 +1415,6 @@ function buildLowOddsScan(
     for (const quote of snapshot.quotes) {
       if (!isLowOddsFixtureSelectorQuote(quote, selectorMarketScope)) continue;
       if (quote.price > config.apiFootball.lowOddsThreshold) continue;
-      if (config.apiFootball.bookmakerAllowlist?.length && quote.bookmaker && !config.apiFootball.bookmakerAllowlist.includes(quote.bookmaker)) continue;
       hits.push({
         fixtureId: fixture.id,
         providerFixtureId: fixture.providerFixtureId,

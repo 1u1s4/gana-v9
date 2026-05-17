@@ -64,6 +64,17 @@ describe('filter engine', () => {
     assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config), ['excluded-outside-window']);
   });
 
+  it('keeps same-date scheduled fixtures outside the kickoff window for full-day scans', () => {
+    const scheduledAt = '2026-05-02T23:00:00.000Z';
+
+    assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config, {
+      date: '2026-05-02',
+      timezone: 'America/Guatemala',
+      now: new Date('2026-05-01T00:00:00.000Z'),
+      fullDay: true,
+    }), []);
+  });
+
   it('keeps UTC next-day fixtures when they belong to the configured local date', () => {
     const scheduledAt = '2026-05-03T00:00:00.000Z';
 

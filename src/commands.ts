@@ -804,7 +804,7 @@ function printOdds(quotes: OddsQuote[], details?: { oddsSnapshotId?: string; pro
 function printLowOddsScan(scan: LowOddsScanView): void {
   console.log(`  ${CYAN}low-odds${RESET} ${DIM}scan=${scan.scanId ?? 'none'} fixtures=${scan.fixtureCount} hits=${scan.hitCount} threshold=${scan.threshold}${RESET}`);
   if (scan.selectorMarketScope?.length) {
-    console.log(`  ${DIM}selector=${scan.selectorMarketScope.join(',')} market-scoped low-odds indicator${RESET}`);
+    console.log(`  ${DIM}selector=${scan.selectorMarketScope.join(',')} home/away H2H low-odds indicator${RESET}`);
   }
   for (const hit of scan.hits) {
     const line = hit.line === undefined ? '' : ` ${hit.line}`;

@@ -9,6 +9,7 @@ export interface ResolvedFilterConfig extends ApiFootballFilterConfig {
   combineMode: FilterCombineMode;
   useDefaultLeagues: boolean;
   useDefaultTeams: boolean;
+  fullDay: boolean;
 }
 
 export function resolveFilterConfig(
@@ -26,6 +27,7 @@ export function resolveFilterConfig(
     combineMode: input.combineMode ?? 'OR',
     useDefaultLeagues: input.leaguesDefault === true,
     useDefaultTeams: input.teamsDefault === true,
+    fullDay: input.fullDay === true,
   };
 }
 
