@@ -794,7 +794,10 @@ export async function createApiFootballPersistence(
               name: normalized.competition.name,
               country: normalized.competition.country,
               type: normalized.competition.type,
-              metadata: null,
+              metadata: assetMetadata({
+                logoUrl: normalized.competition.logoUrl,
+                flagUrl: normalized.competition.flagUrl,
+              }),
             });
             competitions.set(normalized.competition.providerCompetitionId, competition);
           }
@@ -805,7 +808,7 @@ export async function createApiFootballPersistence(
                 providerTeamId: team.providerTeamId,
                 name: team.name,
                 country: team.country,
-                metadata: null,
+                metadata: assetMetadata({ logoUrl: team.logoUrl }),
               });
               teams.set(team.providerTeamId, record);
             }
@@ -882,6 +885,13 @@ function dedupeNormalizedFixtures(fixtures: NormalizedFixture[]): NormalizedFixt
   const byProviderFixtureId = new Map<string, NormalizedFixture>();
   for (const fixture of fixtures) byProviderFixtureId.set(fixture.providerFixtureId, fixture);
   return [...byProviderFixtureId.values()];
+}
+
+function assetMetadata(input: { logoUrl?: string | null; flagUrl?: string | null }): Record<string, JsonValue> | undefined {
+  const assets: Record<string, JsonValue> = {};
+  if (input.logoUrl) assets.logoUrl = input.logoUrl;
+  if (input.flagUrl) assets.flagUrl = input.flagUrl;
+  return Object.keys(assets).length ? { assetSource: API_FOOTBALL_PROVIDER, ...assets } : undefined;
 }
 
 function apiFootballResponseHasRows(payload: unknown): boolean {

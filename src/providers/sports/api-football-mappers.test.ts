@@ -32,6 +32,8 @@ function apiFixture(overrides: Partial<ApiFootballFixturePayload> = {}): ApiFoot
       id: 39,
       name: 'Premier League',
       country: 'England',
+      logo: 'https://media.api-sports.io/football/leagues/39.png',
+      flag: 'https://media.api-sports.io/flags/gb.svg',
       season: 2026,
       round: 'Regular Season - 1',
     },
@@ -39,10 +41,12 @@ function apiFixture(overrides: Partial<ApiFootballFixturePayload> = {}): ApiFoot
       home: {
         id: 33,
         name: 'Manchester United',
+        logo: 'https://media.api-sports.io/football/teams/33.png',
       },
       away: {
         id: 40,
         name: 'Liverpool',
+        logo: 'https://media.api-sports.io/football/teams/40.png',
       },
     },
     goals: {
@@ -73,17 +77,21 @@ describe('api-football mappers', () => {
       name: 'Premier League',
       country: 'England',
       type: undefined,
+      logoUrl: 'https://media.api-sports.io/football/leagues/39.png',
+      flagUrl: 'https://media.api-sports.io/flags/gb.svg',
     });
     assert.equal(result.season, 2026);
     assert.deepEqual(result.homeTeam, {
       providerTeamId: '33',
       name: 'Manchester United',
       country: 'England',
+      logoUrl: 'https://media.api-sports.io/football/teams/33.png',
     });
     assert.deepEqual(result.awayTeam, {
       providerTeamId: '40',
       name: 'Liverpool',
       country: 'England',
+      logoUrl: 'https://media.api-sports.io/football/teams/40.png',
     });
     assert.equal(result.scheduledAt?.toISOString(), '2026-05-01T18:30:00.000Z');
     assert.equal(result.status, 'scheduled');

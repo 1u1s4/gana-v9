@@ -164,12 +164,17 @@ export interface DashboardMetricRow extends DashboardOverviewRow {
 export interface DashboardDailyRecommendationRow {
   rank: number;
   parlayId?: string;
+  sourceRunId?: string | null;
   profile?: string;
   family?: string;
   status?: string;
   combinedOdds?: string | number | null;
   aggregateConfidence?: string | number | null;
+  adjustedProbability?: string | number | null;
   expectedEdge?: string | number | null;
+  score?: string | number | null;
+  exposure?: unknown;
+  bankerLegs?: unknown[];
   riskFlags?: string[];
   reasons?: string[];
   legs?: unknown[];
@@ -207,9 +212,11 @@ export interface DashboardFixtureRow {
     id: string;
     name: string;
     country: string | null;
+    logoUrl?: string | null;
+    flagUrl?: string | null;
   } | null;
-  homeTeam: { id: string; name: string } | null;
-  awayTeam: { id: string; name: string } | null;
+  homeTeam: { id: string; name: string; country?: string | null; logoUrl?: string | null; flagUrl?: string | null } | null;
+  awayTeam: { id: string; name: string; country?: string | null; logoUrl?: string | null; flagUrl?: string | null } | null;
   predictionCount?: number;
   parlayLegCount?: number;
   validationCount?: number;

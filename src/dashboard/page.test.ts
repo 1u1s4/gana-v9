@@ -45,8 +45,24 @@ describe('dashboard page UX affordances', () => {
 
     assert.match(html, /data-tab="daily"/);
     assert.match(html, /function renderDailyRows/);
+    assert.match(html, /function renderRecommendationCard/);
     assert.match(html, /recommendation-card/);
+    assert.match(html, /exposición/);
+    assert.match(html, /Bankers/);
     assert.match(html, /Artifact analítico\. No ejecuta apuestas/);
+  });
+
+  it('renders prediction and parlay card views with asset helpers', () => {
+    const html = dashboardHtml();
+
+    assert.match(html, /function renderPredictionRows/);
+    assert.match(html, /function renderParlayRows/);
+    assert.match(html, /card-grid/);
+    assert.match(html, /entity-card/);
+    assert.match(html, /function renderPredictionRows\(rows\) \{\n\s+\$\(\'#list\'\)\.className = 'card-grid'/);
+    assert.match(html, /assetBadge/);
+    assert.match(html, /logoUrl/);
+    assert.match(html, /flagUrl/);
   });
 
   it('does not schedule automatic overview refreshes', () => {

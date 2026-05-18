@@ -44,6 +44,8 @@ export interface ApiFootballFixturePayload {
     id?: unknown;
     name?: unknown;
     country?: unknown;
+    logo?: unknown;
+    flag?: unknown;
     season?: unknown;
     round?: unknown;
     type?: unknown;
@@ -74,6 +76,7 @@ export interface ApiFootballFixtureTeamPayload {
   id?: unknown;
   name?: unknown;
   country?: unknown;
+  logo?: unknown;
   [key: string]: unknown;
 }
 
@@ -156,17 +159,21 @@ export function mapApiFootballFixture(
       name: stringOrFallback(item.league?.name, `league-${leagueId}`),
       country: optionalString(item.league?.country),
       type: optionalString(item.league?.type),
+      logoUrl: optionalUrl(item.league?.logo),
+      flagUrl: optionalUrl(item.league?.flag),
     },
     season: optionalInteger(item.league?.season),
     homeTeam: {
       providerTeamId: homeTeamId,
       name: stringOrFallback(item.teams?.home?.name, `team-${homeTeamId}`),
       country: optionalString(item.teams?.home?.country) ?? optionalString(item.league?.country),
+      logoUrl: optionalUrl(item.teams?.home?.logo),
     },
     awayTeam: {
       providerTeamId: awayTeamId,
       name: stringOrFallback(item.teams?.away?.name, `team-${awayTeamId}`),
       country: optionalString(item.teams?.away?.country) ?? optionalString(item.league?.country),
+      logoUrl: optionalUrl(item.teams?.away?.logo),
     },
     scheduledAt,
     status: mapApiFootballStatus(rawStatus),
@@ -455,6 +462,17 @@ function stringifyProviderValue(value: unknown): string | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'string' && value.trim()) return value.trim();
   return undefined;
+}
+
+function optionalUrl(value: unknown): string | undefined {
+  const text = optionalString(value);
+  if (!text) return undefined;
+  try {
+    const parsed = new URL(text);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeMapperOptions(optionsOrCapturedAt: ApiFootballFixtureMapperOptions | Date): Required<ApiFootballFixtureMapperOptions> {

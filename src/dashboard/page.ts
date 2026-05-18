@@ -430,7 +430,7 @@ export function dashboardHtml(): string {
       align-self: start;
       z-index: 3;
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 2px;
       padding: 2px;
       border-bottom-left-radius: 0;
@@ -726,6 +726,163 @@ export function dashboardHtml(): string {
     .scoreline { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
     .scoreline span { min-width: 18px; padding: 1px 4px; border-radius: 2px; background: var(--secondary); text-align: center; }
     .rationale { white-space: pre-wrap; line-height: 1.5; color: var(--foreground); }
+    .card-grid {
+      width: 100%;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(286px, 1fr));
+      align-content: start;
+      gap: 8px;
+      padding: 8px;
+    }
+    .entity-card {
+      min-width: 0;
+      min-height: 206px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      background: var(--card);
+      cursor: pointer;
+    }
+    .entity-card:hover,
+    .entity-card.selected { background: color-mix(in oklab, var(--secondary) 42%, transparent); border-color: var(--border); }
+    .entity-card.selected { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--primary) 36%, transparent); }
+    .card-head,
+    .card-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px;
+    }
+    .card-head { border-bottom: 1px solid var(--border-dim); }
+    .card-foot { margin-top: auto; border-top: 1px solid var(--border-dim); }
+    .team-row,
+    .metric-row,
+    .leg-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .team-stack,
+    .leg-list,
+    .card-body { display: grid; gap: 6px; padding: 8px; }
+    .team-name { min-width: 0; display: flex; align-items: center; gap: 7px; color: var(--foreground); font-weight: 600; }
+    .team-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crest,
+    .flag {
+      flex: 0 0 auto;
+      display: inline-grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid var(--border-dim);
+      background: var(--background);
+      color: var(--muted-foreground);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .crest { width: 26px; height: 26px; border-radius: 4px; }
+    .flag { width: 18px; height: 13px; border-radius: 2px; }
+    .crest img,
+    .flag img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .market-chip {
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 6px;
+      border: 1px solid color-mix(in oklab, var(--primary) 28%, var(--border-dim));
+      border-radius: 3px;
+      background: color-mix(in oklab, var(--primary) 10%, transparent);
+      color: var(--foreground);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .metric-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+    .metric-box {
+      min-width: 0;
+      padding: 6px;
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      background: var(--background);
+    }
+    .metric-box span { display: block; margin-bottom: 3px; color: var(--muted-foreground); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .metric-box b { color: var(--foreground); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .meter { height: 4px; overflow: hidden; border-radius: 2px; background: var(--border-dim); }
+    .meter span { display: block; height: 100%; background: var(--primary); }
+    .parlay-card { min-height: 244px; }
+    .leg-row {
+      padding: 6px;
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      background: color-mix(in oklab, var(--secondary) 42%, transparent);
+    }
+    .leg-row .team-name { font-size: 10px; }
+    .leg-meta { text-align: right; font-variant-numeric: tabular-nums; }
+    .metric-card,
+    .daily-card,
+    .recommendation-card {
+      min-width: 0;
+      border: 1px solid var(--border-dim);
+      border-radius: var(--radius);
+      background: var(--card);
+    }
+    .metric-card,
+    .daily-card { display: grid; gap: 8px; padding: 8px; }
+    .metric-card-head,
+    .daily-card-head,
+    .recommendation-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .recommendation-card {
+      display: grid;
+      gap: 7px;
+      padding: 8px;
+      cursor: pointer;
+    }
+    .recommendation-card:hover { border-color: var(--border); background: color-mix(in oklab, var(--secondary) 42%, transparent); }
+    .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+    .daily-grid { width: 100%; display: grid; gap: 8px; padding: 8px; overflow: auto; }
+    .daily-host { overflow: auto; display: block; }
+    .daily-meta,
+    .recommendation-meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 5px;
+    }
+    .daily-meta span,
+    .recommendation-meta span {
+      min-width: 0;
+      padding: 6px;
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      background: var(--background);
+      color: var(--muted-foreground);
+      font-size: 9px;
+      overflow-wrap: anywhere;
+    }
+    .daily-meta b,
+    .recommendation-meta b { display: block; color: var(--foreground); font-size: 13px; font-variant-numeric: tabular-nums; }
+    .rec-leg-list { display: grid; gap: 4px; }
+    .rec-leg {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      padding: 5px;
+      border: 1px solid var(--border-dim);
+      border-radius: 3px;
+      background: color-mix(in oklab, var(--secondary) 40%, transparent);
+    }
+    .rec-leg b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .empty,
     .loading,
     .error {
@@ -924,6 +1081,7 @@ export function dashboardHtml(): string {
         parlay: 'parlays',
         validation: 'validations',
         run: 'runs',
+        metric: 'metrics',
       };
       const TAB_SORT_HEADERS = {
         fixtures: [
@@ -1053,6 +1211,44 @@ export function dashboardHtml(): string {
         ].filter(Boolean);
         return parts.join(' · ') || '—';
       };
+      const initials = (value, fallback = '?') => {
+        const text = String(value || '').trim();
+        if (!text) return fallback;
+        const parts = text.split(/\s+/).filter(Boolean);
+        return (parts.length > 1 ? parts[0][0] + parts[1][0] : text.slice(0, 2)).toUpperCase();
+      };
+      const assetBadge = (url, label, className) => {
+        const fallback = initials(label);
+        return '<span class="' + esc(className) + '" title="' + esc(label || '') + '">' +
+          (url ? '<img src="' + esc(url) + '" alt="" loading="lazy" referrerpolicy="no-referrer" data-fallback="' + esc(fallback) + '" onerror="this.replaceWith(document.createTextNode(this.dataset.fallback || \'\'))">' : esc(fallback)) +
+          '</span>';
+      };
+      const teamName = (team, fallback) => team?.name || fallback;
+      const teamLine = (team, fallback) => {
+        const name = teamName(team, fallback);
+        return '<div class="team-name">' + assetBadge(team?.logoUrl, name, 'crest') + '<span title="' + esc(name) + '">' + esc(name) + '</span></div>';
+      };
+      const countryLine = (fixture) => {
+        const competition = fixture?.competition;
+        if (!competition) return '';
+        const country = competition.country || competition.name || '';
+        return '<div class="sub">' + (competition.flagUrl ? assetBadge(competition.flagUrl, country, 'flag') + ' ' : '') +
+          esc([competition.name, competition.country].filter(Boolean).join(' · ')) + '</div>';
+      };
+      const matchBlock = (fixture) => {
+        if (!fixture) return '<div class="team-stack"><div class="team-name">' + assetBadge(null, 'Sin fixture', 'crest') + '<span>Sin fixture</span></div></div>';
+        return '<div class="team-stack">' +
+          '<div class="team-row">' + teamLine(fixture.homeTeam, 'Local') + '<span class="sub">' + esc(fixture.scoreHome ?? '') + '</span></div>' +
+          '<div class="team-row">' + teamLine(fixture.awayTeam, 'Visita') + '<span class="sub">' + esc(fixture.scoreAway ?? '') + '</span></div>' +
+          countryLine(fixture) +
+        '</div>';
+      };
+      const selectionLabel = (row) => esc(row.selectionKey) + (row.line == null ? '' : ' ' + esc(row.line));
+      const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+      const metricBox = (label, value, meterValue) => '<div class="metric-box"><span>' + esc(label) + '</span><b>' + value + '</b>' +
+        (meterValue == null ? '' : '<div class="meter"><span style="width:' + (clamp01(meterValue) * 100).toFixed(1) + '%"></span></div>') + '</div>';
+      const warningCount = (value) => Array.isArray(value) ? value.length : value ? 1 : 0;
+      const selectedClass = (kind, id) => state.selectedKind === kind && state.selectedId === id ? ' selected' : '';
       const hasText = (value) => String(value ?? '').trim().length > 0;
 
       function sanitizeText(value) {
@@ -1680,37 +1876,50 @@ export function dashboardHtml(): string {
       }
 
       function renderPredictionRows(rows) {
-        const sort = state.sort;
-        const headers = TAB_SORT_HEADERS.predictions;
-        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
-          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
-            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
-          '</tr></thead><tbody>' +
-          rows.map((row) => '<tr data-kind="prediction" data-id="' + esc(row.id) + '"><td><div class="match">' + esc(matchName(row.fixture)) +
-            '</div><div class="sub">' + esc(row.fixture?.competition?.name || '') + ' · ' + esc(row.fixture ? fmtDate(row.fixture.scheduledAt) : '') +
-            '</div><div class="sub">' + fmtScore(row.fixture) + ' ' + (row.latestValidation ? badge(row.latestValidation.status) : '') +
-            '</div></td><td><b>' + esc(row.marketKey) + '</b><div class="sub">' + esc(row.selectionKey) + (row.line ? ' ' + esc(row.line) : '') +
-            '</div></td><td>' + fmtNum(row.odds) + '</td><td>' + fmtPct(row.impliedProbability, 1) + '</td><td>' + fmtPct(row.edge, 1) + '</td><td>' +
-            fmtPct(row.confidence, 1) + '</td><td>' + badge(row.status) + '</td><td>' + fmtDate(row.generatedAt) +
-            '</td></tr>').join('') +
-          '</tbody></table></div>';
+        $('#list').className = 'card-grid';
+        $('#list').innerHTML = rows.map((row) => {
+          const validation = row.latestValidation ? badge(row.latestValidation.status) : '<span class="muted-inline">Sin validación</span>';
+          const warningLabel = warningCount(row.warnings) ? '<span class="badge warn">' + warningCount(row.warnings) + ' warnings</span>' : '';
+          return '<article class="entity-card' + selectedClass('prediction', row.id) + '" data-kind="prediction" data-id="' + esc(row.id) + '">' +
+            '<div class="card-head"><div><span class="market-chip">' + esc(row.marketKey) + ' · ' + selectionLabel(row) + '</span><div class="sub">' + esc(row.quality || 'quality') + ' · ' + fmtDate(row.generatedAt) + '</div></div>' +
+            '<div>' + badge(row.status) + '</div></div>' +
+            matchBlock(row.fixture) +
+            '<div class="card-body">' +
+              '<div class="metric-strip">' +
+                metricBox('Odds', esc(fmtNum(row.odds)), null) +
+                metricBox('Edge', esc(fmtPct(row.edge, 1)), row.edge) +
+                metricBox('Conf.', esc(fmtPct(row.confidence, 1)), row.confidence) +
+              '</div>' +
+              '<div class="metric-row"><span class="sub">Implied ' + esc(fmtPct(row.impliedProbability, 1)) + ' · Modelo ' + esc(fmtPct(row.estimatedProbability, 1)) + '</span>' + validation + '</div>' +
+            '</div>' +
+            '<div class="card-foot"><span class="mono">' + esc(row.id) + '</span><span>' + warningLabel + '</span></div>' +
+          '</article>';
+        }).join('');
       }
 
       function renderParlayRows(rows) {
-        const headers = TAB_SORT_HEADERS.parlays;
-        const sort = state.sort;
-        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
-          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
-            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
-          '<th>Legs</th>' +
-          '</tr></thead><tbody>' +
-          rows.map((row) => '<tr data-kind="parlay" data-id="' + esc(row.id) + '"><td><div class="mono">' + esc(row.id) + '</div><div class="sub">' +
-            fmtDate(row.generatedAt) + '</div><div class="sub">' + (row.latestValidation ? badge(row.latestValidation.status) : 'Sin validación') + '</div></td><td>' + fmtNum(row.combinedOdds) + '</td><td>' + fmtPct(row.aggregateConfidence, 1) + '</td><td>' +
-            fmtPct(row.aggregateQuality, 1) + '</td><td>' + badge(row.status) + '</td><td><div class="chips">' +
-            row.legs.slice(0, 2).map((leg) => '<button class="chip-btn crosslink" data-kind="prediction" data-id="' + esc(leg.predictionId) + '">' + esc(matchName(leg.fixture)) + '</button>').join('') +
-            (row.legs.length > 2 ? '<span class="muted-inline">+' + (row.legs.length - 2) + '</span>' : '') +
-            '</div></td></tr>').join('') +
-          '</tbody></table>';
+        $('#list').className = 'card-grid';
+        $('#list').innerHTML = rows.map((row) => {
+          const validation = row.latestValidation ? badge(row.latestValidation.status) : '<span class="muted-inline">Sin validación</span>';
+          const legs = row.legs.slice(0, 4).map((leg) => '<div class="leg-row">' +
+            '<div>' + teamLine(leg.fixture?.homeTeam, 'Local') + '<div class="sub">' + esc(matchName(leg.fixture)) + '</div></div>' +
+            '<div class="leg-meta"><b>' + esc(fmtNum(leg.odds)) + '</b><div class="sub">' + esc(leg.marketKey) + ' · ' + selectionLabel(leg) + '</div>' +
+            '<button class="chip-btn crosslink" data-kind="prediction" data-id="' + esc(leg.predictionId) + '" type="button">Abrir</button></div>' +
+          '</div>').join('');
+          return '<article class="entity-card parlay-card' + selectedClass('parlay', row.id) + '" data-kind="parlay" data-id="' + esc(row.id) + '">' +
+            '<div class="card-head"><div><span class="market-chip">' + esc(row.legs.length) + ' legs · parlay</span><div class="sub">' + fmtDate(row.generatedAt) + '</div></div><div>' + badge(row.status) + '</div></div>' +
+            '<div class="card-body">' +
+              '<div class="metric-strip">' +
+                metricBox('Odds', esc(fmtNum(row.combinedOdds)), null) +
+                metricBox('Conf.', esc(fmtPct(row.aggregateConfidence, 1)), row.aggregateConfidence) +
+                metricBox('Calidad', esc(fmtPct(row.aggregateQuality, 1)), row.aggregateQuality) +
+              '</div>' +
+              '<div class="metric-row"><span class="sub mono">' + esc(row.id) + '</span>' + validation + '</div>' +
+            '</div>' +
+            '<div class="leg-list">' + legs + (row.legs.length > 4 ? '<span class="muted-inline">+' + (row.legs.length - 4) + ' legs más</span>' : '') + '</div>' +
+            '<div class="card-foot"><span class="sub">' + esc((row.rationale || '').slice(0, 96)) + '</span></div>' +
+          '</article>';
+        }).join('');
       }
 
       function renderValidationRows(rows) {
@@ -1757,29 +1966,32 @@ export function dashboardHtml(): string {
       }
 
       function renderMetricRows(rows) {
-        const headers = TAB_SORT_HEADERS.metrics;
-        const sort = state.sort;
-        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
-          headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
-            (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
-          '<th>Predicciones</th><th>Parlays</th><th>Gráficas</th>' +
-          '</tr></thead><tbody>' +
-          rows.map((row) => {
-            const pred = row.predictionMetrics || {};
-            const parlay = row.parlayMetrics || {};
-            const charts = row.chartMetrics || {};
-            return '<tr><td><b>' + esc(row.metricDate) + '</b><div class="sub mono">' + esc(row.id) + '</div></td><td>' + esc(row.scope) +
-              '</td><td>' + esc(row.timezone) + '</td><td>' + fmtDate(row.generatedAt) +
-              '</td><td>' + metricSummary(pred) + '</td><td>' + metricSummary(parlay) +
-              '</td><td>' + renderMetricCharts(charts) + '</td></tr>';
-          }).join('') +
-          '</tbody></table></div>';
+        $('#list').className = 'card-grid';
+        $('#list').innerHTML = rows.map((row) => {
+          const pred = row.predictionMetrics || {};
+          const parlay = row.parlayMetrics || {};
+          const charts = row.chartMetrics || {};
+          return '<article class="metric-card" data-kind="metric" data-id="' + esc(row.id) + '">' +
+            '<div class="metric-card-head"><div><span class="market-chip">' + esc(row.metricDate) + ' · ' + esc(row.scope) + '</span><div class="sub">' + esc(row.timezone) + ' · generado ' + fmtDate(row.generatedAt) + '</div></div></div>' +
+            '<div class="detail-card"><h4>Predicciones</h4>' + compactMetricSummary(pred) + '</div>' +
+            '<div class="detail-card"><h4>Parlays</h4>' + compactMetricSummary(parlay) + '</div>' +
+            renderMetricCharts(charts) +
+          '</article>';
+        }).join('');
       }
 
       function metricSummary(metrics) {
         return '<div><b>' + esc(metrics.total ?? 0) + '</b> total</div>' +
           '<div class="sub">' + esc(metrics.won ?? 0) + '-' + esc(metrics.lost ?? 0) + ' · hit ' + fmtRate(metrics.hitRate) + '</div>' +
           '<div class="sub">odds ' + fmtNum(metrics.avgOdds) + ' · conf. ' + fmtPct(metrics.avgConfidence, 1) + '</div>';
+      }
+
+      function compactMetricSummary(metrics) {
+        return '<div class="metric-strip">' +
+          metricBox('Total', esc(metrics.total ?? 0), null) +
+          metricBox('Hit', esc(fmtRate(metrics.hitRate)), (Number(metrics.hitRate) || 0) / 100) +
+          metricBox('Conf.', esc(fmtPct(metrics.avgConfidence, 1)), metrics.avgConfidence) +
+        '</div><div class="sub">W-L ' + esc(metrics.won ?? 0) + '-' + esc(metrics.lost ?? 0) + ' · odds ' + fmtNum(metrics.avgOdds) + '</div>';
       }
 
       function renderMetricCharts(charts) {
@@ -1790,6 +2002,41 @@ export function dashboardHtml(): string {
           renderBarChart('Pred. provider', charts.predictionHitRateByProvider || []) +
           renderBarChart('Pred. mercado', charts.predictionHitRateByMarket || []) +
           '</div>';
+      }
+
+      function legDisplayName(leg) {
+        const display = leg?.display || {};
+        return display.fixtureLabel || leg?.fixture || [display.homeTeamName, display.awayTeamName].filter(Boolean).join(' vs ') || 'Leg';
+      }
+
+      function exposureSummary(exposure) {
+        if (!exposure || typeof exposure !== 'object') return 'n/a';
+        const units = exposure.units == null ? 'n/a' : fmtNum(exposure.units, 2);
+        const pct = exposure.percentOfAnalyticalBankroll ?? exposure.percentOfBankroll;
+        return units + 'u' + (pct == null ? '' : ' · ' + fmtPct(pct, 1));
+      }
+
+      function renderRecommendationCard(rec) {
+        const targetAttrs = rec.parlayId ? ' data-kind="parlay" data-id="' + esc(rec.parlayId) + '"' : '';
+        const legs = (rec.legs || []).slice(0, 3).map((leg) => '<div class="rec-leg">' +
+          '<div><b title="' + esc(legDisplayName(leg)) + '">' + esc(legDisplayName(leg)) + '</b><div class="sub">' +
+            esc([leg.market, leg.selection, leg.line == null ? '' : leg.line].filter(Boolean).join(' · ')) + '</div></div>' +
+          '<div class="leg-meta"><b>' + esc(fmtNum(leg.odds)) + '</b><div class="sub">' + esc(leg.banker ? 'banker' : leg.validationStatus || '') + '</div></div>' +
+        '</div>').join('');
+        const bankers = (rec.bankerLegs || []).slice(0, 2).map((leg) => legDisplayName(leg)).join(' · ');
+        return '<article class="recommendation-card"' + targetAttrs + '>' +
+          '<div class="recommendation-head"><div><span class="market-chip">#' + esc(rec.rank) + ' ' + esc(rec.profile || rec.family || 'parlay') + '</span><div class="sub mono">' + esc(rec.parlayId || rec.sourceRunId || '') + '</div></div>' + badge(rec.status || 'review-required') + '</div>' +
+          '<div class="recommendation-meta">' +
+            '<span>odds <b>' + esc(fmtNum(rec.combinedOdds)) + '</b></span>' +
+            '<span>conf <b>' + esc(fmtPct(rec.aggregateConfidence, 1)) + '</b></span>' +
+            '<span>edge <b>' + esc(fmtPct(rec.expectedEdge, 1)) + '</b></span>' +
+            '<span>score <b>' + esc(fmtNum(rec.score, 2)) + '</b></span>' +
+          '</div>' +
+          '<div class="sub">Prob. ajustada ' + esc(fmtPct(rec.adjustedProbability, 1)) + ' · exposición ' + esc(exposureSummary(rec.exposure)) + '</div>' +
+          (bankers ? '<div class="sub">Bankers: ' + esc(bankers) + '</div>' : '') +
+          '<div class="rec-leg-list">' + (legs || '<span class="muted-inline">Sin legs en artifact</span>') + '</div>' +
+          '<div class="sub">' + esc((rec.reasons || []).slice(0, 2).join(' · ') || (rec.riskFlags || []).slice(0, 3).join(' · ') || 'sin razones') + '</div>' +
+        '</article>';
       }
 
       function renderDailyRows(rows) {
@@ -1803,13 +2050,7 @@ export function dashboardHtml(): string {
           const recs = row.recommendations || [];
           const familyCounts = counts.parlayFamilies || {};
           const familyText = Object.entries(familyCounts).map(([family, value]) => family + ': ' + ((value && value.persistedParlays) || 0)).join(' · ');
-          const cards = recs.slice(0, 6).map((rec) => '<article class="recommendation-card">' +
-            '<div class="card-kicker">#' + esc(rec.rank) + ' ' + esc(rec.profile || rec.family || 'parlay') + '</div>' +
-            '<b>Odds ' + fmtNum(rec.combinedOdds) + '</b>' +
-            '<div class="sub">conf. ' + fmtPct(rec.aggregateConfidence, 1) + ' · edge ' + fmtPct(rec.expectedEdge, 1) + '</div>' +
-            '<div>' + badge(rec.status || 'review-required') + '</div>' +
-            '<div class="sub">' + esc((rec.riskFlags || []).slice(0, 3).join(' · ') || 'sin flags') + '</div>' +
-            '</article>').join('');
+          const cards = recs.slice(0, 6).map(renderRecommendationCard).join('');
           return '<article class="daily-card" data-kind="run" data-id="' + esc(row.id) + '">' +
             '<div class="daily-card-head"><div><b>' + esc(row.date || row.id) + '</b><div class="sub mono">' + esc(row.id) + '</div></div><div>' + badge(row.status) + ' ' + esc(row.verdict || '') + '</div></div>' +
             '<div class="daily-meta">' +
@@ -2013,6 +2254,20 @@ export function dashboardHtml(): string {
           if (Array.isArray(data.recentValidations) && data.recentValidations.length) {
             sections.push('<div class="detail-card"><h4>Validaciones del run</h4><div class="detail-list">' + data.recentValidations.slice(0, 5).map(renderMiniValidation).join('') + '</div></div>');
           }
+        }
+        if (kind === 'metric') {
+          const pred = data.predictionMetrics || {};
+          const parlay = data.parlayMetrics || {};
+          sections.push('<div class="insight-grid">' +
+            '<div class="insight"><span>Pred hit</span><b>' + esc(fmtRate(pred.hitRate)) + '</b></div>' +
+            '<div class="insight"><span>Parlay hit</span><b>' + esc(fmtRate(parlay.hitRate)) + '</b></div>' +
+            '<div class="insight"><span>Scope</span><b>' + esc(data.scope || 'all') + '</b></div>' +
+            '</div>');
+          sections.push(kv('Fecha métrica', esc(data.metricDate || '—')));
+          sections.push(kv('Ventana', esc(fmtDate(data.sourceWindowStart) + ' → ' + fmtDate(data.sourceWindowEnd))));
+          sections.push('<div class="detail-card"><h4>Predicciones</h4>' + compactMetricSummary(pred) + '</div>');
+          sections.push('<div class="detail-card"><h4>Parlays</h4>' + compactMetricSummary(parlay) + '</div>');
+          sections.push('<div class="detail-card"><h4>Charts</h4>' + renderMetricCharts(data.chartMetrics || {}) + '</div>');
         }
         if (kind === 'validation') {
           const target = validationTarget || validationTargetForRow(data);
@@ -2254,14 +2509,14 @@ export function dashboardHtml(): string {
           return;
         }
 
-        const row = event.target.closest('tr[data-kind][data-id]');
+        const row = event.target.closest('tr[data-kind][data-id], article[data-kind][data-id]');
         if (!row || !(row instanceof HTMLElement)) return;
         const kind = row.dataset.kind;
         const id = row.dataset.id;
         if (!kind || !id) return;
         const rows = rowsForActiveTab();
         rows.forEach((item) => {
-          const r = document.querySelector('tr[data-id="' + CSS.escape(item.id) + '"]');
+          const r = document.querySelector('[data-id="' + CSS.escape(item.id) + '"][data-kind]');
           if (r) r.classList.remove('selected');
         });
         row.classList.add('selected');

@@ -33,6 +33,13 @@ describe('parseOverviewQuery', () => {
     assert.equal(query.direction, 'asc');
   });
 
+  it('falls back to the active tab default sort for cross-tab sort params', () => {
+    const query = parse('tab=runs&sort=evaluatedAt');
+
+    assert.equal(query.tab, 'runs');
+    assert.equal(query.sort, 'createdAt');
+  });
+
   it('normalizes page/take lower bounds', () => {
     const query = parse('page=0&take=0&sort=not-valid&direction=up');
     assert.equal(query.page, 1);

@@ -328,9 +328,12 @@ export async function runDailyE2E(
     writeProgress(`provider.${provider}.blocked`);
   }
 
-  const successfulProviderRunIds = providerRuns
-    .filter((run) => run.ok && run.runId)
-    .map((run) => run.runId as string);
+  const usableProviderRunIds = providerRuns
+    .flatMap((run) => {
+      if (!run.runId) return [];
+      const result = providerPipelineResults[run.provider];
+      return run.ok || (result && providerHasUsablePredictions(result)) ? [run.runId] : [];
+    });
   const parlayProfiles = profilesToPortfolios(input.parlayProfile);
   const parlayFamilies: DailyParlayFamilyResult[] = [];
 
@@ -363,7 +366,7 @@ export async function runDailyE2E(
     }
   }
 
-  if (successfulProviderRunIds.length >= 2) {
+  if (usableProviderRunIds.length >= 2) {
     for (const parlayProfile of (parlayProfiles.length ? parlayProfiles : [undefined])) {
       const mixedRunId = parlayProfile
         ? boundedDailyChildRunId(dailyBatchId, 'mixed', parlayProfile)
@@ -371,24 +374,24 @@ export async function runDailyE2E(
       const mixedRuntime = childRuntime(runtime, effectiveConfig, mixedRunId);
       const mixed = await buildParlay(effectiveConfig, {
         date: input.date,
-        sourceRunIds: successfulProviderRunIds,
+        sourceRunIds: usableProviderRunIds,
         ...(parlayProfile ? { portfolio: parlayProfile } : {}),
       } satisfies RunParlayBuildInput, mixedRuntime);
-      parlayFamilies.push(toParlayFamily('consensus-mixed', successfulProviderRunIds, mixed, parlayProfile ?? null));
+      parlayFamilies.push(toParlayFamily('consensus-mixed', usableProviderRunIds, mixed, parlayProfile ?? null));
     }
   } else {
     parlayFamilies.push({
       family: 'consensus-mixed',
       profile: null,
-      sourceRunIds: successfulProviderRunIds,
+      sourceRunIds: usableProviderRunIds,
       ok: false,
       verdict: 'blocked',
-      error: 'mixed parlays require successful Codex and Gemini source runs',
+      error: 'mixed parlays require usable Codex and Gemini source runs with predictions',
     });
   }
 
   const parlayAnalysisRunIds = uniqueStrings([
-    ...successfulProviderRunIds,
+    ...usableProviderRunIds,
     ...parlayFamilies.map((family) => family.runId).filter((runId): runId is string => Boolean(runId)),
   ]);
   const analysisRuntime = childRuntime(runtime, effectiveConfig, boundedDailyChildRunId(dailyBatchId, 'recommendations'));
@@ -881,6 +884,10 @@ function toParlayFamily(
 
 function parlayFamilyCountKey(family: DailyParlayFamilyResult): string {
   return family.profile ? `${family.family}:${family.profile}` : family.family;
+}
+
+function providerHasUsablePredictions(result: RunPipelineResult): boolean {
+  return result.scoring.some((item) => item.predictions.length > 0);
 }
 
 function oddsCacheKey(fixtureId: string, markets: readonly MarketKey[] | undefined): string {

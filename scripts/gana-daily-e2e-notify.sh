@@ -25,7 +25,7 @@ const parts = new Intl.DateTimeFormat("en-CA", {
 }).formatToParts(date);
 const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 console.log(`${values.year}-${values.month}-${values.day}`);
-' "$offset_days"
+' -- "$offset_days"
 }
 
 require_command() {
@@ -40,11 +40,9 @@ require_command pnpm
 
 DATE="${GANA_DAILY_DATE:-$(gt_date 0)}"
 DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
-ARTIFACT_ROOT="${GANA_ARTIFACT_ROOT:-.artifacts/gana-v9/runs}"
-RECOMMENDATIONS_ARTIFACT="$ARTIFACT_ROOT/daily-$DATE/daily-parlay-recommendations.json"
 
-export GANA_PROFILE="${GANA_PROFILE:-full-permissions}"
-export GANA_APPROVAL_MODE="${GANA_APPROVAL_MODE:-auto-grant}"
+export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
+export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
 export GANA_MAX_FIXTURES_PER_RUN="${GANA_CRON_MAX_FIXTURES_PER_RUN:-10000}"
 export GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN="${GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN:-10000}"
 export GANA_MAX_PROVIDER_REQUESTS_PER_RUN="${GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN:-10000}"
@@ -54,31 +52,10 @@ export GANA_DAILY_PROVIDER_CONCURRENCY="${GANA_DAILY_PROVIDER_CONCURRENCY:-2}"
 export AGENT_CODEX_FALLBACK_MODELS="${AGENT_CODEX_FALLBACK_MODELS:-gpt-5.4-mini}"
 export AGENT_CODEX_SANDBOX="${AGENT_CODEX_SANDBOX:-danger-full-access}"
 
-set +e
-pnpm gana daily-e2e \
+exec node scripts/gana-daily-e2e-and-notify.mjs \
   --date "$DATE" \
-  --providers "${GANA_DAILY_PROVIDERS:-codex,gemini}" \
-  --provider-concurrency "${GANA_DAILY_PROVIDER_CONCURRENCY}" \
-  --web "${GANA_WEB_MODE:-live}" \
-  --max-fixtures "${GANA_MAX_FIXTURES_PER_RUN}" \
-  --threshold "${GANA_LOW_ODDS_THRESHOLD}" \
-  --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}"
-E2E_STATUS=$?
-set -e
-
-if [[ ! -f "$RECOMMENDATIONS_ARTIFACT" ]]; then
-  echo "Missing recommendations artifact: $RECOMMENDATIONS_ARTIFACT" >&2
-  exit "$E2E_STATUS"
-fi
-
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
-  --artifact "$RECOMMENDATIONS_ARTIFACT" \
-  --transport discord-native \
   --gateway-target "$DISCORD_TARGET" \
-  --max "${GANA_DISCORD_MAX_SELECTIONS:-5}"
-
-if [[ "$E2E_STATUS" -ne 0 ]]; then
-  echo "daily-e2e exited with status $E2E_STATUS after producing recommendations; Discord notification sent." >&2
-fi
-
-exit 0
+  --threshold "$GANA_LOW_ODDS_THRESHOLD" \
+  --provider-concurrency "$GANA_DAILY_PROVIDER_CONCURRENCY" \
+  --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}" \
+  --max "${GANA_DISCORD_MAX_SELECTIONS:-8}"

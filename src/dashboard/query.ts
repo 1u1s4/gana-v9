@@ -96,7 +96,7 @@ export function parseOverviewQuery(params: URLSearchParams, options: DashboardQu
   const take = normalizePositiveInt(params.get('take'), DEFAULT_TAKE, 1, MAX_TAKE);
 
   const sortFromQuery = params.get('sort');
-  const defaultSort = options.defaultSortBy;
+  const defaultSort = isAllowedSort(tab, options.defaultSortBy) ? options.defaultSortBy : OVERVIEW_SORT_OPTIONS[tab][0];
   const sort = isAllowedSort(tab, sortFromQuery) ? sortFromQuery : defaultSort;
   const direction = normalizeDirection(params.get('direction'), options.defaultDirection);
 

@@ -251,6 +251,94 @@ describe('runDailyE2E', () => {
     assert.equal(progress.providers.gemini.status, 'completed');
   });
 
+  it('uses blocked provider runs for mixed parlays when scoring produced predictions', async () => {
+    const ctx = context();
+    const parlayCalls: any[] = [];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-05-18',
+      providers: ['codex', 'gemini'],
+      parlayProfile: 'balanced',
+      persistMetrics: false,
+      dailyBatchId: 'daily-usable-blocked-provider',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        const runId = `${config.provider}-run`;
+        return {
+          ok: config.provider !== 'codex',
+          runId,
+          date: input.date,
+          status: config.provider === 'codex' ? 'failed' : 'succeeded',
+          verdict: config.provider === 'codex' ? 'blocked' : 'promotable',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures: [fixture()],
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [{
+            ok: true,
+            runId,
+            fixtureId: 'fixture-1',
+            providerFixtureId: 'provider-fixture-1',
+            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+            predictions: [highConfidencePrediction(runId)],
+          }],
+          parlay: {
+            ok: false,
+            runId,
+            gateResult: { verdict: 'blocked', reasons: ['no valid analytical parlays generated'], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: [],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => {
+        parlayCalls.push({ input, runId: runtime.runId });
+        return {
+          ok: true,
+          runId: runtime.runId ?? 'parlay-run',
+          date: input.date,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 1.8, aggregateConfidence: 0.8, aggregateQuality: 0.8 } },
+          persistedParlayIds: [`${runtime.runId}-persisted`],
+        } as any;
+      },
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: input.runIds?.length ?? 0,
+        top: [],
+        diagnostics: { generatedAt: '2026-05-18T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 1, profileScopedAnalyzed: 1, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 1, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.providers.find((provider) => provider.provider === 'codex')?.ok, false);
+    assert.equal(parlayCalls.some((call) =>
+      call.input.sourceRunIds?.includes('codex-run') && call.input.sourceRunIds?.includes('gemini-run')
+    ), true);
+    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
+    assert.equal(summary.parlays.some((family: any) =>
+      family.family === 'consensus-mixed' && family.sourceRunIds.includes('codex-run') && family.sourceRunIds.includes('gemini-run')
+    ), true);
+  });
+
   it('keeps a valid provider-only daily run review-required when mixed consensus is unavailable', async () => {
     const ctx = context();
     const result = await runDailyE2E(ctx.config, {

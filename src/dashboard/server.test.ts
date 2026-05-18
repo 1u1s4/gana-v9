@@ -19,9 +19,13 @@ const FIXTURE = {
     id: 'competition-1',
     name: 'Primera',
     country: 'Spain',
+    metadata: {
+      logoUrl: 'https://media.api-sports.io/football/leagues/1.png',
+      flagUrl: 'https://media.api-sports.io/flags/es.svg',
+    },
   },
-  homeTeam: { id: 'team-1', name: 'Home' },
-  awayTeam: { id: 'team-2', name: 'Away' },
+  homeTeam: { id: 'team-1', name: 'Home', country: 'Spain', metadata: { logoUrl: 'https://media.api-sports.io/football/teams/1.png' } },
+  awayTeam: { id: 'team-2', name: 'Away', country: 'Spain', metadata: { logoUrl: 'https://media.api-sports.io/football/teams/2.png' } },
   _count: {
     predictions: 1,
     parlayLegs: 1,
@@ -213,9 +217,14 @@ const DAILY_RUN = {
         harnessStatus: 'promotable',
         combinedOdds: 1.42,
         aggregateConfidence: 0.82,
+        adjustedProbability: 0.74,
         expectedEdge: 0.08,
+        score: 0.91,
+        exposure: { units: 1.2, percentOfAnalyticalBankroll: 0.012, policy: 'capped' },
+        bankerLegs: [{ fixture: 'Home vs Away', market: 'h2h', selection: 'home', odds: 1.2 }],
         riskFlags: ['low-liquidity'],
         reasons: ['test recommendation'],
+        legs: [{ fixture: 'Home vs Away', market: 'h2h', selection: 'home', odds: 1.2, banker: true }],
       }],
       diagnostics: { selected: { totalExposureUnits: 2.2 } },
     },
@@ -349,6 +358,8 @@ describe('dashboard api queries', () => {
     assert.equal(overview.fixtures[0]?.predictionCount, 1);
     assert.equal(overview.fixtures[0]?.parlayLegCount, 1);
     assert.equal(overview.fixtures[0]?.validationCount, 1);
+    assert.equal(overview.fixtures[0]?.homeTeam?.logoUrl, 'https://media.api-sports.io/football/teams/1.png');
+    assert.equal(overview.fixtures[0]?.competition?.flagUrl, 'https://media.api-sports.io/flags/es.svg');
     assert.equal(overview.fixtures[0]?.latestPrediction?.marketKey, 'h2h');
     assert.equal(overview.fixtures[0]?.latestValidation?.status, 'won');
   });
@@ -571,9 +582,30 @@ describe('dashboard api queries', () => {
     assert.equal((overview.daily[0]?.providerComparison as any).summary.sameSelection, 2);
     assert.equal((overview.daily[0]?.providerConsensus as any).consensusPredictions, 2);
     assert.equal(overview.daily[0]?.recommendations[0]?.profile, 'low-odds-top');
+    assert.equal(overview.daily[0]?.recommendations[0]?.score, 0.91);
+    assert.equal((overview.daily[0]?.recommendations[0]?.exposure as any).units, 1.2);
+    assert.equal(overview.daily[0]?.recommendations[0]?.bankerLegs?.length, 1);
     assert.equal(overview.filters.dailyBatchId, 'daily-2026-05-01');
     assert.equal(overview.filters.provider, 'codex');
     assert.equal(overview.filters.family, 'consensus-mixed');
+  });
+
+  it('keeps runs overview on a lean select when cross-tab sort params are stale', async () => {
+    const db = createDashboardDb() as any;
+    let findManyArgs: any;
+    db.harnessRun.findMany = async (args?: any) => {
+      findManyArgs = args;
+      return [RUN];
+    };
+
+    const overview = await readOverview(db, config, new URLSearchParams('tab=runs&sort=evaluatedAt&direction=desc'));
+
+    assert.equal(overview.activeTab, 'runs');
+    assert.equal(overview.sort, 'createdAt');
+    assert.equal(overview.runs.length, 1);
+    assert.equal(findManyArgs.include, undefined);
+    assert.equal(findManyArgs.select.metadata, undefined);
+    assert.equal(findManyArgs.select._count.select.validationArtifacts, true);
   });
 
   it('returns entity not found for missing validation id', async () => {

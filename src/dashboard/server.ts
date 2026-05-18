@@ -39,7 +39,7 @@ type DashboardDb = Pick<
   $queryRaw: PrismaClient['$queryRaw'];
 };
 
-type DashboardEntityKind = 'fixture' | 'prediction' | 'parlay' | 'validation' | 'run';
+type DashboardEntityKind = 'fixture' | 'prediction' | 'parlay' | 'validation' | 'run' | 'metric';
 
 export interface DashboardOptions {
   host?: string;
@@ -53,7 +53,7 @@ export interface DashboardServer {
 
 export interface DashboardEntityResponse {
   kind: DashboardEntityKind;
-  entity: DashboardFixtureRow | DashboardPredictionRow | DashboardParlayRow | DashboardValidationRow | DashboardRunRow;
+  entity: DashboardFixtureRow | DashboardPredictionRow | DashboardParlayRow | DashboardValidationRow | DashboardRunRow | DashboardMetricRow;
   validationHistory?: DashboardValidationRow[];
 }
 
@@ -117,7 +117,7 @@ export async function startDashboardServer(
         return sendJson(res, 200, await readOverview(db, config, url.searchParams));
       }
 
-      const entityMatch = /^\/api\/entity\/(fixture|prediction|parlay|validation|run)\/([^/]+)$/.exec(url.pathname);
+      const entityMatch = /^\/api\/entity\/(fixture|prediction|parlay|validation|run|metric)\/([^/]+)$/.exec(url.pathname);
       if (entityMatch) {
         const kind = entityMatch[1];
         const id = entityMatch[2] ?? '';
@@ -254,6 +254,12 @@ export async function readEntity(
   kind: DashboardEntityKind,
   id: string,
 ): Promise<DashboardEntityResponse | { error: 'not_found'; message: string }> {
+  if (kind === 'metric') {
+    const row = (await db.dailyMetric.findUnique({ where: { id } })) as unknown;
+    if (!row) return { error: 'not_found', message: `metric ${id} not found` };
+    return { kind: 'metric', entity: mapMetric(row) };
+  }
+
   if (kind === 'fixture') {
     const row = (await db.fixture.findUnique({
       where: { id },
@@ -846,7 +852,19 @@ async function readActiveRows(
     orderBy: orderBy as Prisma.HarnessRunFindManyArgs['orderBy'],
     skip,
     take,
-    include: {
+    select: {
+      id: true,
+      runtime: true,
+      profile: true,
+      providerSports: true,
+      providerAgentic: true,
+      model: true,
+      status: true,
+      verdict: true,
+      artifactDir: true,
+      startedAt: true,
+      completedAt: true,
+      createdAt: true,
       _count: {
         select: { tasks: true, artifacts: true, predictions: true, parlays: true, validationArtifacts: true },
       },
@@ -1156,12 +1174,17 @@ function mapDailyRecommendation(row: unknown, index: number): DashboardDailyRow[
   return {
     rank: toIntegerOrUndefined(item.rank) ?? index + 1,
     parlayId: toNullableString(item.parlayId) ?? undefined,
+    sourceRunId: toNullableString(item.sourceRunId),
     profile: toNullableString(item.profile) ?? undefined,
     family: toNullableString(item.family) ?? undefined,
     status: toNullableString(item.harnessStatus) ?? toNullableString(item.validationStatus) ?? undefined,
     combinedOdds: toNumberOrNull(item.combinedOdds),
     aggregateConfidence: toNumberOrNull(item.aggregateConfidence),
+    adjustedProbability: toNumberOrNull(item.adjustedProbability),
     expectedEdge: toNumberOrNull(item.expectedEdge),
+    score: toNumberOrNull(item.score),
+    exposure: item.exposure ?? item.stake ?? null,
+    bankerLegs: toArray(item.bankerLegs),
     riskFlags: toArray(item.riskFlags).map((value) => String(value)),
     reasons: toArray(item.reasons).map((value) => String(value)),
     legs: toArray(item.legs),
@@ -1285,6 +1308,9 @@ function mapFixture(raw: unknown, includeActivity = false): DashboardFixtureRow 
   const competition = toRecord(item.competition);
   const homeTeam = toRecord(item.homeTeam);
   const awayTeam = toRecord(item.awayTeam);
+  const competitionMetadata = toRecord(competition.metadata);
+  const homeTeamMetadata = toRecord(homeTeam.metadata);
+  const awayTeamMetadata = toRecord(awayTeam.metadata);
   const counts = toRecord(item._count);
   const recentPredictions = includeActivity ? toArray(item.predictions).map((prediction) => mapPredictionSummary(prediction)) : [];
   const recentParlayLegs = includeActivity ? toArray(item.parlayLegs).map((leg) => mapParlayLeg(leg)) : [];
@@ -1303,18 +1329,26 @@ function mapFixture(raw: unknown, includeActivity = false): DashboardFixtureRow 
         id: toStringValue(competition.id),
         name: toStringValue(competition.name),
         country: toNullableString(competition.country),
+        logoUrl: readAssetUrl(competitionMetadata, 'logoUrl'),
+        flagUrl: readAssetUrl(competitionMetadata, 'flagUrl'),
       }
       : null,
     homeTeam: item.homeTeam
       ? {
         id: toStringValue(homeTeam.id),
         name: toStringValue(homeTeam.name),
+        country: toNullableString(homeTeam.country),
+        logoUrl: readAssetUrl(homeTeamMetadata, 'logoUrl'),
+        flagUrl: readAssetUrl(homeTeamMetadata, 'flagUrl'),
       }
       : null,
     awayTeam: item.awayTeam
       ? {
         id: toStringValue(awayTeam.id),
         name: toStringValue(awayTeam.name),
+        country: toNullableString(awayTeam.country),
+        logoUrl: readAssetUrl(awayTeamMetadata, 'logoUrl'),
+        flagUrl: readAssetUrl(awayTeamMetadata, 'flagUrl'),
       }
       : null,
     predictionCount: toIntegerOrUndefined(counts.predictions),
@@ -1335,6 +1369,13 @@ function mapFixture(raw: unknown, includeActivity = false): DashboardFixtureRow 
 
 function toRecord(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {};
+}
+
+function readAssetUrl(metadata: Record<string, unknown>, key: 'logoUrl' | 'flagUrl'): string | null {
+  const direct = toNullableString(metadata[key]);
+  if (direct) return direct;
+  const assets = toRecord(metadata.assets);
+  return toNullableString(assets[key]);
 }
 
 

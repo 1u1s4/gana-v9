@@ -121,12 +121,15 @@ export interface NormalizedCompetition {
   name: string;
   country?: string | null;
   type?: string | null;
+  logoUrl?: string | null;
+  flagUrl?: string | null;
 }
 
 export interface NormalizedTeam {
   providerTeamId: string;
   name: string;
   country?: string | null;
+  logoUrl?: string | null;
 }
 
 export interface NormalizedFixture {

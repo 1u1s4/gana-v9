@@ -25,7 +25,7 @@ const parts = new Intl.DateTimeFormat("en-CA", {
 }).formatToParts(date);
 const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 console.log(`${values.year}-${values.month}-${values.day}`);
-' "$offset_days"
+' -- "$offset_days"
 }
 
 require_command() {
@@ -40,6 +40,9 @@ require_command pnpm
 
 DATE="${GANA_VALIDATION_DATE:-$(gt_date -1)}"
 DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
+
+export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
+export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
 
 pnpm gana validate --date "$DATE"
 

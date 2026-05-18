@@ -1699,7 +1699,7 @@ function blockedValidationResult(config: AgentConfig, runId: string, date: strin
 }
 
 function finalVerdict(steps: PipelineStepResult[]): PipelineVerdict {
-  const fatalSteps = new Set(['fetch fixtures', 'fetch odds', 'score', 'build parlay']);
+  const fatalSteps = new Set(['fetch fixtures', 'fetch odds', 'score']);
   if (steps.some((step) => fatalSteps.has(step.name) && (step.verdict === 'blocked' || !step.ok))) return 'blocked';
   if (steps.some((step) => step.verdict === 'review-required' || step.warnings.length > 0 || !step.ok)) return 'review-required';
   return 'promotable';

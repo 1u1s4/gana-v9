@@ -1,132 +1,135 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "e02d8f4d-1e84-4b12-b8b9-5ed0688268f5",
+      "oddsQuoteId": "ac84da9d-00d6-4a8f-98de-bbe180ae1a9f",
       "market": "h2h",
-      "selection": "draw",
+      "selection": "home",
       "line": null,
-      "odds": 3,
-      "probability": 0.35,
-      "modelProbability": 0.35,
-      "marketFairProbability": 0.3193,
-      "edge": 0.0307,
+      "odds": 2.1,
+      "probability": 0.46,
+      "modelProbability": 0.46,
+      "marketFairProbability": 0.437202,
+      "edge": 0.02,
+      "confidence": 0.75,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_h2h_1",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_h2h_2",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_h2h_3"
+      ],
+      "claimIds": [
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_h2h_home_prob",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_h2h_home_odds"
+      ],
+      "rationale": "Hapoel Katamon is the favorite with an estimated 46% win probability, supported by market odds.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "90adc1fd-ab6b-4ed2-9d5d-302696ebdaef",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": null,
+      "odds": 1.33,
+      "probability": 0.79,
+      "modelProbability": 0.79,
+      "marketFairProbability": 0.354486,
+      "edge": 0.44,
+      "confidence": 0.8,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_dc_1",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_h2h_2"
+      ],
+      "claimIds": [
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_dc_home_or_draw_odds",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_h2h_home_prob",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_h2h_draw_prob"
+      ],
+      "rationale": "High probability (79%) for Home or Draw, offering significant edge.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "dc94b751-23af-4258-982d-4c46fd0bb0e0",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.5,
+      "odds": 1.69,
+      "probability": 0.60,
+      "modelProbability": 0.60,
+      "marketFairProbability": 0.562759,
+      "edge": 0.04,
+      "confidence": 0.75,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_goals_1",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_goals_2"
+      ],
+      "claimIds": [
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_goals_under_2_5",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_goals_under_2_5_odds"
+      ],
+      "rationale": "Statistical models suggest a low-scoring match, with Under 2.5 goals offering value.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "bd5eaa22-f7e5-4b7f-ac06-641a87ea51ce",
+      "market": "corners_over_under",
+      "selection": "under",
+      "line": 8.5,
+      "odds": 1.94,
+      "probability": 0.52,
+      "modelProbability": 0.52,
+      "marketFairProbability": 0.491176,
+      "edge": 0.03,
       "confidence": 0.65,
       "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_2",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_3",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_5"
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_corners_1"
       ],
       "claimIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_h2h_2"
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_corners_over_under_8_5_odds"
       ],
-      "rationale": "Web prediction suggests a 1-1 draw. Elche has a strong home record (W3, D3), and Getafe has good away form (W2, D1) and is unbeaten against Elche in the last three encounters.",
+      "rationale": "Considering the low-scoring expectation, a slightly higher probability for Under 8.5 corners is estimated, showing a small edge.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "e1868b89-e5f1-4f02-bfa1-ba043f01b7d0",
-      "market": "double_chance",
-      "selection": "home_or_draw",
-      "line": null,
-      "odds": 1.28,
-      "probability": 0.79,
-      "modelProbability": 0.79,
-      "marketFairProbability": 0.366126,
-      "edge": 0.423874,
-      "confidence": 0.7,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_2",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9"
-      ],
-      "claimIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_double_chance_1"
-      ],
-      "rationale": "Elche has a strong home record (W3, D3) and web predictions suggest a draw, making 'Home or Draw' a strong candidate.",
-      "warnings": [
-        "Calculated edge is unusually high, possibly due to marketFairProbability being lower than expected for a double chance market."
-      ]
-    },
-    {
-      "oddsQuoteId": "eb1cd090-52ef-4539-a9f7-345f6e2ab6ae",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 2.5,
-      "odds": 1.5,
-      "probability": 0.68,
-      "modelProbability": 0.68,
-      "marketFairProbability": 0.649165,
-      "edge": 0.030835,
-      "confidence": 0.75,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_7",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9"
-      ],
-      "claimIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_goals_1",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_goals_2"
-      ],
-      "rationale": "Getafe's recent games consistently feature Under 2.5 goals (6 of last 7), and web predictions strongly suggest 'Under 2.5 Goals'.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "b1cebecf-e4ce-4674-948f-0e893451a48b",
+      "oddsQuoteId": "ce0b35e6-fc8b-4191-9434-0ea590879519",
       "market": "btts",
-      "selection": "yes",
+      "selection": "no",
       "line": null,
-      "odds": 2.2,
-      "probability": 0.48,
-      "modelProbability": 0.48,
-      "marketFairProbability": 0.424084,
-      "edge": 0.055916,
-      "confidence": 0.75,
+      "odds": 1.8,
+      "probability": 0.65,
+      "modelProbability": 0.65,
+      "marketFairProbability": 0.514825,
+      "edge": 0.14,
+      "confidence": 0.85,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_6",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:evidence_9"
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_btts_1",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:evidence_btts_2"
       ],
       "claimIds": [
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_btts_1",
-        "fc52dcb6-3afc-48d8-edb-da6c1413c316:claim_btts_2"
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_btts_no",
+        "ed15ae04-0d96-406d-93c4-8d25423a3231:claim_btts_no_odds"
       ],
-      "rationale": "Elche's recent matches consistently feature both teams scoring, and web predictions indicate 'Both Teams to Score (Yes)'.",
+      "rationale": "Hapoel Katamon's strong defensive form suggests a high probability that both teams will not score.",
       "warnings": []
-    },
-    {
-      "oddsQuoteId": "98ee1d99-19b3-436b-b214-bfa5f4be6f50",
-      "market": "corners_over_under",
-      "selection": "under",
-      "line": 9.5,
-      "odds": 1.72,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.547368,
-      "edge": 0.002632,
-      "confidence": 0.4,
-      "confidenceBand": "low",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [],
-      "claimIds": [],
-      "rationale": "No specific market-specific research evidence available for corners. This prediction is based on general market trends.",
-      "warnings": [
-        "market corners_over_under skipped/review-required: missing market-specific research evidence",
-        "Prediction based on limited evidence and general market trends."
-      ]
     }
   ],
-  "warnings": [
-    "market corners_over_under skipped/review-required: missing market-specific research evidence"
-  ],
-  "metadata": {}
+  "warnings": [],
+  "metadata": {
+    "promptVersion": "score-prediction-v2",
+    "runId": "d8bfa443-3637-4df2-9c60-4dfb52fab8c3",
+    "fixtureId": "e44a7a32-4d76-4baf-8f17-6dd343d806a5"
+  }
 }
