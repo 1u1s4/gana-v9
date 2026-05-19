@@ -48,7 +48,6 @@ export interface RunDailyE2EInput {
   parlayProfile?: DailyParlayProfile;
   persistMetrics?: boolean;
   dailyBatchId?: string;
-  bankrollUnits?: number;
 }
 
 export interface DailyProviderRunResult {
@@ -140,17 +139,18 @@ const DAILY_ATOMIC_RECOMMENDATION_LIMIT = 10;
 const ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR = 0.9;
 const ATOMIC_RECOMMENDATION_EDGE_FLOOR = 0;
 const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
-const DEFAULT_DAILY_BANKROLL_UNITS = 100;
+const DAILY_STAKE_BUCKETS = [1, 5, 10, 15, 20, 25] as const;
 
 export type DailyFinalRecommendation =
   | (ParlayAnalysisRecommendation & { kind: 'parlay'; stakeRecommendation?: DailyStakeRecommendation })
   | AtomicPredictionRecommendation;
 
 export interface DailyStakeRecommendation {
-  units: number;
+  stake: number;
   percentOfBankroll: number;
-  bankrollUnits: number;
-  policy: 'full-bankroll-proportional-confidence-edge-allocation';
+  unitLabel: 'percent-of-bankroll';
+  allowedStakes: readonly number[];
+  policy: 'bucketed-bankroll-percentage-confidence-edge-recommendation';
 }
 
 export interface AtomicPredictionRecommendation {
@@ -205,7 +205,6 @@ export async function runDailyE2E(
   const analyzeParlays = deps.analyzeParlays ?? runParlayAnalysis;
   const buildDailyMetrics = deps.buildDailyMetrics ?? runDailyMetrics;
   const providerConcurrency = normalizeProviderConcurrency(input.providerConcurrency, providers.length);
-  const bankrollUnits = normalizeDailyBankrollUnits(input.bankrollUnits);
   const pairedProviders = providers;
   const providerAgentic = providers.join(',');
   const marketScope = normalizeMarketScope(input.markets, effectiveConfig.apiFootball.defaultMarkets);
@@ -456,7 +455,6 @@ export async function runDailyE2E(
   ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
   const finalRecommendations: DailyFinalRecommendation[] = applyDailyStakeRecommendations(
     [...parlayRecommendations, ...atomicRecommendations],
-    bankrollUnits,
   );
   const offDateLegs = recommendationLegsOutsideRequestedDate(
     finalRecommendations,
@@ -537,7 +535,6 @@ export async function runDailyE2E(
       lowOddsThreshold: effectiveConfig.apiFootball.lowOddsThreshold,
       parlayProfile: input.parlayProfile ?? null,
       providerConcurrency,
-      bankrollUnits,
     },
     counts: {
       providers: providerCounts,
@@ -568,12 +565,11 @@ export async function runDailyE2E(
       parlayDiversity: 'first-pass unique profile, then score fill',
       parlayDiamanteOddsWindow: { min: 1.1, max: 1.3 },
       atomicExcludesSelectedParlayLegs: true,
-      stakeAllocation: {
-        bankrollUnits,
-        unitLabel: 'bank-units',
-        totalRecommendedUnits: bankrollUnits,
-        totalRecommendedPercentOfBankroll: 1,
-        policy: 'full-bankroll-proportional-confidence-edge-allocation',
+      stakeRecommendation: {
+        unitLabel: 'percent-of-bankroll',
+        allowedStakes: DAILY_STAKE_BUCKETS,
+        totalRecommendedPercentOfBankroll: round(finalRecommendations.reduce((sum, item) => sum + (item.stakeRecommendation?.percentOfBankroll ?? 0), 0), 6),
+        policy: 'bucketed-bankroll-percentage-confidence-edge-recommendation',
       },
       atomicConfidenceFloor: ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR,
       atomicEdgeFloor: ATOMIC_RECOMMENDATION_EDGE_FLOOR,
@@ -1054,55 +1050,48 @@ function buildAtomicPredictionRecommendations(
 
 function applyDailyStakeRecommendations<T extends DailyFinalRecommendation>(
   recommendations: readonly T[],
-  bankrollUnits: number,
 ): T[] {
   if (!recommendations.length) return [];
-  const weights = recommendations.map(dailyStakeWeight);
-  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || recommendations.length;
-  let assignedPercent = 0;
-  let assignedUnits = 0;
-  return recommendations.map((recommendation, index) => {
-    const isLast = index === recommendations.length - 1;
-    const rawPercent = totalWeight > 0 ? weights[index] / totalWeight : 1 / recommendations.length;
-    const percentOfBankroll = isLast ? round(Math.max(0, 1 - assignedPercent), 6) : round(rawPercent, 6);
-    const units = isLast ? round(Math.max(0, bankrollUnits - assignedUnits), 4) : round(bankrollUnits * percentOfBankroll, 4);
-    assignedPercent = round(assignedPercent + percentOfBankroll, 6);
-    assignedUnits = round(assignedUnits + units, 4);
+  return recommendations.map((recommendation) => {
+    const stake = dailyStakeBucket(recommendation);
     return {
       ...recommendation,
       stakeRecommendation: {
-        units,
-        percentOfBankroll,
-        bankrollUnits,
-        policy: 'full-bankroll-proportional-confidence-edge-allocation',
+        stake,
+        percentOfBankroll: round(stake / 100, 6),
+        unitLabel: 'percent-of-bankroll',
+        allowedStakes: DAILY_STAKE_BUCKETS,
+        policy: 'bucketed-bankroll-percentage-confidence-edge-recommendation',
       },
     };
   });
 }
 
-function dailyStakeWeight(recommendation: DailyFinalRecommendation): number {
+function dailyStakeBucket(recommendation: DailyFinalRecommendation): number {
   const confidence = clamp(Number(recommendation.aggregateConfidence), 0.01, 0.99);
   const edge = Math.max(0, Number.isFinite(recommendation.expectedEdge) ? recommendation.expectedEdge : 0);
   const odds = Math.max(1.01, Number(recommendation.combinedOdds) || 1.01);
-  const profileMultiplier = recommendation.profile === 'parlay-diamante'
-    ? 1.3
+  const profileBonus = recommendation.profile === 'parlay-diamante'
+    ? 2
     : recommendation.profile === 'high-conviction' || recommendation.profile === 'low-variance'
-      ? 1.12
+      ? 1.5
       : recommendation.kind === 'atomic-prediction'
-        ? 0.82
-        : 1;
-  const riskPenalty = Math.max(0.55, 1 - ((recommendation.riskFlags?.length ?? 0) * 0.04));
-  const oddsDiscipline = 1 / Math.sqrt(odds);
-  return Math.max(0.01, (confidence ** 2) * (1 + Math.min(edge, 0.35)) * profileMultiplier * riskPenalty * oddsDiscipline);
+        ? -1.5
+        : 0;
+  const riskPenalty = (recommendation.riskFlags?.length ?? 0) * 0.75;
+  const oddsPenalty = Math.log2(odds) * 1.5;
+  const rawStake = (confidence * 10)
+    + (Math.min(edge, 0.35) * 20)
+    + profileBonus
+    - riskPenalty
+    - oddsPenalty;
+  return nearestStakeBucket(rawStake);
 }
 
-function normalizeDailyBankrollUnits(value: number | undefined): number {
-  const fromEnv = Number(process.env.GANA_DAILY_BANKROLL_UNITS);
-  const candidate = value ?? (Number.isFinite(fromEnv) ? fromEnv : DEFAULT_DAILY_BANKROLL_UNITS);
-  if (!Number.isFinite(candidate) || candidate <= 0) {
-    throw new Error('daily-e2e bankrollUnits must be a positive number.');
-  }
-  return round(candidate, 4);
+function nearestStakeBucket(value: number): number {
+  return DAILY_STAKE_BUCKETS.reduce((best, bucket) =>
+    Math.abs(bucket - value) < Math.abs(best - value) ? bucket : best,
+  DAILY_STAKE_BUCKETS[0]);
 }
 
 function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): AtomicPredictionRecommendation {

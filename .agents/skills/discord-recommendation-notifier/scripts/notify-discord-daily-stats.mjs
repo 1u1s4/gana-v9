@@ -371,14 +371,15 @@ function formatValidationMirrorLines(recommendation, index) {
 
 function formatValidationMirrorMetricLine(recommendation, status) {
   const stake = formatStakeRecommendation(recommendation);
-  return [
+  const parts = [
     `> 📊 Resultado ${statusIcon(status)} ${status}`,
     `Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
     `🧠 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
     `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
     stake ? `💵 Stake ${stake}` : undefined,
-    `📌 Expo ${formatExposurePercent(recommendation)}`,
-  ].filter(Boolean).join(' · ');
+  ];
+  if (!stake) parts.push(`📌 Expo ${formatExposurePercent(recommendation)}`);
+  return parts.filter(Boolean).join(' · ');
 }
 
 function buildValidationIndex(validationArtifact) {

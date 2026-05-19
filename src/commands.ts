@@ -672,7 +672,6 @@ async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, 
     parlayProfile: optionalDailyParlayProfileFlag(flags),
     persistMetrics,
     dailyBatchId: optionalStringFlag(flags, 'daily-batch-id'),
-    bankrollUnits: optionalPositiveFloatFlag(flags, 'bankroll') ?? optionalPositiveFloatFlag(flags, 'bank'),
   }, ctx.runtime);
 }
 
@@ -2113,7 +2112,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2 --bankroll 100${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

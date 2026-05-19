@@ -15,12 +15,8 @@ const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
 const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
-const bankrollUnits = args.bankroll ?? Number(process.env.GANA_DAILY_BANKROLL_UNITS ?? 100);
 if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
   throw new Error('--provider-concurrency must be a positive integer.');
-}
-if (!Number.isFinite(bankrollUnits) || bankrollUnits <= 0) {
-  throw new Error('--bankroll must be a positive number.');
 }
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}.log`);
 const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
@@ -36,7 +32,6 @@ const command = [
   '--threshold', String(args.threshold ?? 1.2),
   '--web', 'live',
   '--parlay-profile', parlayProfile,
-  '--bankroll', String(bankrollUnits),
   '--daily-batch-id', dailyBatchId,
 ];
 
@@ -50,7 +45,6 @@ const env = {
   AGENT_NATIVE_WEB_SEARCH_MODE: process.env.AGENT_NATIVE_WEB_SEARCH_MODE ?? 'live',
   GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,
   GANA_DAILY_PROVIDER_CONCURRENCY: process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? String(providerConcurrency),
-  GANA_DAILY_BANKROLL_UNITS: process.env.GANA_DAILY_BANKROLL_UNITS ?? String(bankrollUnits),
   GANA_LOW_ODDS_THRESHOLD: process.env.GANA_LOW_ODDS_THRESHOLD ?? String(args.threshold ?? 1.2),
   GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES: process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? process.env.GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? '10000',
   GANA_MAX_FIXTURES_PER_RUN: process.env.GANA_MAX_FIXTURES_PER_RUN ?? '10000',
@@ -126,7 +120,6 @@ function parseArgs(argv) {
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
-    else if (arg === '--bankroll' || arg === '--bank') parsed.bankroll = Number(requireValue(argv, ++index, arg));
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));
     else throw new Error(`Unknown argument: ${arg}`);
   }

@@ -65,7 +65,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - When the user asks for one part / one message, use `--single-message` so the 4 parlays + 10 simples are packed into a single native Discord payload.
 - Disable mentions with `allowed_mentions: { "parse": [] }`.
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
-- When the artifact includes `stakeRecommendation`, show it as analytical bank-unit allocation (`💵 Stake Xu (Y%)`), not as execution language.
+- When the artifact includes `stakeRecommendation`, show only the bucketed analytical bank percentage as `💵 Stake N`; allowed buckets are `1, 5, 10, 15, 20, 25`.
 - Do not include payment links, bookmaker instructions, auto-execution language, or monetary execution claims.
 - Validation stat notifications must use the same native embed policy and must label the output as analytical statistics.
 - Validation notifications should include the recommendation mirror unless `--no-recommendation-mirror` is explicitly provided. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.

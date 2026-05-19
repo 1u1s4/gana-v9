@@ -592,21 +592,29 @@ export function formatStakeRecommendation(recommendation) {
   const stake = recommendation.stakeRecommendation
     ?? recommendation.recommendedStake
     ?? recommendation.bankrollAllocation;
-  const units = stake?.units;
+  if (Number.isFinite(stake?.stake)) return String(Math.round(stake.stake));
   const percent = stake?.percentOfBankroll ?? stake?.percentOfAnalyticalBankroll;
-  if (!Number.isFinite(units) || !Number.isFinite(percent)) return undefined;
-  return `${formatMetricNumber(units, 2)}u (${formatPercent(percent)})`;
+  if (Number.isFinite(percent)) return String(nearestDisplayStake(Number(percent) * 100));
+  return undefined;
 }
 
 function formatCompactMetricLine(recommendation) {
   const stake = formatStakeRecommendation(recommendation);
-  return [
+  const parts = [
     `> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
     `🧠 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
     `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
     stake ? `💵 Stake ${stake}` : undefined,
-    `📌 Expo ${formatExposurePercent(recommendation)}`,
-  ].filter(Boolean).join(' · ');
+  ];
+  if (!stake) parts.push(`📌 Expo ${formatExposurePercent(recommendation)}`);
+  return parts.filter(Boolean).join(' · ');
+}
+
+function nearestDisplayStake(value) {
+  const buckets = [1, 5, 10, 15, 20, 25];
+  return buckets.reduce((best, bucket) =>
+    Math.abs(bucket - value) < Math.abs(best - value) ? bucket : best,
+  buckets[0]);
 }
 
 function commonRecommendationValue(recommendations, key, fallback) {

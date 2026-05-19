@@ -155,7 +155,6 @@ describe('runDailyE2E', () => {
     assert.equal(summary.executionCapability, 'none');
     assert.equal(summary.sharedInputs.maxFixturesPerRun, 12);
     assert.equal(summary.sharedInputs.lowOddsThreshold, 1.2);
-    assert.equal(summary.sharedInputs.bankrollUnits, 100);
     assert.deepEqual(summary.sharedInputs.providerModels, { codex: 'gpt-5.5', gemini: 'gemini-2.5-pro' });
     assert.equal(summary.counts.recommendations, 1);
     assert.equal(summary.counts.atomicRecommendations, 1);
@@ -164,8 +163,9 @@ describe('runDailyE2E', () => {
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.executionCapability, 'none');
     assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');
-    assert.equal(recommendations.recommendations[0].stakeRecommendation.units, 100);
-    assert.equal(recommendations.recommendationPolicy.stakeAllocation.totalRecommendedPercentOfBankroll, 1);
+    assert.equal(recommendations.recommendations[0].stakeRecommendation.stake, 10);
+    assert.equal(recommendations.recommendations[0].stakeRecommendation.percentOfBankroll, 0.1);
+    assert.deepEqual(recommendations.recommendationPolicy.stakeRecommendation.allowedStakes, [1, 5, 10, 15, 20, 25]);
     assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team A vs Team B');
     assert.deepEqual(recommendations.atomicRecommendations[0].legs[0].display, {
       awayTeamName: 'Team B',
@@ -202,7 +202,6 @@ describe('runDailyE2E', () => {
       parlayProfile: 'balanced',
       persistMetrics: false,
       dailyBatchId: 'daily-final-selection-policy',
-      bankrollUnits: 250,
     }, ctx.runtime, {
       repositories: undefined,
       runPipeline: async (config, input) => {
@@ -295,14 +294,11 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 4);
     assert.equal(recommendations.recommendationPolicy.parlayAnalysisTop, 12);
     assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
-    assert.equal(recommendations.recommendationPolicy.stakeAllocation.bankrollUnits, 250);
+    assert.equal(recommendations.recommendationPolicy.stakeRecommendation.policy, 'bucketed-bankroll-percentage-confidence-edge-recommendation');
+    assert.equal(recommendations.recommendations.every((item: any) => [1, 5, 10, 15, 20, 25].includes(item.stakeRecommendation.stake)), true);
     assert.equal(
-      Number(recommendations.recommendations.reduce((sum: number, item: any) => sum + item.stakeRecommendation.units, 0).toFixed(4)),
-      250,
-    );
-    assert.equal(
-      Number(recommendations.recommendations.reduce((sum: number, item: any) => sum + item.stakeRecommendation.percentOfBankroll, 0).toFixed(6)),
-      1,
+      Number(recommendations.recommendations.reduce((sum: number, item: any) => sum + item.stakeRecommendation.percentOfBankroll, 0).toFixed(6)) < 1,
+      true,
     );
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.counts.parlayRecommendations, 4);
