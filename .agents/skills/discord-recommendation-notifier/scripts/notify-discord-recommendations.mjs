@@ -14,6 +14,7 @@ const DISCORD_DESCRIPTION_LIMIT = 4096;
 const DISCORD_EMBED_LIMIT = 10;
 const DISCORD_NON_SELECTION_EMBEDS = 2;
 const DISCORD_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
+const DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - 1;
 
 export function parseArgs(argv) {
   const args = {
@@ -77,16 +78,19 @@ export function buildDiscordPayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const selectionLimit = Math.min(max, DISCORD_SELECTION_EMBEDS_PER_MESSAGE);
   const recommendations = selectRecommendations(artifact).slice(0, selectionLimit);
-  return buildDiscordPayloadPage(recommendations, options);
+  return buildDiscordPayloadPage(recommendations, { ...options, artifactDate: artifact?.date });
 }
 
 export function buildDiscordPayloads(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = selectRecommendations(artifact).slice(0, max);
   if (!recommendations.length) return [buildDiscordPayloadPage([], options)];
-  const pages = chunk(recommendations, DISCORD_SELECTION_EMBEDS_PER_MESSAGE);
+  const pages = recommendations.length > DISCORD_SELECTION_EMBEDS_PER_MESSAGE
+    ? chunk(recommendations, DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE)
+    : [recommendations];
   return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
     ...options,
+    artifactDate: artifact?.date,
     page: index + 1,
     pageCount: pages.length,
     totalRecommendations: recommendations,
@@ -97,15 +101,11 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = selectRecommendations(artifact).slice(0, max);
   const counts = recommendationCounts(recommendations);
-  const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
-  const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
-  const risk = commonRiskFlag(recommendations, 'low-liquidity');
   const embeds = [{
-    title: '🏆 Gana v9 · Recomendaciones en revisión',
+    title: '🏆 Gana v9 · Recomendaciones',
     description: [
       `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
-      `🟡 ${status} · ${validation} · 💧 ${risk}`,
-      '⚠️ Sin ejecución monetaria · Sin garantía',
+      formatArtifactDate(artifact?.date),
     ].join('\n'),
     color: 0x2f80ed,
     footer: { text: 'Gana Hermes · Discord native embeds' },
@@ -149,24 +149,25 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
 
 function buildDiscordPayloadPage(recommendations, options = {}) {
   const totalRecommendations = Array.isArray(options.totalRecommendations) ? options.totalRecommendations : recommendations;
-  const counts = recommendationCounts(recommendations);
   const totalCounts = recommendationCounts(totalRecommendations);
-  const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
-  const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
-  const risk = commonRiskFlag(recommendations, 'low-liquidity');
-  const embeds = [{
-    title: '🏆 Gana v9 · Recomendaciones en revisión',
-    description: [
-      options.pageCount > 1 ? `📄 Parte ${options.page}/${options.pageCount}` : undefined,
-      `📦 ${totalCounts.parlay} parlays · 📌 ${totalCounts.atomic} simples`,
-      options.pageCount > 1 ? `📍 En este mensaje: ${counts.parlay} parlays · ${counts.atomic} simples` : undefined,
-      `🟡 ${status} · ${validation} · 💧 ${risk}`,
-      '⚠️ Sin ejecución monetaria · Sin garantía',
-    ].filter(Boolean).join('\n'),
-    color: 0x2f80ed,
-    footer: { text: 'Gana Hermes · Discord native embeds' },
-    timestamp: new Date().toISOString(),
-  }];
+  const pageCount = Number.isInteger(options.pageCount) ? options.pageCount : 1;
+  const page = Number.isInteger(options.page) ? options.page : 1;
+  const includeHeader = page === 1;
+  const includeClosing = page === pageCount;
+  const embeds = [];
+
+  if (includeHeader) {
+    embeds.push({
+      title: '🏆 Gana v9 · Recomendaciones',
+      description: [
+        `📦 ${totalCounts.parlay} parlays · 📌 ${totalCounts.atomic} simples`,
+        formatArtifactDate(options.artifactDate),
+      ].filter(Boolean).join('\n'),
+      color: 0x2f80ed,
+      footer: { text: 'Gana Hermes · Discord native embeds' },
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   if (recommendations.length) {
     embeds.push(...recommendations.map((recommendation, index) => recommendationEmbed(recommendation, index)));
@@ -178,10 +179,12 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
     });
   }
 
-  embeds.push({
-    description: '🛡️ Revisión manual requerida antes de promoción.',
-    color: 0x56ccf2,
-  });
+  if (includeClosing) {
+    embeds.push({
+      description: '🛡️ Revisión manual requerida antes de promoción.',
+      color: 0x56ccf2,
+    });
+  }
 
   return {
     username: stringOrFallback(options.username, 'Gana Hermes'),
@@ -189,6 +192,13 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
     content: '',
     embeds,
   };
+}
+
+function formatArtifactDate(value) {
+  if (typeof value !== 'string') return undefined;
+  const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/.exec(value.trim());
+  if (!match?.groups) return undefined;
+  return `${match.groups.day}/${match.groups.month}/${match.groups.year}`;
 }
 
 export function buildGatewayMessage(artifact, options = {}) {
