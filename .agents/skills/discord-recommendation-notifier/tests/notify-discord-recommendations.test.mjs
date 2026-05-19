@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import {
   buildDiscordPayload,
   buildDiscordPayloads,
+  buildDiscordSinglePayload,
   buildGatewayMessage,
   findLatestRecommendationsArtifact,
   loadRecommendations,
@@ -150,6 +151,24 @@ describe('discord recommendation notifier', () => {
     assert.match(payloads[1].embeds[1].title, /9️⃣ 📌 Simple/);
   });
 
+  it('can pack fourteen selections into one native Discord message when requested', () => {
+    const artifact = sampleArtifact();
+    artifact.recommendations = Array.from({ length: 14 }, (_, index) => ({
+      ...sampleArtifact().recommendations[0],
+      rank: index + 1,
+      parlayId: `parlay-${index + 1}`,
+      kind: index < 4 ? 'parlay' : 'atomic-prediction',
+    }));
+
+    const payload = buildDiscordSinglePayload(artifact, { max: 14 });
+
+    assert.equal(payload.embeds.length <= 10, true);
+    assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones en revisión');
+    assert.match(payload.embeds[0].description, /📦 4 parlays · 📌 10 simples/);
+    assert.match(payload.embeds[1].title, /Selecciones/);
+    assert.match(payload.embeds.map((embed) => embed.description ?? '').join('\n'), /14\. 📌 Simple/);
+  });
+
   it('loads artifacts and resolves the newest recommendations file', () => {
     const root = join(tmpdir(), `gana-discord-notifier-${Date.now()}`);
     const older = join(root, 'older');
@@ -170,7 +189,7 @@ describe('discord recommendation notifier', () => {
   });
 
   it('parses CLI arguments and posts to the provided fetch implementation', async () => {
-    const args = parseArgs(['--artifact', 'artifact.json', '--webhook-url', 'https://discord.test/webhook', '--transport', 'webhook', '--max', '3']);
+    const args = parseArgs(['--artifact', 'artifact.json', '--webhook-url', 'https://discord.test/webhook', '--transport', 'webhook', '--max', '3', '--single-message']);
     const calls = [];
     const result = await sendDiscordPayload(args.webhookUrl, { ok: true }, async (url, init) => {
       calls.push({ url, init });
@@ -184,6 +203,7 @@ describe('discord recommendation notifier', () => {
     assert.equal(args.artifact, 'artifact.json');
     assert.equal(args.transport, 'webhook');
     assert.equal(args.max, 3);
+    assert.equal(args.singleMessage, true);
     assert.equal(result.status, 204);
     assert.equal(calls[0].url, 'https://discord.test/webhook');
     assert.equal(calls[0].init.method, 'POST');

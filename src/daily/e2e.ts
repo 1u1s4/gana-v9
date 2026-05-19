@@ -13,6 +13,7 @@ import { runParlayBuild, type ParlayBuildRunResult, type RunParlayBuildInput } f
 import type { PredictionRecordView } from '../prediction/types.js';
 import type { ResearchWebMode } from '../prediction/prompts.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
+import { fixtureDateRange } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
 import { createRunArtifactDir, writeArtifact, writeRunJson } from '../runtime/artifacts.js';
@@ -443,6 +444,14 @@ export async function runDailyE2E(
     parlayLegSelectionKeys,
   ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
   const finalRecommendations: DailyFinalRecommendation[] = [...parlayRecommendations, ...atomicRecommendations];
+  const offDateLegs = recommendationLegsOutsideRequestedDate(
+    finalRecommendations,
+    input.date,
+    effectiveConfig.apiFootball.timezone,
+  );
+  if (offDateLegs.length) {
+    throw new Error(`daily recommendations include fixture legs outside requested date ${input.date}: ${offDateLegs.slice(0, 5).join('; ')}`);
+  }
   const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
   const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
   const hasAnySuccessfulProvider = providerRuns.some((run) => run.ok);
@@ -1173,6 +1182,27 @@ function fixtureDisplayMap(fixtures: Fixture[]): Map<string, RecommendationLegDi
       kickoffLocal: fixture.scheduledAt,
     }];
   }));
+}
+
+function recommendationLegsOutsideRequestedDate(
+  recommendations: readonly Pick<DailyFinalRecommendation, 'rank' | 'legs'>[],
+  date: string,
+  timezone?: string,
+): string[] {
+  const window = fixtureDateRange(date, timezone);
+  const offDate: string[] = [];
+  for (const recommendation of recommendations) {
+    for (const leg of recommendation.legs ?? []) {
+      const kickoff = leg.display?.kickoffLocal;
+      if (!kickoff) continue;
+      const scheduledAt = new Date(kickoff);
+      if (!Number.isFinite(scheduledAt.getTime())) continue;
+      if (scheduledAt < window.start || scheduledAt >= window.end) {
+        offDate.push(`#${recommendation.rank ?? '?'} ${leg.fixture ?? leg.fixtureId} @ ${scheduledAt.toISOString()}`);
+      }
+    }
+  }
+  return offDate;
 }
 
 function shouldReplaceFixtureLabel(value: unknown): boolean {

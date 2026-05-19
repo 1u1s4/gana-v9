@@ -257,16 +257,18 @@ function buildParlayQuery(config: AgentConfig, input: RunParlayAnalysisInput): u
   else if (runIds.length === 1) where.runId = runIds[0];
   if (input.date) {
     const window = fixtureDateRange(input.date, config.apiFootball.timezone);
-    where.legs = {
-      some: {
-        fixture: {
-          scheduledAt: {
-            gte: window.start,
-            lt: window.end,
-          },
+    const legInWindow = {
+      fixture: {
+        scheduledAt: {
+          gte: window.start,
+          lt: window.end,
         },
       },
     };
+    where.AND = [
+      { legs: { some: legInWindow } },
+      { legs: { every: legInWindow } },
+    ];
   }
   return {
     where,
@@ -278,8 +280,10 @@ function buildParlayQuery(config: AgentConfig, input: RunParlayAnalysisInput): u
           fixture: {
             select: {
               id: true,
+              scheduledAt: true,
               homeTeam: { select: { name: true } },
               awayTeam: { select: { name: true } },
+              competition: { select: { name: true } },
             },
           },
           prediction: {
@@ -373,10 +377,25 @@ function toLeg(leg: any): ParlayAnalysisLeg {
   const confidence = nullableNumber(prediction.confidence);
   const warnings = stringArray(prediction.warnings);
   const bankerReason = bankerReasonFor(market, odds, confidence, warnings);
+  const homeTeamName = String(fixture.homeTeam?.name ?? 'Local');
+  const awayTeamName = String(fixture.awayTeam?.name ?? 'Visita');
+  const fixtureLabel = `${homeTeamName} vs ${awayTeamName}`;
+  const kickoff = fixture.scheduledAt instanceof Date
+    ? fixture.scheduledAt.toISOString()
+    : typeof fixture.scheduledAt === 'string'
+      ? new Date(fixture.scheduledAt).toISOString()
+      : undefined;
   return {
     predictionId: String(leg.predictionId ?? ''),
     fixtureId: String(leg.fixtureId ?? fixture.id ?? ''),
-    fixture: `${fixture.homeTeam?.name ?? 'Local'} vs ${fixture.awayTeam?.name ?? 'Visita'}`,
+    fixture: fixtureLabel,
+    display: {
+      fixtureLabel,
+      homeTeamName,
+      awayTeamName,
+      ...(typeof fixture.competition?.name === 'string' ? { leagueName: fixture.competition.name } : {}),
+      ...(kickoff ? { kickoffLocal: kickoff } : {}),
+    },
     market,
     selection,
     line,

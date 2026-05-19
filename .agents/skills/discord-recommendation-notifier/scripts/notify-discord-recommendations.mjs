@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
 const DEFAULT_MAX_SELECTIONS = 14;
 const DEFAULT_TRANSPORT = 'discord-native';
-const DEFAULT_GATEWAY_TARGET = 'discord';
+const DEFAULT_GATEWAY_TARGET = 'discord:1494071165453467721';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DISCORD_FIELD_LIMIT = 1024;
 const DISCORD_DESCRIPTION_LIMIT = 4096;
@@ -25,6 +25,7 @@ export function parseArgs(argv) {
     hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
     dryRun: false,
     latest: false,
+    singleMessage: false,
     max: DEFAULT_MAX_SELECTIONS,
     username: 'Gana Hermes',
   };
@@ -39,6 +40,7 @@ export function parseArgs(argv) {
     else if (arg === '--hermes-python') args.hermesPython = requireValue(argv, ++index, arg);
     else if (arg === '--dry-run') args.dryRun = true;
     else if (arg === '--latest') args.latest = true;
+    else if (arg === '--single-message') args.singleMessage = true;
     else if (arg === '--max') args.max = parseMax(requireValue(argv, ++index, arg));
     else if (arg === '--username') args.username = requireValue(argv, ++index, arg);
     else if (arg === '--help' || arg === '-h') args.help = true;
@@ -89,6 +91,60 @@ export function buildDiscordPayloads(artifact, options = {}) {
     pageCount: pages.length,
     totalRecommendations: recommendations,
   }));
+}
+
+export function buildDiscordSinglePayload(artifact, options = {}) {
+  const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
+  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const counts = recommendationCounts(recommendations);
+  const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
+  const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
+  const risk = commonRiskFlag(recommendations, 'low-liquidity');
+  const embeds = [{
+    title: '🏆 Gana v9 · Recomendaciones en revisión',
+    description: [
+      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+      `🟡 ${status} · ${validation} · 💧 ${risk}`,
+      '⚠️ Sin ejecución monetaria · Sin garantía',
+    ].join('\n'),
+    color: 0x2f80ed,
+    footer: { text: 'Gana Hermes · Discord native embeds' },
+    timestamp: new Date().toISOString(),
+  }];
+
+  if (!recommendations.length) {
+    embeds.push({
+      title: 'Sin selecciones',
+      description: '> El artifact no contiene selecciones para notificar.',
+      color: 0x828282,
+    });
+  } else {
+    const lines = recommendations.flatMap((recommendation, index) => formatCompactRecommendationLines(recommendation, index));
+    const descriptions = chunkLinesByLimit(lines, DISCORD_DESCRIPTION_LIMIT - 200);
+    const availableSelectionEmbeds = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
+    for (const [index, description] of descriptions.slice(0, availableSelectionEmbeds).entries()) {
+      embeds.push({
+        title: index === 0 ? 'Selecciones' : `Selecciones cont. ${index + 1}`,
+        description: truncate(description, DISCORD_DESCRIPTION_LIMIT),
+        color: 0x27ae60,
+      });
+    }
+    if (descriptions.length > availableSelectionEmbeds) {
+      embeds[embeds.length - 1].description = truncate(`${embeds[embeds.length - 1].description}\n> +selecciones truncadas por limite de Discord`, DISCORD_DESCRIPTION_LIMIT);
+    }
+  }
+
+  embeds.push({
+    description: '🛡️ Revisión manual requerida antes de promoción.',
+    color: 0x56ccf2,
+  });
+
+  return {
+    username: stringOrFallback(options.username, 'Gana Hermes'),
+    allowed_mentions: { parse: [] },
+    content: '',
+    embeds,
+  };
 }
 
 function buildDiscordPayloadPage(recommendations, options = {}) {
@@ -652,10 +708,28 @@ function chunk(values, size) {
   return chunks;
 }
 
+function chunkLinesByLimit(lines, limit) {
+  const chunks = [];
+  let current = [];
+  let length = 0;
+  for (const line of lines) {
+    const addition = current.length ? line.length + 1 : line.length;
+    if (current.length && length + addition > limit) {
+      chunks.push(current.join('\n'));
+      current = [];
+      length = 0;
+    }
+    current.push(line);
+    length += current.length === 1 ? line.length : addition;
+  }
+  if (current.length) chunks.push(current.join('\n'));
+  return chunks;
+}
+
 function usage() {
   return [
     'Usage:',
-    '  notify-discord-recommendations.mjs --artifact PATH [--max 14] [--gateway-target discord] [--dry-run]',
+    '  notify-discord-recommendations.mjs --artifact PATH [--max 14] [--single-message] [--gateway-target discord] [--dry-run]',
     '  notify-discord-recommendations.mjs --artifact PATH --transport discord-native --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --artifact PATH --transport hermes-gateway --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --latest [--artifact-root .artifacts/gana-v9/runs] [--dry-run]',
@@ -676,8 +750,8 @@ async function main() {
 
   const artifactPath = resolveArtifactPath(options);
   const { artifact, recommendations } = loadRecommendations(artifactPath);
-  const payload = buildDiscordPayload(artifact, options);
-  const payloads = buildDiscordPayloads(artifact, options);
+  const payload = options.singleMessage ? buildDiscordSinglePayload(artifact, options) : buildDiscordPayload(artifact, options);
+  const payloads = options.singleMessage ? [payload] : buildDiscordPayloads(artifact, options);
   const gatewayMessage = buildGatewayMessage(artifact, options);
 
   if (options.dryRun) {

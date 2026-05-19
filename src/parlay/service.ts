@@ -205,8 +205,13 @@ export interface ParlayServiceRepositories {
       take?: number;
     }): Promise<PredictionRecord[]>;
     listForFixtureDate(date: Date | string, query: {
+      runId?: string;
+      runIds?: string[];
+      fixtureId?: string;
       status?: PredictionStatus | string | Array<PredictionStatus | string>;
       take?: number;
+      skip?: number;
+      timezone?: string;
     }): Promise<PredictionRecord[]>;
   };
   harnessRuns?: {
@@ -275,6 +280,7 @@ export async function runParlayBuild(
   const predictionQuery = {
     status: MAIN_PARLAY_PREDICTION_STATUSES,
     take: 500,
+    timezone: config.apiFootball.timezone,
   };
   const predictionSourceRunId = input.sourceRunId;
   const predictionSourceRunIds = normalizeSourceRunIds(input.sourceRunIds, predictionSourceRunId);
@@ -282,9 +288,9 @@ export async function runParlayBuild(
     ? predictionSourceRunIds.join(',')
     : predictionSourceRunId;
   const predictions = predictionSourceRunIds.length > 1
-    ? await repositories.predictions.list({ ...predictionQuery, runIds: predictionSourceRunIds })
+    ? await repositories.predictions.listForFixtureDate(input.date, { ...predictionQuery, runIds: predictionSourceRunIds })
     : predictionSourceRunId
-    ? await repositories.predictions.list({ ...predictionQuery, runId: predictionSourceRunId })
+    ? await repositories.predictions.listForFixtureDate(input.date, { ...predictionQuery, runId: predictionSourceRunId })
     : await repositories.predictions.listForFixtureDate(input.date, predictionQuery);
   const build = buildParlay({
     id: randomUUID(),

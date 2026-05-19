@@ -73,6 +73,7 @@ describe('runParlayBuild', () => {
           listForFixtureDate: async (date, query) => {
             assert.equal(date, '2026-04-25');
             assert.deepEqual(query.status, ['candidate', 'promotable']);
+            assert.equal(query.timezone, 'America/Guatemala');
             return [
               prediction({ id: 'prediction-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8 }),
               prediction({ id: 'prediction-2', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.7 }),
@@ -109,22 +110,24 @@ describe('runParlayBuild', () => {
   it('uses every current-run projection, including normal and low-odds-expanded fixtures', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
-    let listQuery: any;
+    let fixtureDateQuery: any;
+    let fixtureDate: any;
 
     const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunId: 'current-run-1' }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/parlays.json',
       repositories: {
         predictions: {
-          list: async (query) => {
-            listQuery = query;
+          list: async () => {
+            throw new Error('run-scoped parlay builds must stay constrained to the requested fixture date');
+          },
+          listForFixtureDate: async (date, query) => {
+            fixtureDate = date;
+            fixtureDateQuery = query;
             return [
               prediction({ id: 'normal-projection', runId: 'current-run-1', fixtureId: 'fixture-normal', odds: 2, confidence: 0.8 }),
               prediction({ id: 'low-odds-expanded-projection', runId: 'current-run-1', fixtureId: 'fixture-low-odds-expanded', odds: 1.5, confidence: 0.7 }),
             ] as any[];
-          },
-          listForFixtureDate: async () => {
-            throw new Error('run-scoped parlay builds must not read every prediction for the fixture date');
           },
         },
         harnessRuns: { upsertForRun: async () => ({}) },
@@ -134,10 +137,12 @@ describe('runParlayBuild', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(listQuery, {
+    assert.equal(fixtureDate, '2026-04-25');
+    assert.deepEqual(fixtureDateQuery, {
       runId: 'current-run-1',
       status: ['candidate', 'promotable'],
       take: 500,
+      timezone: 'America/Guatemala',
     });
     assert.equal(result.build.parlay.legs.length, 2);
     assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), [
@@ -149,22 +154,24 @@ describe('runParlayBuild', () => {
   it('can combine predictions from multiple source runs without date-wide contamination', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
-    let listQuery: any;
+    let fixtureDateQuery: any;
+    let fixtureDate: any;
 
     const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunIds: ['codex-run', 'gemini-run'] }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/parlays.json',
       repositories: {
         predictions: {
-          list: async (query) => {
-            listQuery = query;
+          list: async () => {
+            throw new Error('multi-run parlay builds must stay constrained to the requested fixture date');
+          },
+          listForFixtureDate: async (date, query) => {
+            fixtureDate = date;
+            fixtureDateQuery = query;
             return [
               prediction({ id: 'codex-pick', runId: 'codex-run', fixtureId: 'fixture-1', odds: 1.6, confidence: 0.8 }),
               prediction({ id: 'gemini-pick', runId: 'gemini-run', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.78 }),
             ] as any[];
-          },
-          listForFixtureDate: async () => {
-            throw new Error('multi-run parlay builds must not read every prediction for the fixture date');
           },
         },
         harnessRuns: { upsertForRun: async () => ({}) },
@@ -174,10 +181,12 @@ describe('runParlayBuild', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(listQuery, {
+    assert.equal(fixtureDate, '2026-04-25');
+    assert.deepEqual(fixtureDateQuery, {
       runIds: ['codex-run', 'gemini-run'],
       status: ['candidate', 'promotable'],
       take: 500,
+      timezone: 'America/Guatemala',
     });
     assert.equal(result.build.parlay.sourceRunId, 'codex-run,gemini-run');
     assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['codex-pick', 'gemini-pick']);
@@ -192,14 +201,16 @@ describe('runParlayBuild', () => {
       writeArtifact: () => '/tmp/parlays.json',
       repositories: {
         predictions: {
-          list: async () => [
+          list: async () => {
+            throw new Error('run-scoped parlay builds must stay constrained to the requested fixture date');
+          },
+          listForFixtureDate: async () => [
             prediction({ id: 'prediction-1', runId: 'current-run-1', fixtureId: 'fixture-1', odds: 2, confidence: 0.8, metadata: { parlayEligible: false } }),
             prediction({ id: 'prediction-2', runId: 'current-run-1', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.8, warnings: ['research is not promotable'] }),
             prediction({ id: 'prediction-3', runId: 'current-run-1', fixtureId: 'fixture-3', odds: 1.5, confidence: 0.8, warnings: ['stale news source'] }),
             prediction({ id: 'prediction-4', runId: 'current-run-1', fixtureId: 'fixture-4', odds: 1.5, confidence: 0.8 }),
             prediction({ id: 'prediction-5', runId: 'current-run-1', fixtureId: 'fixture-5', odds: 1.5, confidence: 0.8 }),
           ] as any[],
-          listForFixtureDate: async () => [],
         },
         harnessRuns: { upsertForRun: async () => ({}) },
         artifacts: { create: async () => ({ id: 'artifact-parlays-1' }) as any },
@@ -1506,8 +1517,14 @@ describe('prediction repository fixture date query', () => {
       } as any,
     });
 
-    await repo.listForFixtureDate('2026-05-02', { timezone: 'America/Guatemala' });
+    await repo.listForFixtureDate('2026-05-02', {
+      runIds: ['run-a', 'run-b'],
+      fixtureId: 'fixture-1',
+      timezone: 'America/Guatemala',
+    });
 
+    assert.deepEqual(where.runId, { in: ['run-a', 'run-b'] });
+    assert.equal(where.fixtureId, 'fixture-1');
     assert.equal(where.fixture.scheduledAt.gte.toISOString(), '2026-05-02T06:00:00.000Z');
     assert.equal(where.fixture.scheduledAt.lt.toISOString(), '2026-05-03T06:00:00.000Z');
   });

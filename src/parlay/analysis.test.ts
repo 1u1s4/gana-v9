@@ -169,7 +169,10 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.diagnostics.profileScope, 'all');
     assert.equal(result.diagnostics.rawAnalyzed, 5);
     assert.equal(result.diagnostics.profileScopedAnalyzed, 5);
-    assert.equal(query.where.legs.some.fixture.scheduledAt.gte.toISOString(), '2026-05-13T06:00:00.000Z');
+    assert.equal(query.where.AND[0].legs.some.fixture.scheduledAt.gte.toISOString(), '2026-05-13T06:00:00.000Z');
+    assert.equal(query.where.AND[0].legs.some.fixture.scheduledAt.lt.toISOString(), '2026-05-14T06:00:00.000Z');
+    assert.equal(query.where.AND[1].legs.every.fixture.scheduledAt.gte.toISOString(), '2026-05-13T06:00:00.000Z');
+    assert.equal(query.where.AND[1].legs.every.fixture.scheduledAt.lt.toISOString(), '2026-05-14T06:00:00.000Z');
     assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-low-odds-top', 'parlay-low-variance']);
     assert.equal(result.top.every((item) => item.validationStatus === 'won'), true);
     assert.equal(result.diagnostics.universe.hitRate, 0.6);

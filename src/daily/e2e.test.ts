@@ -203,7 +203,8 @@ describe('runDailyE2E', () => {
       repositories: undefined,
       runPipeline: async (config, input) => {
         const runId = `${config.provider}-run`;
-        const secondFixture = { ...fixture(), id: 'fixture-2', homeTeamName: 'Team C', awayTeamName: 'Team D' };
+        const firstFixture = fixture('2026-05-19T16:00:00.000Z');
+        const secondFixture = { ...fixture('2026-05-19T18:00:00.000Z'), id: 'fixture-2', homeTeamName: 'Team C', awayTeamName: 'Team D' };
         return {
           ok: true,
           runId,
@@ -215,7 +216,7 @@ describe('runDailyE2E', () => {
           evidencePackPath: '/tmp/evidence.json',
           handoffPath: '/tmp/handoff.md',
           steps: [],
-          fixtures: [fixture(), secondFixture],
+          fixtures: [firstFixture, secondFixture],
           lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
           oddsSnapshots: [],
           research: [],
@@ -389,7 +390,7 @@ describe('runDailyE2E', () => {
           evidencePackPath: '/tmp/evidence.json',
           handoffPath: '/tmp/handoff.md',
           steps: [],
-          fixtures: [fixture()],
+          fixtures: [fixture('2026-05-18T16:00:00.000Z')],
           lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
           oddsSnapshots: [],
           research: [],
@@ -697,7 +698,7 @@ describe('runDailyE2E', () => {
   });
 });
 
-function fixture() {
+function fixture(scheduledAt = '2026-05-14T16:00:00.000Z') {
   return {
     id: 'fixture-1',
     provider: 'api-football',
@@ -706,7 +707,7 @@ function fixture() {
     awayTeamId: 'away-1',
     homeTeamName: 'Team A',
     awayTeamName: 'Team B',
-    scheduledAt: '2026-05-14T16:00:00.000Z',
+    scheduledAt,
     status: 'scheduled',
     includedByFilters: [],
     createdAt: '2026-05-14T00:00:00.000Z',

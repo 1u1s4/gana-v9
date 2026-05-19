@@ -16,6 +16,9 @@ export interface PredictionQuery {
 }
 
 export interface PredictionFixtureDateQuery {
+  runId?: string;
+  runIds?: string[];
+  fixtureId?: string;
   status?: PredictionStatus | string | Array<PredictionStatus | string>;
   take?: number;
   skip?: number;
@@ -68,6 +71,8 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
 
       return db.prediction.findMany({
         where: compactData({
+          runId: query.runIds?.length ? { in: query.runIds } : query.runId,
+          fixtureId: query.fixtureId,
           status: Array.isArray(query.status) ? { in: query.status } : query.status,
           fixture: {
             scheduledAt: {

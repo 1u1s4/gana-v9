@@ -14,9 +14,9 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Daily recommendations artifact: `daily-parlay-recommendations.json`
 - Recommendation types: ranked parlays plus `atomic-prediction` entries, which are high-confidence single-selection recommendations shaped like one-leg parlays.
 - Transport: native Discord embeds via Hermes gateway config by default (`--transport discord-native`), plain Hermes gateway text with `--transport hermes-gateway`, or webhook with `--transport webhook`
-- Gateway target: `--gateway-target discord` by default, or a specific target from Hermes such as `discord:#general`
+- Gateway target: the Gana Discord channel by default, or a specific target from Hermes such as `discord:#general`
 - Discord webhook: `DISCORD_WEBHOOK_URL` or `--webhook-url` only when using `--transport webhook`
-- Optional max selections: `--max N` defaults to 14. Native Discord delivery automatically splits more than 8 selections into multiple embed messages.
+- Optional max selections: `--max N` defaults to 14. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs the compact selections into one native Discord message.
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
 
@@ -62,6 +62,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
 - Preserve the established style in future sends: emoji-led scan lines, native Discord boxes, blockquoted selections, compact metrics, and the final manual-review control.
 - Keep each native message compact enough for Discord embed limits; use the notifier's automatic multi-message pagination for 4 parlays + 10 simples.
+- When the user asks for one part / one message, use `--single-message` so the 4 parlays + 10 simples are packed into a single native Discord payload.
 - Disable mentions with `allowed_mentions: { "parse": [] }`.
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
 - Do not include stake sizing, money instructions, payment links, or betting execution language.
@@ -90,6 +91,7 @@ Useful commands:
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --dry-run
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 3
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 14 --single-message
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --transport discord-native --gateway-target discord:CHANNEL_ID
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --dry-run
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --test-label "Esto es una prueba"
