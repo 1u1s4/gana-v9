@@ -22,7 +22,7 @@ describe('discord recommendation notifier', () => {
 
     assert.equal(payload.username, 'Hermes Test');
     assert.deepEqual(payload.allowed_mentions, { parse: [] });
-    assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones en revisión');
+    assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones');
     assert.equal(payload.embeds.length, 3);
     assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 0 simples/);
     assert.match(payload.embeds[1].title, /1️⃣ Team A vs Team B/);
@@ -144,11 +144,16 @@ describe('discord recommendation notifier', () => {
 
     assert.equal(payloads.length, 2);
     assert.equal(payloads[0].embeds.length, 10);
-    assert.equal(payloads[1].embeds.length, 8);
-    assert.match(payloads[0].embeds[0].description, /📄 Parte 1\/2/);
+    assert.equal(payloads[1].embeds.length, 6);
+    assert.equal(payloads[0].embeds[0].title, '🏆 Gana v9 · Recomendaciones');
+    assert.doesNotMatch(payloads[0].embeds[0].description, /Parte 1\/2/);
     assert.match(payloads[0].embeds[0].description, /📦 4 parlays · 📌 10 simples/);
-    assert.match(payloads[1].embeds[0].description, /📄 Parte 2\/2/);
-    assert.match(payloads[1].embeds[1].title, /9️⃣ 📌 Simple/);
+    assert.doesNotMatch(payloads[0].embeds.at(-1).description ?? '', /Revisión manual requerida/);
+    assert.match(payloads[1].embeds[0].title, /🔟 📌 Simple/);
+    assert.match(payloads[1].embeds.at(-1).description, /Revisión manual requerida/);
+    assert.equal(payloads[0].embeds[1].color, 0xf2c94c);
+    assert.equal(payloads[0].embeds[2].color, 0x27ae60);
+    assert.equal(payloads[0].embeds[5].color, 0x9b51e0);
   });
 
   it('can pack fourteen selections into one native Discord message when requested', () => {
@@ -163,7 +168,7 @@ describe('discord recommendation notifier', () => {
     const payload = buildDiscordSinglePayload(artifact, { max: 14 });
 
     assert.equal(payload.embeds.length <= 10, true);
-    assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones en revisión');
+    assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones');
     assert.match(payload.embeds[0].description, /📦 4 parlays · 📌 10 simples/);
     assert.match(payload.embeds[1].title, /Selecciones/);
     assert.match(payload.embeds.map((embed) => embed.description ?? '').join('\n'), /14\. 📌 Simple/);

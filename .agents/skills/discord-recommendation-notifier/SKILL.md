@@ -56,13 +56,14 @@ When a matching recommendations artifact exists for the validation date, the dai
 ## Message Rules
 
 - Keep native Discord embeds/cajas for Discord delivery unless the user explicitly asks for plain text.
-- Header embed format: `🏆 Gana v9 · Recomendaciones en revisión`, parlay/simple counts, status/risk, and analytical disclaimer.
+- Header embed format: `🏆 Gana v9 · Recomendaciones`, parlay/simple counts, and artifact date as `DD/MM/YYYY`.
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
 - Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
+- Native Discord recommendation blocks are color-coded: yellow for the principal/rank-1 parlay, green for secondary parlays, and purple for simple recommendations.
 - Preserve the established style in future sends: emoji-led scan lines, native Discord boxes, blockquoted selections, compact metrics, and the final manual-review control.
 - Keep each native message compact enough for Discord embed limits; use the notifier's automatic multi-message pagination for 4 parlays + 10 simples.
-- When the user asks for one part / one message, use `--single-message` so the 4 parlays + 10 simples are packed into a single native Discord payload.
+- Use `--single-message` only when the user explicitly asks for one part / one message; it packs compact selections and cannot preserve one native colored block per selection because of Discord embed limits.
 - Disable mentions with `allowed_mentions: { "parse": [] }`.
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
 - When the artifact includes `stakeRecommendation`, show only the bucketed analytical bank percentage as `💵 Stake N`; allowed buckets are `1, 5, 10, 15, 20, 25`.

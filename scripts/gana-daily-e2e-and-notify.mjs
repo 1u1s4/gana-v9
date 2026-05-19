@@ -72,7 +72,6 @@ try {
       '--transport', 'discord-native',
       '--gateway-target', gatewayTarget,
       '--max', String(args.max ?? 14),
-      '--single-message',
     ], {
       cwd: REPO_ROOT,
       env,
