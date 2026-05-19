@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
-const DEFAULT_MAX_SELECTIONS = 5;
+const DEFAULT_MAX_SELECTIONS = 14;
 const DEFAULT_TRANSPORT = 'discord-native';
 const DEFAULT_GATEWAY_TARGET = 'discord';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
@@ -13,6 +13,7 @@ const DISCORD_FIELD_LIMIT = 1024;
 const DISCORD_DESCRIPTION_LIMIT = 4096;
 const DISCORD_EMBED_LIMIT = 10;
 const DISCORD_NON_SELECTION_EMBEDS = 2;
+const DISCORD_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
 
 export function parseArgs(argv) {
   const args = {
@@ -72,19 +73,40 @@ export function loadRecommendations(path) {
 
 export function buildDiscordPayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
-  const selectionLimit = Math.min(max, DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS);
+  const selectionLimit = Math.min(max, DISCORD_SELECTION_EMBEDS_PER_MESSAGE);
   const recommendations = selectRecommendations(artifact).slice(0, selectionLimit);
+  return buildDiscordPayloadPage(recommendations, options);
+}
+
+export function buildDiscordPayloads(artifact, options = {}) {
+  const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
+  const recommendations = selectRecommendations(artifact).slice(0, max);
+  if (!recommendations.length) return [buildDiscordPayloadPage([], options)];
+  const pages = chunk(recommendations, DISCORD_SELECTION_EMBEDS_PER_MESSAGE);
+  return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
+    ...options,
+    page: index + 1,
+    pageCount: pages.length,
+    totalRecommendations: recommendations,
+  }));
+}
+
+function buildDiscordPayloadPage(recommendations, options = {}) {
+  const totalRecommendations = Array.isArray(options.totalRecommendations) ? options.totalRecommendations : recommendations;
   const counts = recommendationCounts(recommendations);
+  const totalCounts = recommendationCounts(totalRecommendations);
   const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
   const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
   const risk = commonRiskFlag(recommendations, 'low-liquidity');
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones en revisión',
     description: [
-      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+      options.pageCount > 1 ? `📄 Parte ${options.page}/${options.pageCount}` : undefined,
+      `📦 ${totalCounts.parlay} parlays · 📌 ${totalCounts.atomic} simples`,
+      options.pageCount > 1 ? `📍 En este mensaje: ${counts.parlay} parlays · ${counts.atomic} simples` : undefined,
       `🟡 ${status} · ${validation} · 💧 ${risk}`,
       '⚠️ Sin ejecución monetaria · Sin garantía',
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     color: 0x2f80ed,
     footer: { text: 'Gana Hermes · Discord native embeds' },
     timestamp: new Date().toISOString(),
@@ -581,8 +603,8 @@ function requireValue(argv, index, flag) {
 
 function parseMax(value) {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 10) {
-    throw new Error('--max must be an integer between 1 and 10.');
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 25) {
+    throw new Error('--max must be an integer between 1 and 25.');
   }
   return parsed;
 }
@@ -622,14 +644,22 @@ function truncate(value, limit) {
   return `${value.slice(0, Math.max(0, limit - 1))}…`;
 }
 
+function chunk(values, size) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function usage() {
   return [
     'Usage:',
-    '  notify-discord-recommendations.mjs --artifact PATH [--max 5] [--gateway-target discord] [--dry-run]',
+    '  notify-discord-recommendations.mjs --artifact PATH [--max 14] [--gateway-target discord] [--dry-run]',
     '  notify-discord-recommendations.mjs --artifact PATH --transport discord-native --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --artifact PATH --transport hermes-gateway --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --latest [--artifact-root .artifacts/gana-v9/runs] [--dry-run]',
-    '  notify-discord-recommendations.mjs --artifact PATH --transport webhook [--max 5]',
+    '  notify-discord-recommendations.mjs --artifact PATH --transport webhook [--max 14]',
     '',
     'Environment:',
     '  HERMES_GATEWAY_PYTHON may override the Python used for Hermes gateway delivery.',
@@ -647,6 +677,7 @@ async function main() {
   const artifactPath = resolveArtifactPath(options);
   const { artifact, recommendations } = loadRecommendations(artifactPath);
   const payload = buildDiscordPayload(artifact, options);
+  const payloads = buildDiscordPayloads(artifact, options);
   const gatewayMessage = buildGatewayMessage(artifact, options);
 
   if (options.dryRun) {
@@ -657,6 +688,7 @@ async function main() {
       gatewayTarget: options.gatewayTarget,
       hermesPython: options.hermesPython,
       payload,
+      payloads,
       gatewayMessage,
     }, null, 2));
     return;
@@ -675,23 +707,28 @@ async function main() {
   }
 
   if (options.transport === 'discord-native') {
-    const result = sendDiscordNativePayload(options.gatewayTarget, payload, { hermesPython: options.hermesPython });
+    const results = payloads.map((item) => sendDiscordNativePayload(options.gatewayTarget, item, { hermesPython: options.hermesPython }));
     console.log(JSON.stringify({
       artifactPath,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
-      discordResult: result,
+      discordResult: results[0],
+      discordResults: results,
     }, null, 2));
     return;
   }
 
-  const result = await sendDiscordPayload(options.webhookUrl, payload);
+  const results = [];
+  for (const item of payloads) {
+    results.push(await sendDiscordPayload(options.webhookUrl, item));
+  }
   console.log(JSON.stringify({
     artifactPath,
     selectionCount: recommendations.length,
     transport: options.transport,
-    discordStatus: result.status,
+    discordStatus: results[0]?.status,
+    discordStatuses: results.map((result) => result.status),
   }, null, 2));
 }
 

@@ -182,7 +182,7 @@ describe('runDailyE2E', () => {
     assert.equal(consensus.analyticalArtifactOnly, true);
   });
 
-  it('limits final parlays to five, prefers the diamante safety window, and excludes used legs from simples', async () => {
+  it('limits final parlays to four, prefers the diamante safety window, and excludes used legs from simples', async () => {
     const ctx = context();
     const analysisTop = [
       parlayRecommendation({ rank: 1, parlayId: 'balanced-1', profile: 'balanced', combinedOdds: 1.8, predictionId: 'prediction-atomic-1' }),
@@ -256,14 +256,17 @@ describe('runDailyE2E', () => {
         build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 1.8, aggregateConfidence: 0.8, aggregateQuality: 0.8 } },
         persistedParlayIds: [`${runtime.runId}-persisted`],
       }) as any,
-      analyzeParlays: async (_config, input, runtime) => ({
-        ok: true,
-        runId: runtime.runId ?? 'analysis-run',
-        date: input.date,
-        analyzed: analysisTop.length,
-        top: analysisTop,
-        diagnostics: { generatedAt: '2026-05-19T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 6, profileScopedAnalyzed: 6, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 6, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 5, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
-      }) as any,
+      analyzeParlays: async (_config, input, runtime) => {
+        assert.equal(input.top, 12);
+        return {
+          ok: true,
+          runId: runtime.runId ?? 'analysis-run',
+          date: input.date,
+          analyzed: analysisTop.length,
+          top: analysisTop,
+          diagnostics: { generatedAt: '2026-05-19T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 6, profileScopedAnalyzed: 6, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 6, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 5, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+        } as any;
+      },
       buildDailyMetrics: async (_config, input, runtime) => ({
         ok: true,
         runId: runtime.runId ?? 'metrics-run',
@@ -278,14 +281,17 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.equal(recommendations.parlayRecommendations.length, 5);
+    assert.equal(recommendations.parlayRecommendations.length, 4);
     assert.equal(recommendations.parlayRecommendations[0].profile, 'parlay-diamante');
-    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3, 4, 5]);
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3, 4]);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'balanced-2'), false);
     assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), ['prediction-atomic-2']);
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayLegs, true);
+    assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 4);
+    assert.equal(recommendations.recommendationPolicy.parlayAnalysisTop, 12);
+    assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
-    assert.equal(summary.counts.parlayRecommendations, 5);
+    assert.equal(summary.counts.parlayRecommendations, 4);
     assert.equal(summary.counts.atomicRecommendations, 1);
   });
 

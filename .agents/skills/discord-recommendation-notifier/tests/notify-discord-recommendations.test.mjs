@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   buildDiscordPayload,
+  buildDiscordPayloads,
   buildGatewayMessage,
   findLatestRecommendationsArtifact,
   loadRecommendations,
@@ -127,6 +128,26 @@ describe('discord recommendation notifier', () => {
 
     assert.equal(payload.embeds.length, 10);
     assert.match(payload.embeds.at(-1).description, /Revisión manual requerida/);
+  });
+
+  it('splits more than eight Discord selections into multiple native payloads', () => {
+    const artifact = sampleArtifact();
+    artifact.recommendations = Array.from({ length: 14 }, (_, index) => ({
+      ...sampleArtifact().recommendations[0],
+      rank: index + 1,
+      parlayId: `parlay-${index + 1}`,
+      kind: index < 4 ? 'parlay' : 'atomic-prediction',
+    }));
+
+    const payloads = buildDiscordPayloads(artifact, { max: 14 });
+
+    assert.equal(payloads.length, 2);
+    assert.equal(payloads[0].embeds.length, 10);
+    assert.equal(payloads[1].embeds.length, 8);
+    assert.match(payloads[0].embeds[0].description, /📄 Parte 1\/2/);
+    assert.match(payloads[0].embeds[0].description, /📦 4 parlays · 📌 10 simples/);
+    assert.match(payloads[1].embeds[0].description, /📄 Parte 2\/2/);
+    assert.match(payloads[1].embeds[1].title, /9️⃣ 📌 Simple/);
   });
 
   it('loads artifacts and resolves the newest recommendations file', () => {

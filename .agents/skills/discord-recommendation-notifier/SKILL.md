@@ -16,7 +16,7 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Transport: native Discord embeds via Hermes gateway config by default (`--transport discord-native`), plain Hermes gateway text with `--transport hermes-gateway`, or webhook with `--transport webhook`
 - Gateway target: `--gateway-target discord` by default, or a specific target from Hermes such as `discord:#general`
 - Discord webhook: `DISCORD_WEBHOOK_URL` or `--webhook-url` only when using `--transport webhook`
-- Optional max selections: `--max N` defaults to 5
+- Optional max selections: `--max N` defaults to 14. Native Discord delivery automatically splits more than 8 selections into multiple embed messages.
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
 
@@ -61,7 +61,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
 - Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
 - Preserve the established style in future sends: emoji-led scan lines, native Discord boxes, blockquoted selections, compact metrics, and the final manual-review control.
-- Keep the message compact enough for Discord embed limits.
+- Keep each native message compact enough for Discord embed limits; use the notifier's automatic multi-message pagination for 4 parlays + 10 simples.
 - Disable mentions with `allowed_mentions: { "parse": [] }`.
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
 - Do not include stake sizing, money instructions, payment links, or betting execution language.

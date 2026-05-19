@@ -71,7 +71,7 @@ try {
       '--artifact', recommendationsPath,
       '--transport', 'discord-native',
       '--gateway-target', gatewayTarget,
-      '--max', String(args.max ?? 8),
+      '--max', String(args.max ?? 14),
     ], {
       cwd: REPO_ROOT,
       env,
