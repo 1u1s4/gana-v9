@@ -27,8 +27,7 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 0 simples/);
     assert.match(payload.embeds[1].title, /1️⃣ Team A vs Team B/);
     assert.match(payload.embeds[1].description, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
-    assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 📌 Expo n\/a/);
-    assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
+    assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 12.5u \(12.5%\) · 📌 Expo n\/a/);
     assert.doesNotMatch(JSON.stringify(payload), /\bbet\b/i);
   });
 
@@ -46,9 +45,8 @@ describe('discord recommendation notifier', () => {
     assert.match(message, /📦 1 parlays · 📌 0 simples/);
     assert.match(message, /1️⃣ Team A vs Team B/);
     assert.match(message, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
-    assert.match(message, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 📌 Expo n\/a/);
+    assert.match(message, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 12.5u \(12.5%\) · 📌 Expo n\/a/);
     assert.match(message, /🛡️ Revisión manual requerida antes de promoción/);
-    assert.doesNotMatch(message, /\bstake\b/i);
     assert.doesNotMatch(message, /\bbet\b/i);
   });
 
@@ -59,8 +57,8 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 1 simples/);
     assert.match(payload.embeds[2].title, /📌 Simple · Team C vs Team D · h2h away/);
     assert.match(payload.embeds[2].description, /> ⚽ Team C vs Team D: h2h away @ 1.18/);
+    assert.match(payload.embeds[2].description, /💵 Stake 8u \(8%\)/);
     assert.match(message, /2️⃣ 📌 Simple · Team C vs Team D · h2h away/);
-    assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
   });
 
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
@@ -264,6 +262,12 @@ function sampleArtifact() {
       adjustedProbability: 0.62,
       expectedEdge: 0.08,
       score: 0.9123,
+      stakeRecommendation: {
+        units: 12.5,
+        percentOfBankroll: 0.125,
+        bankrollUnits: 100,
+        policy: 'full-bankroll-proportional-confidence-edge-allocation',
+      },
       riskFlags: ['none'],
       legs: [{
         predictionId: 'prediction-1',
@@ -315,6 +319,12 @@ function sampleArtifactWithAtomic() {
         expectedEdge: 0.07,
         score: 0.84,
         exposure: { units: 0, percentOfAnalyticalBankroll: 0, policy: 'single-selection-analytical-watchlist' },
+        stakeRecommendation: {
+          units: 8,
+          percentOfBankroll: 0.08,
+          bankrollUnits: 100,
+          policy: 'full-bankroll-proportional-confidence-edge-allocation',
+        },
         bankerLegs: [],
         reasons: ['confidence 0.92', 'edge 0.07'],
         riskFlags: ['single-selection'],

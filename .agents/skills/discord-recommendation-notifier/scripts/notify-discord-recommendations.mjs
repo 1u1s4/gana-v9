@@ -459,7 +459,7 @@ function recommendationEmbed(recommendation, index) {
   if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
     legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
   }
-  legLines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  legLines.push(formatCompactMetricLine(recommendation));
   return {
     title: `${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
     description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
@@ -504,7 +504,7 @@ function formatCompactRecommendationLines(recommendation, index) {
     lines.push('> Sin detalle de selecciones.');
   }
 
-  lines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  lines.push(formatCompactMetricLine(recommendation));
   lines.push('');
   return lines;
 }
@@ -588,6 +588,27 @@ export function formatExposurePercent(recommendation) {
   return Number.isFinite(value) ? formatPercent(value) : 'n/a';
 }
 
+export function formatStakeRecommendation(recommendation) {
+  const stake = recommendation.stakeRecommendation
+    ?? recommendation.recommendedStake
+    ?? recommendation.bankrollAllocation;
+  const units = stake?.units;
+  const percent = stake?.percentOfBankroll ?? stake?.percentOfAnalyticalBankroll;
+  if (!Number.isFinite(units) || !Number.isFinite(percent)) return undefined;
+  return `${formatMetricNumber(units, 2)}u (${formatPercent(percent)})`;
+}
+
+function formatCompactMetricLine(recommendation) {
+  const stake = formatStakeRecommendation(recommendation);
+  return [
+    `> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
+    `🧠 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
+    stake ? `💵 Stake ${stake}` : undefined,
+    `📌 Expo ${formatExposurePercent(recommendation)}`,
+  ].filter(Boolean).join(' · ');
+}
+
 function commonRecommendationValue(recommendations, key, fallback) {
   const values = recommendations
     .map((recommendation) => recommendation?.[key])
@@ -618,6 +639,8 @@ function formatMetricLine(recommendation) {
   if (Number.isFinite(recommendation.expectedEdge)) {
     parts.push(`Edge ${formatPercent(recommendation.expectedEdge)}`);
   }
+  const stake = formatStakeRecommendation(recommendation);
+  if (stake) parts.push(`Stake ${stake}`);
   if (Number.isFinite(recommendation.score)) {
     parts.push(`Score ${formatNumber(recommendation.score, 3)}`);
   }

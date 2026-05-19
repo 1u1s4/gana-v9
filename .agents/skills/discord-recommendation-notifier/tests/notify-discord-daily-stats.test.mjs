@@ -73,10 +73,11 @@ describe('discord daily stats notifier', () => {
     assert.match(payload.embeds[1].description, /> ✅ ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(payload.embeds[1].description, /> ❌ 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
     assert.match(payload.embeds[1].description, /Resultado ❌ lost/);
+    assert.match(payload.embeds[1].description, /💵 Stake 11u \(11%\)/);
     assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
     assert.match(payload.embeds[2].description, /> ✅ 🎯 Team C vs Team D: corners under 9.5 @ 1.82/);
+    assert.match(payload.embeds[2].description, /💵 Stake 7.5u \(7.5%\)/);
     assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
-    assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
     assert.doesNotMatch(message, /\bbet\b/i);
   });
 
@@ -151,6 +152,12 @@ function sampleRecommendationArtifact() {
         combinedOdds: 2.24,
         aggregateConfidence: 0.74,
         expectedEdge: 0.08,
+        stakeRecommendation: {
+          units: 11,
+          percentOfBankroll: 0.11,
+          bankrollUnits: 100,
+          policy: 'full-bankroll-proportional-confidence-edge-allocation',
+        },
         validationStatus: 'unvalidated',
         legs: [
           {
@@ -179,6 +186,12 @@ function sampleRecommendationArtifact() {
         combinedOdds: 1.82,
         aggregateConfidence: 0.9,
         expectedEdge: 0.03,
+        stakeRecommendation: {
+          units: 7.5,
+          percentOfBankroll: 0.075,
+          bankrollUnits: 100,
+          policy: 'full-bankroll-proportional-confidence-edge-allocation',
+        },
         validationStatus: 'unvalidated',
         legs: [{
           predictionId: 'prediction-corners-win',

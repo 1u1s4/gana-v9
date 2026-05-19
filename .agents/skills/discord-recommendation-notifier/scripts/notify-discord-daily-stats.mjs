@@ -7,6 +7,7 @@ import {
   formatExposurePercent,
   formatMetricNumber,
   formatPercent,
+  formatStakeRecommendation,
   rankEmoji,
   recommendationCounts,
   recommendationKind,
@@ -19,7 +20,7 @@ import {
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
 const DEFAULT_TRANSPORT = 'discord-native';
-const DEFAULT_GATEWAY_TARGET = 'discord';
+const DEFAULT_GATEWAY_TARGET = 'discord:1494071165453467721';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DEFAULT_TIMEZONE = 'America/Guatemala';
 const DEFAULT_MAX_RECOMMENDATIONS = 8;
@@ -339,7 +340,7 @@ function validationMirrorEmbed(recommendation, index) {
   if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
     legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
   }
-  legLines.push(`> 📊 Resultado ${statusIcon(status)} ${status} · Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  legLines.push(formatValidationMirrorMetricLine(recommendation, status));
 
   return {
     title: `${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
@@ -363,9 +364,21 @@ function formatValidationMirrorLines(recommendation, index) {
     lines.push('> Sin detalle de selecciones.');
   }
 
-  lines.push(`> 📊 Resultado ${statusIcon(status)} ${status} · Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  lines.push(formatValidationMirrorMetricLine(recommendation, status));
   lines.push('');
   return lines;
+}
+
+function formatValidationMirrorMetricLine(recommendation, status) {
+  const stake = formatStakeRecommendation(recommendation);
+  return [
+    `> 📊 Resultado ${statusIcon(status)} ${status}`,
+    `Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
+    `🧠 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
+    stake ? `💵 Stake ${stake}` : undefined,
+    `📌 Expo ${formatExposurePercent(recommendation)}`,
+  ].filter(Boolean).join(' · ');
 }
 
 function buildValidationIndex(validationArtifact) {

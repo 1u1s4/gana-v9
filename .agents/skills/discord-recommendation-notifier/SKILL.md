@@ -57,7 +57,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 
 - Keep native Discord embeds/cajas for Discord delivery unless the user explicitly asks for plain text.
 - Header embed format: `🏆 Gana v9 · Recomendaciones en revisión`, parlay/simple counts, status/risk, and analytical disclaimer.
-- Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/exposure.
+- Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
 - Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
 - Preserve the established style in future sends: emoji-led scan lines, native Discord boxes, blockquoted selections, compact metrics, and the final manual-review control.
@@ -65,7 +65,8 @@ When a matching recommendations artifact exists for the validation date, the dai
 - When the user asks for one part / one message, use `--single-message` so the 4 parlays + 10 simples are packed into a single native Discord payload.
 - Disable mentions with `allowed_mentions: { "parse": [] }`.
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
-- Do not include stake sizing, money instructions, payment links, or betting execution language.
+- When the artifact includes `stakeRecommendation`, show it as analytical bank-unit allocation (`💵 Stake Xu (Y%)`), not as execution language.
+- Do not include payment links, bookmaker instructions, auto-execution language, or monetary execution claims.
 - Validation stat notifications must use the same native embed policy and must label the output as analytical statistics.
 - Validation notifications should include the recommendation mirror unless `--no-recommendation-mirror` is explicitly provided. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.
 
