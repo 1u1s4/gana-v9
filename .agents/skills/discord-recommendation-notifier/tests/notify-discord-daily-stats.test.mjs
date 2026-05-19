@@ -6,7 +6,10 @@ import { tmpdir } from 'node:os';
 import {
   buildDiscordPayload,
   buildGatewayMessage,
+  buildValidationMirrorPayload,
+  buildValidationMirrorMessage,
   findLatestMetricsArtifact,
+  findLatestRecommendationArtifact,
   findLatestValidationArtifact,
   loadDailyStats,
   parseArgs,
@@ -49,6 +52,34 @@ describe('discord daily stats notifier', () => {
     assert.doesNotMatch(message, /\bbet\b/i);
   });
 
+  it('builds a validated mirror of the prior recommendation message', () => {
+    const payload = buildValidationMirrorPayload(sampleRecommendationArtifact(), {
+      date: '2026-05-14',
+      validationArtifact: sampleValidationArtifact(),
+      testLabel: 'Esto es una prueba',
+      maxRecommendations: 2,
+    });
+    const message = buildValidationMirrorMessage(sampleRecommendationArtifact(), {
+      date: '2026-05-14',
+      validationArtifact: sampleValidationArtifact(),
+      testLabel: 'Esto es una prueba',
+      maxRecommendations: 2,
+    });
+
+    assert.equal(payload.embeds[0].title, '📊 Gana v9 · Validación de recomendaciones');
+    assert.match(payload.embeds[0].description, /🧪 Esto es una prueba/);
+    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 1 simples/);
+    assert.match(payload.embeds[1].title, /1️⃣ ❌ Team A vs Team B/);
+    assert.match(payload.embeds[1].description, /> ✅ ⚽ Team A vs Team B: h2h home @ 1.4/);
+    assert.match(payload.embeds[1].description, /> ❌ 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
+    assert.match(payload.embeds[1].description, /Resultado ❌ lost/);
+    assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.match(payload.embeds[2].description, /> ✅ 🎯 Team C vs Team D: corners under 9.5 @ 1.82/);
+    assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
+    assert.doesNotMatch(message, /\bbet\b/i);
+  });
+
   it('finds the newest metrics and validation artifacts for a date', () => {
     const root = join(tmpdir(), `gana-daily-stats-${Date.now()}`);
     const older = join(root, 'older');
@@ -59,19 +90,26 @@ describe('discord daily stats notifier', () => {
     writeFileSync(join(newer, 'daily-metrics.json'), JSON.stringify(sampleMetricsArtifact()));
     writeFileSync(join(older, 'validations.json'), JSON.stringify({ target: { date: '2026-05-14' }, validations: [] }));
     writeFileSync(join(newer, 'validations.json'), JSON.stringify(sampleValidationArtifact()));
+    writeFileSync(join(older, 'daily-parlay-recommendations.json'), JSON.stringify({ date: '2026-05-14', recommendations: [] }));
+    writeFileSync(join(newer, 'daily-parlay-recommendations.json'), JSON.stringify(sampleRecommendationArtifact()));
     utimesSync(join(older, 'daily-metrics.json'), new Date('2026-05-14T00:00:00Z'), new Date('2026-05-14T00:00:00Z'));
     utimesSync(join(newer, 'daily-metrics.json'), new Date('2026-05-15T00:00:00Z'), new Date('2026-05-15T00:00:00Z'));
     utimesSync(join(older, 'validations.json'), new Date('2026-05-14T00:00:00Z'), new Date('2026-05-14T00:00:00Z'));
     utimesSync(join(newer, 'validations.json'), new Date('2026-05-15T00:00:00Z'), new Date('2026-05-15T00:00:00Z'));
+    utimesSync(join(older, 'daily-parlay-recommendations.json'), new Date('2026-05-14T00:00:00Z'), new Date('2026-05-14T00:00:00Z'));
+    utimesSync(join(newer, 'daily-parlay-recommendations.json'), new Date('2026-05-15T00:00:00Z'), new Date('2026-05-15T00:00:00Z'));
 
     const metricsPath = findLatestMetricsArtifact(root, '2026-05-14');
     const validationPath = findLatestValidationArtifact(root, '2026-05-14');
-    const loaded = loadDailyStats(metricsPath, validationPath);
+    const recommendationPath = findLatestRecommendationArtifact(root, '2026-05-14');
+    const loaded = loadDailyStats(metricsPath, validationPath, recommendationPath);
 
     assert.equal(metricsPath.endsWith(join('newer', 'daily-metrics.json')), true);
     assert.equal(validationPath.endsWith(join('newer', 'validations.json')), true);
+    assert.equal(recommendationPath.endsWith(join('newer', 'daily-parlay-recommendations.json')), true);
     assert.equal(loaded.metricsArtifact.runId, 'daily-2026-05-14-metrics');
     assert.equal(loaded.validationArtifact.gateResult.verdict, 'won');
+    assert.equal(loaded.recommendationArtifact.dailyBatchId, 'daily-2026-05-14');
   });
 
   it('supports dry-run without sending to Discord', async () => {
@@ -85,6 +123,7 @@ describe('discord daily stats notifier', () => {
     assert.equal(result.metricDate, '2026-05-14');
     assert.equal(result.gatewayTarget, 'discord:123');
     assert.equal(result.payload.embeds[0].title, '📊 Gana v9 · Validación diaria');
+    assert.equal(result.mirrorPayload, undefined);
   });
 });
 
@@ -97,6 +136,61 @@ function sampleMetricsArtifact() {
     metrics: [sampleSnapshot('2026-05-14')],
     analyticalArtifactOnly: true,
     executionCapability: 'none',
+  };
+}
+
+function sampleRecommendationArtifact() {
+  return {
+    dailyBatchId: 'daily-2026-05-14',
+    date: '2026-05-14',
+    recommendations: [
+      {
+        kind: 'parlay',
+        rank: 1,
+        parlayId: 'parlay-1',
+        combinedOdds: 2.24,
+        aggregateConfidence: 0.74,
+        expectedEdge: 0.08,
+        validationStatus: 'unvalidated',
+        legs: [
+          {
+            predictionId: 'prediction-h2h-win',
+            fixture: 'Team A vs Team B',
+            market: 'h2h',
+            selection: 'home',
+            odds: 1.4,
+            confidence: 0.8,
+          },
+          {
+            predictionId: 'prediction-goals-loss',
+            fixture: 'Team A vs Team B',
+            market: 'goals_over_under',
+            selection: 'under',
+            line: 2.5,
+            odds: 1.6,
+            confidence: 0.68,
+          },
+        ],
+      },
+      {
+        kind: 'atomic-prediction',
+        rank: 2,
+        parlayId: 'atomic-1',
+        combinedOdds: 1.82,
+        aggregateConfidence: 0.9,
+        expectedEdge: 0.03,
+        validationStatus: 'unvalidated',
+        legs: [{
+          predictionId: 'prediction-corners-win',
+          fixture: 'Team C vs Team D',
+          market: 'corners_over_under',
+          selection: 'under',
+          line: 9.5,
+          odds: 1.82,
+          confidence: 0.9,
+        }],
+      },
+    ],
   };
 }
 
@@ -147,6 +241,10 @@ function sampleValidationArtifact() {
     runId: 'validation-run',
     target: { date: '2026-05-14' },
     gateResult: { verdict: 'won', reasons: [], warnings: [] },
-    validations: [{ status: 'won' }, { status: 'lost' }],
+    validations: [
+      { predictionId: 'prediction-h2h-win', status: 'won' },
+      { predictionId: 'prediction-goals-loss', status: 'lost' },
+      { predictionId: 'prediction-corners-win', status: 'won' },
+    ],
   };
 }

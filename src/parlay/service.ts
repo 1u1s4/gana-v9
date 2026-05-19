@@ -1011,7 +1011,7 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
     case 'parlay-oro':
       return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.45, maxOdds: 2.2, maxLegOdds: 1.25, targetParlays: 1, minConfidence: 0.82, minEdge: 0.02, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.55, reviewOnly: true, riskWeight: 0.75 };
     case 'parlay-diamante':
-      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.1, maxOdds: 1.2, maxLegOdds: 1.13, targetParlays: 1, minConfidence: 0.88, minEdge: 0, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.78, reviewOnly: false, riskWeight: 0.9 };
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.1, maxOdds: 1.3, maxLegOdds: 1.22, targetParlays: 1, minConfidence: 0.88, minEdge: 0, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.78, reviewOnly: false, riskWeight: 0.9 };
   }
 }
 

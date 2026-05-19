@@ -35,12 +35,13 @@ try {
 
   if (metrics.status === 0 && metricsArtifact) {
     const notifyArgs = [
-      '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-validation-stats.mjs',
+      '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs',
+      '--date', date,
       '--metrics-artifact', metricsArtifact,
       '--transport', 'discord-native',
       '--gateway-target', gatewayTarget,
     ];
-    if (validationsArtifact) notifyArgs.push('--validations-artifact', validationsArtifact);
+    if (validationsArtifact) notifyArgs.push('--validation-artifact', validationsArtifact);
     const notify = spawnSync('node', notifyArgs, {
       cwd: REPO_ROOT,
       env,

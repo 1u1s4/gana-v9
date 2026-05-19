@@ -22,7 +22,7 @@ describe('discord recommendation notifier', () => {
     assert.deepEqual(payload.allowed_mentions, { parse: [] });
     assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones en revisión');
     assert.equal(payload.embeds.length, 3);
-    assert.match(payload.embeds[0].description, /📦 1 parlays · 🎯 0 simples/);
+    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 0 simples/);
     assert.match(payload.embeds[1].title, /1️⃣ Team A vs Team B/);
     assert.match(payload.embeds[1].description, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 📌 Expo n\/a/);
@@ -41,7 +41,7 @@ describe('discord recommendation notifier', () => {
     const message = buildGatewayMessage(sampleArtifact(), { max: 1 });
 
     assert.match(message, /🏆 Gana v9 · Recomendaciones en revisión/);
-    assert.match(message, /📦 1 parlays · 🎯 0 simples/);
+    assert.match(message, /📦 1 parlays · 📌 0 simples/);
     assert.match(message, /1️⃣ Team A vs Team B/);
     assert.match(message, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(message, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 📌 Expo n\/a/);
@@ -54,10 +54,10 @@ describe('discord recommendation notifier', () => {
     const payload = buildDiscordPayload(sampleArtifactWithAtomic(), { max: 2 });
     const message = buildGatewayMessage(sampleArtifactWithAtomic(), { max: 2 });
 
-    assert.match(payload.embeds[0].description, /📦 1 parlays · 🎯 1 simples/);
-    assert.match(payload.embeds[2].title, /🎯 Simple · Team C vs Team D · h2h away/);
+    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 1 simples/);
+    assert.match(payload.embeds[2].title, /📌 Simple · Team C vs Team D · h2h away/);
     assert.match(payload.embeds[2].description, /> ⚽ Team C vs Team D: h2h away @ 1.18/);
-    assert.match(message, /2️⃣ 🎯 Simple · Team C vs Team D · h2h away/);
+    assert.match(message, /2️⃣ 📌 Simple · Team C vs Team D · h2h away/);
     assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
   });
 
@@ -84,6 +84,35 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[2].description, /Fluminense vs Sao Paulo: h2h away @ 1.18/);
     assert.doesNotMatch(JSON.stringify(payload), new RegExp(uuidA));
     assert.doesNotMatch(message, new RegExp(uuidB));
+  });
+
+  it('labels over-under markets with the explicit family', () => {
+    const artifact = sampleArtifact();
+    artifact.recommendations[0].legs = [
+      {
+        ...artifact.recommendations[0].legs[0],
+        market: 'goals_over_under',
+        selection: 'under',
+        line: 2.5,
+        odds: 1.6,
+      },
+      {
+        ...artifact.recommendations[0].legs[0],
+        predictionId: 'prediction-corners',
+        market: 'corners_over_under',
+        selection: 'under',
+        line: 9.5,
+        odds: 1.82,
+      },
+    ];
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+
+    assert.match(payload.embeds[1].description, /> 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
+    assert.match(payload.embeds[1].description, /> 🎯 Team A vs Team B: corners under 9.5 @ 1.82/);
+    assert.match(message, /> 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
+    assert.match(message, /> 🎯 Team A vs Team B: corners under 9.5 @ 1.82/);
   });
 
   it('caps native Discord embeds at the platform limit', () => {

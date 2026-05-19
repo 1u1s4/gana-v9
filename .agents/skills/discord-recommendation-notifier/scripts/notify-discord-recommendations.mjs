@@ -81,7 +81,7 @@ export function buildDiscordPayload(artifact, options = {}) {
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones en revisión',
     description: [
-      `📦 ${counts.parlay} parlays · 🎯 ${counts.atomic} simples`,
+      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
       `🟡 ${status} · ${validation} · 💧 ${risk}`,
       '⚠️ Sin ejecución monetaria · Sin garantía',
     ].join('\n'),
@@ -124,7 +124,7 @@ export function buildGatewayMessage(artifact, options = {}) {
   const lines = [
     '🏆 Gana v9 · Recomendaciones en revisión',
     '',
-    `📦 ${counts.parlay} parlays · 🎯 ${counts.atomic} simples`,
+    `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
     `🟡 ${status} · ${validation} · 💧 ${risk}`,
     '⚠️ Sin ejecución monetaria · Sin garantía',
     '',
@@ -318,7 +318,7 @@ function collectRecommendationArtifacts(dir, matches) {
   }
 }
 
-function selectRecommendations(artifact) {
+export function selectRecommendations(artifact) {
   if (Array.isArray(artifact?.recommendations)) return artifact.recommendations;
   return [
     ...(Array.isArray(artifact?.parlayRecommendations) ? artifact.parlayRecommendations : []),
@@ -326,7 +326,7 @@ function selectRecommendations(artifact) {
   ];
 }
 
-function recommendationCounts(recommendations) {
+export function recommendationCounts(recommendations) {
   return recommendations.reduce((counts, recommendation) => {
     if (recommendationKind(recommendation) === 'atomic-prediction') counts.atomic += 1;
     else counts.parlay += 1;
@@ -334,7 +334,7 @@ function recommendationCounts(recommendations) {
   }, { parlay: 0, atomic: 0 });
 }
 
-function recommendationKind(recommendation) {
+export function recommendationKind(recommendation) {
   return recommendation?.kind === 'atomic-prediction' ? 'atomic-prediction' : 'parlay';
 }
 
@@ -376,14 +376,14 @@ function recommendationEmbed(recommendation, index) {
   const rank = numberOrFallback(recommendation.rank, index + 1);
   const kind = recommendationKind(recommendation);
   const legLines = Array.isArray(recommendation.legs) && recommendation.legs.length
-    ? recommendation.legs.slice(0, 8).map((leg) => `> ⚽ ${formatCompactLeg(leg)}`)
+    ? recommendation.legs.slice(0, 8).map((leg) => `> ${formatCompactLeg(leg)}`)
     : ['> Sin detalle de selecciones.'];
   if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
     legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
   }
-  legLines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)}`);
+  legLines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
   return {
-    title: `${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '🎯 Simple · ' : ''}${recommendationTitle(recommendation)}`,
+    title: `${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
     description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
     color: kind === 'atomic-prediction' ? 0x9b51e0 : rank === 1 ? 0xf2c94c : 0x27ae60,
   };
@@ -415,23 +415,23 @@ function formatRecommendationLines(recommendation, index) {
 function formatCompactRecommendationLines(recommendation, index) {
   const rank = numberOrFallback(recommendation.rank, index + 1);
   const kind = recommendationKind(recommendation);
-  const lines = [`${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '🎯 Simple · ' : ''}${recommendationTitle(recommendation)}`];
+  const lines = [`${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`];
 
   if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
     for (const leg of recommendation.legs.slice(0, 8)) {
-      lines.push(`> ⚽ ${formatCompactLeg(leg)}`);
+      lines.push(`> ${formatCompactLeg(leg)}`);
     }
     if (recommendation.legs.length > 8) lines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
   } else {
     lines.push('> Sin detalle de selecciones.');
   }
 
-  lines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)}`);
+  lines.push(`> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
   lines.push('');
   return lines;
 }
 
-function recommendationTitle(recommendation) {
+export function recommendationTitle(recommendation) {
   if (!Array.isArray(recommendation.legs) || !recommendation.legs.length) {
     return stringOrFallback(recommendation.parlayId, 'Parlay sin titulo');
   }
@@ -478,20 +478,29 @@ function compactFixtureName(value) {
     .trim();
 }
 
-function formatCompactLeg(leg) {
-  return `${displayFixtureName(leg)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
+export function formatCompactLeg(leg) {
+  return `${formatMarketIcon(leg)} ${displayFixtureName(leg)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
 }
 
-function formatCompactSelection(leg) {
+function formatMarketIcon(leg) {
+  const market = stringOrFallback(leg?.market, 'market');
+  if (market === 'corners_over_under') return '🎯';
+  if (market === 'goals_over_under' || market === 'btts') return '🥅';
+  return '⚽';
+}
+
+export function formatCompactSelection(leg) {
   const market = stringOrFallback(leg.market, 'market');
   const selection = stringOrFallback(leg.selection, 'selection');
   const line = Number.isFinite(leg.line) ? ` ${formatMetricNumber(leg.line, 2)}` : '';
   if (market === 'btts') return `BTTS ${selection}`;
-  if (market.endsWith('over_under')) return `${selection}${line}`;
+  if (market === 'goals_over_under') return `goals ${selection}${line}`;
+  if (market === 'corners_over_under') return `corners ${selection}${line}`;
+  if (market.endsWith('over_under')) return `${market.replace(/_over_under$/, '')} ${selection}${line}`;
   return `${market} ${selection}${line}`;
 }
 
-function formatExposurePercent(recommendation) {
+export function formatExposurePercent(recommendation) {
   const candidates = [
     recommendation.exposure?.percentOfAnalyticalBankroll,
     recommendation.stake?.percentOfBankroll,
@@ -595,15 +604,15 @@ function formatNumber(value, digits) {
   return Number(value).toFixed(digits).replace(/\.?0+$/, '');
 }
 
-function formatMetricNumber(value, digits) {
+export function formatMetricNumber(value, digits) {
   return Number.isFinite(value) ? formatNumber(value, digits) : 'n/a';
 }
 
-function formatPercent(value) {
+export function formatPercent(value) {
   return Number.isFinite(value) ? `${formatNumber(Number(value) * 100, 2)}%` : 'n/a';
 }
 
-function rankEmoji(rank) {
+export function rankEmoji(rank) {
   const ranks = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
   return ranks[rank] ?? `${rank}.`;
 }

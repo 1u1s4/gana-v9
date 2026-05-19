@@ -182,6 +182,113 @@ describe('runDailyE2E', () => {
     assert.equal(consensus.analyticalArtifactOnly, true);
   });
 
+  it('limits final parlays to five, prefers the diamante safety window, and excludes used legs from simples', async () => {
+    const ctx = context();
+    const analysisTop = [
+      parlayRecommendation({ rank: 1, parlayId: 'balanced-1', profile: 'balanced', combinedOdds: 1.8, predictionId: 'prediction-atomic-1' }),
+      parlayRecommendation({ rank: 2, parlayId: 'balanced-2', profile: 'balanced', combinedOdds: 1.9, predictionId: 'prediction-extra-balanced' }),
+      parlayRecommendation({ rank: 3, parlayId: 'diamante-1', profile: 'parlay-diamante', combinedOdds: 1.12, predictionId: 'prediction-atomic-1' }),
+      parlayRecommendation({ rank: 4, parlayId: 'low-variance-1', profile: 'low-variance', combinedOdds: 1.4, predictionId: 'prediction-low-variance' }),
+      parlayRecommendation({ rank: 5, parlayId: 'high-conviction-1', profile: 'high-conviction', combinedOdds: 1.7, predictionId: 'prediction-high-conviction' }),
+      parlayRecommendation({ rank: 6, parlayId: 'market-diverse-1', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse' }),
+    ];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-05-19',
+      providers: ['codex'],
+      parlayProfile: 'balanced',
+      persistMetrics: false,
+      dailyBatchId: 'daily-final-selection-policy',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        const runId = `${config.provider}-run`;
+        const secondFixture = { ...fixture(), id: 'fixture-2', homeTeamName: 'Team C', awayTeamName: 'Team D' };
+        return {
+          ok: true,
+          runId,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'promotable',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures: [fixture(), secondFixture],
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [{
+            ok: true,
+            runId,
+            fixtureId: 'fixture-1',
+            providerFixtureId: 'provider-fixture-1',
+            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+            predictions: [
+              highConfidencePrediction(runId),
+              {
+                ...highConfidencePrediction(runId),
+                id: 'prediction-atomic-2',
+                fixtureId: 'fixture-2',
+                providerFixtureId: 'provider-fixture-2',
+                selection: 'away',
+                odds: 1.18,
+                edge: 0.08,
+                confidence: 0.94,
+              },
+            ],
+          }],
+          parlay: {
+            ok: true,
+            runId,
+            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: ['codex-parlay'],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'parlay-run',
+        date: input.date,
+        gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+        build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 1.8, aggregateConfidence: 0.8, aggregateQuality: 0.8 } },
+        persistedParlayIds: [`${runtime.runId}-persisted`],
+      }) as any,
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: analysisTop.length,
+        top: analysisTop,
+        diagnostics: { generatedAt: '2026-05-19T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 6, profileScopedAnalyzed: 6, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 6, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 5, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    assert.equal(recommendations.parlayRecommendations.length, 5);
+    assert.equal(recommendations.parlayRecommendations[0].profile, 'parlay-diamante');
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3, 4, 5]);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'balanced-2'), false);
+    assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), ['prediction-atomic-2']);
+    assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayLegs, true);
+    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
+    assert.equal(summary.counts.parlayRecommendations, 5);
+    assert.equal(summary.counts.atomicRecommendations, 1);
+  });
+
   it('keeps useful output when one parallel provider throws', async () => {
     const ctx = context();
 
@@ -626,5 +733,41 @@ function highConfidencePrediction(runId: string) {
     blockers: [],
     promptVersion: 'score-prediction-v2',
     scoringRuleVersion: 'scoring-v2',
+  };
+}
+
+function parlayRecommendation(overrides: Record<string, unknown>) {
+  const predictionId = String(overrides.predictionId ?? 'prediction-1');
+  return {
+    rank: 1,
+    parlayId: 'parlay-1',
+    sourceRunId: 'parlay-run',
+    profile: 'balanced',
+    validationStatus: 'unvalidated',
+    harnessStatus: 'promotable',
+    combinedOdds: 1.8,
+    aggregateConfidence: 0.8,
+    adjustedProbability: 0.82,
+    expectedEdge: 0.1,
+    score: 0.9,
+    exposure: { units: 0, percentOfAnalyticalBankroll: 0, policy: 'test' },
+    stake: { units: 0, percentOfBankroll: 0, policy: 'test' },
+    bankerLegs: [],
+    reasons: [],
+    riskFlags: [],
+    legs: [{
+      predictionId,
+      fixtureId: predictionId === 'prediction-atomic-1' ? 'fixture-1' : `fixture-${predictionId}`,
+      fixture: 'Team A vs Team B',
+      market: 'h2h',
+      selection: 'home',
+      line: null,
+      odds: 1.2,
+      confidence: 0.93,
+      validationStatus: 'unvalidated',
+      warnings: [],
+      banker: false,
+    }],
+    ...overrides,
   };
 }

@@ -1331,7 +1331,7 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames.slice(0, 2), ['parlay-oro.json', 'parlays.json']);
   });
 
-  it('builds parlay-diamante inside the 1.10-1.20 conservative odds window', async () => {
+  it('builds parlay-diamante inside the 1.10-1.30 conservative odds window', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const persisted: any[] = [];
@@ -1355,7 +1355,7 @@ describe('runParlayBuild', () => {
               prediction({ id: 'diamond-1', runId: 'source-run-diamante', fixtureId: 'fixture-d1', marketKey: 'h2h', selectionKey: 'home', odds: 1.05, confidence: 0.97, edge: 0.025, estimatedProbability: 0.95, status: 'promotable', warnings: ['low-liquidity h2h short favorite'] }),
               prediction({ id: 'diamond-2', runId: 'source-run-diamante', fixtureId: 'fixture-d2', marketKey: 'h2h', selectionKey: 'away', odds: 1.06, confidence: 0.96, edge: 0.02, estimatedProbability: 0.94, status: 'promotable' }),
               prediction({ id: 'diamond-3', runId: 'source-run-diamante', fixtureId: 'fixture-d3', marketKey: 'h2h', selectionKey: 'home', odds: 1.08, confidence: 0.95, edge: 0.02, estimatedProbability: 0.93, status: 'promotable' }),
-              prediction({ id: 'too-expensive', runId: 'source-run-diamante', fixtureId: 'fixture-d4', marketKey: 'h2h', selectionKey: 'home', odds: 1.14, confidence: 0.99, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
+              prediction({ id: 'too-expensive', runId: 'source-run-diamante', fixtureId: 'fixture-d4', marketKey: 'h2h', selectionKey: 'home', odds: 1.23, confidence: 0.99, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
               prediction({ id: 'too-weak', runId: 'source-run-diamante', fixtureId: 'fixture-d5', marketKey: 'h2h', selectionKey: 'home', odds: 1.04, confidence: 0.82, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
               prediction({ id: 'draw-risk', runId: 'source-run-diamante', fixtureId: 'fixture-d6', marketKey: 'double_chance', selectionKey: 'home_or_away', odds: 1.05, confidence: 0.97, edge: 0.03, estimatedProbability: 0.94, status: 'promotable' }),
             ] as any[];
@@ -1380,13 +1380,13 @@ describe('runParlayBuild', () => {
     assert.equal(result.build.parlay.legs.length >= 2, true);
     assert.equal(result.build.parlay.legs.length <= 3, true);
     assert.equal((result.build.parlay.combinedOdds ?? 0) >= 1.1, true);
-    assert.equal((result.build.parlay.combinedOdds ?? 0) <= 1.2, true);
+    assert.equal((result.build.parlay.combinedOdds ?? 0) <= 1.3, true);
     assert.equal(firstLegIds.includes('diamond-1'), true);
     assert.equal(firstLegIds.includes('diamond-2'), true);
     assert.equal(firstLegIds.includes('too-expensive'), false);
     assert.equal(firstLegIds.includes('too-weak'), false);
     assert.equal(firstLegIds.includes('draw-risk'), false);
-    assert.equal(result.build.parlay.legs.every((leg) => leg.odds <= 1.13), true);
+    assert.equal(result.build.parlay.legs.every((leg) => leg.odds <= 1.22), true);
     assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'parlay-diamante');
     assert.equal(persisted[0].parlay.metadata.promptVersion, 'deterministic-parlay-diamante-v1');
     assert.equal(

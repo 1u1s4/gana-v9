@@ -3,6 +3,15 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  formatCompactLeg,
+  formatExposurePercent,
+  formatMetricNumber,
+  formatPercent,
+  rankEmoji,
+  recommendationCounts,
+  recommendationKind,
+  recommendationTitle,
+  selectRecommendations,
   sendDiscordNativePayload,
   sendDiscordPayload,
   sendHermesGatewayMessage,
@@ -13,12 +22,14 @@ const DEFAULT_TRANSPORT = 'discord-native';
 const DEFAULT_GATEWAY_TARGET = 'discord';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DEFAULT_TIMEZONE = 'America/Guatemala';
+const DEFAULT_MAX_RECOMMENDATIONS = 8;
 const DISCORD_DESCRIPTION_LIMIT = 4096;
 
 export function parseArgs(argv) {
   const args = {
     metricsArtifact: undefined,
     validationArtifact: undefined,
+    recommendationArtifact: undefined,
     artifactRoot: DEFAULT_ARTIFACT_ROOT,
     date: undefined,
     previousDay: false,
@@ -28,6 +39,9 @@ export function parseArgs(argv) {
     gatewayTarget: DEFAULT_GATEWAY_TARGET,
     hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
     dryRun: false,
+    includeRecommendationMirror: true,
+    maxRecommendations: DEFAULT_MAX_RECOMMENDATIONS,
+    testLabel: undefined,
     username: 'Gana Hermes',
   };
 
@@ -35,6 +49,7 @@ export function parseArgs(argv) {
     const arg = argv[index];
     if (arg === '--metrics-artifact' || arg === '--artifact') args.metricsArtifact = requireValue(argv, ++index, arg);
     else if (arg === '--validation-artifact') args.validationArtifact = requireValue(argv, ++index, arg);
+    else if (arg === '--recommendation-artifact') args.recommendationArtifact = requireValue(argv, ++index, arg);
     else if (arg === '--artifact-root') args.artifactRoot = requireValue(argv, ++index, arg);
     else if (arg === '--date') args.date = requireIsoDate(requireValue(argv, ++index, arg), arg);
     else if (arg === '--previous-day') args.previousDay = true;
@@ -44,6 +59,9 @@ export function parseArgs(argv) {
     else if (arg === '--gateway-target') args.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--hermes-python') args.hermesPython = requireValue(argv, ++index, arg);
     else if (arg === '--dry-run') args.dryRun = true;
+    else if (arg === '--no-recommendation-mirror') args.includeRecommendationMirror = false;
+    else if (arg === '--max-recommendations') args.maxRecommendations = parseMaxRecommendations(requireValue(argv, ++index, arg));
+    else if (arg === '--test-label') args.testLabel = requireValue(argv, ++index, arg);
     else if (arg === '--username') args.username = requireValue(argv, ++index, arg);
     else if (arg === '--help' || arg === '-h') args.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -62,6 +80,12 @@ export function resolveMetricsArtifactPath(options) {
 export function resolveValidationArtifactPath(options) {
   if (options.validationArtifact) return resolve(options.validationArtifact);
   return findLatestValidationArtifact(options.artifactRoot, options.date);
+}
+
+export function resolveRecommendationArtifactPath(options) {
+  if (options.includeRecommendationMirror === false) return undefined;
+  if (options.recommendationArtifact) return resolve(options.recommendationArtifact);
+  return findLatestRecommendationArtifact(options.artifactRoot, options.date);
 }
 
 export function findLatestMetricsArtifact(root = DEFAULT_ARTIFACT_ROOT, date) {
@@ -84,10 +108,18 @@ export function findLatestValidationArtifact(root = DEFAULT_ARTIFACT_ROOT, date)
   return matches[0]?.path;
 }
 
-export function loadDailyStats(metricsPath, validationPath) {
+export function findLatestRecommendationArtifact(root = DEFAULT_ARTIFACT_ROOT, date) {
+  const matches = collectArtifacts(root, 'daily-parlay-recommendations.json')
+    .filter((match) => !date || artifactMatchesDate(match.path, date, 'recommendation'));
+  matches.sort((a, b) => b.mtimeMs - a.mtimeMs || b.path.localeCompare(a.path));
+  return matches[0]?.path;
+}
+
+export function loadDailyStats(metricsPath, validationPath, recommendationPath) {
   const metricsArtifact = readJson(metricsPath);
   const validationArtifact = validationPath ? readJson(validationPath) : undefined;
-  return { metricsArtifact, validationArtifact };
+  const recommendationArtifact = recommendationPath ? readJson(recommendationPath) : undefined;
+  return { metricsArtifact, validationArtifact, recommendationArtifact };
 }
 
 export function buildDiscordPayload(metricsArtifact, options = {}) {
@@ -99,10 +131,11 @@ export function buildDiscordPayload(metricsArtifact, options = {}) {
     {
       title: '📊 Gana v9 · Validación diaria',
       description: [
+        options.testLabel ? `🧪 ${options.testLabel}` : undefined,
         `📅 ${snapshot.metricDate} · ${snapshot.timezone || options.timezone || DEFAULT_TIMEZONE}`,
         `✅ ${totalSettled(snapshot)} resueltas · ⏳ ${totalPending(snapshot)} pendientes · ⚪ ${totalUnvalidated(snapshot)} sin validar`,
         '⚠️ Tracking analítico · Sin ejecución monetaria',
-      ].join('\n'),
+      ].filter(Boolean).join('\n'),
       color: headerColor(snapshot),
       footer: { text: 'Gana Hermes · Discord native embeds' },
       timestamp: new Date().toISOString(),
@@ -147,6 +180,7 @@ export function buildGatewayMessage(metricsArtifact, options = {}) {
   return [
     '📊 Gana v9 · Validación diaria',
     '',
+    options.testLabel ? `🧪 ${options.testLabel}` : undefined,
     `📅 ${snapshot.metricDate} · ${snapshot.timezone || options.timezone || DEFAULT_TIMEZONE}`,
     `✅ ${totalSettled(snapshot)} resueltas · ⏳ ${totalPending(snapshot)} pendientes · ⚪ ${totalUnvalidated(snapshot)} sin validar`,
     '⚠️ Tracking analítico · Sin ejecución monetaria',
@@ -164,39 +198,248 @@ export function buildGatewayMessage(metricsArtifact, options = {}) {
   ].filter((line) => line !== undefined).join('\n');
 }
 
+export function buildValidationMirrorPayload(recommendationArtifact, options = {}) {
+  const max = parseMaxRecommendations(String(options.maxRecommendations ?? DEFAULT_MAX_RECOMMENDATIONS));
+  const recommendations = selectRecommendations(recommendationArtifact).slice(0, Math.min(max, DEFAULT_MAX_RECOMMENDATIONS));
+  const validationIndex = buildValidationIndex(options.validationArtifact);
+  const validatedRecommendations = recommendations.map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
+  const counts = recommendationCounts(validatedRecommendations);
+  const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
+  const embeds = [{
+    title: '📊 Gana v9 · Validación de recomendaciones',
+    description: [
+      options.testLabel ? `🧪 ${options.testLabel}` : undefined,
+      `📅 Recomendaciones ${date} · espejo validado`,
+      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+      '⚠️ Tracking analítico · Sin ejecución monetaria',
+    ].filter(Boolean).join('\n'),
+    color: 0x2f80ed,
+    footer: { text: 'Gana Hermes · Discord native embeds' },
+    timestamp: new Date().toISOString(),
+  }];
+
+  if (validatedRecommendations.length) {
+    embeds.push(...validatedRecommendations.map((recommendation, index) => validationMirrorEmbed(recommendation, index)));
+  } else {
+    embeds.push({
+      title: 'Sin selecciones',
+      description: '> El artifact de recomendaciones no contiene selecciones para validar.',
+      color: 0x828282,
+    });
+  }
+
+  embeds.push({
+    description: '🛡️ Validación espejo de las recomendaciones enviadas. Revisar pendientes y muestras pequeñas antes de ajustar promoción.',
+    color: 0x56ccf2,
+  });
+
+  return {
+    username: stringOrFallback(options.username, 'Gana Hermes'),
+    allowed_mentions: { parse: [] },
+    content: '',
+    embeds,
+  };
+}
+
+export function buildValidationMirrorMessage(recommendationArtifact, options = {}) {
+  const max = parseMaxRecommendations(String(options.maxRecommendations ?? DEFAULT_MAX_RECOMMENDATIONS));
+  const recommendations = selectRecommendations(recommendationArtifact).slice(0, max);
+  const validationIndex = buildValidationIndex(options.validationArtifact);
+  const validatedRecommendations = recommendations.map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
+  const counts = recommendationCounts(validatedRecommendations);
+  const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
+  const lines = [
+    '📊 Gana v9 · Validación de recomendaciones',
+    '',
+    options.testLabel ? `🧪 ${options.testLabel}` : undefined,
+    `📅 Recomendaciones ${date} · espejo validado`,
+    `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+    '⚠️ Tracking analítico · Sin ejecución monetaria',
+    '',
+    '━━━━━━━━━━━━━━━━━━',
+    '',
+  ].filter((line) => line !== undefined);
+
+  if (!validatedRecommendations.length) {
+    lines.push('> Sin selecciones: el artifact de recomendaciones no contiene selecciones para validar.', '');
+  } else {
+    for (const [index, recommendation] of validatedRecommendations.entries()) {
+      lines.push(...formatValidationMirrorLines(recommendation, index));
+    }
+  }
+
+  lines.push(
+    '━━━━━━━━━━━━━━━━━━',
+    '',
+    '🛡️ Validación espejo de las recomendaciones enviadas. Revisar pendientes y muestras pequeñas antes de ajustar promoción.',
+  );
+  return lines.join('\n');
+}
+
 export async function runDailyStatsNotification(options) {
   const metricsPath = resolveMetricsArtifactPath(options);
   const validationPath = resolveValidationArtifactPath(options);
   const { metricsArtifact, validationArtifact } = loadDailyStats(metricsPath, validationPath);
+  const snapshot = selectMetricSnapshot(metricsArtifact, options.date);
+  const recommendationPath = resolveRecommendationArtifactPath({ ...options, date: options.date ?? snapshot.metricDate });
+  const recommendationArtifact = recommendationPath ? readJson(recommendationPath) : undefined;
   const payload = buildDiscordPayload(metricsArtifact, { ...options, validationArtifact });
   const gatewayMessage = buildGatewayMessage(metricsArtifact, { ...options, validationArtifact });
-  const snapshot = selectMetricSnapshot(metricsArtifact, options.date);
+  const mirrorPayload = recommendationArtifact
+    ? buildValidationMirrorPayload(recommendationArtifact, { ...options, date: snapshot.metricDate, validationArtifact })
+    : undefined;
+  const mirrorGatewayMessage = recommendationArtifact
+    ? buildValidationMirrorMessage(recommendationArtifact, { ...options, date: snapshot.metricDate, validationArtifact })
+    : undefined;
 
   if (options.dryRun) {
     return {
       dryRun: true,
       metricsPath,
       validationPath,
+      recommendationPath,
       metricDate: snapshot.metricDate,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
       payload,
       gatewayMessage,
+      mirrorPayload,
+      mirrorGatewayMessage,
     };
   }
 
   if (options.transport === 'hermes-gateway') {
     const gatewayResult = sendHermesGatewayMessage(options.gatewayTarget, gatewayMessage, { hermesPython: options.hermesPython });
-    return { metricsPath, validationPath, metricDate: snapshot.metricDate, transport: options.transport, gatewayTarget: options.gatewayTarget, gatewayResult };
+    const mirrorGatewayResult = mirrorGatewayMessage
+      ? sendHermesGatewayMessage(options.gatewayTarget, mirrorGatewayMessage, { hermesPython: options.hermesPython })
+      : undefined;
+    return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, gatewayTarget: options.gatewayTarget, gatewayResult, mirrorGatewayResult };
   }
 
   if (options.transport === 'discord-native') {
     const discordResult = sendDiscordNativePayload(options.gatewayTarget, payload, { hermesPython: options.hermesPython });
-    return { metricsPath, validationPath, metricDate: snapshot.metricDate, transport: options.transport, gatewayTarget: options.gatewayTarget, discordResult };
+    const mirrorDiscordResult = mirrorPayload
+      ? sendDiscordNativePayload(options.gatewayTarget, mirrorPayload, { hermesPython: options.hermesPython })
+      : undefined;
+    return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, gatewayTarget: options.gatewayTarget, discordResult, mirrorDiscordResult };
   }
 
   const discordStatus = await sendDiscordPayload(options.webhookUrl, payload);
-  return { metricsPath, validationPath, metricDate: snapshot.metricDate, transport: options.transport, discordStatus: discordStatus.status };
+  const mirrorDiscordStatus = mirrorPayload ? await sendDiscordPayload(options.webhookUrl, mirrorPayload) : undefined;
+  return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, discordStatus: discordStatus.status, mirrorDiscordStatus: mirrorDiscordStatus?.status };
+}
+
+function validationMirrorEmbed(recommendation, index) {
+  const rank = num(recommendation.rank) || index + 1;
+  const kind = recommendationKind(recommendation);
+  const status = normalizeStatus(recommendation.validationStatus);
+  const legLines = Array.isArray(recommendation.legs) && recommendation.legs.length
+    ? recommendation.legs.slice(0, 8).map((leg) => `> ${statusIcon(leg.validationStatus)} ${formatCompactLeg(leg)}`)
+    : ['> Sin detalle de selecciones.'];
+  if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
+    legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
+  }
+  legLines.push(`> 📊 Resultado ${statusIcon(status)} ${status} · Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+
+  return {
+    title: `${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
+    description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
+    color: statusColor(status),
+  };
+}
+
+function formatValidationMirrorLines(recommendation, index) {
+  const rank = num(recommendation.rank) || index + 1;
+  const kind = recommendationKind(recommendation);
+  const status = normalizeStatus(recommendation.validationStatus);
+  const lines = [`${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`];
+
+  if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
+    for (const leg of recommendation.legs.slice(0, 8)) {
+      lines.push(`> ${statusIcon(leg.validationStatus)} ${formatCompactLeg(leg)}`);
+    }
+    if (recommendation.legs.length > 8) lines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
+  } else {
+    lines.push('> Sin detalle de selecciones.');
+  }
+
+  lines.push(`> 📊 Resultado ${statusIcon(status)} ${status} · Odds ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🧠 Conf ${formatPercent(recommendation.aggregateConfidence)} · 📈 Edge ${formatPercent(recommendation.expectedEdge)} · 📌 Expo ${formatExposurePercent(recommendation)}`);
+  lines.push('');
+  return lines;
+}
+
+function buildValidationIndex(validationArtifact) {
+  const index = new Map();
+  if (!Array.isArray(validationArtifact?.validations)) return index;
+  for (const validation of validationArtifact.validations) {
+    const predictionId = typeof validation?.predictionId === 'string' ? validation.predictionId.trim() : '';
+    if (predictionId) index.set(predictionId, validation);
+  }
+  return index;
+}
+
+function applyValidationOverlay(recommendation, validationIndex) {
+  const legs = Array.isArray(recommendation.legs)
+    ? recommendation.legs.map((leg) => {
+      const validation = validationIndex.get(leg?.predictionId);
+      return {
+        ...leg,
+        validationStatus: resolveLegStatus(leg, validation),
+        validationReason: validation?.reason || validation?.outcome?.reason || leg?.validationReason,
+      };
+    })
+    : [];
+  return {
+    ...recommendation,
+    legs,
+    validationStatus: aggregateRecommendationStatus(legs, recommendation.validationStatus),
+  };
+}
+
+function resolveLegStatus(leg, validation) {
+  return normalizeStatus(validation?.status || validation?.outcome?.status || leg?.validationStatus);
+}
+
+function aggregateRecommendationStatus(legs, fallback) {
+  const statuses = Array.isArray(legs) ? legs.map((leg) => normalizeStatus(leg.validationStatus)) : [];
+  if (!statuses.length) return normalizeStatus(fallback);
+  if (statuses.includes('lost')) return 'lost';
+  if (statuses.includes('blocked')) return 'blocked';
+  if (statuses.includes('pending')) return 'pending';
+  if (statuses.includes('unvalidated') || statuses.includes('unknown')) return 'unvalidated';
+  if (statuses.every((status) => status === 'voided')) return 'voided';
+  if (statuses.every((status) => status === 'won' || status === 'voided')) return 'won';
+  return normalizeStatus(fallback);
+}
+
+function normalizeStatus(value) {
+  const status = stringOrFallback(value, 'unvalidated').toLowerCase();
+  if (status === 'win') return 'won';
+  if (status === 'loss') return 'lost';
+  if (status === 'void' || status === 'push') return 'voided';
+  if (['won', 'lost', 'voided', 'pending', 'blocked', 'unvalidated'].includes(status)) return status;
+  return 'unknown';
+}
+
+function statusIcon(status) {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'won') return '✅';
+  if (normalized === 'lost') return '❌';
+  if (normalized === 'voided') return '➖';
+  if (normalized === 'pending') return '⏳';
+  if (normalized === 'blocked') return '🚫';
+  if (normalized === 'unvalidated') return '⚪';
+  return '❔';
+}
+
+function statusColor(status) {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'won') return 0x27ae60;
+  if (normalized === 'lost') return 0xeb5757;
+  if (normalized === 'voided') return 0x828282;
+  if (normalized === 'pending') return 0xf2c94c;
+  if (normalized === 'blocked') return 0xf2994a;
+  return 0x9b51e0;
 }
 
 function collectArtifacts(root, fileName) {
@@ -224,6 +467,9 @@ function artifactMatchesDate(path, date, kind) {
     const artifact = readJson(path);
     if (kind === 'metrics') {
       return artifact.date === date || (Array.isArray(artifact.metrics) && artifact.metrics.some((snapshot) => snapshot?.metricDate === date));
+    }
+    if (kind === 'recommendation') {
+      return artifact.date === date || artifact.dailyBatchId === `daily-${date}` || String(artifact.dailyBatchId || '').startsWith(`daily-${date}-`);
     }
     return artifact.target?.date === date || artifact.date === date;
   } catch {
@@ -326,6 +572,14 @@ function requireIsoDate(value, flag) {
   return value;
 }
 
+function parseMaxRecommendations(value) {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric < 1 || numeric > DEFAULT_MAX_RECOMMENDATIONS) {
+    throw new Error(`--max-recommendations must be an integer between 1 and ${DEFAULT_MAX_RECOMMENDATIONS}.`);
+  }
+  return numeric;
+}
+
 function parseTransport(value) {
   if (value === 'discord-native' || value === 'hermes-gateway' || value === 'webhook') return value;
   throw new Error('--transport must be "discord-native", "hermes-gateway", or "webhook".');
@@ -368,7 +622,12 @@ function usage() {
     'Usage:',
     '  notify-discord-daily-stats.mjs --date YYYY-MM-DD [--artifact-root .artifacts/gana-v9/runs] [--dry-run]',
     '  notify-discord-daily-stats.mjs --previous-day --transport discord-native --gateway-target discord:CHANNEL_ID',
-    '  notify-discord-daily-stats.mjs --metrics-artifact PATH [--validation-artifact PATH] [--dry-run]',
+    '  notify-discord-daily-stats.mjs --metrics-artifact PATH [--validation-artifact PATH] [--recommendation-artifact PATH] [--dry-run]',
+    '',
+    'Options:',
+    '  --no-recommendation-mirror disables the day recommendation validation mirror.',
+    `  --max-recommendations N limits mirrored selections, 1-${DEFAULT_MAX_RECOMMENDATIONS}.`,
+    '  --test-label TEXT adds a test/provenance line to both validation messages.',
     '',
     'Environment:',
     '  HERMES_GATEWAY_PYTHON may override the Python used for Hermes gateway delivery.',

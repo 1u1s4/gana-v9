@@ -132,6 +132,9 @@ export interface DailyE2EDependencies {
 }
 
 const DEFAULT_DAILY_PROVIDERS: DailyE2EProvider[] = ['codex', 'gemini'];
+const DAILY_PARLAY_RECOMMENDATION_LIMIT = 4;
+const DAILY_PARLAY_ANALYSIS_TOP = 12;
+const DAILY_ATOMIC_RECOMMENDATION_LIMIT = 10;
 const ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR = 0.9;
 const ATOMIC_RECOMMENDATION_EDGE_FLOOR = 0;
 const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
@@ -399,6 +402,7 @@ export async function runDailyE2E(
     ? await analyzeParlays(effectiveConfig, {
       date: input.date,
       runIds: parlayAnalysisRunIds,
+      top: DAILY_PARLAY_ANALYSIS_TOP,
       profileScope: 'all',
     }, analysisRuntime)
     : undefined;
@@ -422,15 +426,22 @@ export async function runDailyE2E(
       result: providerPipelineResults[provider],
     })),
   });
-  const parlayRecommendations: DailyFinalRecommendation[] = (parlayAnalysis?.top ?? [])
+  const parlayRecommendations: DailyFinalRecommendation[] = selectDailyParlayRecommendations(
+    parlayAnalysis?.top ?? [],
+    DAILY_PARLAY_RECOMMENDATION_LIMIT,
+  )
     .map((recommendation) => hydrateRecommendationDisplay({ ...recommendation, kind: 'parlay' as const }, providerPipelineResults));
+  const parlayLegPredictionIds = recommendationLegPredictionIds(parlayRecommendations);
+  const parlayLegSelectionKeys = recommendationLegSelectionKeys(parlayRecommendations);
   const atomicRecommendations = buildAtomicPredictionRecommendations(
     providerPipelineResults,
     providers,
     effectiveConfig,
     input.models,
     parlayRecommendations.length,
-  );
+    parlayLegPredictionIds,
+    parlayLegSelectionKeys,
+  ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
   const finalRecommendations: DailyFinalRecommendation[] = [...parlayRecommendations, ...atomicRecommendations];
   const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
   const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
@@ -527,6 +538,12 @@ export async function runDailyE2E(
     parlayRecommendations,
     atomicRecommendations,
     recommendationPolicy: {
+      parlayRecommendationLimit: DAILY_PARLAY_RECOMMENDATION_LIMIT,
+      parlayAnalysisTop: DAILY_PARLAY_ANALYSIS_TOP,
+      atomicRecommendationLimit: DAILY_ATOMIC_RECOMMENDATION_LIMIT,
+      parlayDiversity: 'first-pass unique profile, then score fill',
+      parlayDiamanteOddsWindow: { min: 1.1, max: 1.3 },
+      atomicExcludesSelectedParlayLegs: true,
       atomicConfidenceFloor: ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR,
       atomicEdgeFloor: ATOMIC_RECOMMENDATION_EDGE_FLOOR,
       atomicStatuses: ['promotable'],
@@ -863,6 +880,54 @@ function profilesToPortfolios(profile: DailyParlayProfile | undefined): Array<No
   return [profile];
 }
 
+function selectDailyParlayRecommendations(
+  recommendations: readonly ParlayAnalysisRecommendation[],
+  limit: number,
+): ParlayAnalysisRecommendation[] {
+  const selected: ParlayAnalysisRecommendation[] = [];
+  const usedIds = new Set<string>();
+  const usedProfiles = new Set<string>();
+  const add = (recommendation: ParlayAnalysisRecommendation) => {
+    if (selected.length >= limit || usedIds.has(recommendation.parlayId)) return;
+    selected.push(recommendation);
+    usedIds.add(recommendation.parlayId);
+    usedProfiles.add(recommendation.profile);
+  };
+
+  const diamante = recommendations.find((recommendation) =>
+    recommendation.profile === 'parlay-diamante'
+    && recommendation.combinedOdds >= 1.1
+    && recommendation.combinedOdds <= 1.3,
+  );
+  if (diamante) add(diamante);
+
+  for (const recommendation of recommendations) {
+    if (!usedProfiles.has(recommendation.profile)) add(recommendation);
+  }
+  for (const recommendation of recommendations) add(recommendation);
+
+  return selected.slice(0, limit).map((recommendation, index) => ({
+    ...recommendation,
+    rank: index + 1,
+  }));
+}
+
+function recommendationLegPredictionIds(recommendations: readonly Pick<DailyFinalRecommendation, 'legs'>[]): Set<string> {
+  return new Set(recommendations.flatMap((recommendation) =>
+    recommendation.legs
+      .map((leg) => leg.predictionId)
+      .filter((predictionId): predictionId is string => Boolean(predictionId)),
+  ));
+}
+
+function recommendationLegSelectionKeys(recommendations: readonly Pick<DailyFinalRecommendation, 'legs'>[]): Set<string> {
+  return new Set(recommendations.flatMap((recommendation) =>
+    recommendation.legs
+      .map((leg) => legSelectionKey(leg.fixtureId, leg.market, leg.selection, leg.line))
+      .filter((key): key is string => Boolean(key)),
+  ));
+}
+
 function toParlayFamily(
   family: DailyParlayFamilyResult['family'],
   sourceRunIds: string[],
@@ -922,6 +987,8 @@ function buildAtomicPredictionRecommendations(
   config: AgentConfig,
   models: RunDailyE2EInput['models'],
   rankOffset: number,
+  excludedPredictionIds: ReadonlySet<string> = new Set(),
+  excludedSelectionKeys: ReadonlySet<string> = new Set(),
 ): AtomicPredictionRecommendation[] {
   const groups = new Map<string, AtomicPredictionCandidate[]>();
   for (const provider of providers) {
@@ -933,6 +1000,7 @@ function buildAtomicPredictionRecommendations(
         const edge = atomicPredictionEdge(prediction);
         if (!isAtomicRecommendationEligible(prediction, edge)) continue;
         const key = atomicPredictionKey(prediction);
+        if (excludedPredictionIds.has(prediction.id) || excludedSelectionKeys.has(key)) continue;
         const display = fixtureDisplays.get(prediction.fixtureId);
         groups.set(key, [...(groups.get(key) ?? []), {
           provider,
@@ -1060,11 +1128,15 @@ function atomicRecommendationScore(confidence: number, edge: number, providerCou
 }
 
 function atomicPredictionKey(prediction: PredictionRecordView): string {
+  return legSelectionKey(prediction.fixtureId, prediction.market, prediction.selection, prediction.line);
+}
+
+function legSelectionKey(fixtureId: unknown, market: unknown, selection: unknown, line: unknown): string {
   return [
-    prediction.fixtureId,
-    prediction.market,
-    prediction.selection,
-    prediction.line ?? 'none',
+    String(fixtureId ?? ''),
+    String(market ?? ''),
+    String(selection ?? ''),
+    line ?? 'none',
   ].join('|');
 }
 

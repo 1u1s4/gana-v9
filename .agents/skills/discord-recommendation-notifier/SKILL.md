@@ -18,6 +18,7 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Discord webhook: `DISCORD_WEBHOOK_URL` or `--webhook-url` only when using `--transport webhook`
 - Optional max selections: `--max N` defaults to 5
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
+- Validation recommendation mirror: matching `daily-parlay-recommendations.json`
 
 ## Workflow
 
@@ -50,18 +51,22 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily
   --gateway-target discord:CHANNEL_ID
 ```
 
+When a matching recommendations artifact exists for the validation date, the daily stats notifier sends two native Discord messages: the aggregate validation summary and a validated mirror of the prior recommendations message. The mirror preserves recommendation order and compact selection format while prefixing each recommendation and leg with its validation result (`✅`, `❌`, `➖`, `⏳`, `🚫`, `⚪`).
+
 ## Message Rules
 
 - Keep native Discord embeds/cajas for Discord delivery unless the user explicitly asks for plain text.
 - Header embed format: `🏆 Gana v9 · Recomendaciones en revisión`, parlay/simple counts, status/risk, and analytical disclaimer.
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/exposure.
-- Per-atomic embed format: `🎯 Simple · ...`, one blockquote selection line, and the same compact metrics line.
+- Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
+- Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
 - Preserve the established style in future sends: emoji-led scan lines, native Discord boxes, blockquoted selections, compact metrics, and the final manual-review control.
 - Keep the message compact enough for Discord embed limits.
 - Disable mentions with `allowed_mentions: { "parse": [] }`.
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
 - Do not include stake sizing, money instructions, payment links, or betting execution language.
 - Validation stat notifications must use the same native embed policy and must label the output as analytical statistics.
+- Validation notifications should include the recommendation mirror unless `--no-recommendation-mirror` is explicitly provided. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.
 
 ## Style Persistence
 
@@ -71,7 +76,7 @@ The canonical style is encoded in `scripts/notify-discord-recommendations.mjs` a
 
 Use `scripts/notify-discord-recommendations.mjs` for deterministic formatting, validation, latest-artifact discovery, dry-run previews, native Discord embed delivery, plain Hermes gateway delivery, and optional webhook POSTs.
 
-Use `scripts/notify-discord-daily-stats.mjs` for validation/day-after statistics embeds by date. `scripts/notify-discord-validation-stats.mjs` is available when explicit metrics/validation artifact paths are already known.
+Use `scripts/notify-discord-daily-stats.mjs` for validation/day-after statistics embeds by date and the validated recommendation mirror. `scripts/notify-discord-validation-stats.mjs` is available only for legacy explicit metrics/validation artifact sends that do not need the mirror.
 
 Repo-level cron wrappers:
 
@@ -87,6 +92,7 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 3
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --transport discord-native --gateway-target discord:CHANNEL_ID
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --dry-run
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --test-label "Esto es una prueba"
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs
 ```
