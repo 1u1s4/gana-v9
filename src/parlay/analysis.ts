@@ -361,10 +361,19 @@ function markDuplicateLegSetRejections(candidates: Candidate[]): void {
 
 function candidateLegSetSignature(candidate: Candidate): string {
   return candidate.legs
-    .map((leg) => leg.predictionId)
+    .map((leg) => legSelectionSignature(leg))
     .filter(Boolean)
     .sort()
     .join('|');
+}
+
+function legSelectionSignature(leg: ParlayAnalysisLeg): string {
+  return [
+    normalizeSignaturePart(leg.fixtureId),
+    normalizeSignaturePart(leg.market),
+    normalizeSignaturePart(leg.selection),
+    leg.line === null || leg.line === undefined ? 'none' : String(leg.line),
+  ].join(':');
 }
 
 function toLeg(leg: any): ParlayAnalysisLeg {
@@ -759,4 +768,8 @@ function positiveNumber(value: number, label: string): number {
 
 function round(value: number, digits = 6): number {
   return Number(value.toFixed(digits));
+}
+
+function normalizeSignaturePart(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, '_');
 }

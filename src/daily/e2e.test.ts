@@ -187,13 +187,18 @@ describe('runDailyE2E', () => {
 
   it('limits final parlays to four, prefers the diamante safety window, and excludes used legs from simples', async () => {
     const ctx = context();
+    const duplicateLowVarianceLeg = {
+      ...parlayRecommendation({ predictionId: 'prediction-low-variance' }).legs[0],
+      predictionId: 'prediction-low-variance-duplicate',
+    };
     const analysisTop = [
       parlayRecommendation({ rank: 1, parlayId: 'balanced-1', profile: 'balanced', combinedOdds: 1.8, predictionId: 'prediction-atomic-1' }),
       parlayRecommendation({ rank: 2, parlayId: 'balanced-2', profile: 'balanced', combinedOdds: 1.9, predictionId: 'prediction-extra-balanced' }),
       parlayRecommendation({ rank: 3, parlayId: 'diamante-1', profile: 'parlay-diamante', combinedOdds: 1.12, predictionId: 'prediction-atomic-1' }),
       parlayRecommendation({ rank: 4, parlayId: 'low-variance-1', profile: 'low-variance', combinedOdds: 1.4, predictionId: 'prediction-low-variance' }),
-      parlayRecommendation({ rank: 5, parlayId: 'high-conviction-1', profile: 'high-conviction', combinedOdds: 1.7, predictionId: 'prediction-high-conviction' }),
-      parlayRecommendation({ rank: 6, parlayId: 'market-diverse-1', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse' }),
+      parlayRecommendation({ rank: 5, parlayId: 'high-odds-1', profile: 'high-conviction', combinedOdds: 2.6, aggregateConfidence: 0.95, expectedEdge: 0.2, predictionId: 'prediction-high-odds' }),
+      parlayRecommendation({ rank: 6, parlayId: 'market-diverse-duplicate', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse', legs: [duplicateLowVarianceLeg] }),
+      parlayRecommendation({ rank: 7, parlayId: 'high-conviction-1', profile: 'high-conviction', combinedOdds: 1.7, predictionId: 'prediction-high-conviction' }),
     ];
 
     const result = await runDailyE2E(ctx.config, {
@@ -289,6 +294,9 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.parlayRecommendations[0].profile, 'parlay-diamante');
     assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3, 4]);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'balanced-2'), false);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-odds-1'), false);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'market-diverse-duplicate'), false);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-conviction-1'), true);
     assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), ['prediction-atomic-2']);
     assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team C vs Team D');
     assert.deepEqual(recommendations.atomicRecommendations[0].legs[0].display, {
@@ -301,6 +309,8 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 4);
     assert.equal(recommendations.recommendationPolicy.parlayAnalysisTop, 12);
     assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
+    assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.maxCombinedOdds, 2.2);
+    assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.semanticDuplicateKey, 'fixtureId:market:selection:line');
     assert.equal(recommendations.recommendationPolicy.stakeRecommendation.policy, 'bucketed-bankroll-percentage-confidence-edge-recommendation');
     assert.equal(recommendations.recommendations.every((item: any) => [1, 5, 10, 15, 20, 25].includes(item.stakeRecommendation.stake)), true);
     assert.equal(
@@ -761,6 +771,20 @@ function highConfidencePrediction(runId: string) {
 
 function parlayRecommendation(overrides: Record<string, unknown>) {
   const predictionId = String(overrides.predictionId ?? 'prediction-1');
+  const fixtureId = predictionId === 'prediction-atomic-1' ? 'fixture-1' : `fixture-${predictionId}`;
+  const baseLeg = {
+    predictionId,
+    fixtureId,
+    fixture: 'Team A vs Team B',
+    market: 'h2h',
+    selection: 'home',
+    line: null,
+    odds: 1.2,
+    confidence: 0.93,
+    validationStatus: 'unvalidated',
+    warnings: [],
+    banker: false,
+  };
   return {
     rank: 1,
     parlayId: 'parlay-1',
@@ -778,19 +802,15 @@ function parlayRecommendation(overrides: Record<string, unknown>) {
     bankerLegs: [],
     reasons: [],
     riskFlags: [],
-    legs: [{
-      predictionId,
-      fixtureId: predictionId === 'prediction-atomic-1' ? 'fixture-1' : `fixture-${predictionId}`,
-      fixture: 'Team A vs Team B',
-      market: 'h2h',
-      selection: 'home',
-      line: null,
-      odds: 1.2,
-      confidence: 0.93,
-      validationStatus: 'unvalidated',
-      warnings: [],
-      banker: false,
-    }],
+    legs: [
+      baseLeg,
+      {
+        ...baseLeg,
+        predictionId: `${predictionId}-leg-2`,
+        fixtureId: `${fixtureId}-leg-2`,
+        selection: 'away',
+      },
+    ],
     ...overrides,
   };
 }

@@ -6,6 +6,7 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 
 - `07:00` Guatemala: validar el dia anterior, recalcular daily metrics y notificar estadisticas a Discord.
 - `10:00` Guatemala: correr Daily E2E del dia actual con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, y notificar recomendaciones/parlays a Discord.
+- `13:00` Guatemala: correr strategy review del dia anterior cerrado, usando Codex GPT-5.5 con reasoning X-High, y actualizar el log central de mejoras del Harness.
 
 ## Scripts operativos
 
@@ -37,6 +38,22 @@ Este script:
 5. Genera `portfolio-v2`, que incluye `parlay-diamante` como perfil conservador diario objetivo 1.10-1.20.
 6. Envia `daily-parlay-recommendations.json` a Discord con embeds nativos usando Hermes gateway.
 
+Strategy review del dia anterior:
+
+```bash
+scripts/gana-strategy-review.sh
+```
+
+Este script:
+
+1. Calcula ayer en `America/Guatemala`.
+2. Ejecuta `pnpm gana validate --date YYYY-MM-DD` para asegurar settlement actualizado.
+3. Ejecuta `pnpm gana metrics daily --date YYYY-MM-DD --scope daily-YYYY-MM-DD`.
+4. Ejecuta `pnpm gana strategy-review --date YYYY-MM-DD --scope strategy-YYYY-MM-DD`.
+5. Fuerza Codex como proveedor del analisis, con `GANA_STRATEGY_REVIEW_MODEL=gpt-5.5` y `GANA_STRATEGY_REVIEW_REASONING_EFFORT=xhigh` por defecto.
+6. Genera `strategy-review.json`, `strategy-review.md` y actualiza `docs/harness-strategy-review-log.md` con propuestas de cambio al Harness.
+7. Notifica Discord con un mensaje tecnico: resumen de rendimiento, patrones efectivos/fallidos y cambios propuestos por archivo/prioridad/verificacion.
+
 ## Variables
 
 Ambos scripts cargan `.env` si existe.
@@ -59,6 +76,13 @@ Variables utiles:
 - `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
 - `GANA_DISCORD_MAX_SELECTIONS`: default `5`.
 - `GANA_METRICS_PERSIST`: default `true`.
+- `GANA_STRATEGY_REVIEW_DATE`: fuerza fecha para strategy review diario.
+- `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-5.5`.
+- `GANA_STRATEGY_REVIEW_REASONING_EFFORT`: esfuerzo de razonamiento. Default: `xhigh`.
+- `GANA_STRATEGY_REVIEW_CODEX_SANDBOX`: sandbox Codex para el analisis. Default: `read-only`.
+- `GANA_STRATEGY_REVIEW_AGENT`: `true|false`; default `true`.
+- `GANA_STRATEGY_REVIEW_NOTIFY`: `true|false`; default `true`.
+- `GANA_STRATEGY_REVIEW_DOC_PATH`: documento central de tracking. Default: `docs/harness-strategy-review-log.md`.
 
 ## Instalar cron en Hermes
 
@@ -68,11 +92,12 @@ Instalacion idempotente:
 scripts/install-gana-hermes-cron.sh
 ```
 
-Esto crea wrappers bajo `~/.hermes/scripts/` y registra dos jobs `--no-agent`:
+Esto crea wrappers bajo `~/.hermes/scripts/` y registra tres jobs `--no-agent`:
 
 ```text
 gana-v9-validate-yesterday-discord  0 7 * * *
 gana-v9-daily-e2e-discord           0 10 * * *
+gana-v9-strategy-review             0 13 * * *
 ```
 
 Hermes cron muestra los `Next run` en la zona local configurada; en este host debe verse con offset `-06:00`.
@@ -93,6 +118,13 @@ hermes cron create "0 10 * * *" \
   --script gana_v9_daily_e2e_notify.sh \
   --no-agent \
   --workdir /Users/luisalvarado/Documents/GitHub/gana-v9
+
+hermes cron create "0 13 * * *" \
+  --name gana-v9-strategy-review \
+  --deliver origin \
+  --script gana_v9_strategy_review.sh \
+  --no-agent \
+  --workdir /Users/luisalvarado/Documents/GitHub/gana-v9
 ```
 
 ## Pruebas
@@ -102,7 +134,14 @@ Verificar sintaxis de scripts:
 ```bash
 bash -n scripts/gana-previous-day-validation-notify.sh
 bash -n scripts/gana-daily-e2e-notify.sh
+bash -n scripts/gana-strategy-review.sh
 bash -n scripts/install-gana-hermes-cron.sh
+```
+
+Strategy review historico desde la primera fecha con predicciones/parlays:
+
+```bash
+pnpm gana strategy-review --all --through YYYY-MM-DD
 ```
 
 Preview de estadisticas sin enviar:

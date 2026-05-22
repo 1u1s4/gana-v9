@@ -135,11 +135,15 @@ export interface DailyE2EDependencies {
 const DEFAULT_DAILY_PROVIDERS: DailyE2EProvider[] = ['codex', 'gemini'];
 const DAILY_PARLAY_RECOMMENDATION_LIMIT = 4;
 const DAILY_PARLAY_ANALYSIS_TOP = 12;
+const DAILY_PARLAY_CONSERVATIVE_MAX_ODDS = 2.2;
+const DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE = 0.7;
+const DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE = 0.78;
 const DAILY_ATOMIC_RECOMMENDATION_LIMIT = 10;
 const ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR = 0.9;
 const ATOMIC_RECOMMENDATION_EDGE_FLOOR = 0;
 const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
 const DAILY_STAKE_BUCKETS = [1, 5, 10, 15, 20, 25] as const;
+const VALIDATION_FRESHNESS_MIN_COVERAGE = 0.6;
 
 export type DailyFinalRecommendation =
   | (ParlayAnalysisRecommendation & { kind: 'parlay'; stakeRecommendation?: DailyStakeRecommendation })
@@ -151,6 +155,23 @@ export interface DailyStakeRecommendation {
   unitLabel: 'percent-of-bankroll';
   allowedStakes: readonly number[];
   policy: 'bucketed-bankroll-percentage-confidence-edge-recommendation';
+}
+
+interface DailyValidationFreshness {
+  status: 'fresh' | 'thin' | 'empty';
+  date: string;
+  minCoverage: number;
+  predictionCoverage: number | null;
+  parlayCoverage: number | null;
+  predictionSettled: number;
+  parlaySettled: number;
+  predictionTotal: number;
+  parlayTotal: number;
+  predictionUnvalidated: number;
+  parlayUnvalidated: number;
+  predictionPending: number;
+  parlayPending: number;
+  reasons: string[];
 }
 
 export interface AtomicPredictionRecommendation {
@@ -425,6 +446,7 @@ export async function runDailyE2E(
     scope: dailyBatchId,
     persist: input.persistMetrics !== false,
   }, metricsRuntime);
+  const validationFreshness = dailyValidationFreshness(metrics, input.date);
 
   const completedAt = (deps.now ?? (() => new Date()))();
   const { comparison: providerComparison, consensus: providerConsensus } = buildDailyProviderComparison({
@@ -468,11 +490,12 @@ export async function runDailyE2E(
   const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
   const hasAnySuccessfulProvider = providerRuns.some((run) => run.ok);
   const allProvidersSucceeded = providerRuns.every((run) => run.ok);
+  const validationFreshEnoughForPromotion = validationFreshness.status === 'fresh';
   const ok = hasAnySuccessfulProvider
     && hasAnyValidParlayFamily
     && (parlayAnalysis?.ok ?? false)
     && metrics.ok;
-  const verdict = ok && hasConsensus && allProvidersSucceeded
+  const verdict = ok && hasConsensus && allProvidersSucceeded && validationFreshEnoughForPromotion
     ? 'promotable'
     : ok
       ? 'review-required'
@@ -523,6 +546,7 @@ export async function runDailyE2E(
       artifactPath: metrics.artifactPath,
       error: metrics.error,
     } : null,
+    validationFreshness,
     sharedInputs: {
       pairedProviders,
       providerModels: Object.fromEntries(providers.map((provider) => [
@@ -562,8 +586,22 @@ export async function runDailyE2E(
       parlayRecommendationLimit: DAILY_PARLAY_RECOMMENDATION_LIMIT,
       parlayAnalysisTop: DAILY_PARLAY_ANALYSIS_TOP,
       atomicRecommendationLimit: DAILY_ATOMIC_RECOMMENDATION_LIMIT,
-      parlayDiversity: 'first-pass unique profile, then score fill',
+      parlayDiversity: 'semantic leg signature plus first-pass unique profile, then score fill',
       parlayDiamanteOddsWindow: { min: 1.1, max: 1.3 },
+      parlayConservativeGate: {
+        maxCombinedOdds: DAILY_PARLAY_CONSERVATIVE_MAX_ODDS,
+        minAggregateConfidence: DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE,
+        diamanteMinAggregateConfidence: DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE,
+        semanticDuplicateKey: 'fixtureId:market:selection:line',
+        blockedRiskFlags: [
+          'high-combined-odds',
+          'stale-source',
+          'corners-unverified',
+          'negative-portfolio-edge',
+          'duplicate-leg-set',
+        ],
+      },
+      validationFreshness,
       atomicExcludesSelectedParlayLegs: true,
       stakeRecommendation: {
         unitLabel: 'percent-of-bankroll',
@@ -914,11 +952,16 @@ function selectDailyParlayRecommendations(
   const selected: ParlayAnalysisRecommendation[] = [];
   const usedIds = new Set<string>();
   const usedProfiles = new Set<string>();
+  const usedSignatures = new Set<string>();
   const add = (recommendation: ParlayAnalysisRecommendation) => {
     if (selected.length >= limit || usedIds.has(recommendation.parlayId)) return;
+    if (!isConservativeDailyParlayRecommendation(recommendation)) return;
+    const signature = parlayLogicalSignature(recommendation);
+    if (!signature || usedSignatures.has(signature)) return;
     selected.push(recommendation);
     usedIds.add(recommendation.parlayId);
     usedProfiles.add(recommendation.profile);
+    usedSignatures.add(signature);
   };
 
   const diamante = recommendations.find((recommendation) =>
@@ -939,6 +982,34 @@ function selectDailyParlayRecommendations(
   }));
 }
 
+function isConservativeDailyParlayRecommendation(recommendation: ParlayAnalysisRecommendation): boolean {
+  if (recommendation.validationStatus === 'lost' || recommendation.validationStatus === 'blocked') return false;
+  if (!Number.isFinite(recommendation.combinedOdds) || recommendation.combinedOdds <= 1) return false;
+  if (!Number.isFinite(recommendation.aggregateConfidence)) return false;
+  if (!Number.isFinite(recommendation.expectedEdge) || recommendation.expectedEdge <= 0) return false;
+  if ((recommendation.legs?.length ?? 0) < 2) return false;
+  if ((recommendation.legs?.length ?? 0) > 3) return false;
+  const riskFlags = new Set(recommendation.riskFlags ?? []);
+  for (const flag of ['stale-source', 'corners-unverified', 'negative-portfolio-edge', 'duplicate-leg-set']) {
+    if (riskFlags.has(flag)) return false;
+  }
+  if (recommendation.profile === 'parlay-diamante') {
+    return recommendation.combinedOdds >= 1.1
+      && recommendation.combinedOdds <= 1.3
+      && recommendation.aggregateConfidence >= DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE;
+  }
+  if (recommendation.combinedOdds > DAILY_PARLAY_CONSERVATIVE_MAX_ODDS || riskFlags.has('high-combined-odds')) return false;
+  return recommendation.aggregateConfidence >= DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE;
+}
+
+function parlayLogicalSignature(recommendation: Pick<ParlayAnalysisRecommendation, 'legs'>): string {
+  return (recommendation.legs ?? [])
+    .map((leg) => legSelectionKey(leg.fixtureId, leg.market, leg.selection, leg.line))
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
 function recommendationLegPredictionIds(recommendations: readonly Pick<DailyFinalRecommendation, 'legs'>[]): Set<string> {
   return new Set(recommendations.flatMap((recommendation) =>
     recommendation.legs
@@ -953,6 +1024,64 @@ function recommendationLegSelectionKeys(recommendations: readonly Pick<DailyFina
       .map((leg) => legSelectionKey(leg.fixtureId, leg.market, leg.selection, leg.line))
       .filter((key): key is string => Boolean(key)),
   ));
+}
+
+function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, date: string): DailyValidationFreshness {
+  const snapshot = metrics?.metrics?.find((item) => item.metricDate === date) ?? metrics?.metrics?.[0];
+  if (!metrics?.ok || !snapshot) {
+    return {
+      status: 'empty',
+      date,
+      minCoverage: VALIDATION_FRESHNESS_MIN_COVERAGE,
+      predictionCoverage: null,
+      parlayCoverage: null,
+      predictionSettled: 0,
+      parlaySettled: 0,
+      predictionTotal: 0,
+      parlayTotal: 0,
+      predictionUnvalidated: 0,
+      parlayUnvalidated: 0,
+      predictionPending: 0,
+      parlayPending: 0,
+      reasons: ['daily metrics unavailable for validation freshness gate'],
+    };
+  }
+  const prediction = snapshot.predictionMetrics;
+  const parlay = snapshot.parlayMetrics;
+  const predictionCoverage = validationCoverage(prediction);
+  const parlayCoverage = validationCoverage(parlay);
+  const reasons: string[] = [];
+  if (prediction.total === 0 && parlay.total === 0) reasons.push('no predictions or parlays found for validation freshness gate');
+  if (predictionCoverage !== null && predictionCoverage < VALIDATION_FRESHNESS_MIN_COVERAGE) {
+    reasons.push(`prediction validation coverage ${round(predictionCoverage, 3)} below ${VALIDATION_FRESHNESS_MIN_COVERAGE}`);
+  }
+  if (parlay.total > 0 && parlayCoverage !== null && parlayCoverage < VALIDATION_FRESHNESS_MIN_COVERAGE) {
+    reasons.push(`parlay validation coverage ${round(parlayCoverage, 3)} below ${VALIDATION_FRESHNESS_MIN_COVERAGE}`);
+  }
+  const status = reasons.length
+    ? prediction.total === 0 && parlay.total === 0 ? 'empty' : 'thin'
+    : 'fresh';
+  return {
+    status,
+    date: snapshot.metricDate,
+    minCoverage: VALIDATION_FRESHNESS_MIN_COVERAGE,
+    predictionCoverage,
+    parlayCoverage,
+    predictionSettled: prediction.settled,
+    parlaySettled: parlay.settled,
+    predictionTotal: prediction.total,
+    parlayTotal: parlay.total,
+    predictionUnvalidated: prediction.unvalidated,
+    parlayUnvalidated: parlay.unvalidated,
+    predictionPending: prediction.pending,
+    parlayPending: parlay.pending,
+    reasons,
+  };
+}
+
+function validationCoverage(metrics: { total: number; settled: number; voided: number; blocked: number }): number | null {
+  if (!metrics.total) return null;
+  return round((metrics.settled + metrics.voided + metrics.blocked) / metrics.total, 6);
 }
 
 function toParlayFamily(

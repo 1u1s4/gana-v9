@@ -19,6 +19,7 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Optional max selections: `--max N` defaults to 14. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs the compact selections into one native Discord message.
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
+- Strategy review artifact: `strategy-review.json`, produced by `pnpm gana strategy-review`, for technical Harness change notifications.
 
 ## Workflow
 
@@ -50,6 +51,16 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily
   --date YYYY-MM-DD \
   --gateway-target discord:CHANNEL_ID
 ```
+
+For Harness strategy review change notifications:
+
+```bash
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-strategy-review.mjs \
+  --artifact .artifacts/gana-v9/runs/RUN_ID/strategy-review.json \
+  --gateway-target discord:CHANNEL_ID
+```
+
+The strategy review notifier should stay technical and compact: include review scope/date range, model/reasoning, prediction/parlay hit-rate context, effective/failure patterns, proposed Harness changes with priority/status/files/rationale/impact/verification, and a final analytical-only note.
 
 When a matching recommendations artifact exists for the validation date, the daily stats notifier sends two native Discord messages: the aggregate validation summary and a validated mirror of the prior recommendations message. The mirror preserves recommendation order and compact selection format while prefixing each recommendation and leg with its validation result (`✅`, `❌`, `➖`, `⏳`, `🚫`, `⚪`).
 
@@ -97,6 +108,7 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --transport discord-native --gateway-target discord:CHANNEL_ID
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --dry-run
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --test-label "Esto es una prueba"
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-strategy-review.mjs --artifact .artifacts/gana-v9/runs/RUN_ID/strategy-review.json --dry-run
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs
 ```

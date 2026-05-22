@@ -583,6 +583,7 @@ async function main() {
     || command === 'parlay'
     || command === 'validate'
     || command === 'metrics'
+    || command === 'strategy-review'
     || command === 'run'
     || command === 'daily-e2e'
     || command === 'certify'

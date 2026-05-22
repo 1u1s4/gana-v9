@@ -58,6 +58,7 @@ import type { ResearchWebMode } from './prediction/prompts.js';
 import { runCertification } from './evals/runner.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from './metrics/daily.js';
 import { runDailyE2E, type DailyE2ERunResult, type DailyE2EProvider, type DailyParlayProfile } from './daily/e2e.js';
+import { runStrategyReview, type StrategyReviewResult } from './strategy-review/daily.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -645,6 +646,22 @@ async function buildDailyMetrics(ctx: HeadlessCommandContext | CommandContext, f
   }, ctx.runtime);
 }
 
+async function buildStrategyReview(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<StrategyReviewResult> {
+  const agentFlag = optionalStringFlag(flags, 'agent');
+  const agent = flags.agent === true || agentFlag === undefined
+    ? true
+    : !['false', 'off', 'no', '0'].includes(agentFlag.toLowerCase());
+  return runStrategyReview(ctx.config, {
+    date: optionalStringFlag(flags, 'date'),
+    from: optionalStringFlag(flags, 'from'),
+    through: optionalStringFlag(flags, 'through'),
+    all: flags.all === true,
+    scope: optionalStringFlag(flags, 'scope'),
+    docPath: optionalStringFlag(flags, 'doc'),
+    agent,
+  }, ctx.runtime);
+}
+
 async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunPipelineResult> {
   const input = requiredRunInput(flags);
   const service = await loadOptionalRunService();
@@ -946,6 +963,23 @@ function printDailyMetricsResult(result: DailyMetricsRunResult): void {
     const parlays = snapshot.parlayMetrics;
     console.log(`  ${GREEN}•${RESET} ${CYAN}${snapshot.metricDate}${RESET} ${DIM}pred=${predictions.won}-${predictions.lost} hit=${formatNullablePercent(predictions.hitRate)} parlay=${parlays.won}-${parlays.lost} hit=${formatNullablePercent(parlays.hitRate)}${RESET}`);
   }
+  if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
+}
+
+function printStrategyReviewResult(result: StrategyReviewResult): void {
+  const marker = result.ok ? `${GREEN}✓${RESET}` : `${YELLOW}!${RESET}`;
+  console.log(`  ${marker} ${CYAN}strategy review${RESET} ${DIM}${result.ok ? 'ready' : 'failed'}${RESET}`);
+  printKeyValue('runId', result.runId);
+  printKeyValue('scope', result.scope);
+  printKeyValue('dates', result.dates.join(',') || 'none');
+  printKeyValue('model', result.model);
+  printKeyValue('reasoning', result.reasoningEffort);
+  printKeyValue('agentStatus', result.agentReview.status);
+  printKeyValue('predictionHitRate', result.historySummary.predictions.hitRate === null ? 'n/a' : formatNullablePercent(result.historySummary.predictions.hitRate * 100));
+  printKeyValue('parlayHitRate', result.historySummary.parlays.hitRate === null ? 'n/a' : formatNullablePercent(result.historySummary.parlays.hitRate * 100));
+  if (result.artifactPath) printKeyValue('artifact', result.artifactPath);
+  if (result.reportPath) printKeyValue('report', result.reportPath);
+  if (result.docPath) printKeyValue('doc', result.docPath);
   if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);
 }
 
@@ -1635,6 +1669,16 @@ commands.push({
 });
 
 commands.push({
+  name: '/strategy-review',
+  description: 'Analyze settled prediction/parlay history and update harness strategy backlog',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await buildStrategyReview(ctx, flags);
+    printStrategyReviewResult(result);
+  },
+});
+
+commands.push({
   name: '/run',
   description: 'Run canonical headless pipeline for a date',
   execute: async (args, ctx) => {
@@ -1953,6 +1997,18 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
     }
 
+    if (area === 'strategy-review') {
+      const flags = parseFlags(argv.slice(1));
+      const hasDate = typeof flags.date === 'string';
+      const hasRange = typeof flags.from === 'string' || typeof flags.through === 'string';
+      if (!hasDate && !hasRange && flags.all !== true) {
+        throw new Error('strategy-review requires --date YYYY-MM-DD, --from/--through, or --all.');
+      }
+      const result = await buildStrategyReview(ctx, flags);
+      printStrategyReviewResult(result);
+      return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
+    }
+
     if (area === 'run') {
       const flags = parseFlags(argv.slice(1));
       const result = await runPipeline(ctx, flags);
@@ -2111,6 +2167,8 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
+  console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
+  console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
   console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);

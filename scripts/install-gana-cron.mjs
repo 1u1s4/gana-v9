@@ -14,6 +14,7 @@ const block = [
   'TZ=America/Guatemala',
   `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`node scripts/gana-validate-metrics-and-notify.mjs --gateway-target ${gatewayTarget} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`)}`,
   `0 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`node scripts/gana-daily-e2e-and-notify.mjs --gateway-target ${gatewayTarget} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
+  `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`node scripts/gana-strategy-review.mjs >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`)}`,
   end,
 ].join('\n');
 

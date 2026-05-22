@@ -242,6 +242,28 @@ describe('headless daily metrics command', () => {
   });
 });
 
+describe('headless strategy review command', () => {
+  it('requires a date, range, or all flag', async () => {
+    let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
+    await captureConsole(async () => {
+      result = await dispatchHeadless(['strategy-review'], context());
+    });
+
+    assert.equal(result?.ok, false);
+    assert.equal(result?.exitCode, 1);
+    assert.match(result?.message ?? '', /strategy-review requires/);
+  });
+
+  it('prints strategy review usage and registers the slash command', async () => {
+    const output = await captureConsole(() => printHeadlessUsage());
+    const names = listCommands().map((command) => command.name);
+
+    assert.ok(names.includes('/strategy-review'));
+    assert.match(output, /pnpm gana strategy-review --date YYYY-MM-DD --agent true\|false/);
+    assert.match(output, /pnpm gana strategy-review --all --through YYYY-MM-DD/);
+  });
+});
+
 describe('headless run command', () => {
   it('requires --date before running the canonical pipeline', async () => {
     let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
