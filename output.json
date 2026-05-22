@@ -1,139 +1,111 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "265422d2-e27b-4a1c-beae-20317fd79379",
+      "oddsQuoteId": "945c00f4-4d9a-4903-8f05-c8a04da27af1",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 2.67,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.36144,
-      "edge": 0.18856,
-      "confidence": 0.75,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:evidence_2",
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:evidence_3"
-      ],
-      "claimIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:claim_2",
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:claim_4"
-      ],
-      "rationale": "IF Elfsborg has a strong home advantage (67% win rate in last 6 home matches) and historical edge over Mjällby AIF.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "4968da72-4eb9-433f-a573-d13e2cfd7c4a",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 2.05,
-      "probability": 0.52,
-      "modelProbability": 0.52,
-      "marketFairProbability": 0.46731,
-      "edge": 0.05269,
-      "confidence": 0.65,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:evidence_2"
-      ],
-      "claimIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:claim_3"
-      ],
-      "rationale": "Mjällby AIF's strong offensive form, averaging 2.2 goals per match in their last five games, supports over 2.5 goals.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "23f56597-4fa6-4729-9a46-7c1dab4a7245",
-      "market": "double_chance",
-      "selection": "home_or_draw",
-      "line": null,
-      "odds": 1.5,
-      "probability": 0.653634,
-      "modelProbability": 0.653634,
-      "marketFairProbability": 0.312573,
-      "edge": 0.341061,
+      "odds": 2.59,
+      "probability": 0.373024,
+      "modelProbability": 0.373024,
+      "marketFairProbability": 0.363024,
+      "edge": 0.01,
       "confidence": 0.5,
       "confidenceBand": "low",
       "blockers": [],
       "promotable": false,
       "evidenceIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:evidence_2",
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:evidence_3"
+        "e9d916c4-dff7-41c3-976d-42271c3f6593:e1"
       ],
       "claimIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:claim_2",
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:claim_4"
+        "e9d916c4-dff7-41c3-976d-42271c3f6593:claim_1"
       ],
-      "rationale": "Derived from strong home advantage of IF Elfsborg and historical data, despite missing specific research evidence for this market.",
-      "warnings": [
-        "Market double_chance skipped/review-required: missing market-specific research evidence. Prediction derived from h2h market data."
-      ]
+      "rationale": "No strong market-specific evidence beyond 'noop' for H2H home win, model assumes slight edge.",
+      "warnings": ["H2H pick relies on 'noop' evidence and a simulated model edge."]
     },
     {
-      "oddsQuoteId": "48b296a3-7176-490c-9b61-54c23a3cec76",
-      "market": "corners_over_under",
-      "selection": "over",
-      "line": 9.5,
-      "odds": 1.71,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.546419,
-      "edge": 0.003581,
-      "confidence": 0.3,
+      "oddsQuoteId": "79b67f4e-6aee-4f83-b9d1-8b143afeb85f",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": null,
+      "odds": 1.4,
+      "probability": 0.337961,
+      "modelProbability": 0.337961,
+      "marketFairProbability": 0.327961,
+      "edge": 0.01,
+      "confidence": 0.5,
       "confidenceBand": "low",
       "blockers": [],
       "promotable": false,
-      "evidenceIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:source_api_football_fixture_statistics"
-      ],
+      "evidenceIds": [],
       "claimIds": [],
-      "rationale": "No market-specific research evidence available for corners. This prediction is based on general football match expectations and API-Football fixture statistics.",
-      "warnings": [
-        "Market corners_over_under skipped/review-required: missing market-specific research evidence. Prediction is a best analytical candidate with explicit warnings."
-      ]
+      "rationale": "Missing market-specific research evidence for double chance. Model assumes slight edge.",
+      "warnings": ["market double_chance skipped/review-required: missing market-specific research evidence"]
     },
     {
-      "oddsQuoteId": "7f8e07c7-c01b-4c16-a033-76900c46f130",
+      "oddsQuoteId": "60d97c50-4904-4f99-88b6-73d6138647ed",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 1.5,
+      "odds": 1.35,
+      "probability": 0.716452,
+      "modelProbability": 0.716452,
+      "marketFairProbability": 0.706452,
+      "edge": 0.01,
+      "confidence": 0.5,
+      "confidenceBand": "low",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [],
+      "claimIds": [],
+      "rationale": "Missing market-specific research evidence for goals_over_under. Model assumes slight edge.",
+      "warnings": ["market goals_over_under skipped/review-required: missing market-specific research evidence"]
+    },
+    {
+      "oddsQuoteId": "d6b94d7d-006e-482b-9aff-ed2af8647baf",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 8.5,
+      "odds": 1.57,
+      "probability": 0.603264,
+      "modelProbability": 0.603264,
+      "marketFairProbability": 0.593264,
+      "edge": 0.01,
+      "confidence": 0.5,
+      "confidenceBand": "low",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [],
+      "claimIds": [],
+      "rationale": "Missing market-specific research evidence for corners_over_under. Model assumes slight edge.",
+      "warnings": ["market corners_over_under skipped/review-required: missing market-specific research evidence"]
+    },
+    {
+      "oddsQuoteId": "7e8bf429-6c2c-4a73-8d9c-9561cacf0294",
       "market": "btts",
       "selection": "yes",
       "line": null,
-      "odds": 1.8,
-      "probability": 0.62,
-      "modelProbability": 0.62,
-      "marketFairProbability": 0.52,
-      "edge": 0.1,
-      "confidence": 0.6,
-      "confidenceBand": "medium",
+      "odds": 1.83,
+      "probability": 0.51,
+      "modelProbability": 0.51,
+      "marketFairProbability": 0.5,
+      "edge": 0.01,
+      "confidence": 0.5,
+      "confidenceBand": "low",
       "blockers": [],
       "promotable": false,
-      "evidenceIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:evidence_2"
-      ],
-      "claimIds": [
-        "63e3d8c4-8d40-40d2-906c-676d21f63b31:claim_3"
-      ],
-      "rationale": "Mjällby AIF has strong offensive form, averaging 2.2 goals per match, increasing the likelihood of both teams scoring.",
-      "warnings": [
-        "Market btts skipped/review-required: missing market-specific research evidence. Prediction derived from Mjällby's offensive form."
-      ]
+      "evidenceIds": [],
+      "claimIds": [],
+      "rationale": "Missing market-specific research evidence for btts. Model assumes slight edge.",
+      "warnings": ["market btts skipped/review-required: missing market-specific research evidence"]
     }
   ],
   "warnings": [
-    "removed unknown claim references from evidence item "evidence_2"",
-    "removed unknown claim references from evidence item "evidence_3"",
-    "removed unknown claim references from evidence item "evidence_4"",
     "market double_chance skipped/review-required: missing market-specific research evidence",
+    "market goals_over_under skipped/review-required: missing market-specific research evidence",
     "market corners_over_under skipped/review-required: missing market-specific research evidence",
     "market btts skipped/review-required: missing market-specific research evidence",
-    "Market double_chance skipped/review-required: missing market-specific research evidence. Prediction derived from h2h market data.",
-    "Market corners_over_under skipped/review-required: missing market-specific research evidence. Prediction is a best analytical candidate with explicit warnings.",
-    "Market btts skipped/review-required: missing market-specific research evidence. Prediction derived from Mjällby's offensive form."
+    "Need web search"
   ],
   "metadata": {}
 }

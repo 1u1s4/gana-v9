@@ -1,0 +1,179 @@
+{
+  "sources": [
+    {
+      "id": "web-search-summary",
+      "type": "web-search",
+      "url": "https://www.google.com/search?q=Canterbury+Bankstown+vs+Northern+Tigers+football+match+analysis+and+predictions",
+      "title": "Canterbury Bankstown vs Northern Tigers football match analysis and predictions",
+      "capturedAt": "2026-05-22T17:09:00.000Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "api-football-fixture",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football Fixture Snapshot",
+      "capturedAt": "2026-05-22T17:09:00.785Z",
+      "hash": "c936f67c-a439-40bf-9f36-27ca15059e2a",
+      "metadata": {
+        "providerSnapshotId": "c936f67c-a439-40bf-9f36-27ca15059e2a"
+      }
+    },
+    {
+      "id": "api-football-stats",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football Statistics Snapshot",
+      "capturedAt": "2026-05-22T17:09:01.334Z",
+      "hash": "57823bda-ff51-4944-a526-e82b6bd02368",
+      "metadata": {
+        "providerSnapshotId": "57823bda-ff51-4944-a526-e82b6bd02368"
+      }
+    },
+    {
+      "id": "odds-snapshot",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "Odds Snapshot",
+      "capturedAt": "2026-05-22T17:09:02.274Z",
+      "hash": "fbc5853b-322d-4daf-b2d8-7515ceedec91",
+      "metadata": {
+        "providerSnapshotId": "fbc5853b-322d-4daf-b2d8-7515ceedec91"
+      }
+    }
+  ],
+  "evidenceItems": [
+    {
+      "id": "evidence-h2h-dominance",
+      "sourceId": "web-search-summary",
+      "claimIds": ["claim-h2h-away", "claim-double-chance-away"],
+      "snippet": "Northern Tigers have dominated this fixture... Total Matches: 10 (since 2018), Northern Tigers Wins: 7, Canterbury Bankstown Wins: 2, Draws: 1",
+      "summary": "Northern Tigers have a strong head-to-head record against Canterbury Bankstown, winning 7 of their last 10 encounters.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence-recent-form",
+      "sourceId": "web-search-summary",
+      "claimIds": ["claim-h2h-away", "claim-double-chance-away"],
+      "snippet": "Northern Tigers: Currently sitting in 2nd place with 29 points from 15 matches (8W, 5D, 2L)... Canterbury Bankstown: Currently in 10th place with 19 points from 15 matches (5W, 4D, 6L).",
+      "summary": "Northern Tigers are 2nd in the league, significantly ahead of Canterbury Bankstown in 10th place, indicating better recent form.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence-btts-history",
+      "sourceId": "web-search-summary",
+      "claimIds": ["claim-btts-yes"],
+      "snippet": "BTTS (Both Teams to Score): There is a high probability (around 80% in recent youth and senior trends) of both teams finding the net.",
+      "summary": "Historical data suggests a high likelihood of both teams scoring in this fixture (around 80% probability).",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+        "id": "evidence-goals-over-under",
+        "sourceId": "web-search-summary",
+        "claimIds": ["claim-goals-over-2.5"],
+        "snippet": "Recent matches between these two have been relatively high-scoring (e.g., the 3-2 result in February).",
+        "summary": "Recent matches between the two teams have been high scoring, including a 3-2 result in their last meeting.",
+        "confidence": 0.85,
+        "metadata": {}
+    },
+    {
+        "id": "evidence-h2h-odds",
+        "sourceId": "odds-snapshot",
+        "claimIds": ["claim-h2h-away"],
+        "snippet": "market: h2h, selection: away, price: 1.67",
+        "summary": "The odds for an away win (Northern Tigers) are 1.67, implying a 59.9% probability.",
+        "confidence": 0.95,
+        "metadata": {}
+    },
+    {
+        "id": "evidence-double-chance-odds",
+        "sourceId": "odds-snapshot",
+        "claimIds": ["claim-double-chance-away"],
+        "snippet": "market: double_chance, selection: draw_or_away, price: 1.18",
+        "summary": "The odds for draw or away win are 1.18, implying a 84.7% probability.",
+        "confidence": 0.95,
+        "metadata": {}
+    },
+    {
+        "id": "evidence-goals-over-under-odds",
+        "sourceId": "odds-snapshot",
+        "claimIds": ["claim-goals-over-2.5"],
+        "snippet": "market: goals_over_under, selection: over, line: 2.5, price: 1.6",
+        "summary": "The odds for Over 2.5 goals are 1.60, implying a 62.5% probability.",
+        "confidence": 0.95,
+        "metadata": {}
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim-h2h-away",
+      "statement": "Northern Tigers are favored to win the match against Canterbury Bankstown.",
+      "subject": {
+        "type": "market",
+        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence-h2h-dominance", "evidence-recent-form", "evidence-h2h-odds"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim-double-chance-away",
+      "statement": "Northern Tigers are likely to win or draw against Canterbury Bankstown.",
+      "subject": {
+        "type": "market",
+        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence-h2h-dominance", "evidence-recent-form", "evidence-double-chance-odds"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim-goals-over-2.5",
+      "statement": "The match is likely to have over 2.5 goals.",
+      "subject": {
+        "type": "market",
+        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence-goals-over-under", "evidence-goals-over-under-odds"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim-btts-yes",
+      "statement": "Both teams are likely to score in the match.",
+      "subject": {
+        "type": "market",
+        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence-btts-history"],
+      "conflictStatus": "none",
+      "metadata": {}
+    }
+  ],
+  "gateResult": {
+    "verdict": "promotable",
+    "reasons": [
+      "Structured research generated with sufficient evidence from web search and odds data."
+    ],
+    "warnings": []
+  },
+  "warnings": [],
+  "metadata": {
+    "marketCoverage": {
+        "skippedMarkets": ["corners_over_under"],
+        "notes": "Insufficient evidence found for the 'corners_over_under' market from the web search."
+    }
+  }
+}
