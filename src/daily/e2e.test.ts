@@ -219,8 +219,8 @@ describe('runDailyE2E', () => {
           evidencePackPath: '/tmp/evidence.json',
           handoffPath: '/tmp/handoff.md',
           steps: [],
-          fixtures: [firstFixture, secondFixture],
-          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
+          fixtures: [firstFixture],
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 1, hitCount: 0, hits: [], candidateFixtures: [secondFixture], fixtureEvaluations: [] },
           oddsSnapshots: [],
           research: [],
           scoring: [{
@@ -290,6 +290,13 @@ describe('runDailyE2E', () => {
     assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3, 4]);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'balanced-2'), false);
     assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), ['prediction-atomic-2']);
+    assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team C vs Team D');
+    assert.deepEqual(recommendations.atomicRecommendations[0].legs[0].display, {
+      awayTeamName: 'Team D',
+      fixtureLabel: 'Team C vs Team D',
+      homeTeamName: 'Team C',
+      kickoffLocal: '2026-05-19T18:00:00.000Z',
+    });
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayLegs, true);
     assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 4);
     assert.equal(recommendations.recommendationPolicy.parlayAnalysisTop, 12);

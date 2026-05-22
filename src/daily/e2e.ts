@@ -1021,7 +1021,7 @@ function buildAtomicPredictionRecommendations(
   for (const provider of providers) {
     const result = providerPipelineResults[provider];
     if (!result?.ok) continue;
-    const fixtureDisplays = fixtureDisplayMap(result.fixtures);
+    const fixtureDisplays = fixtureDisplayMap(displayFixturesFromPipelineResult(result));
     for (const scoring of result.scoring) {
       for (const prediction of scoring.predictions) {
         const edge = atomicPredictionEdge(prediction);
@@ -1217,7 +1217,7 @@ function hydrateRecommendationDisplay<T extends DailyFinalRecommendation>(
   recommendation: T,
   providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>,
 ): T {
-  const displays = fixtureDisplayMap(Object.values(providerPipelineResults).flatMap((result) => result?.fixtures ?? []));
+  const displays = fixtureDisplayMap(Object.values(providerPipelineResults).flatMap(displayFixturesFromPipelineResult));
   const hydrateLeg = (leg: any) => {
     const display = displays.get(String(leg.fixtureId ?? ''));
     if (!display) return leg;
@@ -1246,6 +1246,14 @@ function fixtureDisplayMap(fixtures: Fixture[]): Map<string, RecommendationLegDi
       kickoffLocal: fixture.scheduledAt,
     }];
   }));
+}
+
+function displayFixturesFromPipelineResult(result: RunPipelineResult | undefined): Fixture[] {
+  if (!result) return [];
+  return [
+    ...(result.fixtures ?? []),
+    ...(result.lowOddsScan?.candidateFixtures ?? []),
+  ];
 }
 
 function recommendationLegsOutsideRequestedDate(

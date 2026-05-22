@@ -77,13 +77,13 @@ export function loadRecommendations(path) {
 export function buildDiscordPayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const selectionLimit = Math.min(max, DISCORD_SELECTION_EMBEDS_PER_MESSAGE);
-  const recommendations = selectRecommendations(artifact).slice(0, selectionLimit);
+  const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, selectionLimit));
   return buildDiscordPayloadPage(recommendations, { ...options, artifactDate: artifact?.date });
 }
 
 export function buildDiscordPayloads(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
-  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   if (!recommendations.length) return [buildDiscordPayloadPage([], options)];
   const pages = recommendations.length > DISCORD_SELECTION_EMBEDS_PER_MESSAGE
     ? chunk(recommendations, DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE)
@@ -99,7 +99,7 @@ export function buildDiscordPayloads(artifact, options = {}) {
 
 export function buildDiscordSinglePayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
-  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const counts = recommendationCounts(recommendations);
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones',
@@ -203,7 +203,7 @@ function formatArtifactDate(value) {
 
 export function buildGatewayMessage(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
-  const recommendations = selectRecommendations(artifact).slice(0, max);
+  const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const counts = recommendationCounts(recommendations);
   const status = commonRecommendationValue(recommendations, 'harnessStatus', 'review-required');
   const validation = commonRecommendationValue(recommendations, 'validationStatus', 'unvalidated');
@@ -533,6 +533,69 @@ export function recommendationTitle(recommendation) {
     .join(' + ');
 }
 
+export function hydrateRecommendationDisplayLabels(recommendations) {
+  if (!Array.isArray(recommendations) || !recommendations.length) return recommendations;
+  const displayByFixtureId = recommendationDisplayMap(recommendations);
+  if (!displayByFixtureId.size) return recommendations;
+
+  const hydrateLeg = (leg) => {
+    const fixtureId = typeof leg?.fixtureId === 'string' ? leg.fixtureId.trim() : '';
+    const display = fixtureId ? displayByFixtureId.get(fixtureId) : undefined;
+    if (!display) return leg;
+    const fixture = shouldReplaceFixtureLabel(leg?.fixture)
+      ? display.fixtureLabel
+      : leg.fixture;
+    return {
+      ...leg,
+      fixture,
+      display: {
+        ...(leg?.display && typeof leg.display === 'object' ? leg.display : {}),
+        ...display,
+      },
+    };
+  };
+
+  return recommendations.map((recommendation) => ({
+    ...recommendation,
+    legs: Array.isArray(recommendation.legs) ? recommendation.legs.map(hydrateLeg) : recommendation.legs,
+    bankerLegs: Array.isArray(recommendation.bankerLegs) ? recommendation.bankerLegs.map(hydrateLeg) : recommendation.bankerLegs,
+  }));
+}
+
+function recommendationDisplayMap(recommendations) {
+  const displayByFixtureId = new Map();
+  for (const recommendation of recommendations) {
+    for (const leg of [
+      ...(Array.isArray(recommendation?.legs) ? recommendation.legs : []),
+      ...(Array.isArray(recommendation?.bankerLegs) ? recommendation.bankerLegs : []),
+    ]) {
+      const fixtureId = typeof leg?.fixtureId === 'string' ? leg.fixtureId.trim() : '';
+      if (!fixtureId || displayByFixtureId.has(fixtureId)) continue;
+      const display = displayFromLeg(leg);
+      if (display) displayByFixtureId.set(fixtureId, display);
+    }
+  }
+  return displayByFixtureId;
+}
+
+function displayFromLeg(leg) {
+  const display = leg?.display && typeof leg.display === 'object' ? leg.display : {};
+  const fixtureLabel = display.fixtureLabel
+    || buildLabelFromTeams(display.homeTeamName, display.awayTeamName)
+    || buildLabelFromTeams(leg?.homeTeamName, leg?.awayTeamName)
+    || leg?.fixtureLabel
+    || (typeof leg?.fixture === 'string' ? leg.fixture : undefined);
+  if (typeof fixtureLabel !== 'string' || !fixtureLabel.trim() || isUuidFixtureLabel(fixtureLabel)) return undefined;
+  const homeTeamName = typeof display.homeTeamName === 'string' ? display.homeTeamName : undefined;
+  const awayTeamName = typeof display.awayTeamName === 'string' ? display.awayTeamName : undefined;
+  return {
+    ...display,
+    fixtureLabel: compactFixtureName(fixtureLabel),
+    ...(homeTeamName ? { homeTeamName } : {}),
+    ...(awayTeamName ? { awayTeamName } : {}),
+  };
+}
+
 function displayFixtureName(leg) {
   const display = leg?.display && typeof leg.display === 'object' ? leg.display : {};
   const fromDisplay = display.fixtureLabel
@@ -681,6 +744,11 @@ function isUuidFixtureLabel(value) {
   if (isUuidLike(normalized)) return true;
   const parts = normalized.split(/\s+vs\.?\s+/i);
   return parts.length === 2 && parts.every(isUuidLike);
+}
+
+function shouldReplaceFixtureLabel(value) {
+  if (typeof value !== 'string' || !value.trim()) return true;
+  return isUuidFixtureLabel(value);
 }
 
 function isUuidLike(value) {

@@ -88,6 +88,35 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(message, new RegExp(uuidB));
   });
 
+  it('shares fixture display labels across recommendations with the same fixture id', () => {
+    const artifact = sampleArtifactWithAtomic();
+    const fixtureId = artifact.recommendations[0].legs[0].fixtureId;
+    artifact.recommendations[0].legs[0] = {
+      ...artifact.recommendations[0].legs[0],
+      fixtureId,
+      fixture: 'Team A vs Team B',
+      display: {
+        fixtureLabel: 'Team A vs Team B',
+        homeTeamName: 'Team A',
+        awayTeamName: 'Team B',
+      },
+    };
+    artifact.recommendations[1].legs[0] = {
+      ...artifact.recommendations[1].legs[0],
+      fixtureId,
+      fixture: fixtureId,
+      display: undefined,
+    };
+
+    const payloads = buildDiscordPayloads(artifact, { max: 2 });
+    const message = buildGatewayMessage(artifact, { max: 2 });
+
+    assert.match(payloads[0].embeds[2].title, /📌 Simple · Team A vs Team B · h2h away/);
+    assert.match(payloads[0].embeds[2].description, /> ⚽ Team A vs Team B: h2h away @ 1.18/);
+    assert.doesNotMatch(JSON.stringify(payloads), new RegExp(fixtureId));
+    assert.doesNotMatch(message, new RegExp(fixtureId));
+  });
+
   it('labels over-under markets with the explicit family', () => {
     const artifact = sampleArtifact();
     artifact.recommendations[0].legs = [
