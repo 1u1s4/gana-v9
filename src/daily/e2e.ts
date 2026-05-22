@@ -592,7 +592,7 @@ export async function runDailyE2E(
         maxCombinedOdds: DAILY_PARLAY_CONSERVATIVE_MAX_ODDS,
         minAggregateConfidence: DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE,
         diamanteMinAggregateConfidence: DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE,
-        semanticDuplicateKey: 'fixtureId:market:selection:line',
+        semanticDuplicateSignature: 'fixtureId:market:selection:line',
         blockedRiskFlags: [
           'high-combined-odds',
           'stale-source',
@@ -955,6 +955,7 @@ function selectDailyParlayRecommendations(
   const usedSignatures = new Set<string>();
   const add = (recommendation: ParlayAnalysisRecommendation) => {
     if (selected.length >= limit || usedIds.has(recommendation.parlayId)) return;
+    if (usedProfiles.has(recommendation.profile)) return;
     if (!isConservativeDailyParlayRecommendation(recommendation)) return;
     const signature = parlayLogicalSignature(recommendation);
     if (!signature || usedSignatures.has(signature)) return;

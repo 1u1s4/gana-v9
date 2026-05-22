@@ -106,3 +106,42 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Expand low-odds discovery to safe double-chance (proposed) — src/filters/low-odds-selector.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md
 - [high] Fix parlay profile attribution in review feedback (ready-for-implementation) — src/parlay/service.ts, src/strategy-review/daily.ts
 - [medium] Add validation-driven threshold feedback (proposed) — src/strategy-review/daily.ts, src/prediction/service.ts, src/parlay/service.ts
+
+## 2026-05-22 · harness-applied-changes-round-1
+
+- Source review: strategy-review-backfill-mphflk7p
+- Objective: apply the first high-confidence Harness changes identified by the historical Codex review.
+- Status: implemented in working tree; verified with typecheck, full test run, notifier test, cron syntax, and strategy-review smoke.
+
+### Applied Modifications
+
+- [high] Semantic parlay deduplication — `src/parlay/analysis.ts`, `src/daily/e2e.ts`, `src/strategy-review/daily.ts`
+  - Parlay analysis now detects duplicate exposure by `fixtureId:market:selection:line`, not prediction id.
+  - Final daily recommendations reject duplicate logical leg signatures and avoid repeated profile exposure.
+  - Strategy review artifact audits now count duplicate parlays using the same semantic signature and exclude atomic singles.
+- [high] Conservative final parlay promotion — `src/daily/e2e.ts`
+  - Final daily parlays require positive adjusted edge, 2-3 legs, aggregate confidence >= 0.70, combined odds <= 2.20, and no high-risk flags.
+  - `parlay-diamante` remains allowed only inside 1.10-1.30 combined odds with aggregate confidence >= 0.78.
+  - High-odds, stale-source, unverified-corners, negative-edge, and duplicate-leg-set candidates stay out of final recommendations.
+- [high] Validation freshness gate — `src/daily/e2e.ts`
+  - Daily E2E now derives validation freshness from daily metrics.
+  - Promotion requires prediction/parlay validation coverage >= 60%; otherwise the run remains review-required even if providers and parlays succeeded.
+  - Recommendation artifacts include the validation freshness snapshot and gate policy.
+- [high] Parlay profile attribution fix — `src/strategy-review/daily.ts`
+  - Strategy review now reads `metadata.portfolioProfile` before fallback profile fields, so future review buckets can distinguish profiles such as `parlay-diamante`, `low-variance`, and `balanced`.
+
+## 2026-05-22 · harness-applied-smoke
+
+- Run: strategy-review-2026-05-22-122120f3
+- Dates: 2026-05-22
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-22-122120f3/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-22-122120f3/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: skipped
+- Predictions: 39-25 hit 60.9% (576 total)
+- Parlays: 0-1 hit 0.0% (22 total)
+
+### Proposed Modifications
+
+- None generated.
