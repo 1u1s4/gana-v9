@@ -1,357 +1,135 @@
 {
-  "sources": [
+  "predictions": [
     {
-      "id": "web_search_1",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHJr5bY6kIVChhrCx1qrLy42y1TkR5MA5ZwYqyQorgpXll5jRflWLq7-aNjnJS2v4abH0CcNoGS1FhgncfetxD3I7zKuDgceOE4rIMuRGsN4SH5S6BwG8ZOx211u7g5ESRaOL_d00vRH5Xo2EvTeATsmHyIs2bvGlcUCpV0BsNMRF-hDqhhStlDV35_b3Lw19Qk92tRwpZfLY_XNvRfZpWL6zRWey9ByKkBIH6SejkcgxMZ5ry-GkbXBg==",
-      "title": "soccerpunter.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_2",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFIv4oFZAjE9E82pJV3oOynHls3RPx5wxD0jb_hDoxmczOc0ZI-jzEzv68r53CRRMkLNC6HkdGtRKDPAvT_U4NBNE27dP3C3Vi2NfXLMHJ5JbaJtDydG4ZAjBHc4zfEQQkO3qColTabAJXD-uDgCnB-h2S7jraAGaR_iYPqr0GumYc2",
-      "title": "betmines.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_3",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEvhSE98lzzyokQk0SSiIl8JOLRiEcpr89K6nlz5wgvaf3MgWB7JbzcEOBYNAlz0vxcp8lWvutMpspRXZwhb2SU5j0lZtZjTFPpwynMuuxT3ltrfqKUTA52Fs8H0xh7QSk1gGFUBySy1aDKKRnKli9OUaRxT66B3VTL83f8lQXZ5VToxlKbu7rumGFj-hk=",
-      "title": "flashscore.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_4",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE_daBg2q9k3Hkb4HBZ_Fzrwqf46xRv_C439mWwFisX2s5vX2Tp0SE3Q4sF_R_rOAy-u-Md_2K1LyxifnBON-Tz0Zz4vKnz8ga5v51vhtCxpxxJv91WhUeIv3GgLI9GCx4u1qk3GZ2bvdhsBnuFiSes8KOUsDk4hK2SnEuixILMZzivXII6Fr-xc-eQwC0aLr4L9R3uN64kncVyfr_A63ihRJjPCcypSStIj_VrX1kvjcqD",
-      "title": "footballpark.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_5",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHA2U1btsYnwwGZxrPPVxZa9a8YAudTBDgHo7rlCy3K-KUpU3dJqfafYkuWBvxLnrdLd9zCkihx6CqloEsn87YlmivqDi41SDHKq6inj4NzYPmBTkwZrN2_cQxdQMHWlC5TD8lS3Di4OJcRPxAvgVFIlZ1dLgPBWylaFDWUY26IoDcUmd6Jv71t5Zk=",
-      "title": "betmines.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_6",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHV1PrUoo5Ya_f22UqXwC7fFOLRzKAuwODIk4Pge3Lc7RP4cBf15cDMB8IJDHOXK0da1mJSbfMz0OKlMplXQ_yVouBJIxvKW_OlhtCP3cegYPyUDuKqew8dso_dtOZ--jPyKGkH4_gK8dk_WwrYCyYOUSZmRWt5Yjn_M8JIIFGS",
-      "title": "aiscore.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_7",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHyIvwtYzxm9n2j3MZc5JkdyZtSasPzhd7yVVEDhudXwXZ-ItM-OkWyX2l5xIkpYcuT7Ko0JrZjumzjzHOmktXnYqaWoni-PQCEVSMM7Hc5mmkDKF8gw-BriHF7x4RGwYu9AEqcWDMAcrx2ngk9Br0WM1QwIqxs-Pc-3rxrWIHqOb9Rks1hoGGyesIGzPM=",
-      "title": "oddslot.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_8",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG8PH1Ppr9k1NwJ-G_7RhTzzNlL-UMGK5kf4QJ0ikAnBkkg7o8saiBxk-YnfflICpsYlcmrjupFd0v1ccrc2UQVwxY2nnaPEddzcSaBg6z9zjjqYfC14e8vGu6NpXt402lZJ22Zmeo99zfdLTV3bl2X8nuu9jNQUR2-Q1-Y4M8fT59aU2I=",
-      "title": "footystats.org",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_9",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFKOwEhdljSNXV6ub6EJw5-egYVmg3eQF5lIroZOvCzdd-eIv-nRXK_a2d9RUjyb8aY0vRzTdhmqGrKuYA_Ij5iNBZVO0oxQH5Z5gT55k9E9QT9SHyrA5TTNoYNCMySnXacRKMHLO01yB4VvPxgSiNKd1ccayS_VaZqh-7lHw==",
-      "title": "aiscore.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_10",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEu8KkvwUCKGt9_E1s0PK4Rucx9UbKYmjEQkNNHNKnUyMv9eqFgs6IoTqmMe5UTYi0aq1UJm9hMBcLp6usM3UUnm9idFjoehba5mwg0N0aW4yrRjEU2d1NgZyNT4BOpyTKR1Po317ObX2mm0LnEQ1EWujWZ0VKh7SyyaxglgkULFYEy3OXWtK5odxU=",
-      "title": "forebet.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_11",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEX7VN8F6lKBxEma7OUo-F9VJeLl67WYmuHJNBZ-nqgTmqUN2P1AKrkw7blhdIR6gfCEpcnHga-QV6vj-Za3SRSBwAWs4ZlFuQgKhvvbGy88LnKW1-pJm4BlZ27CIp-baMmsYMl8R4Q-zAPt0_Hjt0wrcRKFkPGuorT4Fr7R6tS0w-MvtU-Jw==",
-      "title": "wincomparator.com",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_12",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHHhaxmEJqtleb99ZOSUuTWYJMRQYM_0IOp3L__XHoIORJXv-SQdFngn6wXpOwTQL3Z0du5NvaEykSSmIclke5a4UlQXIXgnDqiVrpRAl9xmCoefJ6nM5RgAaqLCqcQj1EGeCUQhODH1qY3Vs6JXw==",
-      "title": "livescores.biz",
-      "capturedAt": "2026-05-23T06:52:04.220Z",
-      "metadata": {}
-    },
-    {
-      "id": "api_football_odds",
-      "type": "provider-snapshot",
-      "url": "internal",
-      "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-23T06:52:07.658Z",
-      "hash": "772f2294b264bfad02787da86703fce1a5c03e62ab2c1ba143681334279a4711",
-      "metadata": {
-        "providerSnapshotId": "7f3a0072-8d5c-485e-8668-89bdae16ce5f"
-      }
-    }
-  ],
-  "evidenceItems": [
-    {
-      "id": "evidence_form_am",
-      "sourceId": "web_search_2",
-      "claimIds": [],
-      "snippet": "Altona Magic (11th Place): Recent Form: 2 wins, 1 draw, 2 losses in their last 5 matches. Home Performance: They have struggled at Paisley Park, recording only 1 win in their last 4 home games. Stats: Averaging 1.15 goals scored and 1.77 goals conceded per match this season.",
-      "summary": "Altona Magic is in 11th place with 2 wins, 1 draw, 2 losses in their last 5 matches. They have struggled at home with only 1 win in their last 4 home games. They average 1.15 goals scored and 1.77 conceded per match.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_form_hc",
-      "sourceId": "web_search_8",
-      "claimIds": [],
-      "snippet": "Hume City (2nd Place): Recent Form: 4 wins, 1 draw, 0 losses in their last 5 matches. Away Performance: Strong travelers, having secured a win in their most recent away outing and remaining unbeaten in their last five overall. Stats: Averaging 1.85 goals scored and 1.23 goals conceded per match.",
-      "summary": "Hume City is in 2nd place with 4 wins, 1 draw, 0 losses in their last 5 matches. They are strong away performers and average 1.85 goals scored and 1.23 conceded per match.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_dominance",
-      "sourceId": "web_search_9",
-      "claimIds": [],
-      "snippet": "Head-to-Head (H2H) Statistics: Historically, Hume City has dominated this matchup, though Altona Magic pulled off a surprise in their most recent meeting. Total Meetings (since 2009): 18 Games Hume City Wins: 11 Altona Magic Wins: 2 Draws: 5 Last Meeting (Feb 13, 2026): Hume City 1–3 Altona Magic (A rare away win for Altona).",
-      "summary": "Hume City has historically dominated Altona Magic with 11 wins to Altona's 2 out of 18 meetings. The last meeting was a 3-1 away win for Altona Magic.",
-      "confidence": 0.9,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_bet365",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: h2h, Selection: home, Price: 3.5; Market: h2h, Selection: draw, Price: 3.5; Market: h2h, Selection: away, Price: 1.9",
-      "summary": "Bet365 odds for H2H: Altona Magic win (home) at 3.5, Draw at 3.5, Hume City win (away) at 1.9.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_pinnacle",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: h2h, Selection: home, Price: 3.15; Market: h2h, Selection: draw, Price: 3.96; Market: h2h, Selection: away, Price: 1.91",
-      "summary": "Pinnacle odds for H2H: Altona Magic win (home) at 3.15, Draw at 3.96, Hume City win (away) at 1.91.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_double_chance_odds",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: double_chance, Selection: home_or_draw, Price: 1.8; Market: double_chance, Selection: home_or_away, Price: 1.22; Market: double_chance, Selection: draw_or_away, Price: 1.22",
-      "summary": "Bet365 odds for Double Chance: Home or Draw at 1.8, Home or Away at 1.22, Draw or Away at 1.22.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_odds_bet365_1.5",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: goals_over_under, Selection: over, Line: 1.5, Price: 1.2; Market: goals_over_under, Selection: under, Line: 1.5, Price: 4.33",
-      "summary": "Bet365 odds for Over/Under 1.5 goals: Over 1.5 at 1.2, Under 1.5 at 4.33.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_odds_bet365_2.5",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: goals_over_under, Selection: over, Line: 2.5, Price: 1.67; Market: goals_over_under, Selection: under, Line: 2.5, Price: 2.15",
-      "summary": "Bet365 odds for Over/Under 2.5 goals: Over 2.5 at 1.67, Under 2.5 at 2.15.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_odds_bet365_3.5",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: goals_over_under, Selection: over, Line: 3.5, Price: 2.62; Market: goals_over_under, Selection: under, Line: 3.5, Price: 1.44",
-      "summary": "Bet365 odds for Over/Under 3.5 goals: Over 3.5 at 2.62, Under 3.5 at 1.44.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_odds_pinnacle_2.5",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: goals_over_under, Selection: over, Line: 2.5, Price: 1.64; Market: goals_over_under, Selection: under, Line: 2.5, Price: 2.2",
-      "summary": "Pinnacle odds for Over/Under 2.5 goals: Over 2.5 at 1.64, Under 2.5 at 2.2.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_trend",
-      "sourceId": "web_search_10",
-      "claimIds": [],
-      "snippet": "Trend: 5 of the last 6 league encounters between these two have seen Under 2.5 goals, suggesting a potentially tight, low-scoring affair despite Hume's attacking form.",
-      "summary": "5 of the last 6 league encounters between Altona Magic and Hume City have resulted in Under 2.5 goals.",
-      "confidence": 0.85,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_btts_odds",
-      "sourceId": "api_football_odds",
-      "claimIds": [],
-      "snippet": "Market: btts, Selection: yes, Price: 1.62; Market: btts, Selection: no, Price: 2.2",
-      "summary": "Bet365 odds for Both Teams To Score: Yes at 1.62, No at 2.2.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_win_probability",
-      "sourceId": "web_search_11",
-      "claimIds": [],
-      "snippet": "Win Probability: Hume City (~48%), Draw (~27%), Altona Magic (~25%).",
-      "summary": "Win probability: Hume City (~48%), Draw (~27%), Altona Magic (~25%).",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_predicted_score",
-      "sourceId": "web_search_10",
-      "claimIds": [],
-      "snippet": "Predicted Score: 1–1 or 1–2 in favor of Hume City.",
-      "summary": "Predicted score is 1-1 or 1-2 in favor of Hume City.",
+      "oddsQuoteId": "a90246ef-50c5-412f-bca9-177cb67b0460",
+      "market": "h2h",
+      "selection": "away",
+      "line": null,
+      "odds": 2.84,
+      "probability": 0.38,
+      "modelProbability": 0.38,
+      "marketFairProbability": 0.338367,
+      "edge": 0.041633,
       "confidence": 0.75,
-      "metadata": {}
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-h2h-2",
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-h2h-1"
+      ],
+      "claimIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:claim-h2h-1",
+        "d631620d-cf94-4f00-830a-23d464d402d9:claim-h2h-2"
+      ],
+      "rationale": "Petrojet is identified as a slight favorite due to a strong recent head-to-head record and the expectation of a closely contested match based on tight bookmaker odds.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "61841e11-12b7-4a69-9ea3-70838bf9b914",
+      "market": "double_chance",
+      "selection": "draw_or_away",
+      "line": null,
+      "odds": 1.4,
+      "probability": 0.38,
+      "modelProbability": 0.38,
+      "marketFairProbability": 0.327586,
+      "edge": 0.052414,
+      "confidence": 0.6,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-dc-1",
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-dc-2"
+      ],
+      "claimIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:claim-dc-1"
+      ],
+      "rationale": "A 'Draw or Away' outcome is highly probable, supported by betting odds and web prediction sources identifying 'Petrojet Win or Draw' as a primary betting tip.",
+      "warnings": [
+        "Mapped invalid supportLevel "strongly-supported" to "weak" on claim "claim-dc-1""
+      ]
+    },
+    {
+      "oddsQuoteId": "3f18947e-ea48-4539-92e6-64827a6e57f8",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.5,
+      "odds": 1.65,
+      "probability": 0.62,
+      "modelProbability": 0.62,
+      "marketFairProbability": 0.580774,
+      "edge": 0.039226,
+      "confidence": 0.65,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-ou-1",
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-ou-2"
+      ],
+      "claimIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:claim-ou-1"
+      ],
+      "rationale": "The match is expected to have fewer than 2.5 goals, indicated by low odds for 'Under 2.5 goals' and statistical trends showing a high percentage of recent matches with under 2.5 goals.",
+      "warnings": [
+        "Mapped invalid supportLevel "strongly-supported" to "weak" on claim "claim-ou-1""
+      ]
+    },
+    {
+      "oddsQuoteId": "f49caa88-f99f-4a41-8b16-ac503d0e5920",
+      "market": "corners_over_under",
+      "selection": "under",
+      "line": 9.5,
+      "odds": 1.88,
+      "probability": 0.519298,
+      "modelProbability": 0.519298,
+      "marketFairProbability": 0.519298,
+      "edge": 0.0,
+      "confidence": 0.3,
+      "confidenceBand": "low",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-corners-1"
+      ],
+      "claimIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:claim-corners-1"
+      ],
+      "rationale": "There is no clear evidence to suggest a likely outcome for the corners market, with odds for over and under 9.5 being nearly even.",
+      "warnings": [
+        "Mapped invalid supportLevel "neutral" to "weak" on claim "claim-corners-1"",
+        "Insufficient evidence found to make a confident claim on the 'corners_over_under' market."
+      ]
+    },
+    {
+      "oddsQuoteId": "f11fd04a-1fd5-4456-be0e-4348a676b2ce",
+      "market": "btts",
+      "selection": "no",
+      "line": null,
+      "odds": 1.73,
+      "probability": 0.58,
+      "modelProbability": 0.58,
+      "marketFairProbability": 0.536193,
+      "edge": 0.043807,
+      "confidence": 0.7,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:ev-btts-1"
+      ],
+      "claimIds": [
+        "d631620d-cf94-4f00-830a-23d464d402d9:claim-btts-1"
+      ],
+      "rationale": "It is more likely that at least one team will not score, as indicated by significantly lower odds for BTTS 'No'.",
+      "warnings": []
     }
   ],
-  "claims": [
-    {
-      "id": "claim_h2h_form_am",
-      "statement": "Altona Magic is in poor form, sitting 11th in the league with 2 wins, 1 draw, and 2 losses in their last 5 matches, and only 1 home win in their last 4 games.",
-      "subject": {
-        "type": "team",
-        "id": "54076ccd-eb44-4433-ae24-c9ce03bf8550",
-        "teamName": "Altona Magic"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_form_am"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_h2h_form_hc",
-      "statement": "Hume City is in strong form, sitting 2nd in the league with 4 wins, 1 draw, and 0 losses in their last 5 matches, and are strong away performers.",
-      "subject": {
-        "type": "team",
-        "id": "263b5063-d673-4a31-87f1-469f8468c3b0",
-        "teamName": "Hume City"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_form_hc"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_h2h_historical",
-      "statement": "Historically, Hume City has dominated Altona Magic with 11 wins to Altona's 2 in 18 total meetings.",
-      "subject": {
-        "type": "fixture",
-        "id": "2ccf5844-4a2e-4ae2-9651-b0ce497caad5"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_dominance"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_h2h_odds",
-      "statement": "Hume City is favored to win the match with Bet365 odds at 1.90 and Pinnacle odds at 1.91. Altona Magic win odds are around 3.15-3.5, and a draw is around 3.5-3.96.",
-      "subject": {
-        "type": "market",
-        "id": "2ccf5844-4a2e-4ae2-9651-b0ce497caad5",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_odds_bet365", "evidence_h2h_odds_pinnacle", "evidence_win_probability"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_double_chance",
-      "statement": "The odds for Double Chance 'Draw or Away' and 'Home or Away' are both 1.22, while 'Home or Draw' is 1.8.",
-      "subject": {
-        "type": "market",
-        "id": "2ccf5844-4a2e-4ae2-9651-b0ce497caad5",
-        "market": "double_chance"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_double_chance_odds"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_goals_over_under_trend",
-      "statement": "5 of the last 6 league encounters between these two teams have seen Under 2.5 goals.",
-      "subject": {
-        "type": "fixture",
-        "id": "2ccf5844-4a2e-4ae2-9651-b0ce497caad5"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_goals_trend"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_goals_over_under_odds_2.5",
-      "statement": "Odds for Over 2.5 goals are 1.67 (Bet365) and 1.64 (Pinnacle), while Under 2.5 goals are 2.15 (Bet365) and 2.2 (Pinnacle).",
-      "subject": {
-        "type": "market",
-        "id": "2ccf5844-4a2e-4ae2-9651-b0ce497caad5",
-        "market": "goals_over_under"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_goals_over_under_odds_bet365_2.5", "evidence_goals_over_under_odds_pinnacle_2.5"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_btts_odds",
-      "statement": "Odds for Both Teams To Score 'Yes' are 1.62, and 'No' are 2.2.",
-      "subject": {
-        "type": "market",
-        "id": "2ccf5844-4a2e-4ae2-9651-b0ce497caad5",
-        "market": "btts"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_btts_odds"],
-      "conflictStatus": "none",
-      "metadata": {}
-    }
+  "warnings": [
+    "API-Football fixture statistics unavailable for scoring: API-Football provider_unavailable: provider request failed (endpoint=fixture_statistics). Expected API-Football response without provider errors.; received {"requests":"You have reached the request limit for the day, Go to https://dashboard.api-football.com to upgrade your plan."}.",
+    "Scoring prompt allowedQuotes trimmed from 54 to 41 representative quotes"
   ],
-  "gateResult": {
-    "verdict": "review-required",
-    "reasons": [
-      "Structured research generated, but 'corners_over_under' market evidence was not found in web search or provided context."
-    ],
-    "warnings": []
-  },
-  "warnings": [],
-  "metadata": {
-    "marketCoverage": {
-      "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
-      "skippedMarkets": ["corners_over_under"]
-    }
-  }
+  "metadata": {}
 }

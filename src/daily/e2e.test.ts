@@ -135,6 +135,7 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.dailyBatchId, 'daily-2026-05-14');
+    assert.deepEqual(result.recommendations, { total: 1, parlays: 0, atomic: 1 });
     assert.deepEqual(pipelineCalls.map((call) => call.provider), ['codex', 'gemini']);
     assert.equal(pipelineCalls[0].model, 'gpt-5.5');
     assert.equal(pipelineCalls[1].model, 'gemini-2.5-pro');
@@ -159,7 +160,10 @@ describe('runDailyE2E', () => {
     assert.equal(summary.counts.recommendations, 1);
     assert.equal(summary.counts.atomicRecommendations, 1);
     assert.equal(summary.providerComparison.summary.comparablePredictions, 1);
-    assert.match(readFileSync(result.reportPath, 'utf-8'), /Artifact analitico\. No ejecuta apuestas/);
+    const report = readFileSync(result.reportPath, 'utf-8');
+    assert.match(report, /total: 1/);
+    assert.match(report, /simples: 1/);
+    assert.match(report, /Artifact analitico\. No ejecuta apuestas/);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.executionCapability, 'none');
     assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');
@@ -290,6 +294,8 @@ describe('runDailyE2E', () => {
     });
 
     assert.equal(result.ok, true);
+    assert.equal(result.recommendations.parlays >= 1, true);
+    assert.equal(result.recommendations.atomic >= 1, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.parlayRecommendations.length, 3);
     assert.equal(recommendations.parlayRecommendations[0].profile, 'parlay-diamante');
@@ -325,6 +331,111 @@ describe('runDailyE2E', () => {
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.counts.parlayRecommendations, 3);
     assert.equal(summary.counts.atomicRecommendations, 1);
+  });
+
+  it('keeps analytical fallback parlays and simples when strict promotion gates select none', async () => {
+    const ctx = context();
+    const fixtures = [
+      fixture('2026-05-20T16:00:00.000Z'),
+      { ...fixture('2026-05-20T18:00:00.000Z'), id: 'fixture-2', providerFixtureId: 'provider-fixture-2', homeTeamName: 'Team C', awayTeamName: 'Team D' },
+      { ...fixture('2026-05-20T20:00:00.000Z'), id: 'fixture-3', providerFixtureId: 'provider-fixture-3', homeTeamName: 'Team E', awayTeamName: 'Team F' },
+      { ...fixture('2026-05-20T22:00:00.000Z'), id: 'fixture-4', providerFixtureId: 'provider-fixture-4', homeTeamName: 'Team G', awayTeamName: 'Team H' },
+      { ...fixture('2026-05-20T23:00:00.000Z'), id: 'fixture-5', providerFixtureId: 'provider-fixture-5', homeTeamName: 'Team I', awayTeamName: 'Team J' },
+    ];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-05-20',
+      providers: ['codex'],
+      parlayProfile: 'portfolio-v2',
+      persistMetrics: false,
+      dailyBatchId: 'daily-analytical-fallback-output',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        const runId = `${config.provider}-run`;
+        return {
+          ok: true,
+          runId,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'review-required',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures,
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: fixtures.length, hitCount: 0, hits: [], candidateFixtures: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [{
+            ok: true,
+            runId,
+            fixtureId: 'fixture-1',
+            providerFixtureId: 'provider-fixture-1',
+            gateResult: { verdict: 'review-required', reasons: ['manual review required'], warnings: [] },
+            predictions: [
+              fallbackPrediction(runId, 'fallback-prediction-1', 'fixture-1', { odds: 1.42, confidence: 0.66, market: 'h2h', selection: 'home' }),
+              fallbackPrediction(runId, 'fallback-prediction-2', 'fixture-2', { odds: 1.36, confidence: 0.64, market: 'goals_over_under', selection: 'over', line: 2.5 }),
+              fallbackPrediction(runId, 'fallback-prediction-3', 'fixture-3', { odds: 1.55, confidence: 0.62, market: 'btts', selection: 'yes' }),
+              fallbackPrediction(runId, 'fallback-prediction-4', 'fixture-4', { odds: 1.48, confidence: 0.6, market: 'h2h', selection: 'away' }),
+              fallbackPrediction(runId, 'fallback-prediction-5', 'fixture-5', { odds: 1.52, confidence: 0.58, market: 'double_chance', selection: 'home_or_draw' }),
+            ],
+          }],
+          parlay: {
+            ok: false,
+            runId,
+            gateResult: { verdict: 'blocked', reasons: ['strict parlay gate found no promotion-safe build'], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: [],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => ({
+        ok: false,
+        runId: runtime.runId ?? 'parlay-run',
+        date: input.date,
+        gateResult: { verdict: 'blocked', reasons: ['no valid analytical parlays generated'], warnings: [] },
+        build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 0, aggregateConfidence: 0, aggregateQuality: 0 } },
+        persistedParlayIds: [],
+      }) as any,
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: input.runIds?.length ?? 0,
+        top: [],
+        diagnostics: { generatedAt: '2026-05-20T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 1, profileScopedAnalyzed: 1, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 1, unvalidated: 0, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [{ parlayId: 'strict-parlay-1', reasons: ['strict gate rejected all candidates'] }] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    assert.equal(recommendations.parlayRecommendations.length >= 1, true);
+    assert.equal(recommendations.atomicRecommendations.length >= 1, true);
+    assert.equal(recommendations.parlayRecommendations[0].selectionMode, 'analytical-fallback');
+    assert.equal(recommendations.atomicRecommendations[0].selectionMode, 'analytical-fallback');
+    assert.equal(recommendations.parlayRecommendations[0].harnessStatus, 'review-required');
+    assert.equal(recommendations.parlayRecommendations[0].legs[0].fixture, 'Team A vs Team B');
+    assert.match(recommendations.atomicRecommendations[0].legs[0].fixture, /^Team [EGI] vs Team [FHJ]$/);
+    assert.equal(recommendations.recommendationPolicy.fallbackRecommendations.enabled, true);
+    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
+    assert.equal(summary.status, 'succeeded');
+    assert.equal(summary.verdict, 'review-required');
+    assert.equal(summary.counts.strictParlayRecommendations, 0);
+    assert.equal(summary.counts.fallbackParlayRecommendations, recommendations.parlayRecommendations.length);
+    assert.equal(summary.counts.strictAtomicRecommendations, 0);
+    assert.equal(summary.counts.fallbackAtomicRecommendations, recommendations.atomicRecommendations.length);
   });
 
   it('keeps useful output when one parallel provider throws', async () => {
@@ -771,6 +882,28 @@ function highConfidencePrediction(runId: string) {
     blockers: [],
     promptVersion: 'score-prediction-v2',
     scoringRuleVersion: 'scoring-v2',
+  };
+}
+
+function fallbackPrediction(runId: string, id: string, fixtureId: string, overrides: Record<string, unknown> = {}) {
+  return {
+    ...highConfidencePrediction(runId),
+    id,
+    fixtureId,
+    providerFixtureId: `provider-${fixtureId}`,
+    odds: 1.5,
+    impliedProbability: 0.66,
+    marketFairProbability: 0.67,
+    modelProbability: 0.68,
+    edge: 0.02,
+    confidence: 0.6,
+    quality: 'medium',
+    confidenceBand: 'medium',
+    status: 'review-required',
+    warnings: ['manual review required before promotion'],
+    blockers: [],
+    parlayEligible: true,
+    ...overrides,
   };
 }
 

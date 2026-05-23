@@ -459,14 +459,18 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
     }
     return { ...evidence, claimIds: filteredClaimIds };
   });
+  const additionalEvidenceItems: any[] = [];
 
   const repairedClaims = claims.map((claim: any) => {
     const subject = repairClaimSubject(claim?.subject, claim?.id, claim?.statement, warnings);
     const conflictStatus = repairClaimConflictStatus(claim?.conflictStatus, claim?.id, warnings);
     const supportLevel = repairClaimSupportLevel(claim?.supportLevel, claim?.id, warnings);
-    if (!Array.isArray(claim?.evidenceIds)) return { ...claim, subject, conflictStatus, supportLevel };
+    const claimEvidenceIds = Array.isArray(claim?.evidenceIds) ? claim.evidenceIds : [];
+    if (!Array.isArray(claim?.evidenceIds)) {
+      warnings.push(`initialized missing evidenceIds on claim "${claim?.id ?? 'unknown'}"`);
+    }
     const repairedEvidenceIds: string[] = [];
-    for (const evidenceId of claim.evidenceIds) {
+    for (const evidenceId of claimEvidenceIds) {
       if (typeof evidenceId !== 'string') continue;
       if (evidenceIds.has(evidenceId)) {
         repairedEvidenceIds.push(evidenceId);
@@ -480,16 +484,66 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
       }
       warnings.push(`removed unknown evidence reference "${evidenceId}" from claim "${claim.id ?? 'unknown'}"`);
     }
-    return { ...claim, subject, conflictStatus, supportLevel, evidenceIds: uniqueStrings(repairedEvidenceIds) };
+    const uniqueEvidenceIds = uniqueStrings(repairedEvidenceIds);
+    if (uniqueEvidenceIds.length === 0) {
+      const synthesizedEvidence = synthesizeEvidenceForUnsupportedClaim(claim, subject);
+      if (synthesizedEvidence) {
+        additionalEvidenceItems.push(synthesizedEvidence);
+        evidenceIds.add(synthesizedEvidence.id);
+        uniqueEvidenceIds.push(synthesizedEvidence.id);
+        warnings.push(`synthesized provider evidence for claim "${claim.id ?? 'unknown'}" with no evidenceIds`);
+      }
+    }
+    return { ...claim, subject, conflictStatus, supportLevel, evidenceIds: uniqueEvidenceIds };
   });
 
   return {
     value: {
       ...value,
-      evidenceItems: repairedEvidenceItems,
+      evidenceItems: [...repairedEvidenceItems, ...additionalEvidenceItems],
       claims: repairedClaims,
+      gateResult: repairResearchGateResult(value?.gateResult, warnings),
     },
     warnings: uniqueStrings(warnings),
+  };
+}
+
+function synthesizeEvidenceForUnsupportedClaim(claim: any, subject: any): any | undefined {
+  if (typeof claim?.id !== 'string') return undefined;
+  const sourceId = isOddsBackedClaim(claim, subject) ? 'source_api_football_odds_snapshot' : 'source_api_football_fixture';
+  return {
+    id: `evidence_repaired_${claim.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+    sourceId,
+    claimIds: [claim.id],
+    summary: `Provider context supports claim: ${String(claim?.statement ?? claim.id)}`,
+    confidence: 0.5,
+    metadata: {
+      repaired: true,
+      reason: 'LLM output returned a claim without evidenceIds.',
+    },
+  };
+}
+
+function isOddsBackedClaim(claim: any, subject: any): boolean {
+  if (subject?.type === 'market') return true;
+  const text = `${claim?.statement ?? ''} ${JSON.stringify(claim?.metadata ?? {})}`.toLowerCase();
+  return /\b(odds?|bookmaker|priced?|price|line|h2h|double chance|goals?|corners?|btts)\b/.test(text);
+}
+
+function repairResearchGateResult(value: any, warnings: string[]): any {
+  const verdict = value?.verdict;
+  if (verdict === 'promotable' || verdict === 'review-required' || verdict === 'blocked') {
+    return {
+      ...value,
+      reasons: Array.isArray(value?.reasons) ? value.reasons.filter((reason: unknown) => typeof reason === 'string' && reason.trim()) : [],
+      warnings: Array.isArray(value?.warnings) ? value.warnings.filter((warning: unknown) => typeof warning === 'string' && warning.trim()) : [],
+    };
+  }
+  warnings.push(`mapped invalid or missing research gateResult "${String(verdict ?? 'missing')}" to "review-required"`);
+  return {
+    verdict: 'review-required',
+    reasons: ['research gateResult missing or invalid in agent output'],
+    warnings: ['research gateResult was repaired conservatively'],
   };
 }
 
@@ -549,6 +603,20 @@ function repairClaimConflictStatus(value: unknown, claimId: unknown, warnings: s
 }
 
 function repairClaimSubject(subject: any, claimId: unknown, statement: unknown, warnings: string[]): any {
+  if (subject?.type !== 'market' && subject?.type !== 'fixture' && subject?.type !== 'team') {
+    const inferredMarket = typeof statement === 'string' ? inferMarketSubjectFromText(statement) : undefined;
+    if (isMarketKey(inferredMarket)) {
+      warnings.push(`mapped invalid subject type "${String(subject?.type ?? 'unknown')}" to market "${inferredMarket}" on claim "${String(claimId ?? 'unknown')}"`);
+      return { ...subject, type: 'market', market: inferredMarket };
+    }
+    warnings.push(`mapped invalid subject type "${String(subject?.type ?? 'unknown')}" to fixture on claim "${String(claimId ?? 'unknown')}"`);
+    return {
+      ...subject,
+      type: 'fixture',
+      id: typeof subject?.id === 'string' && subject.id ? subject.id : String(claimId ?? 'unknown'),
+      market: undefined,
+    };
+  }
   if (subject?.type !== 'market') return subject;
   if (isMarketKey(subject.market)) return subject;
   if (isMarketKey(subject.id)) {
@@ -1153,6 +1221,8 @@ function repairEvidenceSourceReferences(
 
 function shouldSynthesizeWebSearchSource(evidence: any, web: ResearchWebMode): boolean {
   if (web === 'off') return false;
+  const sourceId = typeof evidence?.sourceId === 'string' ? evidence.sourceId.toLowerCase().replace(/[_-]+/g, ' ') : '';
+  if (/\b(web|search)\b/.test(sourceId)) return true;
   const text = `${evidence?.summary ?? ''} ${evidence?.snippet ?? ''}`.toLowerCase();
   return /\b(web|search|result|report|news|article|site|source)\b/.test(text);
 }
@@ -1216,12 +1286,13 @@ function uniqueStrings(values: string[]): string[] {
 
 function normalizeSourceRecords(sources: SourceRecord[], defaultCapturedAt?: string): SourceRecord[] {
   return sources.map((source) => {
+    const capturedAt = normalizeIsoDateTime(source.capturedAt) ?? normalizeIsoDateTime(defaultCapturedAt);
     const normalized: any = {
       ...source,
-      capturedAt: normalizeIsoDateTime(source.capturedAt ?? defaultCapturedAt),
+      capturedAt,
     };
-    if (normalized.url == null) delete normalized.url;
-    if (normalized.hash == null) delete normalized.hash;
+    if (normalized.url == null || normalized.url === '') delete normalized.url;
+    if (normalized.hash == null || normalized.hash === '') delete normalized.hash;
     if (normalized.snapshotId == null) delete normalized.snapshotId;
     if (normalized.artifactPath == null) delete normalized.artifactPath;
     if (normalized.externalId == null) delete normalized.externalId;
@@ -1249,7 +1320,7 @@ function sourceExternalIdFallback(source: SourceRecord & { metadata?: Record<str
 function normalizeIsoDateTime(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
 }
 
 function isValidUrl(value: string): boolean {

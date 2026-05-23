@@ -105,6 +105,11 @@ export interface DailyE2ERunResult {
   date: string;
   providers: DailyProviderRunResult[];
   parlays: DailyParlayFamilyResult[];
+  recommendations: {
+    total: number;
+    parlays: number;
+    atomic: number;
+  };
   providerComparison?: DailyProviderComparison;
   providerConsensus?: DailyProviderConsensus;
   parlayAnalysis?: ParlayAnalysisRunResult;
@@ -135,6 +140,8 @@ export interface DailyE2EDependencies {
 const DEFAULT_DAILY_PROVIDERS: DailyE2EProvider[] = ['codex', 'gemini'];
 const DAILY_PARLAY_RECOMMENDATION_LIMIT = 4;
 const DAILY_PARLAY_ANALYSIS_TOP = 12;
+const DAILY_FALLBACK_PARLAY_LIMIT = 3;
+const DAILY_FALLBACK_PARLAY_LEGS = 2;
 const DAILY_PARLAY_CONSERVATIVE_MAX_ODDS = 2.2;
 const DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE = 0.7;
 const DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE = 0.78;
@@ -170,9 +177,17 @@ const ATOMIC_BLOCKED_RISK_FLAGS = [
   'overinflated-edge',
 ] as const;
 
+export type DailyRecommendationSelectionMode = 'promotion-gate' | 'analytical-fallback';
+
+interface DailyRecommendationSelectionMetadata {
+  selectionMode?: DailyRecommendationSelectionMode;
+  fallbackReasons?: string[];
+  sourceRunIds?: string[];
+}
+
 export type DailyFinalRecommendation =
-  | (ParlayAnalysisRecommendation & { kind: 'parlay'; stakeRecommendation?: DailyStakeRecommendation })
-  | AtomicPredictionRecommendation;
+  | (ParlayAnalysisRecommendation & DailyRecommendationSelectionMetadata & { kind: 'parlay'; stakeRecommendation?: DailyStakeRecommendation })
+  | (AtomicPredictionRecommendation & DailyRecommendationSelectionMetadata);
 
 export interface DailyStakeRecommendation {
   stake: number;
@@ -231,6 +246,8 @@ export interface AtomicPredictionRecommendation {
   reasons: string[];
   riskFlags: string[];
   legs: ParlayAnalysisRecommendation['legs'];
+  selectionMode?: DailyRecommendationSelectionMode;
+  fallbackReasons?: string[];
 }
 
 export async function runDailyE2E(
@@ -487,15 +504,32 @@ export async function runDailyE2E(
       result: providerPipelineResults[provider],
     })),
   });
-  const parlayRecommendations: DailyFinalRecommendation[] = selectDailyParlayRecommendations(
+  let parlayRecommendations: DailyFinalRecommendation[] = selectDailyParlayRecommendations(
     parlayAnalysis?.top ?? [],
     DAILY_PARLAY_RECOMMENDATION_LIMIT,
   )
     .map((recommendation) => hydrateRecommendationDisplay({ ...recommendation, kind: 'parlay' as const }, providerPipelineResults));
+  const strictParlayRecommendationCount = parlayRecommendations.length;
+  if (!parlayRecommendations.length) {
+    const analysisFallbackParlays = selectDailyFallbackParlayRecommendations(
+      parlayAnalysis?.top ?? [],
+      DAILY_PARLAY_RECOMMENDATION_LIMIT,
+    )
+      .map((recommendation) => hydrateRecommendationDisplay(recommendation, providerPipelineResults));
+    parlayRecommendations = analysisFallbackParlays.length
+      ? analysisFallbackParlays
+      : buildFallbackParlayRecommendations(
+        providerPipelineResults,
+        providers,
+        effectiveConfig,
+        input.models,
+        DAILY_FALLBACK_PARLAY_LIMIT,
+      ).map((recommendation) => hydrateRecommendationDisplay(recommendation, providerPipelineResults));
+  }
   const parlayLegPredictionIds = recommendationLegPredictionIds(parlayRecommendations);
   const parlayLegSelectionKeys = recommendationLegSelectionKeys(parlayRecommendations);
   const parlayLegFixtureIds = recommendationLegFixtureIds(parlayRecommendations);
-  const atomicRecommendations = buildAtomicPredictionRecommendations(
+  let atomicRecommendations = buildAtomicPredictionRecommendations(
     providerPipelineResults,
     providers,
     effectiveConfig,
@@ -505,6 +539,19 @@ export async function runDailyE2E(
     parlayLegSelectionKeys,
     parlayLegFixtureIds,
   ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
+  const strictAtomicRecommendationCount = atomicRecommendations.length;
+  if (!atomicRecommendations.length) {
+    atomicRecommendations = buildFallbackAtomicPredictionRecommendations(
+      providerPipelineResults,
+      providers,
+      effectiveConfig,
+      input.models,
+      parlayRecommendations.length,
+      parlayLegPredictionIds,
+      parlayLegSelectionKeys,
+      parlayLegFixtureIds,
+    ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
+  }
   const finalRecommendations: DailyFinalRecommendation[] = applyDailyStakeRecommendations(
     [...parlayRecommendations, ...atomicRecommendations],
   );
@@ -521,8 +568,9 @@ export async function runDailyE2E(
   const hasAnySuccessfulProvider = providerRuns.some((run) => run.ok);
   const allProvidersSucceeded = providerRuns.every((run) => run.ok);
   const validationFreshEnoughForPromotion = validationFreshness.status === 'fresh';
+  const hasAnalyticalRecommendations = finalRecommendations.length > 0;
   const ok = hasAnySuccessfulProvider
-    && hasAnyValidParlayFamily
+    && (hasAnyValidParlayFamily || hasAnalyticalRecommendations)
     && (parlayAnalysis?.ok ?? false)
     && metrics.ok;
   const verdict = ok && hasConsensus && allProvidersSucceeded && validationFreshEnoughForPromotion
@@ -596,6 +644,10 @@ export async function runDailyE2E(
       recommendations: finalRecommendations.length,
       parlayRecommendations: parlayRecommendations.length,
       atomicRecommendations: atomicRecommendations.length,
+      strictParlayRecommendations: strictParlayRecommendationCount,
+      fallbackParlayRecommendations: Math.max(0, parlayRecommendations.length - strictParlayRecommendationCount),
+      strictAtomicRecommendations: strictAtomicRecommendationCount,
+      fallbackAtomicRecommendations: Math.max(0, atomicRecommendations.length - strictAtomicRecommendationCount),
       comparisonItems: providerComparison.items.length,
       consensusPredictions: providerConsensus.summary.consensusPredictions,
     },
@@ -616,6 +668,15 @@ export async function runDailyE2E(
       parlayRecommendationLimit: DAILY_PARLAY_RECOMMENDATION_LIMIT,
       parlayAnalysisTop: DAILY_PARLAY_ANALYSIS_TOP,
       atomicRecommendationLimit: DAILY_ATOMIC_RECOMMENDATION_LIMIT,
+      fallbackRecommendations: {
+        enabled: true,
+        mode: 'analytical-fallback',
+        parlayLimit: DAILY_FALLBACK_PARLAY_LIMIT,
+        parlayLegs: DAILY_FALLBACK_PARLAY_LEGS,
+        when: 'strict promotion gates select zero parlays or zero simples from available analytical candidates',
+        harnessStatus: 'review-required',
+        riskFlags: ['analytical-fallback', 'review-required'],
+      },
       parlayDiversity: 'semantic leg signature plus first-pass unique profile, then score fill',
       parlayDiamanteOddsWindow: { min: 1.1, max: 1.3 },
       parlayConservativeGate: {
@@ -700,6 +761,11 @@ export async function runDailyE2E(
     date: input.date,
     providers: providerRuns,
     parlays: parlayFamilies,
+    recommendations: {
+      total: finalRecommendations.length,
+      parlays: parlayRecommendations.length,
+      atomic: atomicRecommendations.length,
+    },
     providerComparison,
     providerConsensus,
     parlayAnalysis,
@@ -1035,6 +1101,53 @@ function isConservativeDailyParlayRecommendation(recommendation: ParlayAnalysisR
   return recommendation.aggregateConfidence >= DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE;
 }
 
+function selectDailyFallbackParlayRecommendations(
+  recommendations: readonly ParlayAnalysisRecommendation[],
+  limit: number,
+): DailyFinalRecommendation[] {
+  const selected: DailyFinalRecommendation[] = [];
+  const usedIds = new Set<string>();
+  const usedSignatures = new Set<string>();
+  for (const recommendation of recommendations) {
+    if (selected.length >= limit || usedIds.has(recommendation.parlayId)) continue;
+    if (!isAnalyticalFallbackParlayRecommendation(recommendation)) continue;
+    const signature = parlayLogicalSignature(recommendation);
+    if (!signature || usedSignatures.has(signature)) continue;
+    selected.push(markParlayAsAnalyticalFallback(recommendation, selected.length + 1));
+    usedIds.add(recommendation.parlayId);
+    usedSignatures.add(signature);
+  }
+  return selected;
+}
+
+function isAnalyticalFallbackParlayRecommendation(recommendation: ParlayAnalysisRecommendation): boolean {
+  if (recommendation.validationStatus === 'lost' || recommendation.validationStatus === 'blocked') return false;
+  if (!Number.isFinite(recommendation.combinedOdds) || recommendation.combinedOdds <= 1) return false;
+  if (!Number.isFinite(recommendation.aggregateConfidence) || recommendation.aggregateConfidence <= 0) return false;
+  if ((recommendation.legs?.length ?? 0) < 2) return false;
+  return true;
+}
+
+function markParlayAsAnalyticalFallback(recommendation: ParlayAnalysisRecommendation, rank: number): DailyFinalRecommendation {
+  return {
+    ...recommendation,
+    kind: 'parlay',
+    rank,
+    harnessStatus: 'review-required',
+    selectionMode: 'analytical-fallback',
+    fallbackReasons: ['strict daily parlay promotion gate selected 0 parlays'],
+    riskFlags: uniqueStrings([
+      ...(recommendation.riskFlags ?? []),
+      'analytical-fallback',
+      'review-required',
+    ]),
+    reasons: uniqueStrings([
+      ...(recommendation.reasons ?? []),
+      'analytical fallback: strict daily parlay promotion gate selected 0 parlays',
+    ]),
+  };
+}
+
 function parlayLogicalSignature(recommendation: Pick<ParlayAnalysisRecommendation, 'legs'>): string {
   return (recommendation.legs ?? [])
     .map((leg) => legSelectionKey(leg.fixtureId, leg.market, leg.selection, leg.line))
@@ -1195,6 +1308,299 @@ interface RecommendationLegDisplay {
   awayTeamName: string;
   leagueName?: string;
   kickoffLocal?: string;
+}
+
+function buildFallbackParlayRecommendations(
+  providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>,
+  providers: DailyE2EProvider[],
+  config: AgentConfig,
+  models: RunDailyE2EInput['models'],
+  limit: number,
+): DailyFinalRecommendation[] {
+  let remaining = selectFallbackParlayCandidatePool(collectFallbackPredictionCandidates(
+    providerPipelineResults,
+    providers,
+    config,
+    models,
+  ));
+  const recommendations: DailyFinalRecommendation[] = [];
+  const usedSignatures = new Set<string>();
+
+  while (recommendations.length < limit && remaining.length >= DAILY_FALLBACK_PARLAY_LEGS) {
+    const legs: AtomicPredictionCandidate[] = [];
+    const usedFixtureIds = new Set<string>();
+    for (const candidate of remaining) {
+      const fixtureId = candidate.prediction.fixtureId;
+      if (usedFixtureIds.has(fixtureId)) continue;
+      legs.push(candidate);
+      usedFixtureIds.add(fixtureId);
+      if (legs.length >= DAILY_FALLBACK_PARLAY_LEGS) break;
+    }
+    if (legs.length < DAILY_FALLBACK_PARLAY_LEGS) break;
+
+    const signature = legs.map((candidate) => atomicPredictionKey(candidate.prediction)).sort().join('|');
+    if (!usedSignatures.has(signature)) {
+      recommendations.push(toFallbackParlayRecommendation(legs, recommendations.length + 1));
+      usedSignatures.add(signature);
+    }
+
+    const selectedFixtureIds = new Set(legs.map((candidate) => candidate.prediction.fixtureId));
+    const selectedPredictionIds = new Set(legs.map((candidate) => candidate.prediction.id));
+    remaining = remaining.filter((candidate) =>
+      !selectedFixtureIds.has(candidate.prediction.fixtureId)
+      && !selectedPredictionIds.has(candidate.prediction.id)
+    );
+  }
+
+  return recommendations;
+}
+
+function buildFallbackAtomicPredictionRecommendations(
+  providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>,
+  providers: DailyE2EProvider[],
+  config: AgentConfig,
+  models: RunDailyE2EInput['models'],
+  rankOffset: number,
+  excludedPredictionIds: ReadonlySet<string> = new Set(),
+  excludedSelectionKeys: ReadonlySet<string> = new Set(),
+  excludedFixtureIds: ReadonlySet<string> = new Set(),
+): AtomicPredictionRecommendation[] {
+  const groups = new Map<string, AtomicPredictionCandidate[]>();
+  const candidates = collectFallbackPredictionCandidates(
+    providerPipelineResults,
+    providers,
+    config,
+    models,
+    excludedPredictionIds,
+    excludedSelectionKeys,
+    excludedFixtureIds,
+  );
+  const nonBlocked = candidates.filter((candidate) => candidate.prediction.status !== 'blocked');
+  for (const candidate of nonBlocked.length ? nonBlocked : candidates) {
+    const key = atomicPredictionKey(candidate.prediction);
+    groups.set(key, [...(groups.get(key) ?? []), candidate]);
+  }
+
+  const ordered = [...groups.values()]
+    .map(toAtomicRecommendationDraft)
+    .map(markAtomicAsAnalyticalFallback)
+    .sort((a, b) => b.score - a.score || b.aggregateConfidence - a.aggregateConfidence || a.combinedOdds - b.combinedOdds);
+  const selected: AtomicPredictionRecommendation[] = [];
+  const usedFixtureIds = new Set<string>();
+  for (const recommendation of ordered) {
+    const fixtureId = recommendation.legs[0]?.fixtureId;
+    if (fixtureId && usedFixtureIds.has(fixtureId)) continue;
+    if (fixtureId) usedFixtureIds.add(fixtureId);
+    selected.push(recommendation);
+  }
+  return selected.map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
+}
+
+function collectFallbackPredictionCandidates(
+  providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>,
+  providers: DailyE2EProvider[],
+  config: AgentConfig,
+  models: RunDailyE2EInput['models'],
+  excludedPredictionIds: ReadonlySet<string> = new Set(),
+  excludedSelectionKeys: ReadonlySet<string> = new Set(),
+  excludedFixtureIds: ReadonlySet<string> = new Set(),
+): AtomicPredictionCandidate[] {
+  const bestByKey = new Map<string, AtomicPredictionCandidate>();
+  for (const provider of providers) {
+    const result = providerPipelineResults[provider];
+    if (!result?.runId) continue;
+    const fixtureDisplays = fixtureDisplayMap(displayFixturesFromPipelineResult(result));
+    const providerModel = modelForProvider(config, provider, models);
+    for (const scoring of result.scoring) {
+      for (const prediction of scoring.predictions) {
+        const edge = atomicPredictionEdge(prediction);
+        const model = prediction.model ?? providerModel;
+        const key = atomicPredictionKey(prediction);
+        if (!isFallbackPredictionCandidate(prediction)) continue;
+        if (DAILY_FINAL_DEMOTED_MODELS.includes(model as any)) continue;
+        if (excludedPredictionIds.has(prediction.id) || excludedSelectionKeys.has(key)) continue;
+        if (excludedFixtureIds.has(prediction.fixtureId)) continue;
+        const display = fixtureDisplays.get(prediction.fixtureId);
+        const candidate: AtomicPredictionCandidate = {
+          provider,
+          model,
+          runId: result.runId,
+          prediction,
+          fixture: display?.fixtureLabel ?? scoring.fixtureId ?? prediction.fixtureId,
+          display,
+          edge,
+        };
+        const current = bestByKey.get(key);
+        if (!current || fallbackCandidateScore(candidate) > fallbackCandidateScore(current)) {
+          bestByKey.set(key, candidate);
+        }
+      }
+    }
+  }
+  return [...bestByKey.values()].sort((a, b) =>
+    fallbackCandidateScore(b) - fallbackCandidateScore(a)
+    || b.prediction.confidence - a.prediction.confidence
+    || a.prediction.odds - b.prediction.odds
+  );
+}
+
+function selectFallbackParlayCandidatePool(candidates: AtomicPredictionCandidate[]): AtomicPredictionCandidate[] {
+  const pools = [
+    candidates.filter((candidate) => candidate.prediction.parlayEligible !== false && candidate.prediction.status === 'promotable'),
+    candidates.filter((candidate) => candidate.prediction.parlayEligible !== false && candidate.prediction.status !== 'blocked'),
+    candidates.filter((candidate) => candidate.prediction.status !== 'blocked'),
+    candidates,
+  ];
+  return pools.find((pool) => uniqueFixtureCount(pool) >= DAILY_FALLBACK_PARLAY_LEGS) ?? [];
+}
+
+function uniqueFixtureCount(candidates: readonly AtomicPredictionCandidate[]): number {
+  return new Set(candidates.map((candidate) => candidate.prediction.fixtureId)).size;
+}
+
+function isFallbackPredictionCandidate(prediction: PredictionRecordView): boolean {
+  return Number.isFinite(prediction.odds)
+    && prediction.odds > 1
+    && Number.isFinite(prediction.confidence)
+    && prediction.confidence > 0
+    && Boolean(prediction.id)
+    && Boolean(prediction.fixtureId);
+}
+
+function fallbackCandidateScore(candidate: AtomicPredictionCandidate): number {
+  const prediction = candidate.prediction;
+  const statusBonus = prediction.status === 'promotable'
+    ? 0.5
+    : prediction.status === 'candidate'
+      ? 0.35
+      : prediction.status === 'review-required'
+        ? 0.2
+        : prediction.status === 'draft'
+          ? 0.1
+          : -0.3;
+  const parlayEligibleBonus = prediction.parlayEligible === false ? -0.25 : 0.08;
+  const riskPenalty = fallbackRiskFlags(prediction).length * 0.025;
+  const oddsPenalty = Math.log2(Math.max(1.01, prediction.odds)) * 0.04;
+  return round(statusBonus + parlayEligibleBonus + (prediction.confidence * 0.7) + (Math.max(0, candidate.edge) * 0.35) - riskPenalty - oddsPenalty, 6);
+}
+
+function toFallbackParlayRecommendation(candidates: AtomicPredictionCandidate[], rank: number): DailyFinalRecommendation {
+  const combinedOdds = round(candidates.reduce((product, candidate) => product * candidate.prediction.odds, 1), 6);
+  const aggregateConfidence = round(candidates.reduce((product, candidate) => product * clamp(candidate.prediction.confidence, 0.01, 0.99), 1), 6);
+  const providerCount = new Set(candidates.map((candidate) => candidate.provider)).size;
+  const adjustedProbability = round(clamp(aggregateConfidence * (providerCount > 1 ? 1.02 : 1), 0.01, 0.99), 6);
+  const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
+  const riskFlags = uniqueStrings([
+    'analytical-fallback',
+    'review-required',
+    ...candidates.flatMap((candidate) => fallbackRiskFlags(candidate.prediction)),
+  ]);
+  const legs = candidates.map(parlayLegFromFallbackCandidate);
+  const sourceRunIds = uniqueStrings(candidates.map((candidate) => candidate.runId));
+
+  return {
+    kind: 'parlay',
+    rank,
+    parlayId: `analytical-fallback-${candidates.map((candidate) => candidate.prediction.id).join('-').slice(0, 48)}`,
+    sourceRunId: sourceRunIds[0] ?? null,
+    sourceRunIds,
+    profile: 'analytical-fallback',
+    validationStatus: 'unvalidated',
+    harnessStatus: 'review-required',
+    selectionMode: 'analytical-fallback',
+    fallbackReasons: ['strict daily parlay promotion gate selected 0 parlays'],
+    combinedOdds,
+    aggregateConfidence,
+    adjustedProbability,
+    expectedEdge,
+    score: round((adjustedProbability * 0.65) + (Math.max(0, expectedEdge) * 0.2) - (riskFlags.length * 0.01), 6),
+    exposure: {
+      units: 0,
+      percentOfAnalyticalBankroll: 0,
+      policy: 'analytical-fallback-review-only-exposure',
+    },
+    stake: {
+      units: 0,
+      percentOfBankroll: 0,
+      policy: 'analytical-fallback-review-only-stake',
+    },
+    bankerLegs: legs
+      .filter((leg) => leg.banker)
+      .map((leg) => ({
+        predictionId: leg.predictionId,
+        fixtureId: leg.fixtureId,
+        fixture: leg.fixture,
+        ...(leg.display ? { display: leg.display } : {}),
+        market: leg.market,
+        selection: leg.selection,
+        line: leg.line,
+        odds: leg.odds,
+        confidence: leg.confidence,
+        reason: leg.bankerReason ?? 'analytical fallback banker leg',
+      })),
+    reasons: [
+      'analytical fallback: strict daily parlay promotion gate selected 0 parlays',
+      `selected ${legs.length} review-required leg(s) from available predictions`,
+      `source runs: ${sourceRunIds.join(', ') || 'unknown'}`,
+      `aggregate confidence ${round(aggregateConfidence, 3)}`,
+      `adjusted edge ${round(expectedEdge, 3)}`,
+    ],
+    riskFlags,
+    legs,
+  };
+}
+
+function parlayLegFromFallbackCandidate(candidate: AtomicPredictionCandidate): ParlayAnalysisRecommendation['legs'][number] {
+  const prediction = candidate.prediction;
+  const warnings = uniqueStrings([
+    ...(prediction.warnings ?? []),
+    ...(prediction.blockers ?? []),
+  ]);
+  const banker = prediction.confidence >= 0.65
+    && prediction.odds <= 1.5
+    && prediction.market !== 'corners_over_under'
+    && prediction.status !== 'blocked';
+  return {
+    predictionId: prediction.id,
+    fixtureId: prediction.fixtureId,
+    fixture: candidate.fixture,
+    ...(candidate.display ? { display: candidate.display } : {}),
+    market: prediction.market,
+    selection: prediction.selection,
+    line: prediction.line ?? null,
+    odds: round(prediction.odds, 6),
+    confidence: round(prediction.confidence, 6),
+    validationStatus: 'unvalidated',
+    warnings,
+    banker,
+    ...(banker ? { bankerReason: `analytical fallback banker: confidence ${round(prediction.confidence, 3)} with odds ${round(prediction.odds, 3)}` } : {}),
+  };
+}
+
+function markAtomicAsAnalyticalFallback(recommendation: AtomicPredictionRecommendation): AtomicPredictionRecommendation {
+  return {
+    ...recommendation,
+    harnessStatus: recommendation.harnessStatus === 'blocked' ? 'review-required' : recommendation.harnessStatus,
+    selectionMode: 'analytical-fallback',
+    fallbackReasons: ['strict daily atomic promotion gate selected 0 simples'],
+    riskFlags: uniqueStrings([
+      ...(recommendation.riskFlags ?? []),
+      'analytical-fallback',
+      'review-required',
+    ]),
+    reasons: uniqueStrings([
+      ...(recommendation.reasons ?? []),
+      'analytical fallback: strict daily atomic promotion gate selected 0 simples',
+    ]),
+  };
+}
+
+function fallbackRiskFlags(prediction: PredictionRecordView): string[] {
+  const flags = atomicRiskFlags(prediction, 1).filter((flag) => flag !== 'single-selection');
+  if (prediction.status !== 'promotable') flags.push(`source-${prediction.status}`);
+  if (prediction.status === 'blocked') flags.push('blocked-source-prediction');
+  if (prediction.parlayEligible === false) flags.push('parlay-ineligible-source');
+  return uniqueStrings(flags);
 }
 
 function buildAtomicPredictionRecommendations(
@@ -1559,6 +1965,7 @@ function firstError(
 }
 
 function buildDailyReport(summary: any, recommendationsPath: string): string {
+  const counts = summary.counts ?? {};
   const lines = [
     `# Daily E2E ${summary.date}`,
     '',
@@ -1578,7 +1985,11 @@ function buildDailyReport(summary: any, recommendationsPath: string): string {
     '',
     '## Recommendations',
     `artifact: ${recommendationsPath}`,
-    `top: ${summary.parlayAnalysis?.top?.length ?? 0}`,
+    `total: ${counts.recommendations ?? 0}`,
+    `parlays: ${counts.parlayRecommendations ?? 0}`,
+    `simples: ${counts.atomicRecommendations ?? 0}`,
+    `fallbackParlays: ${counts.fallbackParlayRecommendations ?? 0}`,
+    `fallbackSimples: ${counts.fallbackAtomicRecommendations ?? 0}`,
     '',
     'Artifact analitico. No ejecuta apuestas ni garantiza resultados.',
     '',

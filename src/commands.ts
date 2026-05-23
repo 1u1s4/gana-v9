@@ -1013,7 +1013,9 @@ function printDailyE2EResult(result: DailyE2ERunResult): void {
     printKeyValue('llmDiscrepancies', summary.materialDisagreements ?? summary.sameMarketDifferentSelection);
     printKeyValue('llmAgreementRate', summary.agreementRate === null ? 'n/a' : formatNullablePercent(summary.agreementRate * 100));
   }
-  if (result.parlayAnalysis) printKeyValue('recommendations', result.parlayAnalysis.top.length);
+  printKeyValue('recommendations', result.recommendations.total);
+  printKeyValue('parlayRecommendations', result.recommendations.parlays);
+  printKeyValue('atomicRecommendations', result.recommendations.atomic);
   if (result.metrics) printKeyValue('metricsPersisted', result.metrics.persisted);
   printKeyValue('artifactType', 'analytical only; not executable');
   if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);

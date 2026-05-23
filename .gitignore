@@ -6,4 +6,4 @@ dist/
 .artifacts/
 npm-debug.log*
 tmp/
-output.json
+

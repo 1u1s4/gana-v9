@@ -1,0 +1,215 @@
+{
+  "sources": [
+    {
+      "id": "source_1",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football Fixture Snapshot",
+      "capturedAt": "2026-05-23T16:44:23.665Z",
+      "hash": "30979a30-aa2d-43b6-ba17-f9e1150a7a10",
+      "metadata": {
+        "provider": "api-football",
+        "providerFixtureId": "1540729"
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football Odds Snapshot",
+      "capturedAt": "2026-05-23T16:44:25.038Z",
+      "hash": "e5f75403-c79d-4823-95e1-4184fa619b87",
+      "metadata": {
+        "provider": "api-football",
+        "bookmakerCount": 2
+      }
+    },
+    {
+      "id": "source_3",
+      "type": "web-search",
+      "url": "https://www.footystats.org/israel/beitar-jerusalem-fc-vs-hapoel-tel-aviv-fc-h2h-stats",
+      "title": "Beitar Jerusalem vs Hapoel Tel Aviv H2H Stats | FootyStats",
+      "capturedAt": "2026-05-23T16:45:10.123Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "source_4",
+      "type": "web-search",
+      "url": "https://www.livescores.biz/h2h/beitar-jerusalem-vs-hapoel-tel-aviv",
+      "title": "Beitar Jerusalem vs Hapoel Tel Aviv Livescore and Live Video",
+      "capturedAt": "2026-05-23T16:45:10.123Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "source_5",
+      "type": "web-search",
+      "url": "https://www.transfermarkt.com/spielbericht/index/spielbericht/4356987",
+      "title": "Beitar Jerusalem - Hapoel Tel Aviv, May 23, 2026 - Ligat Ha'al",
+      "capturedAt": "2026-05-23T16:45:10.123Z",
+      "hash": null,
+      "metadata": {}
+    }
+  ],
+  "evidenceItems": [
+    {
+      "id": "evidence_h2h_odds",
+      "sourceId": "source_2",
+      "claimIds": ["claim_h2h_home_win"],
+      "snippet": "h2h home price: 1.75 (Bet365), 1.79 (Pinnacle)",
+      "summary": "Bookmakers Bet365 and Pinnacle price Beitar Jerusalem as the favorite to win, with odds of 1.75 and 1.79 respectively, implying a probability of over 55%.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_h2h_form",
+      "sourceId": "source_3",
+      "claimIds": ["claim_h2h_home_win"],
+      "snippet": "Beitar Jerusalem FC's home form is excellent with the following results : W W W W W. At home in the Ligat ha'Al, Beitar Jerusalem FC has a 78% win rate.",
+      "summary": "Beitar Jerusalem has an exceptional 78% win rate at home this season and is on a five-game winning streak at home.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+     {
+      "id": "evidence_h2h_recent_meeting",
+      "sourceId": "source_4",
+      "claimIds": ["claim_h2h_home_win", "claim_btts_yes"],
+      "snippet": "The latest head-to-head match between Hapoel Tel Aviv and Beitar Jerusalem took place on 6 May 2026 and ended in a 0:1 score.",
+      "summary": "Beitar Jerusalem won the most recent head-to-head match against Hapoel Tel Aviv 1-0 in May 2026.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_dc_odds",
+      "sourceId": "source_2",
+      "claimIds": ["claim_dc_home_draw"],
+      "snippet": "double_chance home_or_draw price: 1.22 (Bet365)",
+      "summary": "The odds for Beitar Jerusalem to either win or draw are very low (1.22), indicating a high probability for this outcome.",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_goals_over_2.5_odds",
+      "sourceId": "source_2",
+      "claimIds": ["claim_goals_over_2.5"],
+      "snippet": "goals_over_under over 2.5 price: 1.65 (Bet365), 1.64 (Pinnacle)",
+      "summary": "Bookmakers price the 'Over 2.5 goals' market at around 1.65, suggesting it is a likely outcome with an implied probability of ~60%.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_btts_odds",
+      "sourceId": "source_2",
+      "claimIds": ["claim_btts_yes"],
+      "snippet": "btts yes price: 1.62 (Bet365)",
+      "summary": "The odds for 'Both Teams to Score: Yes' are 1.62, implying a ~62% probability that both Beitar Jerusalem and Hapoel Tel Aviv will score.",
+      "confidence": 0.75,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_corners_odds",
+      "sourceId": "source_2",
+      "claimIds": ["claim_corners_under_9.5"],
+      "snippet": "corners_over_under under 9.5 price: 1.67 (Bet365)",
+      "summary": "Bet365 offers odds of 1.67 for the match to have under 9.5 corners, implying a higher probability for fewer corners.",
+      "confidence": 0.6,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_hapoel_away_form",
+      "sourceId": "source_3",
+      "claimIds": ["claim_btts_yes", "claim_h2h_home_win"],
+      "snippet": "Hapoel Tel Aviv FC's away form is very poor... Hapoel Tel Aviv FC has conceded in 82% of their away matches this season.",
+      "summary": "Hapoel Tel Aviv has a very poor away record and has conceded goals in 82% of their away matches, supporting the likelihood of Beitar scoring.",
+      "confidence": 0.8,
+      "metadata": {}
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_h2h_home_win",
+      "statement": "Beitar Jerusalem is the favorite to win the match against Hapoel Tel Aviv.",
+      "subject": {
+        "type": "market",
+        "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_h2h_odds", "evidence_h2h_form", "evidence_h2h_recent_meeting", "evidence_hapoel_away_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_dc_home_draw",
+      "statement": "Beitar Jerusalem is highly likely to either win or draw the match (1X).",
+      "subject": {
+        "type": "market",
+        "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_dc_odds", "evidence_h2h_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_goals_over_2.5",
+      "statement": "The match is likely to have more than 2.5 goals.",
+      "subject": {
+        "type": "market",
+        "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_goals_over_2.5_odds", "evidence_hapoel_away_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_btts_yes",
+      "statement": "Both teams are likely to score in the match.",
+      "subject": {
+        "type": "market",
+        "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_btts_odds", "evidence_hapoel_away_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_corners_under_9.5",
+      "statement": "The match is likely to have fewer than 9.5 corners.",
+      "subject": {
+        "type": "market",
+        "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7",
+        "market": "corners_over_under"
+      },
+      "supportLevel": "partially-supported",
+      "evidenceIds": ["evidence_corners_odds"],
+      "conflictStatus": "none",
+      "metadata": {
+        "comment": "This claim is based solely on bookmaker odds. No statistical evidence regarding team corner history was found during the research."
+      }
+    }
+  ],
+  "gateResult": {
+    "verdict": "review-required",
+    "reasons": [
+      "Research for the 'corners_over_under' market is based only on odds and lacks statistical evidence from web search or other sources.",
+      "Full analysis requires deeper statistical data for some markets."
+    ],
+    "warnings": []
+  },
+  "warnings": [],
+  "metadata": {
+    "runId": "a5dfc697-3bb4-440a-87f8-e8f6261b8541",
+    "marketCoverage": {
+      "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
+      "analyzedMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
+      "skippedMarkets": []
+    }
+  }
+}

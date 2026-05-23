@@ -1,299 +1,276 @@
 {
   "sources": [
     {
-      "id": "web_search_1",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFtI9KAnW5oEkqIv-7F4h48JQXZ7BC9GAnEHCIVmHecBUt_IBWtrvai2392bjpbpOdUFOeyIEvxnPg6j72ybl10D0ZstUOSXmAZ0jDUVnplRZ9lJUpJTTPt420vaAzZ20JLh2QErG0T4FBDJcRykLAMFqHmw5vde0Ga5_npiDVi1x3jNebGdKenqrxLNAY=",
-      "title": "soccerway.com",
-      "capturedAt": "2026-05-23T06:50:15.831Z",
-      "metadata": {}
+      "id": "source_1",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football Fixture Data",
+      "capturedAt": "2026-05-23T16:36:37.140Z",
+      "hash": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+      "metadata": {
+        "providerFixtureId": "1490315"
+      }
     },
     {
-      "id": "web_search_2",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH9fKFQS9PrVA8N2NCaxVnUnpJMtU6qWJctp-RqWAuSgluJbNkvnuDJCa7XCfKS_1iLpvM_ytEBEcQBuOTPDLTmJ5QtAokzRXABPdBgDMOD8RKDASTEC9wuDZkzLN0tDIlQ01Bo6cHRrEq0d6r8AbXey7QQA9x7FqQ50uQT3cN6hDMoq3u5sxumncgX2ZjOvSQzItchLa1I",
-      "title": "flashscore.com",
-      "capturedAt": "2026-05-23T06:50:15.831Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_3",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE37mUgs2Qc_OZ9UH41oxvfWmVhCZzFYBAOiE6ZTAeOdHcDUwLKLX0TvqylJY_Xj2yxIzBTTnfZsGunAQ82nbGbnpgWmFws37lLmCiqxiafzYBurgzuM4OdhzsbXnAGdrQ7_CZ04azulbwL1tATxltl2nJR8Mf-Qrs=",
-      "title": "flashscore.com - standings",
-      "capturedAt": "2026-05-23T06:50:15.831Z",
-      "metadata": {}
-    },
-    {
-      "id": "web_search_4",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEfE6c_OEhqCiTPRBlO7SgvQd2RL4alFfcpIa3-aHWH0HhLo95P7JkEgEKZUGXVC3vu9Y-TnWAJE2JfleHfiwHfdmtHXlT8O2Bw78SCLEqRnZ9wfcP8QBtHm9MX-NIsLwDu8KnTIuviNLNxhWGS05Yv8GjyAJg9ucl5GAsar3l12jpKNZvN36FZKDySX8SvoNXo",
-      "title": "aiscore.com",
-      "capturedAt": "2026-05-23T06:50:15.831Z",
-      "metadata": {}
-    },
-    {
-      "id": "api_football_odds_snapshot",
-      "type": "provider-snapshot",
-      "url": "N/A",
+      "id": "source_2",
+      "type": "api-football",
+      "url": null,
       "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-23T06:50:21.052Z",
-      "hash": "31e210430fce1c88149864d43b470cbc78a452444f2a15bee345fe239c822dfb",
+      "capturedAt": "2026-05-23T16:36:40.763Z",
+      "hash": "08635c9a13708675a40f66985096734744cf033147ce9e0768f6077970327efe",
+      "metadata": {
+        "oddsSnapshotId": "666aca20-cb01-4d0b-90fa-0be209ed9f18"
+      }
+    },
+    {
+      "id": "source_3",
+      "type": "web-search",
+      "url": "https://www.sportsgambler.com/",
+      "title": "SportsGambler Prediction",
+      "capturedAt": "2026-05-23T16:40:00.000Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "source_4",
+      "type": "web-search",
+      "url": "https://www.sportskeeda.com/",
+      "title": "Sportskeeda Prediction",
+      "capturedAt": "2026-05-23T16:40:00.000Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "source_5",
+      "type": "web-search",
+      "url": "https://www.yardbarker.com/",
+      "title": "Yardbarker Report on Hugo Cuypers",
+      "capturedAt": "2026-05-23T16:40:00.000Z",
+      "hash": null,
       "metadata": {}
     }
   ],
   "evidenceItems": [
     {
       "id": "evidence_1",
-      "sourceId": "web_search_1",
+      "sourceId": "source_2",
       "claimIds": ["claim_1", "claim_2"],
-      "snippet": "The football match between Hills United (also known as Hills Brumbies) and Blacktown Spartans is scheduled for today, Saturday, May 23, 2026. Competition: Football NSW League One (Australia), Round 16. Kickoff Time: 5:00 PM local time (Sydney) / 07:00 UTC. Venue: Landen Stadium, Seven Hills, NSW.",
-      "summary": "Match details confirming the fixture between Hills Brumbies and Blacktown Spartans on May 23, 2026, as part of Football NSW League One, including kickoff time and venue.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_2",
-      "sourceId": "web_search_3",
-      "claimIds": ["claim_3", "claim_4", "claim_5"],
-      "snippet": "Blacktown Spartans: Currently 1st place with 33 points (10 wins, 3 draws, 2 losses). They are the league leaders and in strong form. Hills United: Currently 6th place with 23 points (7 wins, 2 draws, 6 losses).",
-      "summary": "Current league standings for Blacktown Spartans (1st place, 33 points) and Hills United (6th place, 23 points) in the NSW League One.",
+      "snippet": "h2h home price: 1.48 (Bet365), 1.50 (Pinnacle)",
+      "summary": "Chicago Fire are strong favorites to win, with average odds around 1.49.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
+      "id": "evidence_2",
+      "sourceId": "source_3",
+      "claimIds": ["claim_1", "claim_6"],
+      "snippet": "Chicago Fire (7-2-4) enter this match in 4th place in the Eastern Conference, coming off back-to-back road wins... Toronto FC (3-5-5) are struggling in 11th place and are winless in their last eight matches.",
+      "summary": "Chicago is in strong form (4th in conference) while Toronto is struggling (11th, winless in 8).",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
       "id": "evidence_3",
-      "sourceId": "web_search_4",
-      "claimIds": ["claim_6"],
-      "snippet": "Head-to-Head (2026 Season): This is the second meeting between the two sides in the 2026 season. In their previous encounter on February 6, 2026, Blacktown Spartans won 4–1.",
-      "summary": "Head-to-head record for the 2026 season showing Blacktown Spartans won 4-1 against Hills Brumbies on February 6, 2026.",
+      "sourceId": "source_4",
+      "claimIds": ["claim_1"],
+      "snippet": "Chicago is unbeaten in their last seven meetings against Toronto.",
+      "summary": "Chicago has a strong head-to-head advantage, being unbeaten in the last seven matches against Toronto.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
       "id": "evidence_4",
-      "sourceId": "api_football_odds_snapshot",
-      "claimIds": ["claim_7", "claim_8", "claim_9", "claim_10", "claim_11", "claim_12", "claim_13"],
-      "snippet": "Odds for h2h, double_chance, and goals_over_under markets from Bet365 and Pinnacle.",
-      "summary": "Provided odds snapshot from API-Football for h2h, double_chance, and goals_over_under markets, including prices and implied probabilities.",
-      "confidence": 1.0,
+      "sourceId": "source_5",
+      "claimIds": ["claim_1", "claim_5", "claim_7"],
+      "snippet": "Chicago’s Hugo Cuypers is currently the league's top scorer with 13 goals. He has scored in every league match he has played this season (10 consecutive games)...",
+      "summary": "Chicago's striker Hugo Cuypers is the league's top scorer and on a 10-game scoring streak.",
+      "confidence": 0.95,
       "metadata": {}
+    },
+    {
+        "id": "evidence_5",
+        "sourceId": "source_2",
+        "claimIds": ["claim_3"],
+        "snippet": "double_chance home_or_draw price: 1.12 (Bet365)",
+        "summary": "The odds for Chicago Fire to win or draw are very low (1.12), indicating a high probability.",
+        "confidence": 0.9,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_6",
+        "sourceId": "source_2",
+        "claimIds": ["claim_4", "claim_5", "claim_6"],
+        "snippet": "goals_over_under over 2.5 price: 1.48 (Bet365), 1.50 (Pinnacle)",
+        "summary": "Odds favor over 2.5 goals, with an average price of 1.49.",
+        "confidence": 0.85,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_7",
+        "sourceId": "source_3",
+        "claimIds": ["claim_5", "claim_6"],
+        "snippet": "Over 2.5 goals is highly likely, given Chicago's offensive form and Toronto's defensive struggles.",
+        "summary": "Web sources predict over 2.5 goals due to Chicago's strong offense and Toronto's weak defense.",
+        "confidence": 0.8,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_8",
+        "sourceId": "source_2",
+        "claimIds": ["claim_7"],
+        "snippet": "btts yes price: 1.62 (Bet365)",
+        "summary": "Odds suggest it's likely both teams will score, with a price of 1.62 for 'Yes'.",
+        "confidence": 0.75,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_9",
+        "sourceId": "source_2",
+        "claimIds": ["claim_8"],
+        "snippet": "corners_over_under over 9.5 price: 1.91 (Bet365)",
+        "summary": "The odds for the corners market are close to even for a 9.5 line.",
+        "confidence": 0.6,
+        "metadata": {}
     }
   ],
   "claims": [
     {
       "id": "claim_1",
-      "statement": "The match between Hills Brumbies and Blacktown Spartans is part of Football NSW League One, Round 16.",
+      "statement": "Chicago Fire is likely to win the match against Toronto FC.",
       "subject": {
-        "type": "fixture",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd"
+        "type": "market",
+        "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+        "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_1"],
+      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3", "evidence_4"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
       "id": "claim_2",
-      "statement": "The match is scheduled for May 23, 2026, at 07:00 UTC at Landen Stadium, Seven Hills, NSW.",
+      "statement": "Toronto FC is unlikely to win the match.",
       "subject": {
-        "type": "fixture",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd"
+        "type": "market",
+        "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+        "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_1"],
+      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
       "id": "claim_3",
-      "statement": "Blacktown Spartans are currently 1st in the Football NSW League One standings with 33 points.",
-      "subject": {
-        "type": "team",
-        "id": "1517c9f3-45ba-4cbd-a279-1afb37a916e4"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_2"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_4",
-      "statement": "Hills Brumbies are currently 6th in the Football NSW League One standings with 23 points.",
-      "subject": {
-        "type": "team",
-        "id": "b149e0bb-a7c3-4b54-9a1e-8dd1598733b9"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_2"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_5",
-      "statement": "Blacktown Spartans have 10 wins, 3 draws, and 2 losses in the current season, indicating strong form.",
-      "subject": {
-        "type": "team",
-        "id": "1517c9f3-45ba-4cbd-a279-1afb37a916e4"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_2"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_6",
-      "statement": "In the previous encounter this season (February 6, 2026), Blacktown Spartans defeated Hills Brumbies 4-1.",
-      "subject": {
-        "type": "fixture",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_3"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_7",
-      "statement": "The implied probability for Hills Brumbies to win (h2h) is 35.71% (Bet365) and 36.10% (Pinnacle).",
+      "statement": "Chicago Fire will likely not lose the match (win or draw).",
       "subject": {
         "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
-      "conflictStatus": "none",
-      "metadata": {
-        "selection": "home",
-        "price_bet365": 2.8,
-        "probability_bet365": 0.35714285714285715,
-        "price_pinnacle": 2.77,
-        "probability_pinnacle": 0.36101083032490977
-      }
-    },
-    {
-      "id": "claim_8",
-      "statement": "The implied probability for a draw (h2h) is 26.67% (Bet365) and 27.62% (Pinnacle).",
-      "subject": {
-        "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
-      "conflictStatus": "none",
-      "metadata": {
-        "selection": "draw",
-        "price_bet365": 3.75,
-        "probability_bet365": 0.26666666666666666,
-        "price_pinnacle": 3.62,
-        "probability_pinnacle": 0.27624309392265195
-      }
-    },
-    {
-      "id": "claim_9",
-      "statement": "The implied probability for Blacktown Spartans to win (h2h) is 48.78% (Bet365) and 48.78% (Pinnacle).",
-      "subject": {
-        "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
-      "conflictStatus": "none",
-      "metadata": {
-        "selection": "away",
-        "price_bet365": 2.05,
-        "probability_bet365": 0.48780487804878053,
-        "price_pinnacle": 2.05,
-        "probability_pinnacle": 0.48780487804878053
-      }
-    },
-    {
-      "id": "claim_10",
-      "statement": "The implied probability for Hills Brumbies or draw (double_chance) is 59.88% (Bet365).",
-      "subject": {
-        "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
+        "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
         "market": "double_chance"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
+      "evidenceIds": ["evidence_5", "evidence_2", "evidence_3"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "home_or_draw",
-        "price_bet365": 1.67,
-        "probability_bet365": 0.5988023952095809
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_11",
-      "statement": "The implied probability for either team to win (double_chance) is 83.33% (Bet365).",
-      "subject": {
-        "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
-        "market": "double_chance"
+        "id": "claim_4",
+        "statement": "The total number of goals in the match is likely to be over 2.5.",
+        "subject": {
+          "type": "market",
+          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+          "market": "goals_over_under"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_6", "evidence_7"],
+        "conflictStatus": "none",
+        "metadata": {}
       },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
-      "conflictStatus": "none",
-      "metadata": {
-        "selection": "home_or_away",
-        "price_bet365": 1.2,
-        "probability_bet365": 0.8333333333333334
-      }
-    },
-    {
-      "id": "claim_12",
-      "statement": "The implied probability for draw or Blacktown Spartans to win (double_chance) is 76.92% (Bet365).",
-      "subject": {
-        "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
-        "market": "double_chance"
+      {
+        "id": "claim_5",
+        "statement": "Chicago's strong offense, led by top scorer Hugo Cuypers, is expected to produce goals.",
+        "subject": {
+          "type": "market",
+          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+          "market": "goals_over_under"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_4", "evidence_7"],
+        "conflictStatus": "none",
+        "metadata": {}
       },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
-      "conflictStatus": "none",
-      "metadata": {
-        "selection": "draw_or_away",
-        "price_bet365": 1.3,
-        "probability_bet365": 0.7692307692307692
-      }
-    },
-    {
-      "id": "claim_13",
-      "statement": "The implied probability for Over 2.5 goals is 65.36% (Bet365) and 68.49% (Pinnacle).",
-      "subject": {
-        "type": "market",
-        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
-        "market": "goals_over_under"
+      {
+        "id": "claim_6",
+        "statement": "Toronto FC's defense has been poor, contributing to the likelihood of a high-scoring game.",
+        "subject": {
+          "type": "market",
+          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+          "market": "goals_over_under"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_2", "evidence_7"],
+        "conflictStatus": "none",
+        "metadata": {}
       },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_4"],
-      "conflictStatus": "none",
-      "metadata": {
-        "selection": "over",
-        "line": 2.5,
-        "price_bet365": 1.53,
-        "probability_bet365": 0.6535947712418301,
-        "price_pinnacle": 1.46,
-        "probability_pinnacle": 0.684931506849315
+      {
+        "id": "claim_7",
+        "statement": "Both teams are likely to score.",
+        "subject": {
+          "type": "market",
+          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+          "market": "btts"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_8", "evidence_4"],
+        "conflictStatus": "none",
+        "metadata": {}
+      },
+      {
+        "id": "claim_8",
+        "statement": "The number of corners is uncertain, with odds pointing towards a line of 9.5 but no strong evidence either way.",
+        "subject": {
+          "type": "market",
+          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+          "market": "corners_over_under"
+        },
+        "supportLevel": "indeterminate",
+        "evidenceIds": ["evidence_9"],
+        "conflictStatus": "none",
+        "metadata": {}
       }
-    }
   ],
   "gateResult": {
-    "verdict": "review-required",
+    "verdict": "promotable",
     "reasons": [
-      "Missing web-search evidence or specific claims for all required markets.",
-      "The 'corners_over_under' and 'btts' markets lack sufficient data from web search and odds snapshot."
+      "Research is well-supported by both market odds and multiple web sources.",
+      "Strong consensus on match outcome (Chicago win) and high goal count.",
+      "Clear evidence for H2H, Double Chance, Goals Over/Under, and BTTS markets."
     ],
-    "warnings": []
+    "warnings": [
+        "Limited evidence for the corners market."
+    ]
   },
   "warnings": [],
   "metadata": {
+    "runId": "a5dfc697-3bb4-440a-87f8-e8f6261b8541",
+    "fixtureId": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
     "marketCoverage": {
-      "skippedMarkets": ["corners_over_under", "btts"]
+        "requiredMarkets": [
+            "h2h",
+            "double_chance",
+            "goals_over_under",
+            "corners_over_under",
+            "btts"
+        ],
+        "coveredMarkets": [
+            "h2h",
+            "double_chance",
+            "goals_over_under",
+            "btts"
+        ],
+        "skippedMarkets": [
+            "corners_over_under"
+        ]
     }
   }
 }

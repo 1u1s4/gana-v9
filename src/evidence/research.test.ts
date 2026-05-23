@@ -271,7 +271,7 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /OpenRouter\/browser fallback|no native web-search tool|browser fallback/i);
   });
 
-  it('normalizes web-search capturedAt offsets before schema validation', async () => {
+  it('normalizes web-search capturedAt values before schema validation', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const output = agentOutput({
@@ -281,6 +281,12 @@ describe('runFixtureResearch', () => {
         url: 'https://example.com/team-news',
         title: 'Team news',
         capturedAt: '2026-05-06T09:30:00-03:00',
+      }, {
+        id: 'source-web-2',
+        type: 'web-search',
+        url: 'https://example.com/match-preview',
+        title: 'Match preview',
+        capturedAt: 'x',
       }],
     });
 
@@ -296,6 +302,7 @@ describe('runFixtureResearch', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.sources.find((source) => source.id === 'source-web-1')?.capturedAt, '2026-05-06T12:30:00.000Z');
+    assert.equal(result.bundle?.sources.find((source) => source.id === 'source-web-2')?.capturedAt, createdAt.toISOString());
   });
 
   it('adds a synthetic web-search source when native web search was used but omitted from JSON', async () => {
@@ -502,16 +509,103 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped unknown evidence source "source_3"/);
   });
 
-  it('repairs null source locators before validation', async () => {
+  it('synthesizes omitted web sources when the missing source id identifies a web source', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      sources: [{
+        id: 'web_source_1',
+        type: 'web-search',
+        url: 'https://example.com/team-news',
+        title: 'Team news',
+        capturedAt: createdAt.toISOString(),
+      }],
+      evidenceItems: [{
+        id: 'evidence_1',
+        sourceId: 'web_source_3',
+        claimIds: ['claim_1'],
+        summary: 'BTTS yes because both defenses have been vulnerable.',
+        confidence: 0.8,
+      }],
+      claims: [{
+        id: 'claim_1',
+        statement: 'Both teams are expected to score.',
+        subject: { type: 'market', id: 'fixture-1', market: 'btts' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence_1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.sources.some((source) => source.id === 'web_source_3' && source.type === 'web-search'), true);
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /synthesized omitted web-search source "web_source_3"/);
+  });
+
+  it('synthesizes provider evidence for odds claims without evidence ids', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      evidenceItems: [],
+      claims: [{
+        id: 'claim_h2h_home_odds',
+        statement: 'The odds for the home win are 2.15 at Bet365.',
+        subject: { type: 'market', id: 'fixture-1', market: 'h2h' },
+        supportLevel: 'supported',
+        evidenceIds: [],
+        conflictStatus: 'none',
+        metadata: { bookmaker: 'Bet365', price: 2.15 },
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: {
+        getFixture: async () => fixture,
+        getCanonicalOddsSnapshot: async () => oddsSnapshot,
+      },
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    const claim = result.bundle?.claims.find((item) => item.id === 'claim_h2h_home_odds');
+    const evidence = result.bundle?.evidenceItems.find((item) => item.id === 'evidence_repaired_claim_h2h_home_odds');
+    assert.equal(result.ok, true);
+    assert.deepEqual(claim?.evidenceIds, ['evidence_repaired_claim_h2h_home_odds']);
+    assert.equal(evidence?.sourceId, 'source_api_football_odds_snapshot');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /synthesized provider evidence for claim "claim_h2h_home_odds"/);
+  });
+
+  it('repairs blank and null source locators before validation', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const output = agentOutput({
       sources: [{
         id: 'provider-snapshot-odds',
         type: 'provider-snapshot',
-        url: null,
+        url: '',
         title: 'API-Football odds snapshot',
         hash: null,
+        metadata: { provider: 'api-football', providerFixtureId: '1001' },
+      }, {
+        id: 'api-football-fixture',
+        type: 'api-football',
+        url: null,
+        title: 'API-Football fixture',
+        hash: '',
         metadata: { provider: 'api-football', providerFixtureId: '1001' },
       }, {
         id: 'source-web-1',
@@ -519,7 +613,7 @@ describe('runFixtureResearch', () => {
         url: 'https://example.com/team-news',
         title: 'Team news',
         capturedAt: createdAt.toISOString(),
-        hash: null,
+        hash: '',
       }],
       evidenceItems: [{
         id: 'evidence-1',
@@ -555,12 +649,16 @@ describe('runFixtureResearch', () => {
     });
 
     const providerSource = result.bundle?.sources.find((source) => source.id === 'provider-snapshot-odds');
+    const apiFootballSource = result.bundle?.sources.find((source) => source.id === 'api-football-fixture');
     const webSource = result.bundle?.sources.find((source) => source.id === 'source-web-1');
     assert.equal(result.ok, true);
     assert.equal(providerSource?.url, undefined);
     assert.equal(providerSource?.hash, undefined);
     assert.equal(providerSource?.capturedAt, createdAt.toISOString());
     assert.match(providerSource?.externalId ?? '', /^api-football:\/\//);
+    assert.equal(apiFootballSource?.url, undefined);
+    assert.equal(apiFootballSource?.hash, undefined);
+    assert.match(apiFootballSource?.externalId ?? '', /^api-football:\/\//);
     assert.equal(webSource?.hash, undefined);
   });
 
@@ -623,6 +721,66 @@ describe('runFixtureResearch', () => {
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.claims[0]?.subject.market, 'goals_over_under');
     assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped market subject id "goals_over_under"/);
+  });
+
+  it('repairs unsupported claim subject types before validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      claims: [{
+        id: 'claim-1',
+        statement: 'League standings show the teams are adjacent in the table.',
+        subject: { type: 'league_standings', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.claims[0]?.subject.type, 'fixture');
+    assert.equal(result.bundle?.claims[0]?.subject.id, 'fixture-1');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped invalid subject type "league_standings" to fixture/);
+  });
+
+  it('repairs missing research gate results conservatively before validation', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const output = agentOutput({
+      gateResult: undefined,
+      claims: [{
+        id: 'claim-1',
+        statement: 'The fixture context is supported by current sources.',
+        subject: { type: 'fixture', id: 'fixture-1' },
+        supportLevel: 'supported',
+        evidenceIds: ['evidence-1'],
+        conflictStatus: 'none',
+      }],
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        emitNativeWebSearch(options);
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /mapped invalid or missing research gateResult "missing"/);
   });
 
   it('repairs non-schema conflict statuses to potential before validation', async () => {
