@@ -199,6 +199,7 @@ describe('runDailyE2E', () => {
       parlayRecommendation({ rank: 5, parlayId: 'high-odds-1', profile: 'high-conviction', combinedOdds: 2.6, aggregateConfidence: 0.95, expectedEdge: 0.2, predictionId: 'prediction-high-odds' }),
       parlayRecommendation({ rank: 6, parlayId: 'market-diverse-duplicate', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse', legs: duplicateLowVarianceLegs }),
       parlayRecommendation({ rank: 7, parlayId: 'high-conviction-1', profile: 'high-conviction', combinedOdds: 1.7, predictionId: 'prediction-high-conviction' }),
+      parlayRecommendation({ rank: 8, parlayId: 'low-odds-top-1', profile: 'low-odds-top', combinedOdds: 1.35, aggregateConfidence: 0.82, expectedEdge: 0.08, predictionId: 'prediction-low-odds-top' }),
     ];
 
     const result = await runDailyE2E(ctx.config, {
@@ -290,13 +291,14 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.equal(recommendations.parlayRecommendations.length, 4);
+    assert.equal(recommendations.parlayRecommendations.length, 3);
     assert.equal(recommendations.parlayRecommendations[0].profile, 'parlay-diamante');
-    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3, 4]);
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3]);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'balanced-2'), false);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-odds-1'), false);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'market-diverse-duplicate'), false);
-    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-conviction-1'), true);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-conviction-1'), false);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'low-odds-top-1'), true);
     assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), ['prediction-atomic-2']);
     assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team C vs Team D');
     assert.deepEqual(recommendations.atomicRecommendations[0].legs[0].display, {
@@ -311,6 +313,9 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.maxCombinedOdds, 2.2);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.semanticDuplicateSignature, 'fixtureId:market:selection:line');
+    assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.allowedProfiles, ['parlay-diamante', 'low-odds-top', 'low-variance']);
+    assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayFixtures, true);
+    assert.deepEqual(recommendations.recommendationPolicy.demotedModels, ['gpt-5.4-mini']);
     assert.equal(recommendations.recommendationPolicy.stakeRecommendation.policy, 'bucketed-bankroll-percentage-confidence-edge-recommendation');
     assert.equal(recommendations.recommendations.every((item: any) => [1, 5, 10, 15, 20, 25].includes(item.stakeRecommendation.stake)), true);
     assert.equal(
@@ -318,7 +323,7 @@ describe('runDailyE2E', () => {
       true,
     );
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
-    assert.equal(summary.counts.parlayRecommendations, 4);
+    assert.equal(summary.counts.parlayRecommendations, 3);
     assert.equal(summary.counts.atomicRecommendations, 1);
   });
 

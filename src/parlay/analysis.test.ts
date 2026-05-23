@@ -211,14 +211,14 @@ describe('runParlayAnalysis', () => {
         ],
       }),
       parlay({
-        id: 'parlay-core-high',
-        profile: 'high-conviction',
+        id: 'parlay-core-diamante',
+        profile: 'parlay-diamante',
         validation: 'unvalidated',
-        odds: 1.806,
-        confidence: 0.81,
+        odds: 1.207,
+        confidence: 0.88,
         legs: [
-          leg({ id: 'core-a', market: 'goals_over_under', selection: 'over', odds: 1.4, confidence: 0.9 }),
-          leg({ id: 'core-b', market: 'h2h', selection: 'home', odds: 1.29, confidence: 0.9 }),
+          leg({ id: 'core-a', market: 'double_chance', selection: 'home_or_draw', odds: 1.1, confidence: 0.9 }),
+          leg({ id: 'core-b', market: 'double_chance', selection: 'draw_or_away', odds: 1.097, confidence: 0.86 }),
         ],
       }),
       parlay({
@@ -260,8 +260,8 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.diagnostics.rawAnalyzed, 4);
     assert.equal(result.diagnostics.profileScopedAnalyzed, 2);
     assert.equal(result.analyzed, 2);
-    assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-core-high', 'parlay-core-balanced']);
-    assert.equal(result.top.some((item) => item.profile === 'low-odds-top' || item.profile === 'parlay-oro'), false);
+    assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-core-diamante']);
+    assert.equal(result.top.some((item) => item.profile === 'balanced' || item.profile === 'high-conviction' || item.profile === 'low-odds-top' || item.profile === 'parlay-oro'), false);
   });
 
   it('keeps parlay-diamante in core recommendations despite low-liquidity h2h favorite flags', async () => {
@@ -315,7 +315,7 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.diagnostics.rejected.some((item) => item.parlayId === 'parlay-diamante-safe'), false);
   });
 
-  it('keeps promotable low-liquidity balanced parlays recommendable with reduced stake', async () => {
+  it('quarantines balanced parlays from final analysis recommendations', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const rows = [
@@ -344,10 +344,8 @@ describe('runParlayAnalysis', () => {
       writeArtifact: () => '/tmp/parlay-analysis.json',
     });
 
-    assert.equal(result.top.length, 1);
-    assert.equal(result.top[0]?.parlayId, 'parlay-balanced-low-liquidity');
-    assert.equal(result.top[0]?.riskFlags.includes('low-liquidity'), true);
-    assert.equal((result.top[0]?.stake.units ?? 0) > 0, true);
+    assert.equal(result.top.length, 0);
+    assert.match(JSON.stringify(result.diagnostics.rejected), /profile balanced is purged from final recommendations/);
   });
 
   it('requires a persisted parlay scope', async () => {

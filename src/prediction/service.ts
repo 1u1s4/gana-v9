@@ -43,6 +43,8 @@ const WEB_RESEARCH_MAX_AGE_MS = positiveIntegerFromEnv('GANA_WEB_RESEARCH_MAX_AG
 const CALIBRATION_MIN_SAMPLE = positiveIntegerFromEnv('GANA_CALIBRATION_MIN_SAMPLE', 50);
 const MIN_EDGE = numberFromEnv('GANA_MIN_EDGE', 0);
 const MIN_CONFIDENCE = numberFromEnv('GANA_MIN_CONFIDENCE', 0.5);
+const PROMOTABLE_CONFIDENCE_FLOOR = numberFromEnv('GANA_PROMOTABLE_CONFIDENCE_FLOOR', 0.65);
+const REVIEW_ONLY_MODELS = new Set(['gpt-5.4-mini']);
 const MIN_EVIDENCE_ITEMS = positiveIntegerFromEnv('GANA_MIN_EVIDENCE_ITEMS', 1);
 const MIN_DISTINCT_SOURCES = positiveIntegerFromEnv('GANA_MIN_DISTINCT_SOURCES', 1);
 const MIN_MARKET_EFFICIENCY = numberFromEnv('GANA_MIN_MARKET_EFFICIENCY', 0);
@@ -445,6 +447,7 @@ export async function runFixtureScoring(
       warnings: baseWarnings,
       confidence: calibration.confidence ?? pick.confidence,
       calibrationApplied: calibration.applied,
+      model: config.model,
     });
     const configurableGateWarnings = evaluateConfigurablePredictionWarnings({
       pick,
@@ -1156,6 +1159,7 @@ function evaluatePostScoringRiskControls(input: {
   warnings: string[];
   confidence: number;
   calibrationApplied?: boolean;
+  model?: string;
 }): {
   confidence: number;
   confidenceBand?: 'low' | 'medium' | 'high';
@@ -1180,11 +1184,21 @@ function evaluatePostScoringRiskControls(input: {
     parlayIneligible = true;
     warnings.push('stale low-liquidity prediction requires review and is excluded from parlays');
   }
+  if (confidence < PROMOTABLE_CONFIDENCE_FLOOR) {
+    forceReview = true;
+    parlayIneligible = true;
+    warnings.push(`confidence ${round(confidence)} below promotion floor ${PROMOTABLE_CONFIDENCE_FLOOR}`);
+  }
   if (confidence >= 0.8 && confidence < 0.9 && !input.calibrationApplied) {
     const nextConfidence = Math.min(confidence, 0.74);
     confidenceChanged = confidenceChanged || nextConfidence !== confidence;
     confidence = nextConfidence;
     warnings.push('uncalibrated high-confidence band 0.80-0.90 capped after validation overconfidence');
+  }
+  if (input.model && REVIEW_ONLY_MODELS.has(input.model)) {
+    forceReview = true;
+    parlayIneligible = true;
+    warnings.push(`${input.model} output is review-only until calibration sample is sufficient`);
   }
 
   return {

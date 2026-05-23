@@ -180,7 +180,7 @@ const DEFAULT_MAX_PORTFOLIO_EXPOSURE = 0.08;
 const DEFAULT_MAX_PARLAY_EXPOSURE = 0.025;
 const DEFAULT_PROFILE_SCOPE: ParlayAnalysisProfileScope = 'core';
 const CORE_ANALYSIS_PROFILES = new Set(['default', 'balanced', 'high-conviction', 'parlay-diamante']);
-const PURGED_ANALYSIS_PROFILES = new Set(['default', 'review', 'totals', 'market-diverse', 'parlay-oro', 'aggressive']);
+const PURGED_ANALYSIS_PROFILES = new Set(['default', 'review', 'totals', 'balanced', 'high-conviction', 'market-diverse', 'parlay-oro', 'aggressive']);
 const MAX_RECOMMENDABLE_COMBINED_ODDS = 3.0;
 const MAX_RECOMMENDABLE_LEGS = 3;
 

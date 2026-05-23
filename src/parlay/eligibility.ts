@@ -2,7 +2,7 @@ import type { ParlaySourcePrediction } from './types.js';
 
 export const LOW_ODDS_TOP_MAX_LEG_ODDS = 1.2;
 export const AUTOMATIC_PARLAY_MAX_LEG_ODDS = 2.2;
-export const FRAGILE_TOTAL_OVER_MAX_ODDS = 1.3;
+export const FRAGILE_TOTAL_OVER_MAX_ODDS = 1.4;
 export const OVERINFLATED_EDGE_FLOOR = 0.2;
 
 export function automaticParlayRiskReasons(prediction: ParlaySourcePrediction): string[] {
@@ -13,7 +13,7 @@ export function automaticParlayRiskReasons(prediction: ParlaySourcePrediction): 
   if (hasStaleLowLiquidityRisk(prediction)) {
     reasons.push('stale low-liquidity prediction');
   }
-  if (prediction.status !== 'promotable' && hasLowLiquidityH2hFavoriteRisk(prediction)) {
+  if (hasLowLiquidityH2hFavoriteRisk(prediction)) {
     reasons.push('low-liquidity h2h short favorite');
   }
   if (hasUnverifiedCornersRisk(prediction)) {

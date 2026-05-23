@@ -108,11 +108,12 @@ const sourceRecords = [
   },
 ];
 
-function config() {
+function config(overrides: Record<string, unknown> = {}) {
   return loadConfig({
     databaseUrl: 'mysql://user:pass@localhost:3306/gana',
     provider: 'codex',
     model: 'gpt-5.5',
+    ...overrides,
   }, { skipApiKey: true });
 }
 
@@ -1189,6 +1190,87 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].confidence, 0.74);
     assert.equal(persisted[0].quality, 'medium');
     assert.match(persisted[0].warnings.join('\n'), /0.80-0.90 capped/);
+  });
+
+  it('makes the promotion confidence floor review-aware', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.6,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(persisted[0].status, 'review-required');
+    assert.equal(persisted[0].metadata.parlayEligible, false);
+    assert.match(persisted[0].warnings.join('\n'), /below promotion floor 0.65/);
+  });
+
+  it('keeps gpt-5.4-mini scoring output review-only until calibrated', async () => {
+    const cfg = config({ model: 'gpt-5.4-mini' });
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => ({
+        text: JSON.stringify({
+          predictions: [{
+            oddsQuoteId: 'odds-quote-1',
+            market: 'h2h',
+            selection: 'home',
+            line: null,
+            odds: 2.1,
+            probability: 0.56,
+            confidence: 0.75,
+            evidenceIds: ['evidence-1', 'evidence-2'],
+            claimIds: ['claim-1'],
+            rationale: 'Home selection is supported by the supplied evidence.',
+            warnings: [],
+          }],
+        }),
+        usage: {},
+        output: '',
+      }),
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(persisted[0].status, 'review-required');
+    assert.equal(persisted[0].model, 'gpt-5.4-mini');
+    assert.equal(persisted[0].metadata.parlayEligible, false);
+    assert.match(persisted[0].warnings.join('\n'), /gpt-5\.4-mini output is review-only/);
   });
 
   it('caps inflated double-chance edge against implied probability', async () => {

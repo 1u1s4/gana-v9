@@ -768,12 +768,15 @@ describe('executeRunPipeline', () => {
         calls.push(`low-odds:${providerFixtureId}`);
         const isFijiTarget = providerFixtureId === fijiTarget.providerFixtureId;
         const target = isFijiTarget ? fijiTarget : defaultTarget;
+        const quoteRecordIds: Record<string, string> = isFijiTarget
+          ? { 'test-book|h2h|away|': 'odds-quote-fiji-ba' }
+          : { 'test-book|double_chance|home_or_draw|': 'odds-quote-default-dc' };
         return {
           fixtureId: target.id,
           providerFixtureId: target.providerFixtureId,
           oddsSnapshotId: `low-odds-snapshot-${target.providerFixtureId}`,
           providerSnapshotId: `provider-snapshot-${target.providerFixtureId}`,
-          quoteRecordIds: isFijiTarget ? { 'test-book|h2h|away|': 'odds-quote-fiji-ba' } : undefined,
+          quoteRecordIds,
           capturedAt: '2026-04-29T12:00:00.000Z',
           bookmakerCount: 1,
           payloadHash: `hash-${target.providerFixtureId}`,
@@ -799,15 +802,14 @@ describe('executeRunPipeline', () => {
           fixtureId: target.id,
           providerFixtureId: target.providerFixtureId,
           gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
-          predictions: isFijiTarget
-            ? [predictionRecord({
+          predictions: [predictionRecord({
               runId: 'run-global-low-odds-slate',
               fixtureId: target.id,
               providerFixtureId: target.providerFixtureId,
-              oddsQuoteId: 'odds-quote-fiji-ba',
-              selection: 'away',
-            })]
-            : [],
+              oddsQuoteId: isFijiTarget ? 'odds-quote-fiji-ba' : 'odds-quote-default-dc',
+              market: isFijiTarget ? 'h2h' : 'double_chance',
+              selection: isFijiTarget ? 'away' : 'home_or_draw',
+            })],
         };
       },
     }));
@@ -815,10 +817,10 @@ describe('executeRunPipeline', () => {
     assert.equal(result.verdict, 'review-required');
     assert.deepEqual(discoveryQueries, [{ date: '2026-04-29', fullDay: true }]);
     assert.equal(result.lowOddsScan.fixtureCount, 2);
-    assert.equal(result.lowOddsScan.hitCount, 1);
-    assert.equal(result.lowOddsScan.hits[0]?.providerFixtureId, '9001');
-    assert.equal(result.lowOddsScan.hits[0]?.market, 'h2h');
-    assert.equal(result.lowOddsScan.hits[0]?.oddsQuoteId, 'odds-quote-fiji-ba');
+    assert.equal(result.lowOddsScan.hitCount, 2);
+    assert.deepEqual(result.lowOddsScan.hits.map((hit) => hit.providerFixtureId), ['1001', '9001']);
+    assert.deepEqual(result.lowOddsScan.hits.map((hit) => hit.market), ['double_chance', 'h2h']);
+    assert.equal(result.lowOddsScan.hits[1]?.oddsQuoteId, 'odds-quote-fiji-ba');
 
     const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
     assert.deepEqual(
@@ -826,7 +828,7 @@ describe('executeRunPipeline', () => {
       ['1001', '9001'],
     );
     const selected = JSON.parse(readFileSync(join(result.artifactDir, 'selected-fixtures.json'), 'utf-8'));
-    assert.equal(selected.lowOddsUniqueFixtures, 1);
+    assert.equal(selected.lowOddsUniqueFixtures, 2);
     assert.equal(selected.selectedFixtures, 2);
 
     const resumeRuntime = createRuntimeContext(config, 'session-resume.jsonl');
@@ -836,11 +838,11 @@ describe('executeRunPipeline', () => {
       validate: false,
     }, resumeRuntime, successfulPipelineDeps({ target: defaultTarget, calls, runId: 'run-global-low-odds-slate', date: '2026-04-29' }));
     const resumedSelected = JSON.parse(readFileSync(join(resumed.artifactDir, 'selected-fixtures.json'), 'utf-8'));
-    assert.equal(resumedSelected.lowOddsUniqueFixtures, 1);
+    assert.equal(resumedSelected.lowOddsUniqueFixtures, 2);
     assert.equal(resumedSelected.selectedFixtures, 2);
 
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
-    assert.equal(evaluation.lowOddsPredictionCoverage.hits, 1);
+    assert.equal(evaluation.lowOddsPredictionCoverage.hits, 2);
     assert.equal(evaluation.lowOddsPredictionCoverage.missingPredictionHits, 0);
     assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
     assert.ok(calls.includes('score:1001'));
@@ -888,7 +890,7 @@ describe('executeRunPipeline', () => {
     assert.match(handoff, /lowOddsPredicted: 0\/1/);
   });
 
-  it('falls back to scoring the eligible fixture slate when no h2h home or away low odds exist', async () => {
+  it('uses safe double-chance quotes for low-odds expansion when h2h home or away is absent', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const target = fixture();
@@ -1019,11 +1021,11 @@ describe('executeRunPipeline', () => {
     });
 
     assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
-    assert.equal(result.lowOddsScan.hitCount, 0);
+    assert.equal(result.lowOddsScan.hitCount, 1);
 
     const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
-    assert.equal(lowOddsScan.hitCount, 0);
+    assert.equal(lowOddsScan.hitCount, 1);
     const lowOddsStep = evaluation.steps.find((step: { name: string }) => step.name === 'scan low odds');
     assert.equal(lowOddsStep.ok, true);
     assert.equal(lowOddsStep.verdict, 'promotable');
@@ -1031,7 +1033,7 @@ describe('executeRunPipeline', () => {
     assert.equal(evaluation.counts.predictions, 1);
   });
 
-  it('uses h2h favorites as low-odds selector while preserving requested analysis scope', async () => {
+  it('uses h2h favorites and safe double chance as low-odds selector while preserving requested analysis scope', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const target = fixture();
@@ -1169,12 +1171,12 @@ describe('executeRunPipeline', () => {
     });
 
     assert.deepEqual(observed.odds, ['double_chance']);
-    assert.deepEqual(observed.lowOdds, ['h2h']);
+    assert.deepEqual(observed.lowOdds, ['h2h', 'double_chance']);
     assert.deepEqual(observed.research, ['double_chance']);
     assert.deepEqual(observed.score, ['double_chance']);
     assert.equal(result.lowOddsScan.hitCount, 1);
     assert.equal(result.lowOddsScan.hits[0]?.market, 'h2h');
-    assert.deepEqual(result.lowOddsScan.selectorMarketScope, ['h2h']);
+    assert.deepEqual(result.lowOddsScan.selectorMarketScope, ['h2h', 'double_chance']);
     assert.deepEqual(result.lowOddsScan.analysisMarketScope, ['double_chance']);
 
     const inputArtifact = JSON.parse(readFileSync(join(result.artifactDir, 'input.json'), 'utf-8'));
@@ -1183,12 +1185,12 @@ describe('executeRunPipeline', () => {
     const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
     const handoff = readFileSync(result.handoffPath, 'utf-8');
     assert.deepEqual(inputArtifact.marketScope, ['double_chance']);
-    assert.deepEqual(lowOddsScan.selectorMarketScope, ['h2h']);
+    assert.deepEqual(lowOddsScan.selectorMarketScope, ['h2h', 'double_chance']);
     assert.deepEqual(lowOddsScan.analysisMarketScope, ['double_chance']);
     assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
     assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 1);
     assert.deepEqual(evaluation.marketCoverage.requestedMarkets, ['double_chance']);
-    assert.deepEqual(evaluation.marketCoverage.lowOddsSelectorMarkets, ['h2h']);
+    assert.deepEqual(evaluation.marketCoverage.lowOddsSelectorMarkets, ['h2h', 'double_chance']);
     assert.deepEqual(evaluation.marketCoverage.lowOddsAnalysisMarkets, ['double_chance']);
     assert.equal(evaluation.webSearchCoverage.required, false);
     assert.deepEqual(manifest.marketCoverage.requestedMarkets, ['double_chance']);

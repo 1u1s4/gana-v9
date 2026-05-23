@@ -144,6 +144,31 @@ const ATOMIC_RECOMMENDATION_EDGE_FLOOR = 0;
 const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
 const DAILY_STAKE_BUCKETS = [1, 5, 10, 15, 20, 25] as const;
 const VALIDATION_FRESHNESS_MIN_COVERAGE = 0.6;
+const VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE = 0.25;
+const DAILY_FINAL_PARLAY_ALLOWED_PROFILES = ['parlay-diamante', 'low-odds-top', 'low-variance'] as const;
+const DAILY_FINAL_PARLAY_BLOCKED_PROFILES = ['balanced', 'high-conviction', 'market-diverse', 'parlay-oro', 'default', 'review', 'totals', 'aggressive'] as const;
+const DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS = [
+  'high-combined-odds',
+  'stale-source',
+  'corners-unverified',
+  'negative-portfolio-edge',
+  'duplicate-leg-set',
+  'historically-weak-profile',
+  'low-liquidity-h2h-favorite',
+] as const;
+const DAILY_FINAL_DEMOTED_MODELS = ['gpt-5.4-mini'] as const;
+const ATOMIC_BLOCKED_RISK_FLAGS = [
+  'stale-source',
+  'corners-market',
+  'corners-unverified',
+  'low-liquidity-h2h-favorite',
+  'low-liquidity',
+  'lineup-pending',
+  'selection-evidence-missing',
+  'h2h-away',
+  'inflated-double-chance-edge',
+  'overinflated-edge',
+] as const;
 
 export type DailyFinalRecommendation =
   | (ParlayAnalysisRecommendation & { kind: 'parlay'; stakeRecommendation?: DailyStakeRecommendation })
@@ -161,8 +186,11 @@ interface DailyValidationFreshness {
   status: 'fresh' | 'thin' | 'empty';
   date: string;
   minCoverage: number;
+  maxUnresolvedRate: number;
   predictionCoverage: number | null;
   parlayCoverage: number | null;
+  predictionUnresolvedRate: number | null;
+  parlayUnresolvedRate: number | null;
   predictionSettled: number;
   parlaySettled: number;
   predictionTotal: number;
@@ -466,6 +494,7 @@ export async function runDailyE2E(
     .map((recommendation) => hydrateRecommendationDisplay({ ...recommendation, kind: 'parlay' as const }, providerPipelineResults));
   const parlayLegPredictionIds = recommendationLegPredictionIds(parlayRecommendations);
   const parlayLegSelectionKeys = recommendationLegSelectionKeys(parlayRecommendations);
+  const parlayLegFixtureIds = recommendationLegFixtureIds(parlayRecommendations);
   const atomicRecommendations = buildAtomicPredictionRecommendations(
     providerPipelineResults,
     providers,
@@ -474,6 +503,7 @@ export async function runDailyE2E(
     parlayRecommendations.length,
     parlayLegPredictionIds,
     parlayLegSelectionKeys,
+    parlayLegFixtureIds,
   ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
   const finalRecommendations: DailyFinalRecommendation[] = applyDailyStakeRecommendations(
     [...parlayRecommendations, ...atomicRecommendations],
@@ -593,16 +623,15 @@ export async function runDailyE2E(
         minAggregateConfidence: DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE,
         diamanteMinAggregateConfidence: DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE,
         semanticDuplicateSignature: 'fixtureId:market:selection:line',
-        blockedRiskFlags: [
-          'high-combined-odds',
-          'stale-source',
-          'corners-unverified',
-          'negative-portfolio-edge',
-          'duplicate-leg-set',
-        ],
+        allowedProfiles: DAILY_FINAL_PARLAY_ALLOWED_PROFILES,
+        blockedProfiles: DAILY_FINAL_PARLAY_BLOCKED_PROFILES,
+        blockedRiskFlags: DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS,
       },
       validationFreshness,
       atomicExcludesSelectedParlayLegs: true,
+      atomicExcludesSelectedParlayFixtures: true,
+      atomicMaxPerFixture: 1,
+      demotedModels: DAILY_FINAL_DEMOTED_MODELS,
       stakeRecommendation: {
         unitLabel: 'percent-of-bankroll',
         allowedStakes: DAILY_STAKE_BUCKETS,
@@ -612,6 +641,7 @@ export async function runDailyE2E(
       atomicConfidenceFloor: ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR,
       atomicEdgeFloor: ATOMIC_RECOMMENDATION_EDGE_FLOOR,
       atomicStatuses: ['promotable'],
+      atomicBlockedRiskFlags: ATOMIC_BLOCKED_RISK_FLAGS,
       atomicProfile: ATOMIC_RECOMMENDATION_PROFILE,
       portfolioBuckets: [
         'parlay-diamante',
@@ -985,13 +1015,15 @@ function selectDailyParlayRecommendations(
 
 function isConservativeDailyParlayRecommendation(recommendation: ParlayAnalysisRecommendation): boolean {
   if (recommendation.validationStatus === 'lost' || recommendation.validationStatus === 'blocked') return false;
+  if (!DAILY_FINAL_PARLAY_ALLOWED_PROFILES.includes(recommendation.profile as any)) return false;
+  if (DAILY_FINAL_PARLAY_BLOCKED_PROFILES.includes(recommendation.profile as any)) return false;
   if (!Number.isFinite(recommendation.combinedOdds) || recommendation.combinedOdds <= 1) return false;
   if (!Number.isFinite(recommendation.aggregateConfidence)) return false;
   if (!Number.isFinite(recommendation.expectedEdge) || recommendation.expectedEdge <= 0) return false;
   if ((recommendation.legs?.length ?? 0) < 2) return false;
   if ((recommendation.legs?.length ?? 0) > 3) return false;
   const riskFlags = new Set(recommendation.riskFlags ?? []);
-  for (const flag of ['stale-source', 'corners-unverified', 'negative-portfolio-edge', 'duplicate-leg-set']) {
+  for (const flag of DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS) {
     if (riskFlags.has(flag)) return false;
   }
   if (recommendation.profile === 'parlay-diamante') {
@@ -1027,6 +1059,14 @@ function recommendationLegSelectionKeys(recommendations: readonly Pick<DailyFina
   ));
 }
 
+function recommendationLegFixtureIds(recommendations: readonly Pick<DailyFinalRecommendation, 'legs'>[]): Set<string> {
+  return new Set(recommendations.flatMap((recommendation) =>
+    recommendation.legs
+      .map((leg) => typeof leg.fixtureId === 'string' ? leg.fixtureId : null)
+      .filter((fixtureId): fixtureId is string => Boolean(fixtureId)),
+  ));
+}
+
 function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, date: string): DailyValidationFreshness {
   const snapshot = metrics?.metrics?.find((item) => item.metricDate === date) ?? metrics?.metrics?.[0];
   if (!metrics?.ok || !snapshot) {
@@ -1034,8 +1074,11 @@ function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, da
       status: 'empty',
       date,
       minCoverage: VALIDATION_FRESHNESS_MIN_COVERAGE,
+      maxUnresolvedRate: VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE,
       predictionCoverage: null,
       parlayCoverage: null,
+      predictionUnresolvedRate: null,
+      parlayUnresolvedRate: null,
       predictionSettled: 0,
       parlaySettled: 0,
       predictionTotal: 0,
@@ -1051,6 +1094,8 @@ function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, da
   const parlay = snapshot.parlayMetrics;
   const predictionCoverage = validationCoverage(prediction);
   const parlayCoverage = validationCoverage(parlay);
+  const predictionUnresolvedRate = unresolvedRate(prediction);
+  const parlayUnresolvedRate = unresolvedRate(parlay);
   const reasons: string[] = [];
   if (prediction.total === 0 && parlay.total === 0) reasons.push('no predictions or parlays found for validation freshness gate');
   if (predictionCoverage !== null && predictionCoverage < VALIDATION_FRESHNESS_MIN_COVERAGE) {
@@ -1059,6 +1104,12 @@ function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, da
   if (parlay.total > 0 && parlayCoverage !== null && parlayCoverage < VALIDATION_FRESHNESS_MIN_COVERAGE) {
     reasons.push(`parlay validation coverage ${round(parlayCoverage, 3)} below ${VALIDATION_FRESHNESS_MIN_COVERAGE}`);
   }
+  if (predictionUnresolvedRate !== null && predictionUnresolvedRate > VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE) {
+    reasons.push(`prediction unresolved rate ${round(predictionUnresolvedRate, 3)} above ${VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE}`);
+  }
+  if (parlay.total > 0 && parlayUnresolvedRate !== null && parlayUnresolvedRate > VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE) {
+    reasons.push(`parlay unresolved rate ${round(parlayUnresolvedRate, 3)} above ${VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE}`);
+  }
   const status = reasons.length
     ? prediction.total === 0 && parlay.total === 0 ? 'empty' : 'thin'
     : 'fresh';
@@ -1066,8 +1117,11 @@ function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, da
     status,
     date: snapshot.metricDate,
     minCoverage: VALIDATION_FRESHNESS_MIN_COVERAGE,
+    maxUnresolvedRate: VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE,
     predictionCoverage,
     parlayCoverage,
+    predictionUnresolvedRate,
+    parlayUnresolvedRate,
     predictionSettled: prediction.settled,
     parlaySettled: parlay.settled,
     predictionTotal: prediction.total,
@@ -1083,6 +1137,11 @@ function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, da
 function validationCoverage(metrics: { total: number; settled: number; voided: number; blocked: number }): number | null {
   if (!metrics.total) return null;
   return round((metrics.settled + metrics.voided + metrics.blocked) / metrics.total, 6);
+}
+
+function unresolvedRate(metrics: { total: number; pending: number; unvalidated: number }): number | null {
+  if (!metrics.total) return null;
+  return round((metrics.pending + metrics.unvalidated) / metrics.total, 6);
 }
 
 function toParlayFamily(
@@ -1146,22 +1205,27 @@ function buildAtomicPredictionRecommendations(
   rankOffset: number,
   excludedPredictionIds: ReadonlySet<string> = new Set(),
   excludedSelectionKeys: ReadonlySet<string> = new Set(),
+  excludedFixtureIds: ReadonlySet<string> = new Set(),
 ): AtomicPredictionRecommendation[] {
   const groups = new Map<string, AtomicPredictionCandidate[]>();
   for (const provider of providers) {
     const result = providerPipelineResults[provider];
     if (!result?.ok) continue;
     const fixtureDisplays = fixtureDisplayMap(displayFixturesFromPipelineResult(result));
+    const providerModel = modelForProvider(config, provider, models);
     for (const scoring of result.scoring) {
       for (const prediction of scoring.predictions) {
         const edge = atomicPredictionEdge(prediction);
+        const model = prediction.model ?? providerModel;
+        if (DAILY_FINAL_DEMOTED_MODELS.includes(model as any)) continue;
         if (!isAtomicRecommendationEligible(prediction, edge)) continue;
         const key = atomicPredictionKey(prediction);
         if (excludedPredictionIds.has(prediction.id) || excludedSelectionKeys.has(key)) continue;
+        if (excludedFixtureIds.has(prediction.fixtureId)) continue;
         const display = fixtureDisplays.get(prediction.fixtureId);
         groups.set(key, [...(groups.get(key) ?? []), {
           provider,
-          model: modelForProvider(config, provider, models),
+          model,
           runId: result.runId,
           prediction,
           fixture: display?.fixtureLabel ?? scoring.fixtureId ?? prediction.fixtureId,
@@ -1172,10 +1236,18 @@ function buildAtomicPredictionRecommendations(
     }
   }
 
-  return [...groups.values()]
+  const ordered = [...groups.values()]
     .map(toAtomicRecommendationDraft)
-    .sort((a, b) => b.score - a.score || b.aggregateConfidence - a.aggregateConfidence || a.combinedOdds - b.combinedOdds)
-    .map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
+    .sort((a, b) => b.score - a.score || b.aggregateConfidence - a.aggregateConfidence || a.combinedOdds - b.combinedOdds);
+  const selected: AtomicPredictionRecommendation[] = [];
+  const usedFixtureIds = new Set<string>();
+  for (const recommendation of ordered) {
+    const fixtureId = recommendation.legs[0]?.fixtureId;
+    if (fixtureId && usedFixtureIds.has(fixtureId)) continue;
+    if (fixtureId) usedFixtureIds.add(fixtureId);
+    selected.push(recommendation);
+  }
+  return selected.map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
 }
 
 function applyDailyStakeRecommendations<T extends DailyFinalRecommendation>(
@@ -1203,7 +1275,7 @@ function dailyStakeBucket(recommendation: DailyFinalRecommendation): number {
   const odds = Math.max(1.01, Number(recommendation.combinedOdds) || 1.01);
   const profileBonus = recommendation.profile === 'parlay-diamante'
     ? 2
-    : recommendation.profile === 'high-conviction' || recommendation.profile === 'low-variance'
+    : recommendation.profile === 'low-variance'
       ? 1.5
       : recommendation.kind === 'atomic-prediction'
         ? -1.5
@@ -1306,11 +1378,9 @@ function isAtomicRecommendationEligible(prediction: PredictionRecordView, edge: 
   if (!Number.isFinite(prediction.confidence) || prediction.confidence < ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR) return false;
   if (!Number.isFinite(prediction.odds) || prediction.odds <= 1) return false;
   if (!Number.isFinite(edge) || edge <= ATOMIC_RECOMMENDATION_EDGE_FLOOR) return false;
-  const warnings = prediction.warnings ?? [];
-  if (warnings.some((warning) => /stale (?:news|source|odds) source|stale odds|unverified corners|low[-_ ]liquidity h2h short favorite|low_liquidity_h2h_favorite/i.test(warning))) {
-    return false;
-  }
-  return true;
+  if (prediction.model && DAILY_FINAL_DEMOTED_MODELS.includes(prediction.model as any)) return false;
+  const riskFlags = atomicRiskFlags(prediction, 1);
+  return !riskFlags.some((flag) => ATOMIC_BLOCKED_RISK_FLAGS.includes(flag as any));
 }
 
 function atomicPredictionEdge(prediction: PredictionRecordView): number {
@@ -1322,7 +1392,34 @@ function atomicPredictionEdge(prediction: PredictionRecordView): number {
 function atomicRiskFlags(prediction: PredictionRecordView, providerCount: number): string[] {
   const flags: string[] = ['single-selection'];
   if (providerCount > 1) flags.push('provider-consensus');
-  if (prediction.market === 'corners_over_under') flags.push('corners-market');
+  const text = [
+    prediction.rationale ?? '',
+    ...(prediction.warnings ?? []),
+    ...(prediction.blockers ?? []),
+  ].join('\n');
+  if (prediction.market === 'corners_over_under') {
+    flags.push('corners-market');
+    if (!/corners[- ]settlement[- ]reliable|corner settlement reliable|settlement reliable for corners/i.test(text)) {
+      flags.push('corners-unverified');
+    }
+  }
+  if (/stale (?:news|source|odds) source|stale odds/i.test(text)) flags.push('stale-source');
+  if (/low[-_ ]liquidity|low liquidity|single[-_ ]bookmaker/i.test(text)) flags.push('low-liquidity');
+  if (
+    prediction.market === 'h2h'
+    && prediction.selection !== 'draw'
+    && prediction.odds <= 1.2
+    && /low[-_ ]liquidity|low liquidity|single[-_ ]bookmaker|low_liquidity_h2h_favorite/i.test(text)
+  ) {
+    flags.push('low-liquidity-h2h-favorite');
+  }
+  if (/lineup[-_ ]pending|lineup pending|lineups? unconfirmed|lineup confirmation pending/i.test(text)) flags.push('lineup-pending');
+  if (/no selection(?:\/line)?[- ]specific|selection[- ]level .*not supplied|selection[- ]level .*missing|market[- ]level only|support is market[- ]level only|fixture[- ]level evidence/i.test(text)) {
+    flags.push('selection-evidence-missing');
+  }
+  if (prediction.market === 'h2h' && prediction.selection === 'away' && prediction.odds > 1.2) flags.push('h2h-away');
+  if (prediction.market === 'double_chance' && prediction.odds <= 1.25 && Number(prediction.edge ?? 0) >= 0.25) flags.push('inflated-double-chance-edge');
+  if (Number(prediction.edge ?? 0) >= 0.2) flags.push('overinflated-edge');
   return flags;
 }
 

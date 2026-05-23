@@ -675,7 +675,7 @@ async function runLowOddsTopPortfolio(
     ? [
       fallbackEnabled
         ? `deterministic low-odds-top fallback selected ${builds.length} parlay(s) from h2h/double_chance/goals_over_under predictions with odds <= ${LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS}`
-        : `deterministic low-odds-top selected ${builds.length} parlay(s) from h2h home/away predictions with odds <= ${threshold}`,
+        : `deterministic low-odds-top selected ${builds.length} parlay(s) from h2h home/away and safe double-chance predictions with odds <= ${threshold}`,
     ]
     : [`low-odds-top pool has ${pool.length} eligible prediction(s); ${LOW_ODDS_TOP_PROFILE.minLegs} required`];
   const portfolio: ParlayPortfolio = {
@@ -1007,7 +1007,7 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
     case 'low-variance':
       return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.25, maxOdds: 1.8, maxLegOdds: LOW_ODDS_TOP_MAX_LEG_ODDS, targetParlays: 2, minConfidence: 0.78, minEdge: 0.005, markets: ['double_chance'], avoidDrawExposure: true, riskWeight: 0.75 };
     case 'balanced':
-      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.72, minEdge: 0.02, markets: ['h2h', 'double_chance', 'btts', 'goals_over_under'], reviewOnly: true, riskWeight: 0.55 };
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.6, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.74, minEdge: 0.025, markets: ['btts', 'goals_over_under'], reviewOnly: true, minAggregateConfidence: 0.55, riskWeight: 0.55 };
     case 'totals':
       return { profile, minLegs: 2, maxLegs: 2, minOdds: 1.5, maxOdds: 2.2, targetParlays: 2, minConfidence: 0.68, minEdge: 0.02, markets: ['goals_over_under', 'btts'], requireLine: true, minAggregateConfidence: 0.48, riskWeight: 0.6 };
     case 'high-conviction':
@@ -1972,6 +1972,9 @@ function portfolioPoolExclusionReasons(
   if (hasRiskTag(prediction, 'fragile_low_price_dc') && hasRiskTag(prediction, 'low_edge')) {
     reasons.push('fragile low-price double chance with low edge');
   }
+  if (profile.key === 'balanced' && prediction.market !== 'btts' && prediction.market !== 'goals_over_under') {
+    reasons.push('market not allowed for balanced profile');
+  }
   return reasons;
 }
 
@@ -1981,8 +1984,8 @@ function lowOddsTopPoolExclusionReasons(
   threshold: number,
 ): string[] {
   const reasons = portfolioPoolExclusionReasons(prediction, profile);
-  if (prediction.market !== 'h2h') reasons.push('not h2h for low-odds-top');
-  if (prediction.selection !== 'home' && prediction.selection !== 'away') reasons.push('not home/away for low-odds-top');
+  if (!isLowOddsTopStrictSelection(prediction)) reasons.push('market/selection not allowed for low-odds-top');
+  if (hasRiskTag(prediction, 'low_liquidity_h2h_favorite')) reasons.push('low-liquidity h2h short favorite');
   if (prediction.odds > threshold) reasons.push(`above low-odds threshold ${threshold}`);
   if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
   if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
@@ -1995,13 +1998,26 @@ function lowOddsTopFallbackExclusionReasons(
   maxOdds: number,
 ): string[] {
   const reasons = portfolioPoolExclusionReasons(prediction, profile);
-  if (!['h2h', 'double_chance', 'goals_over_under'].includes(prediction.market)) {
+  if (!isLowOddsTopFallbackSelection(prediction)) {
     reasons.push('market not allowed for low-odds-top fallback');
   }
+  if (hasRiskTag(prediction, 'low_liquidity_h2h_favorite')) reasons.push('low-liquidity h2h short favorite');
   if (prediction.odds > maxOdds) reasons.push(`above low-odds fallback threshold ${maxOdds}`);
   if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
   if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
   return [...new Set(reasons)];
+}
+
+function isLowOddsTopStrictSelection(prediction: ParlaySourcePrediction): boolean {
+  if (prediction.market === 'h2h') return prediction.selection === 'home' || prediction.selection === 'away';
+  if (prediction.market === 'double_chance') return prediction.selection === 'home_or_draw' || prediction.selection === 'draw_or_away';
+  return false;
+}
+
+function isLowOddsTopFallbackSelection(prediction: ParlaySourcePrediction): boolean {
+  if (isLowOddsTopStrictSelection(prediction)) return true;
+  if (prediction.market === 'goals_over_under') return prediction.selection === 'under' || Number(prediction.line ?? 0) >= 2.5;
+  return false;
 }
 
 function hasHardResearchWarning(prediction: ParlaySourcePrediction): boolean {

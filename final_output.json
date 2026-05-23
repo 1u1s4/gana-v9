@@ -1,179 +1,299 @@
 {
   "sources": [
     {
-      "id": "web-search-summary",
+      "id": "web_search_1",
       "type": "web-search",
-      "url": "https://www.google.com/search?q=Canterbury+Bankstown+vs+Northern+Tigers+football+match+analysis+and+predictions",
-      "title": "Canterbury Bankstown vs Northern Tigers football match analysis and predictions",
-      "capturedAt": "2026-05-22T17:09:00.000Z",
-      "hash": null,
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFtI9KAnW5oEkqIv-7F4h48JQXZ7BC9GAnEHCIVmHecBUt_IBWtrvai2392bjpbpOdUFOeyIEvxnPg6j72ybl10D0ZstUOSXmAZ0jDUVnplRZ9lJUpJTTPt420vaAzZ20JLh2QErG0T4FBDJcRykLAMFqHmw5vde0Ga5_npiDVi1x3jNebGdKenqrxLNAY=",
+      "title": "soccerway.com",
+      "capturedAt": "2026-05-23T06:50:15.831Z",
       "metadata": {}
     },
     {
-      "id": "api-football-fixture",
-      "type": "api-football",
-      "url": null,
-      "title": "API-Football Fixture Snapshot",
-      "capturedAt": "2026-05-22T17:09:00.785Z",
-      "hash": "c936f67c-a439-40bf-9f36-27ca15059e2a",
-      "metadata": {
-        "providerSnapshotId": "c936f67c-a439-40bf-9f36-27ca15059e2a"
-      }
+      "id": "web_search_2",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH9fKFQS9PrVA8N2NCaxVnUnpJMtU6qWJctp-RqWAuSgluJbNkvnuDJCa7XCfKS_1iLpvM_ytEBEcQBuOTPDLTmJ5QtAokzRXABPdBgDMOD8RKDASTEC9wuDZkzLN0tDIlQ01Bo6cHRrEq0d6r8AbXey7QQA9x7FqQ50uQT3cN6hDMoq3u5sxumncgX2ZjOvSQzItchLa1I",
+      "title": "flashscore.com",
+      "capturedAt": "2026-05-23T06:50:15.831Z",
+      "metadata": {}
     },
     {
-      "id": "api-football-stats",
-      "type": "api-football",
-      "url": null,
-      "title": "API-Football Statistics Snapshot",
-      "capturedAt": "2026-05-22T17:09:01.334Z",
-      "hash": "57823bda-ff51-4944-a526-e82b6bd02368",
-      "metadata": {
-        "providerSnapshotId": "57823bda-ff51-4944-a526-e82b6bd02368"
-      }
+      "id": "web_search_3",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE37mUgs2Qc_OZ9UH41oxvfWmVhCZzFYBAOiE6ZTAeOdHcDUwLKLX0TvqylJY_Xj2yxIzBTTnfZsGunAQ82nbGbnpgWmFws37lLmCiqxiafzYBurgzuM4OdhzsbXnAGdrQ7_CZ04azulbwL1tATxltl2nJR8Mf-Qrs=",
+      "title": "flashscore.com - standings",
+      "capturedAt": "2026-05-23T06:50:15.831Z",
+      "metadata": {}
     },
     {
-      "id": "odds-snapshot",
+      "id": "web_search_4",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEfE6c_OEhqCiTPRBlO7SgvQd2RL4alFfcpIa3-aHWH0HhLo95P7JkEgEKZUGXVC3vu9Y-TnWAJE2JfleHfiwHfdmtHXlT8O2Bw78SCLEqRnZ9wfcP8QBtHm9MX-NIsLwDu8KnTIuviNLNxhWGS05Yv8GjyAJg9ucl5GAsar3l12jpKNZvN36FZKDySX8SvoNXo",
+      "title": "aiscore.com",
+      "capturedAt": "2026-05-23T06:50:15.831Z",
+      "metadata": {}
+    },
+    {
+      "id": "api_football_odds_snapshot",
       "type": "provider-snapshot",
-      "url": null,
-      "title": "Odds Snapshot",
-      "capturedAt": "2026-05-22T17:09:02.274Z",
-      "hash": "fbc5853b-322d-4daf-b2d8-7515ceedec91",
-      "metadata": {
-        "providerSnapshotId": "fbc5853b-322d-4daf-b2d8-7515ceedec91"
-      }
+      "url": "N/A",
+      "title": "API-Football Odds Snapshot",
+      "capturedAt": "2026-05-23T06:50:21.052Z",
+      "hash": "31e210430fce1c88149864d43b470cbc78a452444f2a15bee345fe239c822dfb",
+      "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence-h2h-dominance",
-      "sourceId": "web-search-summary",
-      "claimIds": ["claim-h2h-away", "claim-double-chance-away"],
-      "snippet": "Northern Tigers have dominated this fixture... Total Matches: 10 (since 2018), Northern Tigers Wins: 7, Canterbury Bankstown Wins: 2, Draws: 1",
-      "summary": "Northern Tigers have a strong head-to-head record against Canterbury Bankstown, winning 7 of their last 10 encounters.",
+      "id": "evidence_1",
+      "sourceId": "web_search_1",
+      "claimIds": ["claim_1", "claim_2"],
+      "snippet": "The football match between Hills United (also known as Hills Brumbies) and Blacktown Spartans is scheduled for today, Saturday, May 23, 2026. Competition: Football NSW League One (Australia), Round 16. Kickoff Time: 5:00 PM local time (Sydney) / 07:00 UTC. Venue: Landen Stadium, Seven Hills, NSW.",
+      "summary": "Match details confirming the fixture between Hills Brumbies and Blacktown Spartans on May 23, 2026, as part of Football NSW League One, including kickoff time and venue.",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_2",
+      "sourceId": "web_search_3",
+      "claimIds": ["claim_3", "claim_4", "claim_5"],
+      "snippet": "Blacktown Spartans: Currently 1st place with 33 points (10 wins, 3 draws, 2 losses). They are the league leaders and in strong form. Hills United: Currently 6th place with 23 points (7 wins, 2 draws, 6 losses).",
+      "summary": "Current league standings for Blacktown Spartans (1st place, 33 points) and Hills United (6th place, 23 points) in the NSW League One.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence-recent-form",
-      "sourceId": "web-search-summary",
-      "claimIds": ["claim-h2h-away", "claim-double-chance-away"],
-      "snippet": "Northern Tigers: Currently sitting in 2nd place with 29 points from 15 matches (8W, 5D, 2L)... Canterbury Bankstown: Currently in 10th place with 19 points from 15 matches (5W, 4D, 6L).",
-      "summary": "Northern Tigers are 2nd in the league, significantly ahead of Canterbury Bankstown in 10th place, indicating better recent form.",
+      "id": "evidence_3",
+      "sourceId": "web_search_4",
+      "claimIds": ["claim_6"],
+      "snippet": "Head-to-Head (2026 Season): This is the second meeting between the two sides in the 2026 season. In their previous encounter on February 6, 2026, Blacktown Spartans won 4–1.",
+      "summary": "Head-to-head record for the 2026 season showing Blacktown Spartans won 4-1 against Hills Brumbies on February 6, 2026.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence-btts-history",
-      "sourceId": "web-search-summary",
-      "claimIds": ["claim-btts-yes"],
-      "snippet": "BTTS (Both Teams to Score): There is a high probability (around 80% in recent youth and senior trends) of both teams finding the net.",
-      "summary": "Historical data suggests a high likelihood of both teams scoring in this fixture (around 80% probability).",
-      "confidence": 0.8,
+      "id": "evidence_4",
+      "sourceId": "api_football_odds_snapshot",
+      "claimIds": ["claim_7", "claim_8", "claim_9", "claim_10", "claim_11", "claim_12", "claim_13"],
+      "snippet": "Odds for h2h, double_chance, and goals_over_under markets from Bet365 and Pinnacle.",
+      "summary": "Provided odds snapshot from API-Football for h2h, double_chance, and goals_over_under markets, including prices and implied probabilities.",
+      "confidence": 1.0,
       "metadata": {}
-    },
-    {
-        "id": "evidence-goals-over-under",
-        "sourceId": "web-search-summary",
-        "claimIds": ["claim-goals-over-2.5"],
-        "snippet": "Recent matches between these two have been relatively high-scoring (e.g., the 3-2 result in February).",
-        "summary": "Recent matches between the two teams have been high scoring, including a 3-2 result in their last meeting.",
-        "confidence": 0.85,
-        "metadata": {}
-    },
-    {
-        "id": "evidence-h2h-odds",
-        "sourceId": "odds-snapshot",
-        "claimIds": ["claim-h2h-away"],
-        "snippet": "market: h2h, selection: away, price: 1.67",
-        "summary": "The odds for an away win (Northern Tigers) are 1.67, implying a 59.9% probability.",
-        "confidence": 0.95,
-        "metadata": {}
-    },
-    {
-        "id": "evidence-double-chance-odds",
-        "sourceId": "odds-snapshot",
-        "claimIds": ["claim-double-chance-away"],
-        "snippet": "market: double_chance, selection: draw_or_away, price: 1.18",
-        "summary": "The odds for draw or away win are 1.18, implying a 84.7% probability.",
-        "confidence": 0.95,
-        "metadata": {}
-    },
-    {
-        "id": "evidence-goals-over-under-odds",
-        "sourceId": "odds-snapshot",
-        "claimIds": ["claim-goals-over-2.5"],
-        "snippet": "market: goals_over_under, selection: over, line: 2.5, price: 1.6",
-        "summary": "The odds for Over 2.5 goals are 1.60, implying a 62.5% probability.",
-        "confidence": 0.95,
-        "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim-h2h-away",
-      "statement": "Northern Tigers are favored to win the match against Canterbury Bankstown.",
+      "id": "claim_1",
+      "statement": "The match between Hills Brumbies and Blacktown Spartans is part of Football NSW League One, Round 16.",
+      "subject": {
+        "type": "fixture",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_1"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_2",
+      "statement": "The match is scheduled for May 23, 2026, at 07:00 UTC at Landen Stadium, Seven Hills, NSW.",
+      "subject": {
+        "type": "fixture",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_1"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_3",
+      "statement": "Blacktown Spartans are currently 1st in the Football NSW League One standings with 33 points.",
+      "subject": {
+        "type": "team",
+        "id": "1517c9f3-45ba-4cbd-a279-1afb37a916e4"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_4",
+      "statement": "Hills Brumbies are currently 6th in the Football NSW League One standings with 23 points.",
+      "subject": {
+        "type": "team",
+        "id": "b149e0bb-a7c3-4b54-9a1e-8dd1598733b9"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_5",
+      "statement": "Blacktown Spartans have 10 wins, 3 draws, and 2 losses in the current season, indicating strong form.",
+      "subject": {
+        "type": "team",
+        "id": "1517c9f3-45ba-4cbd-a279-1afb37a916e4"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_6",
+      "statement": "In the previous encounter this season (February 6, 2026), Blacktown Spartans defeated Hills Brumbies 4-1.",
+      "subject": {
+        "type": "fixture",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_3"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_7",
+      "statement": "The implied probability for Hills Brumbies to win (h2h) is 35.71% (Bet365) and 36.10% (Pinnacle).",
       "subject": {
         "type": "market",
-        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence-h2h-dominance", "evidence-recent-form", "evidence-h2h-odds"],
+      "evidenceIds": ["evidence_4"],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {
+        "selection": "home",
+        "price_bet365": 2.8,
+        "probability_bet365": 0.35714285714285715,
+        "price_pinnacle": 2.77,
+        "probability_pinnacle": 0.36101083032490977
+      }
     },
     {
-      "id": "claim-double-chance-away",
-      "statement": "Northern Tigers are likely to win or draw against Canterbury Bankstown.",
+      "id": "claim_8",
+      "statement": "The implied probability for a draw (h2h) is 26.67% (Bet365) and 27.62% (Pinnacle).",
       "subject": {
         "type": "market",
-        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4"],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "draw",
+        "price_bet365": 3.75,
+        "probability_bet365": 0.26666666666666666,
+        "price_pinnacle": 3.62,
+        "probability_pinnacle": 0.27624309392265195
+      }
+    },
+    {
+      "id": "claim_9",
+      "statement": "The implied probability for Blacktown Spartans to win (h2h) is 48.78% (Bet365) and 48.78% (Pinnacle).",
+      "subject": {
+        "type": "market",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4"],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "away",
+        "price_bet365": 2.05,
+        "probability_bet365": 0.48780487804878053,
+        "price_pinnacle": 2.05,
+        "probability_pinnacle": 0.48780487804878053
+      }
+    },
+    {
+      "id": "claim_10",
+      "statement": "The implied probability for Hills Brumbies or draw (double_chance) is 59.88% (Bet365).",
+      "subject": {
+        "type": "market",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
         "market": "double_chance"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence-h2h-dominance", "evidence-recent-form", "evidence-double-chance-odds"],
+      "evidenceIds": ["evidence_4"],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {
+        "selection": "home_or_draw",
+        "price_bet365": 1.67,
+        "probability_bet365": 0.5988023952095809
+      }
     },
     {
-      "id": "claim-goals-over-2.5",
-      "statement": "The match is likely to have over 2.5 goals.",
+      "id": "claim_11",
+      "statement": "The implied probability for either team to win (double_chance) is 83.33% (Bet365).",
       "subject": {
         "type": "market",
-        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4"],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "home_or_away",
+        "price_bet365": 1.2,
+        "probability_bet365": 0.8333333333333334
+      }
+    },
+    {
+      "id": "claim_12",
+      "statement": "The implied probability for draw or Blacktown Spartans to win (double_chance) is 76.92% (Bet365).",
+      "subject": {
+        "type": "market",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4"],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "draw_or_away",
+        "price_bet365": 1.3,
+        "probability_bet365": 0.7692307692307692
+      }
+    },
+    {
+      "id": "claim_13",
+      "statement": "The implied probability for Over 2.5 goals is 65.36% (Bet365) and 68.49% (Pinnacle).",
+      "subject": {
+        "type": "market",
+        "id": "d53b337c-fc9c-4cbb-b89c-e3186f7c6dfd",
         "market": "goals_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence-goals-over-under", "evidence-goals-over-under-odds"],
+      "evidenceIds": ["evidence_4"],
       "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim-btts-yes",
-      "statement": "Both teams are likely to score in the match.",
-      "subject": {
-        "type": "market",
-        "id": "e7e1444b-913e-4a1a-8db9-7de7d72df8ad",
-        "market": "btts"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence-btts-history"],
-      "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {
+        "selection": "over",
+        "line": 2.5,
+        "price_bet365": 1.53,
+        "probability_bet365": 0.6535947712418301,
+        "price_pinnacle": 1.46,
+        "probability_pinnacle": 0.684931506849315
+      }
     }
   ],
   "gateResult": {
-    "verdict": "promotable",
+    "verdict": "review-required",
     "reasons": [
-      "Structured research generated with sufficient evidence from web search and odds data."
+      "Missing web-search evidence or specific claims for all required markets.",
+      "The 'corners_over_under' and 'btts' markets lack sufficient data from web search and odds snapshot."
     ],
     "warnings": []
   },
   "warnings": [],
   "metadata": {
     "marketCoverage": {
-        "skippedMarkets": ["corners_over_under"],
-        "notes": "Insufficient evidence found for the 'corners_over_under' market from the web search."
+      "skippedMarkets": ["corners_over_under", "btts"]
     }
   }
 }
