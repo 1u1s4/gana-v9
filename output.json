@@ -1,135 +1,131 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "a90246ef-50c5-412f-bca9-177cb67b0460",
+      "oddsQuoteId": "f9cf451b-e7e3-4895-a1fa-4c948241d71f",
       "market": "h2h",
-      "selection": "away",
+      "selection": "home",
       "line": null,
-      "odds": 2.84,
-      "probability": 0.38,
-      "modelProbability": 0.38,
-      "marketFairProbability": 0.338367,
-      "edge": 0.041633,
-      "confidence": 0.75,
+      "odds": 1.9,
+      "probability": 0.55,
+      "modelProbability": 0.55,
+      "marketFairProbability": 0.503585,
+      "edge": 0.046415,
+      "confidence": 0.64,
       "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-h2h-2",
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-h2h-1"
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_h2h_bet365_home",
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_web_penarol_motivation"
       ],
       "claimIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:claim-h2h-1",
-        "d631620d-cf94-4f00-830a-23d464d402d9:claim-h2h-2"
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_home_odds",
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_penarol_motivation"
       ],
-      "rationale": "Petrojet is identified as a slight favorite due to a strong recent head-to-head record and the expectation of a closely contested match based on tight bookmaker odds.",
+      "rationale": "Penarol needs a win to qualify for Copa Sudamericana playoffs, giving them strong motivation to secure victory at home.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "61841e11-12b7-4a69-9ea3-70838bf9b914",
+      "oddsQuoteId": "5e94441f-17fc-41c3-a96c-4c0a1b5f1b9d",
       "market": "double_chance",
-      "selection": "draw_or_away",
+      "selection": "home_or_draw",
       "line": null,
-      "odds": 1.4,
-      "probability": 0.38,
-      "modelProbability": 0.38,
-      "marketFairProbability": 0.327586,
-      "edge": 0.052414,
-      "confidence": 0.6,
-      "confidenceBand": "medium",
+      "odds": 1.18,
+      "probability": 0.77,
+      "modelProbability": 0.77,
+      "marketFairProbability": 0.399199,
+      "edge": 0.370801,
+      "confidence": 0.95,
+      "confidenceBand": "high",
       "blockers": [],
-      "promotable": false,
+      "promotable": true,
       "evidenceIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-dc-1",
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-dc-2"
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_double_chance_bet365_home_or_draw",
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_web_penarol_motivation",
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_web_santafe_motivation"
       ],
       "claimIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:claim-dc-1"
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_double_chance_home_or_draw_odds",
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_penarol_motivation",
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_santafe_motivation"
       ],
-      "rationale": "A 'Draw or Away' outcome is highly probable, supported by betting odds and web prediction sources identifying 'Petrojet Win or Draw' as a primary betting tip.",
+      "rationale": "Penarol's strong motivation to win combined with Santa Fe's potential to play for a draw makes a home win or draw highly probable.",
       "warnings": [
-        "Mapped invalid supportLevel "strongly-supported" to "weak" on claim "claim-dc-1""
+        "High overround and low liquidity for double_chance market suggests potential unreliability of marketFairProbability."
       ]
     },
     {
-      "oddsQuoteId": "3f18947e-ea48-4539-92e6-64827a6e57f8",
+      "oddsQuoteId": "a5e7f29a-b9cf-400a-9883-846cbaa4cc37",
       "market": "goals_over_under",
-      "selection": "under",
+      "selection": "over",
       "line": 2.5,
-      "odds": 1.65,
-      "probability": 0.62,
-      "modelProbability": 0.62,
-      "marketFairProbability": 0.580774,
-      "edge": 0.039226,
-      "confidence": 0.65,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-ou-1",
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-ou-2"
-      ],
-      "claimIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:claim-ou-1"
-      ],
-      "rationale": "The match is expected to have fewer than 2.5 goals, indicated by low odds for 'Under 2.5 goals' and statistical trends showing a high percentage of recent matches with under 2.5 goals.",
-      "warnings": [
-        "Mapped invalid supportLevel "strongly-supported" to "weak" on claim "claim-ou-1""
-      ]
-    },
-    {
-      "oddsQuoteId": "f49caa88-f99f-4a41-8b16-ac503d0e5920",
-      "market": "corners_over_under",
-      "selection": "under",
-      "line": 9.5,
-      "odds": 1.88,
-      "probability": 0.519298,
-      "modelProbability": 0.519298,
-      "marketFairProbability": 0.519298,
-      "edge": 0.0,
-      "confidence": 0.3,
-      "confidenceBand": "low",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-corners-1"
-      ],
-      "claimIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:claim-corners-1"
-      ],
-      "rationale": "There is no clear evidence to suggest a likely outcome for the corners market, with odds for over and under 9.5 being nearly even.",
-      "warnings": [
-        "Mapped invalid supportLevel "neutral" to "weak" on claim "claim-corners-1"",
-        "Insufficient evidence found to make a confident claim on the 'corners_over_under' market."
-      ]
-    },
-    {
-      "oddsQuoteId": "f11fd04a-1fd5-4456-be0e-4348a676b2ce",
-      "market": "btts",
-      "selection": "no",
-      "line": null,
-      "odds": 1.73,
-      "probability": 0.58,
-      "modelProbability": 0.58,
-      "marketFairProbability": 0.536193,
-      "edge": 0.043807,
-      "confidence": 0.7,
+      "odds": 2.3,
+      "probability": 0.45,
+      "modelProbability": 0.45,
+      "marketFairProbability": 0.416681,
+      "edge": 0.033319,
+      "confidence": 0.52,
       "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:ev-btts-1"
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_goals_over_under_bet365_over_2_5"
       ],
       "claimIds": [
-        "d631620d-cf94-4f00-830a-23d464d402d9:claim-btts-1"
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_goals_over_2_5_odds"
       ],
-      "rationale": "It is more likely that at least one team will not score, as indicated by significantly lower odds for BTTS 'No'.",
+      "rationale": "Both teams have motivation to score; Penarol to win, Santa Fe potentially for a Libertadores R16 spot, which could lead to an open game.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "89a2fbb7-0f42-4227-88ae-0e6efcda51a0",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 8.5,
+      "odds": 1.82,
+      "probability": 0.58,
+      "modelProbability": 0.58,
+      "marketFairProbability": 0.537429,
+      "edge": 0.042571,
+      "confidence": 0.67,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_corners_over_under_bet365_over_8_5"
+      ],
+      "claimIds": [
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_corners_over_8_5_odds"
+      ],
+      "rationale": "High-stakes match for both teams could lead to more attacking play and thus more corners.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "6c46b510-56d6-4e0c-addc-895636e5bd02",
+      "market": "btts",
+      "selection": "yes",
+      "line": null,
+      "odds": 2,
+      "probability": 0.52,
+      "modelProbability": 0.52,
+      "marketFairProbability": 0.466667,
+      "edge": 0.053333,
+      "confidence": 0.63,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_btts_bet365_yes"
+      ],
+      "claimIds": [
+        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_btts_yes_odds"
+      ],
+      "rationale": "With both teams highly motivated to achieve their respective qualification goals, an open game with goals from both sides is expected.",
       "warnings": []
     }
   ],
   "warnings": [
-    "API-Football fixture statistics unavailable for scoring: API-Football provider_unavailable: provider request failed (endpoint=fixture_statistics). Expected API-Football response without provider errors.; received {"requests":"You have reached the request limit for the day, Go to https://dashboard.api-football.com to upgrade your plan."}.",
-    "Scoring prompt allowedQuotes trimmed from 54 to 41 representative quotes"
+    "Used a heuristic for modelProbability and confidence calculation due to lack of explicit model data. Confidence capped at 0.95."
   ],
   "metadata": {}
 }

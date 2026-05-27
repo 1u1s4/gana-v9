@@ -229,3 +229,44 @@ Automated reviews are analytical only. They create a proposed change backlog; so
   - 2026-05-22 metrics artifact: `/Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/cbae1056-4649-45b1-9932-eb730dbb1273/daily-metrics.json`
   - Discord stats message: `1507627247912358009`
   - Discord validation mirror message: `1507627251686965379`
+
+## 2026-05-23 · strategy-2026-05-22
+
+- Run: strategy-review-2026-05-22-f67eae91
+- Dates: 2026-05-22
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-22-f67eae91/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-22-f67eae91/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 233-155 hit 60.1% (576 total)
+- Parlays: 3-19 hit 13.6% (22 total)
+
+### Proposed Modifications
+
+- [high] Quarantine weak parlay profiles before final recommendations (ready-for-implementation) — src/daily/e2e.ts, src/parlay/analysis.ts, src/parlay/service.ts
+- [high] Raise default automatic parlay construction floors (ready-for-implementation) — src/parlay/rules.ts, src/parlay/service.ts, src/parlay/ranker.ts
+- [high] Add market-specific validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/prediction/service.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Expand low-liquidity H2H and low-price parlay blockers (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/service.ts, src/parlay/analysis.ts, src/daily/e2e.ts
+- [medium] Calibrate high-confidence and high-edge outputs by history bucket (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+- [medium] Apply fixture-level exposure caps across all final recommendations (proposed) — src/daily/e2e.ts, src/parlay/analysis.ts
+
+## 2026-05-26 · strategy-2026-05-25
+
+- Run: strategy-review-2026-05-25-41ef91a2
+- Dates: 2026-05-25
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-25-41ef91a2/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-25-41ef91a2/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+
+### Proposed Modifications
+
+- [high] Add empty-run diagnostics to daily and strategy review artifacts (ready-for-implementation) — src/daily/e2e.ts, src/strategy-review/daily.ts
+- [high] Persist blocked per-market prediction placeholders (proposed) — skills/score-prediction-v2/prompt.md, src/prediction/gates.ts, src/prediction/service.ts
+- [medium] Honor requested market scope in low-odds selection (proposed) — src/filters/low-odds-selector.ts, src/daily/e2e.ts
+- [high] Add sample-size guard before threshold retuning (ready-for-implementation) — src/strategy-review/daily.ts, src/scoring/edge-gate.ts, src/parlay/rules.ts, src/parlay/ranker.ts
+- [medium] Harden analytical fallback eligibility and telemetry (proposed) — src/daily/e2e.ts

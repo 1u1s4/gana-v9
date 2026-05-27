@@ -1,0 +1,799 @@
+{
+  "promptVersion": "score-prediction-v2",
+  "runId": "85a75bb5-dd27-4238-85cb-c20a33bd726d",
+  "createdAt": "2026-05-27T17:07:58.172Z",
+  "webMode": "live",
+  "requiredMarkets": [
+    "h2h",
+    "double_chance",
+    "goals_over_under",
+    "corners_over_under",
+    "btts"
+  ],
+  "marketFocus": [
+    "h2h",
+    "double_chance",
+    "goals_over_under",
+    "corners_over_under",
+    "btts"
+  ],
+  "fixture": {
+    "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+    "providerFixtureId": "1544101",
+    "competitionId": "43898aff-3eb5-48cf-adab-09c22002cb89",
+    "season": 2026,
+    "homeTeamId": "a8984a96-100b-420e-b44a-a3ffacb0d9d9",
+    "awayTeamId": "3fc40c01-d968-4ec5-8539-298e8561762c",
+    "scheduledAt": "2026-05-27T10:15:00.000Z",
+    "status": "completed",
+    "scoreHome": 1,
+    "scoreAway": 1,
+    "includedByFilters": [],
+    "metadata": {
+      "league": {
+        "id": 765,
+        "name": "PFL",
+        "country": "Philippines",
+        "season": 2026,
+        "round": "Group Stage"
+      },
+      "teams": {
+        "home": {
+          "id": 22754,
+          "name": "Davao Aguilas"
+        },
+        "away": {
+          "id": 23384,
+          "name": "Taguig"
+        }
+      },
+      "round": "Group Stage",
+      "timezone": "UTC",
+      "apiFootballStatusShort": "FT",
+      "apiFootballStatusLong": "Match Finished"
+    }
+  },
+  "fixtureStatistics": {
+    "providerFixtureId": "1544101",
+    "capturedAt": "2026-05-27T17:08:00.765Z",
+    "providerSnapshotId": "28f420c5-46b7-4034-a93d-4532e8b8375a"
+  },
+  "oddsSnapshot": {
+    "id": "a9706e4d-e7b8-41a2-9292-e22d7ad51480",
+    "fixtureId": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+    "providerFixtureId": "1544101",
+    "providerSnapshotId": "957e0f0c-cf54-45fd-90f5-9306fe21b082",
+    "bookmakerCount": 2,
+    "capturedAt": "2026-05-27T16:21:49.859Z",
+    "payloadHash": "4165456f41bd2e3aaf780b3a67817ced119f10f70234386cba7a6780cbc6eeef"
+  },
+  "researchBundle": {
+    "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659",
+    "runId": "bde77068-2a26-4c4b-b31a-ca2fe6894955",
+    "status": "promotable",
+    "gateResult": {
+      "reasons": [
+        "structured research generated with sufficient evidence",
+        "web-search evidence included",
+        "objective research gate passed with current web evidence"
+      ],
+      "verdict": "promotable",
+      "warnings": [
+        "mapped invalid supportLevel "neutral" to "weak" on claim "claim_corners_over_under"",
+        "market btts skipped/review-required: missing odds quotes for requested market"
+      ]
+    },
+    "providerAgentic": "gemini",
+    "model": "gemini-2.5-flash",
+    "promptVersion": "research-fixture-v2",
+    "warnings": [
+      "mapped invalid supportLevel "neutral" to "weak" on claim "claim_corners_over_under"",
+      "market btts skipped/review-required: missing odds quotes for requested market"
+    ],
+    "metadata": {
+      "marketScope": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "corners_over_under",
+        "btts"
+      ],
+      "marketCoverage": {
+        "warnings": [
+          "market btts skipped/review-required: missing odds quotes for requested market"
+        ],
+        "quotedMarkets": [
+          "corners_over_under",
+          "double_chance",
+          "goals_over_under",
+          "h2h"
+        ],
+        "skippedMarkets": [
+          {
+            "market": "btts",
+            "reason": "missing odds quotes for requested market"
+          }
+        ],
+        "evidenceMarkets": [
+          "btts",
+          "corners_over_under",
+          "double_chance",
+          "goals_over_under",
+          "h2h"
+        ],
+        "requiredMarkets": [
+          "h2h",
+          "double_chance",
+          "goals_over_under",
+          "corners_over_under",
+          "btts"
+        ]
+      },
+      "referenceRepairs": [
+        "mapped invalid supportLevel "neutral" to "weak" on claim "claim_corners_over_under"",
+        "market btts skipped/review-required: missing odds quotes for requested market"
+      ],
+      "webSearchCoverage": {
+        "mode": "live",
+        "provider": "gemini",
+        "required": true,
+        "nativeToolUsed": true,
+        "nativeSupported": true,
+        "browserFallbackUsed": false,
+        "realWebSearchSourceCount": 1,
+        "syntheticWebSearchSourceCount": 0
+      },
+      "providerContextWarnings": []
+    }
+  },
+  "sources": [
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_odds_1",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "Odds Snapshot for Davao Aguilas vs Taguig",
+      "externalId": "api-football://source_odds_1",
+      "providerSnapshotId": null,
+      "capturedAt": "2026-05-27T16:21:49.859Z",
+      "metadata": {
+        "providerSnapshotId": "957e0f0c-cf54-45fd-90f5-9306fe21b082"
+      }
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_api_football_odds_snapshot",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "API-Football odds snapshot",
+      "externalId": "1544101",
+      "providerSnapshotId": null,
+      "capturedAt": "2026-05-27T16:21:49.859Z",
+      "metadata": {
+        "fixtureId": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+        "quoteCount": 33,
+        "snapshotId": "957e0f0c-cf54-45fd-90f5-9306fe21b082",
+        "bookmakerCount": 2,
+        "oddsSnapshotId": "a9706e4d-e7b8-41a2-9292-e22d7ad51480",
+        "providerFixtureId": "1544101"
+      }
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_api_football_fixture_statistics",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football fixture statistics",
+      "externalId": "1544101",
+      "providerSnapshotId": null,
+      "capturedAt": "2026-05-27T16:21:48.824Z",
+      "metadata": {
+        "fields": [
+          "cornersHome",
+          "cornersAway",
+          "totalCorners"
+        ],
+        "snapshotId": "796849b5-44f3-499b-b94c-5c646d296d72",
+        "providerFixtureId": "1544101"
+      }
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_web_1",
+      "type": "web-search",
+      "url": "https://soccerstats.com/",
+      "title": "Davao Aguilas vs One Taguig FC Match Report",
+      "externalId": null,
+      "providerSnapshotId": null,
+      "capturedAt": "2026-05-27T16:21:45.288Z",
+      "metadata": {}
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_api_football_fixture",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football fixture",
+      "externalId": "1544101",
+      "providerSnapshotId": null,
+      "capturedAt": "2026-05-27T16:21:45.288Z",
+      "metadata": {
+        "fixtureId": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+        "providerFixtureId": "1544101"
+      }
+    }
+  ],
+  "evidenceItems": [
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_web_1",
+      "sourceId": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_web_1",
+      "summary": "The web search confirms the match between Davao Aguilas and One Taguig FC ended in a 1-1 draw.",
+      "confidence": 1,
+      "claimIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_h2h",
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_double_chance",
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_goals_over_under",
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_btts"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_h2h",
+      "sourceId": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_odds_1",
+      "summary": "Bookmakers offered odds for H2H market, including a draw.",
+      "confidence": 0.9,
+      "claimIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_h2h"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_double_chance",
+      "sourceId": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_odds_1",
+      "summary": "Bookmakers offered odds for double chance markets, including home_or_draw and draw_or_away.",
+      "confidence": 0.9,
+      "claimIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_double_chance"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_goals_over_under",
+      "sourceId": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_odds_1",
+      "summary": "Bookmakers offered odds for goals over/under markets at various lines.",
+      "confidence": 0.9,
+      "claimIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_goals_over_under"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_corners_over_under",
+      "sourceId": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:source_odds_1",
+      "summary": "Bookmakers offered odds for corners over/under markets at various lines.",
+      "confidence": 0.9,
+      "claimIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_corners_over_under"
+      ],
+      "metadata": {}
+    }
+  ],
+  "claims": [
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_h2h",
+      "statement": "The football match between Davao Aguilas and Taguig resulted in a 1-1 draw.",
+      "marketKey": "h2h",
+      "selectionKey": null,
+      "line": null,
+      "supportLevel": "supported",
+      "confidence": null,
+      "evidenceIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_web_1",
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_h2h"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_double_chance",
+      "statement": "Given the 1-1 draw, 'Home or Draw' and 'Draw or Away' selections in the double chance market were winning outcomes.",
+      "marketKey": "double_chance",
+      "selectionKey": null,
+      "line": null,
+      "supportLevel": "supported",
+      "confidence": null,
+      "evidenceIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_web_1",
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_double_chance"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_goals_over_under",
+      "statement": "A total of 2 goals were scored in the match (1-1). Therefore, 'Under 2.5 goals' and 'Over 1.5 goals' were winning selections.",
+      "marketKey": "goals_over_under",
+      "selectionKey": null,
+      "line": null,
+      "supportLevel": "supported",
+      "confidence": null,
+      "evidenceIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_web_1",
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_goals_over_under"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_corners_over_under",
+      "statement": "Odds were provided for Corners Over/Under 8 and 8.5. The actual number of corners is not available in the provided information.",
+      "marketKey": "corners_over_under",
+      "selectionKey": null,
+      "line": null,
+      "supportLevel": "weak",
+      "confidence": null,
+      "evidenceIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_odds_corners_over_under"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:claim_btts",
+      "statement": "Both teams scored in the match, with the final score being 1-1.",
+      "marketKey": "btts",
+      "selectionKey": null,
+      "line": null,
+      "supportLevel": "supported",
+      "confidence": null,
+      "evidenceIds": [
+        "9f488ab6-4aa4-40cb-b1d6-d5a9a9ea3659:evidence_web_1"
+      ],
+      "conflictStatus": "none"
+    }
+  ],
+  "allowedQuotes": [
+    {
+      "oddsQuoteId": "ca15e91c-6f81-49d7-b4a1-cf124e61e6a0",
+      "market": "h2h",
+      "selection": "away",
+      "line": null,
+      "odds": 1.47,
+      "impliedProbability": 0.680272,
+      "marketImpliedProbability": 0.697279,
+      "marketFairProbability": 0.622222,
+      "consensusFairOdds": 1.607144,
+      "overround": 0.120789,
+      "marketEfficiencyScore": 0.6092,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "b2732dc5-549d-4197-a1ec-37418f3860a2",
+      "market": "h2h",
+      "selection": "draw",
+      "line": null,
+      "odds": 4.75,
+      "impliedProbability": 0.210526,
+      "marketImpliedProbability": 0.240398,
+      "marketFairProbability": 0.214365,
+      "consensusFairOdds": 4.664949,
+      "overround": 0.120789,
+      "marketEfficiencyScore": 0.6092,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "b5a9f664-3f10-4272-851c-63d7a8256934",
+      "market": "h2h",
+      "selection": "home",
+      "line": null,
+      "odds": 5.69,
+      "impliedProbability": 0.175747,
+      "marketImpliedProbability": 0.183112,
+      "marketFairProbability": 0.163414,
+      "consensusFairOdds": 6.119442,
+      "overround": 0.120789,
+      "marketEfficiencyScore": 0.6092,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "3b98d47c-9a29-4fe5-a6b9-03cedef0db6a",
+      "market": "double_chance",
+      "selection": "draw_or_away",
+      "line": null,
+      "odds": 1.11,
+      "impliedProbability": 0.900901,
+      "marketImpliedProbability": 0.900901,
+      "marketFairProbability": 0.413566,
+      "consensusFairOdds": 2.417995,
+      "overround": 1.178373,
+      "marketEfficiencyScore": 0.5167,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "36dc80ca-7aa6-44e2-9340-8bcaf2006e5f",
+      "market": "double_chance",
+      "selection": "home_or_away",
+      "line": null,
+      "odds": 1.12,
+      "impliedProbability": 0.892857,
+      "marketImpliedProbability": 0.892857,
+      "marketFairProbability": 0.409873,
+      "consensusFairOdds": 2.439778,
+      "overround": 1.178373,
+      "marketEfficiencyScore": 0.5167,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "34ff23f6-23d0-4f01-a637-573797886a3c",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": null,
+      "odds": 2.6,
+      "impliedProbability": 0.384615,
+      "marketImpliedProbability": 0.384615,
+      "marketFairProbability": 0.176561,
+      "consensusFairOdds": 5.663771,
+      "overround": 1.178373,
+      "marketEfficiencyScore": 0.5167,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "804528a3-2d84-454f-a7c8-21f399dcee0c",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.5,
+      "odds": 1.65,
+      "impliedProbability": 0.606061,
+      "marketImpliedProbability": 0.621502,
+      "marketFairProbability": 0.578565,
+      "consensusFairOdds": 1.728413,
+      "overround": 0.074652,
+      "marketEfficiencyScore": 0.6991,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "35391ef0-b93c-4138-8be7-9f6d81882022",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.5,
+      "odds": 2.35,
+      "impliedProbability": 0.425532,
+      "marketImpliedProbability": 0.453151,
+      "marketFairProbability": 0.421435,
+      "consensusFairOdds": 2.372847,
+      "overround": 0.074652,
+      "marketEfficiencyScore": 0.6991,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "3216f1ad-f335-45cd-909a-c91422636d1a",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 3.5,
+      "odds": 2.59,
+      "impliedProbability": 0.3861,
+      "marketImpliedProbability": 0.3861,
+      "marketFairProbability": 0.3525,
+      "consensusFairOdds": 2.836879,
+      "overround": 0.09532,
+      "marketEfficiencyScore": 0.5681,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "f0c4489d-b9b9-40c0-b89e-f5b7e31bde36",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 3.5,
+      "odds": 1.41,
+      "impliedProbability": 0.70922,
+      "marketImpliedProbability": 0.70922,
+      "marketFairProbability": 0.6475,
+      "consensusFairOdds": 1.544402,
+      "overround": 0.09532,
+      "marketEfficiencyScore": 0.5681,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "8c97090b-851f-4e9f-b8c2-f1687494e96c",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.25,
+      "odds": 1.47,
+      "impliedProbability": 0.680272,
+      "marketImpliedProbability": 0.680272,
+      "marketFairProbability": 0.620155,
+      "consensusFairOdds": 1.6125,
+      "overround": 0.096939,
+      "marketEfficiencyScore": 0.5647,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "6ef97b5a-6733-4a65-b6ce-dee224570d46",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.25,
+      "odds": 2.4,
+      "impliedProbability": 0.416667,
+      "marketImpliedProbability": 0.416667,
+      "marketFairProbability": 0.379845,
+      "consensusFairOdds": 2.632653,
+      "overround": 0.096939,
+      "marketEfficiencyScore": 0.5647,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "571113a6-6b1a-4370-b3f5-703ed450425f",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.75,
+      "odds": 1.83,
+      "impliedProbability": 0.546448,
+      "marketImpliedProbability": 0.546448,
+      "marketFairProbability": 0.506739,
+      "consensusFairOdds": 1.973404,
+      "overround": 0.078363,
+      "marketEfficiencyScore": 0.6034,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "20203e2b-7e27-4f39-8a9a-74c21699d0f3",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.75,
+      "odds": 1.88,
+      "impliedProbability": 0.531915,
+      "marketImpliedProbability": 0.531915,
+      "marketFairProbability": 0.493261,
+      "consensusFairOdds": 2.027322,
+      "overround": 0.078363,
+      "marketEfficiencyScore": 0.6034,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "c761129d-7b51-4b58-b2cc-dcb7629b7be6",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 3.25,
+      "odds": 2.34,
+      "impliedProbability": 0.42735,
+      "marketImpliedProbability": 0.42735,
+      "marketFairProbability": 0.390625,
+      "consensusFairOdds": 2.56,
+      "overround": 0.094017,
+      "marketEfficiencyScore": 0.5708,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "b75a418e-4e56-45bc-9829-b1136b3302fc",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 3.25,
+      "odds": 1.5,
+      "impliedProbability": 0.666667,
+      "marketImpliedProbability": 0.666667,
+      "marketFairProbability": 0.609375,
+      "consensusFairOdds": 1.641026,
+      "overround": 0.094017,
+      "marketEfficiencyScore": 0.5708,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "56b69980-aa8a-4f0f-bfe9-9e2e1a2bb867",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 3.75,
+      "odds": 2.79,
+      "impliedProbability": 0.358423,
+      "marketImpliedProbability": 0.358423,
+      "marketFairProbability": 0.326087,
+      "consensusFairOdds": 3.066667,
+      "overround": 0.099164,
+      "marketEfficiencyScore": 0.5601,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "b3cc746f-34f2-49bf-a7f7-e32214aa1990",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 3.75,
+      "odds": 1.35,
+      "impliedProbability": 0.740741,
+      "marketImpliedProbability": 0.740741,
+      "marketFairProbability": 0.673913,
+      "consensusFairOdds": 1.483871,
+      "overround": 0.099164,
+      "marketEfficiencyScore": 0.5601,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "9dd08a0c-3100-43e0-b7ca-b9c9fe1af6e9",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 4,
+      "odds": 2.89,
+      "impliedProbability": 0.346021,
+      "marketImpliedProbability": 0.346021,
+      "marketFairProbability": 0.313539,
+      "consensusFairOdds": 3.189394,
+      "overround": 0.103597,
+      "marketEfficiencyScore": 0.5508,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "b3b27eed-9cea-40b7-b066-008f03dc28f6",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 3,
+      "odds": 2.09,
+      "impliedProbability": 0.478469,
+      "marketImpliedProbability": 0.478469,
+      "marketFairProbability": 0.441176,
+      "consensusFairOdds": 2.266667,
+      "overround": 0.08453,
+      "marketEfficiencyScore": 0.5906,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "fd21489a-8554-499c-bea0-f08f21ac182c",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2,
+      "odds": 1.3,
+      "impliedProbability": 0.769231,
+      "marketImpliedProbability": 0.769231,
+      "marketFairProbability": 0.699769,
+      "consensusFairOdds": 1.429043,
+      "overround": 0.099264,
+      "marketEfficiencyScore": 0.5599,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "a5f8b394-6c6a-43e2-9cd2-cd871d2c9552",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2,
+      "odds": 3.03,
+      "impliedProbability": 0.330033,
+      "marketImpliedProbability": 0.330033,
+      "marketFairProbability": 0.300231,
+      "consensusFairOdds": 3.330769,
+      "overround": 0.099264,
+      "marketEfficiencyScore": 0.5599,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "66a9284a-1255-4bb5-8a13-7ba28346c4ab",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 3,
+      "odds": 1.65,
+      "impliedProbability": 0.606061,
+      "marketImpliedProbability": 0.606061,
+      "marketFairProbability": 0.558824,
+      "consensusFairOdds": 1.789474,
+      "overround": 0.08453,
+      "marketEfficiencyScore": 0.5906,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "4aa48024-2410-4f1a-a5fb-4c434dd397a3",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 4,
+      "odds": 1.32,
+      "impliedProbability": 0.757576,
+      "marketImpliedProbability": 0.757576,
+      "marketFairProbability": 0.686461,
+      "consensusFairOdds": 1.456747,
+      "overround": 0.103597,
+      "marketEfficiencyScore": 0.5508,
+      "lowLiquidity": true,
+      "bookmaker": "Pinnacle",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "747b6abc-646f-4741-917c-f0d4eb67a999",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 8.5,
+      "odds": 2,
+      "impliedProbability": 0.5,
+      "marketImpliedProbability": 0.5,
+      "marketFairProbability": 0.463807,
+      "consensusFairOdds": 2.156069,
+      "overround": 0.078035,
+      "marketEfficiencyScore": 0.6041,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "77f1bec9-b613-4ae0-a6f4-0eafa8e8d649",
+      "market": "corners_over_under",
+      "selection": "under",
+      "line": 8.5,
+      "odds": 1.73,
+      "impliedProbability": 0.578035,
+      "marketImpliedProbability": 0.578035,
+      "marketFairProbability": 0.536193,
+      "consensusFairOdds": 1.865,
+      "overround": 0.078035,
+      "marketEfficiencyScore": 0.6041,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "d2911bd8-645d-4864-92d2-9a6ebed5d2cb",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 8,
+      "odds": 1.82,
+      "impliedProbability": 0.549451,
+      "marketImpliedProbability": 0.549451,
+      "marketFairProbability": 0.521053,
+      "consensusFairOdds": 1.919192,
+      "overround": 0.054501,
+      "marketEfficiencyScore": 0.6531,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    },
+    {
+      "oddsQuoteId": "31d49ae8-50ed-40dd-bc50-3933b811491a",
+      "market": "corners_over_under",
+      "selection": "under",
+      "line": 8,
+      "odds": 1.98,
+      "impliedProbability": 0.505051,
+      "marketImpliedProbability": 0.505051,
+      "marketFairProbability": 0.478947,
+      "consensusFairOdds": 2.087912,
+      "overround": 0.054501,
+      "marketEfficiencyScore": 0.6531,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-05-27T16:21:49.859Z"
+    }
+  ],
+  "providerContextWarnings": [
+    "scoring prompt allowedQuotes trimmed from 33 to 28 representative quotes"
+  ]
+}

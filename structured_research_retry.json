@@ -1,148 +1,199 @@
 {
   "sources": [
     {
-      "id": "source_1_retry",
-      "type": "api-football",
-      "url": null,
-      "title": "API-Football Fixture Snapshot",
-      "capturedAt": "2026-05-23T16:44:23.665Z",
-      "hash": "30979a30-aa2d-43b6-ba17-f9e1150a7a10",
-      "metadata": { "provider": "api-football", "providerFixtureId": "1540729" }
-    },
-    {
-      "id": "source_2_retry",
+      "id": "source_1",
       "type": "api-football",
       "url": null,
       "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-23T16:44:25.038Z",
-      "hash": "e5f75403-c79d-4823-95e1-4184fa619b87",
-      "metadata": { "provider": "api-football", "bookmakerCount": 2 }
+      "capturedAt": "2026-05-27T16:16:14.837Z",
+      "hash": "5a48e4701c046e96c9eeeca14aa2659af6d341af4c6700c49f089e581e04d22a",
+      "metadata": {
+        "provider": "api-football",
+        "providerSnapshotId": "8d6ba681-865e-4d60-bd18-d4815ad9af8d"
+      }
     },
     {
-      "id": "source_3_retry",
+      "id": "source_2",
       "type": "web-search",
-      "url": "https://footystats.org/israel/beitar-jerusalem-fc-vs-hapoel-tel-aviv-fc-h2h-stats",
-      "title": "Beitar Jerusalem vs Hapoel Tel Aviv H2H Stats | FootyStats",
-      "capturedAt": "2026-05-23T16:50:00.000Z",
+      "url": "https://www.sofascore.com/instituto-ac-cordoba-reserve-velez-sarsfield-reserve/uExcscob",
+      "title": "Vélez Sársfield Res. vs Instituto Res. live score, H2H and lineups | Sofascore",
+      "capturedAt": "2026-05-27T16:17:00.000Z",
       "hash": null,
       "metadata": {}
     },
     {
-      "id": "source_4_retry",
+      "id": "source_3",
       "type": "web-search",
-      "url": "https://forebet.com/en/predictions-tips-beitar-jerusalem-hapoel-tel-aviv-19396860",
-      "title": "Beitar Jerusalem vs Hapoel Tel Aviv Prediction | Forebet",
-      "capturedAt": "2026-05-23T16:50:00.000Z",
+      "url": "https://www.aiscore.com/match-velez-sarsfield-reserves-vs-instituto-ac-cordoba-reserves/vlon2khwcz9wdli",
+      "title": "Velez Sarsfield Reserves vs Instituto AC Cordoba Reserves live score",
+      "capturedAt": "2026-05-27T16:17:00.000Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "source_4",
+      "type": "web-search",
+      "url": "https://www.365scores.com/football/match/velez-sarsfield-instituto/1000/1000/10/1512434#",
+      "title": "Velez Sarsfield vs Instituto AC Cordoba | Match Overview",
+      "capturedAt": "2026-05-27T16:17:00.000Z",
       "hash": null,
       "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "ev_h2h_odds",
-      "sourceId": "source_2_retry",
-      "claimIds": ["claim_h2h_win"],
-      "snippet": "h2h home price: 1.75 (Bet365), 1.79 (Pinnacle)",
-      "summary": "Bookmaker odds favor a home win (avg. 1.77), implying a ~56% probability.",
-      "confidence": 0.9,
-      "metadata": {}
-    },
-    {
-      "id": "ev_h2h_form",
-      "sourceId": "source_4_retry",
-      "claimIds": ["claim_h2h_win"],
-      "snippet": "Beitar Jerusalem are in excellent form, having won 5 of their last 6 league matches.",
-      "summary": "Beitar Jerusalem is in superior form with 5 wins in their last 6 matches.",
-      "confidence": 0.85,
-      "metadata": {}
-    },
-    {
-      "id": "ev_dc_odds",
-      "sourceId": "source_2_retry",
-      "claimIds": ["claim_dc_1x"],
-      "snippet": "double_chance home_or_draw price: 1.22 (Bet365)",
-      "summary": "Odds for 'Beitar Jerusalem or Draw' are very low (1.22), indicating a high likelihood.",
+      "id": "evidence_1",
+      "sourceId": "source_1",
+      "claimIds": ["claim_1", "claim_2", "claim_3"],
+      "snippet": "Bet365: home: 1.5, draw: 3.4, away: 6.25",
+      "summary": "Bet365 odds heavily favor a home win for Vélez Sársfield Res. at 1.5, implying a 66.7% probability, compared to an away win at 6.25.",
       "confidence": 0.95,
       "metadata": {}
     },
     {
-      "id": "ev_goals_odds",
-      "sourceId": "source_2_retry",
-      "claimIds": ["claim_goals_over_2.5"],
-      "snippet": "goals_over_under over 2.5 price: 1.65 (Bet365), 1.64 (Pinnacle)",
-      "summary": "Odds for Over 2.5 goals are ~1.65, implying a ~60% probability.",
-      "confidence": 0.8,
+      "id": "evidence_2",
+      "sourceId": "source_3",
+      "claimIds": ["claim_1"],
+      "snippet": "Vélez Sársfield Res. has historically dominated this fixture. Total Meetings: 6 (since 2023), Vélez Sársfield Res. Wins: 4, Draws: 2, Instituto Res. Wins: 0.",
+      "summary": "Vélez Sársfield Res. is unbeaten in their last 6 encounters against Instituto Res., winning 4 and drawing 2.",
+      "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "ev_btts_odds",
-      "sourceId": "source_2_retry",
-      "claimIds": ["claim_btts_yes"],
-      "snippet": "btts yes price: 1.62 (Bet365)",
-      "summary": "Odds for 'Both Teams to Score: Yes' are 1.62, implying a ~62% probability.",
-      "confidence": 0.75,
+      "id": "evidence_3",
+      "sourceId": "source_2",
+      "claimIds": ["claim_1"],
+      "snippet": "League Position: 1st (Group A). Recent Form: W-D-W-W-W. They are in exceptional form, currently leading the table with 35 points from 14 matches.",
+      "summary": "Vélez Sársfield Res. are in dominant form, leading their group and coming into the match with a strong winning streak.",
+      "confidence": 0.9,
       "metadata": {}
     },
     {
-        "id": "ev_btts_stats",
-        "sourceId": "source_3_retry",
-        "claimIds": ["claim_btts_yes"],
-        "snippet": "Hapoel Tel Aviv FC has conceded in 82% of their away matches this season.",
-        "summary": "Hapoel Tel Aviv concedes in 82% of away games, while Beitar scores frequently at home.",
+      "id": "evidence_4",
+      "sourceId": "source_1",
+      "claimIds": ["claim_4"],
+      "snippet": "Bet365: Over 2.5: 2.0, Under 2.5: 1.8",
+      "summary": "The goals market odds are tightly priced, with a slight favor towards Under 2.5 goals at 1.8, but Over 2.5 at 2.0 is also seen as very possible.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_5",
+      "sourceId": "source_4",
+      "claimIds": ["claim_4"],
+      "snippet": "Scoring Power: Vélez Sársfield Res. averages 2.21 goals per game, while conceding only 0.57 goals per game.",
+      "summary": "Vélez has a high goal-scoring average and a very strong defense, suggesting they can control the scoreline.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+        "id": "evidence_6",
+        "sourceId": "source_1",
+        "claimIds": ["claim_5"],
+        "snippet": "No direct odds for BTTS were provided in the snapshot.",
+        "summary": "There is no direct evidence for the BTTS market in the provided odds snapshot.",
+        "confidence": 1.0,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_7",
+        "sourceId": "source_4",
+        "claimIds": ["claim_5"],
+        "snippet": "Defensive Solidity: Vélez has a 50% clean sheet rate this season, making them very difficult to break down.",
+        "summary": "With a 50% clean sheet rate, Vélez's defense is very strong, making it less likely for both teams to score.",
         "confidence": 0.8,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_8",
+        "sourceId": "source_1",
+        "claimIds": ["claim_2"],
+        "snippet": "Bet365: home_or_draw: 1.07",
+        "summary": "The double chance market for 'home or draw' is priced at 1.07, indicating an extremely high probability of Vélez avoiding defeat.",
+        "confidence": 0.98,
         "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim_h2h_win",
-      "statement": "Beitar Jerusalem is favored to win the match.",
-      "subject": { "type": "market", "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7", "market": "h2h" },
+      "id": "claim_1",
+      "statement": "Vélez Sársfield Res. is the strong favorite to win the match against Instituto Res.",
+      "subject": {
+        "type": "market",
+        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "market": "h2h"
+      },
       "supportLevel": "supported",
-      "evidenceIds": ["ev_h2h_odds", "ev_h2h_form"],
+      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_dc_1x",
-      "statement": "Beitar Jerusalem is highly likely to secure at least a draw.",
-      "subject": { "type": "market", "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7", "market": "double_chance" },
+      "id": "claim_2",
+      "statement": "Vélez Sársfield Res. is highly likely to win or draw the match.",
+      "subject": {
+        "type": "market",
+        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "market": "double_chance"
+      },
       "supportLevel": "supported",
-      "evidenceIds": ["ev_dc_odds", "ev_h2h_form"],
+      "evidenceIds": ["evidence_1", "evidence_8"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_goals_over_2.5",
-      "statement": "The match is likely to feature over 2.5 goals.",
-      "subject": { "type": "market", "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7", "market": "goals_over_under" },
+      "id": "claim_3",
+      "statement": "Instituto Res. is a significant underdog with a low probability of winning.",
+      "subject": {
+        "type": "market",
+        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "market": "h2h"
+      },
       "supportLevel": "supported",
-      "evidenceIds": ["ev_goals_odds", "ev_btts_stats"],
+      "evidenceIds": ["evidence_1", "evidence_2"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_btts_yes",
-      "statement": "It is likely that both teams will score.",
-      "subject": { "type": "market", "id": "69787c94-f1f0-4c5c-9717-6e8a342140d7", "market": "btts" },
+      "id": "claim_4",
+      "statement": "The match is likely to have under 2.5 goals, but it is a close call.",
+      "subject": {
+        "type": "market",
+        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "market": "goals_over_under"
+      },
       "supportLevel": "supported",
-      "evidenceIds": ["ev_btts_odds", "ev_btts_stats"],
+      "evidenceIds": ["evidence_4", "evidence_5"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_5",
+      "statement": "It is unlikely that both teams will score in this match.",
+      "subject": {
+        "type": "market",
+        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_6", "evidence_7"],
       "conflictStatus": "none",
       "metadata": {}
     }
   ],
   "gateResult": {
     "verdict": "promotable",
-    "reasons": ["Research is supported by consistent odds and web-search data for all 4 primary markets."],
+    "reasons": [
+      "Structured research is well-supported by a combination of API odds data and multiple web search sources providing statistical analysis, H2H records, and current team form.",
+      "All required markets except for corners_over_under have been analyzed with sufficient evidence."
+    ],
     "warnings": []
   },
   "warnings": [],
   "metadata": {
-    "runId": "a5dfc697-3bb4-440a-87f8-e8f6261b8541",
-    "marketCoverage": {
-      "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
-      "analyzedMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
-      "skippedMarkets": ["corners_over_under"]
-    }
+      "marketCoverage": {
+          "skippedMarkets": ["corners_over_under"],
+          "notes": "No reliable evidence for the corners market was found during the research process."
+      }
   }
 }

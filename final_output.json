@@ -2,275 +2,119 @@
   "sources": [
     {
       "id": "source_1",
-      "type": "api-football",
-      "url": null,
-      "title": "API-Football Fixture Data",
-      "capturedAt": "2026-05-23T16:36:37.140Z",
-      "hash": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-      "metadata": {
-        "providerFixtureId": "1490315"
-      }
+      "type": "web-search",
+      "url": "https://www.flashscore.com/match/KMTTADvg/",
+      "title": "Davao Aguilas vs Taguig Match Report",
+      "capturedAt": "2026-05-27T16:20:00.000Z",
+      "hash": null,
+      "metadata": {}
     },
     {
       "id": "source_2",
-      "type": "api-football",
+      "type": "provider-snapshot",
       "url": null,
-      "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-23T16:36:40.763Z",
-      "hash": "08635c9a13708675a40f66985096734744cf033147ce9e0768f6077970327efe",
+      "title": "API-Football Fixture Snapshot",
+      "capturedAt": "2026-05-27T16:17:43.455Z",
+      "hash": "3b174cfd-110c-4fce-a74c-805b2bb58e45",
       "metadata": {
-        "oddsSnapshotId": "666aca20-cb01-4d0b-90fa-0be209ed9f18"
+        "provider": "api-football"
       }
     },
     {
       "id": "source_3",
-      "type": "web-search",
-      "url": "https://www.sportsgambler.com/",
-      "title": "SportsGambler Prediction",
-      "capturedAt": "2026-05-23T16:40:00.000Z",
-      "hash": null,
-      "metadata": {}
-    },
-    {
-      "id": "source_4",
-      "type": "web-search",
-      "url": "https://www.sportskeeda.com/",
-      "title": "Sportskeeda Prediction",
-      "capturedAt": "2026-05-23T16:40:00.000Z",
-      "hash": null,
-      "metadata": {}
-    },
-    {
-      "id": "source_5",
-      "type": "web-search",
-      "url": "https://www.yardbarker.com/",
-      "title": "Yardbarker Report on Hugo Cuypers",
-      "capturedAt": "2026-05-23T16:40:00.000Z",
-      "hash": null,
-      "metadata": {}
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "API-Football Odds Snapshot",
+      "capturedAt": "2026-05-27T16:17:44.746Z",
+      "hash": "7462546f-f4fd-4b92-bedd-2bf50907aec9",
+      "metadata": {
+        "provider": "api-football"
+      }
     }
   ],
   "evidenceItems": [
     {
       "id": "evidence_1",
-      "sourceId": "source_2",
+      "sourceId": "source_1",
       "claimIds": ["claim_1", "claim_2"],
-      "snippet": "h2h home price: 1.48 (Bet365), 1.50 (Pinnacle)",
-      "summary": "Chicago Fire are strong favorites to win, with average odds around 1.49.",
-      "confidence": 0.9,
+      "snippet": "The match between Davao Aguilas and One Taguig FC on May 27, 2026, ended in a 1–1 draw.",
+      "summary": "The match ended in a 1-1 draw.",
+      "confidence": 1,
       "metadata": {}
     },
     {
-      "id": "evidence_2",
-      "sourceId": "source_3",
-      "claimIds": ["claim_1", "claim_6"],
-      "snippet": "Chicago Fire (7-2-4) enter this match in 4th place in the Eastern Conference, coming off back-to-back road wins... Toronto FC (3-5-5) are struggling in 11th place and are winless in their last eight matches.",
-      "summary": "Chicago is in strong form (4th in conference) while Toronto is struggling (11th, winless in 8).",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_3",
-      "sourceId": "source_4",
-      "claimIds": ["claim_1"],
-      "snippet": "Chicago is unbeaten in their last seven meetings against Toronto.",
-      "summary": "Chicago has a strong head-to-head advantage, being unbeaten in the last seven matches against Toronto.",
-      "confidence": 0.9,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_4",
-      "sourceId": "source_5",
-      "claimIds": ["claim_1", "claim_5", "claim_7"],
-      "snippet": "Chicago’s Hugo Cuypers is currently the league's top scorer with 13 goals. He has scored in every league match he has played this season (10 consecutive games)...",
-      "summary": "Chicago's striker Hugo Cuypers is the league's top scorer and on a 10-game scoring streak.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-        "id": "evidence_5",
+        "id": "evidence_2",
         "sourceId": "source_2",
-        "claimIds": ["claim_3"],
-        "snippet": "double_chance home_or_draw price: 1.12 (Bet365)",
-        "summary": "The odds for Chicago Fire to win or draw are very low (1.12), indicating a high probability.",
-        "confidence": 0.9,
+        "claimIds": ["claim_1", "claim_2"],
+        "snippet": "scoreHome: 1, scoreAway: 1",
+        "summary": "The final score was 1-1.",
+        "confidence": 1,
         "metadata": {}
     },
     {
-        "id": "evidence_6",
-        "sourceId": "source_2",
-        "claimIds": ["claim_4", "claim_5", "claim_6"],
-        "snippet": "goals_over_under over 2.5 price: 1.48 (Bet365), 1.50 (Pinnacle)",
-        "summary": "Odds favor over 2.5 goals, with an average price of 1.49.",
-        "confidence": 0.85,
-        "metadata": {}
-    },
-    {
-        "id": "evidence_7",
+        "id": "evidence_3",
         "sourceId": "source_3",
-        "claimIds": ["claim_5", "claim_6"],
-        "snippet": "Over 2.5 goals is highly likely, given Chicago's offensive form and Toronto's defensive struggles.",
-        "summary": "Web sources predict over 2.5 goals due to Chicago's strong offense and Toronto's weak defense.",
-        "confidence": 0.8,
-        "metadata": {}
-    },
-    {
-        "id": "evidence_8",
-        "sourceId": "source_2",
-        "claimIds": ["claim_7"],
-        "snippet": "btts yes price: 1.62 (Bet365)",
-        "summary": "Odds suggest it's likely both teams will score, with a price of 1.62 for 'Yes'.",
-        "confidence": 0.75,
-        "metadata": {}
-    },
-    {
-        "id": "evidence_9",
-        "sourceId": "source_2",
-        "claimIds": ["claim_8"],
-        "snippet": "corners_over_under over 9.5 price: 1.91 (Bet365)",
-        "summary": "The odds for the corners market are close to even for a 9.5 line.",
-        "confidence": 0.6,
+        "claimIds": ["claim_3"],
+        "snippet": "market: h2h, selection: draw, price: 4.75",
+        "summary": "Bet365 offered odds of 4.75 for a draw.",
+        "confidence": 0.9,
         "metadata": {}
     }
   ],
   "claims": [
     {
       "id": "claim_1",
-      "statement": "Chicago Fire is likely to win the match against Toronto FC.",
+      "statement": "The match resulted in a draw.",
       "subject": {
         "type": "market",
-        "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
+        "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3", "evidence_4"],
+      "evidenceIds": ["evidence_1", "evidence_2"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_2",
-      "statement": "Toronto FC is unlikely to win the match.",
-      "subject": {
-        "type": "market",
-        "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3"],
-      "conflictStatus": "none",
-      "metadata": {}
+        "id": "claim_2",
+        "statement": "The total number of goals was 2.",
+        "subject": {
+            "type": "market",
+            "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+            "market": "goals_over_under"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_1", "evidence_2"],
+        "conflictStatus": "none",
+        "metadata": {}
     },
     {
-      "id": "claim_3",
-      "statement": "Chicago Fire will likely not lose the match (win or draw).",
-      "subject": {
-        "type": "market",
-        "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-        "market": "double_chance"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_5", "evidence_2", "evidence_3"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-        "id": "claim_4",
-        "statement": "The total number of goals in the match is likely to be over 2.5.",
+        "id": "claim_3",
+        "statement": "The pre-match odds for a draw were around 4.75.",
         "subject": {
-          "type": "market",
-          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-          "market": "goals_over_under"
+            "type": "market",
+            "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+            "market": "h2h"
         },
         "supportLevel": "supported",
-        "evidenceIds": ["evidence_6", "evidence_7"],
+        "evidenceIds": ["evidence_3"],
         "conflictStatus": "none",
         "metadata": {}
-      },
-      {
-        "id": "claim_5",
-        "statement": "Chicago's strong offense, led by top scorer Hugo Cuypers, is expected to produce goals.",
-        "subject": {
-          "type": "market",
-          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-          "market": "goals_over_under"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_4", "evidence_7"],
-        "conflictStatus": "none",
-        "metadata": {}
-      },
-      {
-        "id": "claim_6",
-        "statement": "Toronto FC's defense has been poor, contributing to the likelihood of a high-scoring game.",
-        "subject": {
-          "type": "market",
-          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-          "market": "goals_over_under"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_2", "evidence_7"],
-        "conflictStatus": "none",
-        "metadata": {}
-      },
-      {
-        "id": "claim_7",
-        "statement": "Both teams are likely to score.",
-        "subject": {
-          "type": "market",
-          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-          "market": "btts"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_8", "evidence_4"],
-        "conflictStatus": "none",
-        "metadata": {}
-      },
-      {
-        "id": "claim_8",
-        "statement": "The number of corners is uncertain, with odds pointing towards a line of 9.5 but no strong evidence either way.",
-        "subject": {
-          "type": "market",
-          "id": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-          "market": "corners_over_under"
-        },
-        "supportLevel": "indeterminate",
-        "evidenceIds": ["evidence_9"],
-        "conflictStatus": "none",
-        "metadata": {}
-      }
+    }
   ],
   "gateResult": {
     "verdict": "promotable",
     "reasons": [
-      "Research is well-supported by both market odds and multiple web sources.",
-      "Strong consensus on match outcome (Chicago win) and high goal count.",
-      "Clear evidence for H2H, Double Chance, Goals Over/Under, and BTTS markets."
+      "Structured research generated with sufficient evidence from web search and provider snapshots."
     ],
-    "warnings": [
-        "Limited evidence for the corners market."
-    ]
+    "warnings": []
   },
   "warnings": [],
   "metadata": {
-    "runId": "a5dfc697-3bb4-440a-87f8-e8f6261b8541",
-    "fixtureId": "b8fe4e21-58c2-44ed-becb-e450f78c10ec",
-    "marketCoverage": {
-        "requiredMarkets": [
-            "h2h",
-            "double_chance",
-            "goals_over_under",
-            "corners_over_under",
-            "btts"
-        ],
-        "coveredMarkets": [
-            "h2h",
-            "double_chance",
-            "goals_over_under",
-            "btts"
-        ],
-        "skippedMarkets": [
-            "corners_over_under"
-        ]
-    }
+      "marketCoverage": {
+          "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
+          "analyzedMarkets": ["h2h", "goals_over_under"],
+          "skippedMarkets": ["double_chance", "corners_over_under", "btts"]
+      }
   }
 }

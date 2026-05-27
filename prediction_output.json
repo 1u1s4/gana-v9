@@ -1,0 +1,129 @@
+{
+  "predictions": [
+    {
+      "oddsQuoteId": "dc48efda-c58c-44a6-883d-a16947da671f",
+      "market": "h2h",
+      "selection": "home",
+      "line": null,
+      "odds": 1.13,
+      "probability": 0.89,
+      "modelProbability": 0.89,
+      "marketFairProbability": 0.814596,
+      "edge": 0.075404,
+      "confidence": 0.9,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_odds",
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_form",
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_past_meetings"
+      ],
+      "claimIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_h2h_home_win"
+      ],
+      "rationale": "Brann W is strongly favored to win the match against Lyn W. Bookmakers heavily favor Brann W to win, with odds as low as 1.12, implying an ~89% probability. Brann W is undefeated in the season (7W, 1D, 0L) and has won their last 5 matches, positioning them at the top of the Toppserien. Brann has dominated recent head-to-head encounters, including a significant 9-0 victory in the last season.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "392378a6-56ab-442d-b8cc-80a455575212",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": null,
+      "odds": 1.01,
+      "probability": 0.99,
+      "modelProbability": 0.99,
+      "marketFairProbability": 0.470022,
+      "edge": 0.519978,
+      "confidence": 0.94,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_double_chance_odds",
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_form"
+      ],
+      "claimIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_dc_home_draw"
+      ],
+      "rationale": "Brann W is highly likely to avoid defeat (win or draw). The odds for Brann W to win or draw are extremely low at 1.01, indicating this outcome is seen as a near certainty. Brann W is undefeated in the season (7W, 1D, 0L) and has won their last 5 matches, positioning them at the top of the Toppserien.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "5d620893-79b5-474c-8497-944b963802d2",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.5,
+      "odds": 1.36,
+      "probability": 0.74,
+      "modelProbability": 0.74,
+      "marketFairProbability": 0.685158,
+      "edge": 0.054842,
+      "confidence": 0.9,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_goals_over_under_odds",
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_goals_form"
+      ],
+      "claimIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_goals_over_2_5"
+      ],
+      "rationale": "The match is expected to have more than 2.5 goals. Odds for Over 2.5 goals are short at 1.36, suggesting bookmakers expect a high-scoring game. Brann W has a powerful offense, averaging 4.4 goals in their last five games.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "705a44d6-91d6-4c86-89fc-ddf908bb2ac1",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 9.5,
+      "odds": 1.67,
+      "probability": 0.6,
+      "modelProbability": 0.6,
+      "marketFairProbability": 0.557029,
+      "edge": 0.042971,
+      "confidence": 0.6,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_corners_odds"
+      ],
+      "claimIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_corners_over_9_5"
+      ],
+      "rationale": "The match is likely to feature more than 9.5 corners. The odds for Over 9.5 corners are 1.67, suggesting it is more likely than under, but with less certainty than other markets. The 'corners_over_under' claim is based only on odds data, lacking statistical team performance metrics for confirmation.",
+      "warnings": [
+        "The 'corners_over_under' claim is based only on odds data, lacking statistical team performance metrics for confirmation."
+      ]
+    },
+    {
+      "oddsQuoteId": null,
+      "market": "btts",
+      "selection": "no",
+      "line": null,
+      "odds": null,
+      "probability": 0.8,
+      "modelProbability": 0.8,
+      "marketFairProbability": null,
+      "edge": null,
+      "confidence": 0.8,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_btts_no"
+      ],
+      "claimIds": [
+        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_btts_no"
+      ],
+      "rationale": "It is unlikely that both teams will score. Brann W's defense is very strong, conceding only 0.2 goals on average in their last five matches, making it unlikely both teams will score.",
+      "warnings": [
+        "No odds quotes available for BTTS market. Prediction is based on analytical evidence only."
+      ]
+    }
+  ],
+  "warnings": [],
+  "metadata": {}
+}
