@@ -5,7 +5,7 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 ## Horarios
 
 - `07:00` Guatemala: validar el dia anterior contra el artifact de recomendaciones publicado, recalcular daily metrics solo de picks publicados y notificar estadisticas a Discord.
-- `10:00` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, council gate, y notificar recomendaciones/parlays a Discord.
+- `10:15` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, council gate, y notificar recomendaciones/parlays a Discord.
 - `13:00` Guatemala: correr strategy review del dia anterior cerrado, usando Codex GPT-5.5 con reasoning X-High, y actualizar el log central de mejoras del Harness.
 
 ## Scripts operativos
@@ -101,7 +101,7 @@ Esto crea wrappers bajo `~/.hermes/scripts/` y registra tres jobs `--no-agent`:
 
 ```text
 gana-v9-validate-yesterday-discord  0 7 * * *
-gana-v9-daily-e2e-discord           0 10 * * *
+gana-v9-daily-e2e-discord           15 10 * * *
 gana-v9-strategy-review             0 13 * * *
 ```
 
@@ -117,7 +117,7 @@ hermes cron create "0 7 * * *" \
   --no-agent \
   --workdir /Users/luisalvarado/Documents/GitHub/gana-v9
 
-hermes cron create "0 10 * * *" \
+hermes cron create "15 10 * * *" \
   --name gana-v9-daily-e2e-discord \
   --deliver origin \
   --script gana_v9_daily_e2e_notify.sh \

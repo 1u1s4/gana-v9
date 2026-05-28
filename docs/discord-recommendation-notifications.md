@@ -186,7 +186,7 @@ Jobs esperados:
 
 ```text
 gana-v9-validate-yesterday-discord  0 7 * * *
-gana-v9-daily-e2e-discord           0 10 * * *
+gana-v9-daily-e2e-discord           15 10 * * *
 ```
 
 Los wrappers tienen locks por fecha bajo `.artifacts/gana-v9/cron/locks/` para evitar doble envio si Hermes cron y el crontab fallback quedan activos al mismo tiempo. Usar `--force` solo para reprocesos manuales deliberados.
