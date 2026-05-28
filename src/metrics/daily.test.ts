@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../config.js';
@@ -142,6 +142,56 @@ describe('daily metrics service', () => {
     assert.equal(result.persisted, 0);
     assert.equal(result.metrics[0]?.predictionMetrics.total, 0);
     assert.equal(result.metrics[0]?.parlayMetrics.total, 0);
+  });
+
+  it('scopes metrics to published recommendation targets when an artifact is supplied', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'gana-daily-metrics-recommendations-'));
+    const recommendationArtifact = join(root, 'daily-parlay-recommendations.json');
+    writeFileSync(recommendationArtifact, JSON.stringify({
+      date: '2026-05-13',
+      recommendations: [
+        {
+          kind: 'parlay',
+          parlayId: 'parlay-1',
+          legs: [{ predictionId: 'prediction-1' }, { predictionId: 'prediction-2' }],
+        },
+        {
+          kind: 'atomic-prediction',
+          predictionId: 'prediction-3',
+          parlayId: 'atomic-prediction-3',
+          legs: [{ predictionId: 'prediction-3' }],
+        },
+      ],
+    }));
+    const predictionQueries: any[] = [];
+    const parlayQueries: any[] = [];
+    const db = {
+      prediction: {
+        findMany: async (args: any) => {
+          predictionQueries.push(args);
+          return [];
+        },
+      },
+      parlay: {
+        findMany: async (args: any) => {
+          parlayQueries.push(args);
+          return [];
+        },
+      },
+    };
+
+    const result = await runDailyMetrics(config, {
+      date: '2026-05-13',
+      persist: false,
+      recommendationArtifact,
+    }, { runId: 'metrics-run-published' }, {
+      db,
+      writeArtifact: () => '/tmp/daily-metrics.json',
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(predictionQueries[0].where.id.in, ['prediction-1', 'prediction-2', 'prediction-3']);
+    assert.deepEqual(parlayQueries[0].where.id.in, ['parlay-1']);
   });
 
   it('writes chart-ready labels in artifacts without circular metric references', async () => {

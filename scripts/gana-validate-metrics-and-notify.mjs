@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
@@ -14,8 +14,13 @@ const date = args.date ?? guatemalaDate(-1);
 const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
 const runSlug = `validation-${date}`;
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${runSlug}.log`);
+const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `${runSlug}.lock`);
 
 mkdirSync(dirname(logPath), { recursive: true });
+if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, startedAt: new Date().toISOString() })) {
+  console.log(JSON.stringify({ ok: true, skipped: true, reason: 'validation already ran or is running for this date', date, lockPath }, null, 2));
+  process.exit(0);
+}
 const startedAt = Date.now();
 const env = {
   ...process.env,
@@ -28,8 +33,15 @@ const env = {
 const logFd = openSync(logPath, 'a');
 try {
   let handled = false;
-  const validation = runLogged(logFd, ['gana', 'validate', '--date', date], env);
-  const metrics = runLogged(logFd, ['gana', 'metrics', 'daily', '--date', date, '--scope', args.scope ?? `daily-${date}`], env);
+  const recommendationArtifact = args.recommendationArtifact ?? findLatestRecommendation(date);
+  const validationArgs = ['gana', 'validate', '--date', date];
+  const metricsArgs = ['gana', 'metrics', 'daily', '--date', date, '--scope', args.scope ?? `daily-${date}`];
+  if (recommendationArtifact) {
+    validationArgs.push('--recommendation-artifact', recommendationArtifact);
+    metricsArgs.push('--recommendation-artifact', recommendationArtifact);
+  }
+  const validation = runLogged(logFd, validationArgs, env);
+  const metrics = runLogged(logFd, metricsArgs, env);
   const validationsArtifact = findLatest(['validations.json', 'validations-blocked.json'], startedAt);
   const metricsArtifact = findLatest(['daily-metrics.json'], startedAt);
 
@@ -42,6 +54,7 @@ try {
       '--gateway-target', gatewayTarget,
     ];
     if (validationsArtifact) notifyArgs.push('--validation-artifact', validationsArtifact);
+    if (recommendationArtifact) notifyArgs.push('--recommendation-artifact', recommendationArtifact);
     const notify = spawnSync('node', notifyArgs, {
       cwd: REPO_ROOT,
       env,
@@ -52,6 +65,24 @@ try {
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`validation notification failed with exit ${notify.status}`);
     console.log(notify.stdout.trim());
+    if (recommendationArtifact && validationsArtifact) {
+      const feedback = spawnSync('node', [
+        'scripts/gana-council-feedback.mjs',
+        '--recommendation-artifact', recommendationArtifact,
+        '--validation-artifact', validationsArtifact,
+        '--transport', 'discord-native',
+        '--gateway-target', gatewayTarget,
+      ], {
+        cwd: REPO_ROOT,
+        env,
+        encoding: 'utf8',
+        maxBuffer: 10 * 1024 * 1024,
+      });
+      writeLogLine(logFd, feedback.stdout.trim());
+      if (feedback.stderr.trim()) writeLogLine(logFd, feedback.stderr.trim());
+      if (feedback.status !== 0) throw new Error(`council feedback failed with exit ${feedback.status}`);
+      console.log(feedback.stdout.trim());
+    }
     process.exitCode = validation.status === 0 ? 0 : validation.status ?? 1;
     handled = true;
   }
@@ -99,9 +130,33 @@ function parseArgs(argv) {
     if (arg === '--date') parsed.date = requireValue(argv, ++index, arg);
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--scope') parsed.scope = requireValue(argv, ++index, arg);
+    else if (arg === '--recommendation-artifact') parsed.recommendationArtifact = requireValue(argv, ++index, arg);
+    else if (arg === '--force') parsed.force = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return parsed;
+}
+
+function acquireOnce(path, ttlMs, payload) {
+  mkdirSync(dirname(path), { recursive: true });
+  if (existsSync(path)) {
+    const ageMs = Date.now() - statSync(path).mtimeMs;
+    if (ageMs < ttlMs) return false;
+    rmSync(path, { force: true });
+  }
+  let fd;
+  try {
+    fd = openSync(path, 'wx');
+  } catch (err) {
+    if (err?.code === 'EEXIST') return false;
+    throw err;
+  }
+  try {
+    writeSync(fd, `${JSON.stringify(payload, null, 2)}\n`);
+  } finally {
+    closeSync(fd);
+  }
+  return true;
 }
 
 function guatemalaDate(offsetDays) {
@@ -133,6 +188,14 @@ function findLatest(names, sinceMs) {
   return matches[0]?.path;
 }
 
+function findLatestRecommendation(date) {
+  const runs = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs');
+  const matches = [];
+  collectRecommendations(runs, matches, date);
+  matches.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return matches[0]?.path;
+}
+
 function collect(dir, matches, names, sinceMs) {
   let entries;
   try {
@@ -146,6 +209,22 @@ function collect(dir, matches, names, sinceMs) {
     else if (entry.isFile() && names.has(entry.name)) {
       const mtimeMs = statSync(path).mtimeMs;
       if (mtimeMs >= sinceMs - 1000) matches.push({ path, mtimeMs });
+    }
+  }
+}
+
+function collectRecommendations(dir, matches, date) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) collectRecommendations(path, matches, date);
+    else if (entry.isFile() && entry.name === 'daily-parlay-recommendations.json' && path.includes(date)) {
+      matches.push({ path, mtimeMs: statSync(path).mtimeMs });
     }
   }
 }

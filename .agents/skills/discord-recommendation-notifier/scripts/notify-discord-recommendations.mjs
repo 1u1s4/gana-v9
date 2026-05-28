@@ -104,7 +104,7 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones',
     description: [
-      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+      recommendationCountLine(counts),
       formatArtifactDate(artifact?.date),
     ].join('\n'),
     color: 0x2f80ed,
@@ -160,7 +160,7 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
     embeds.push({
       title: '🏆 Gana v9 · Recomendaciones',
       description: [
-        `📦 ${totalCounts.parlay} parlays · 📌 ${totalCounts.atomic} simples`,
+        recommendationCountLine(totalCounts),
         formatArtifactDate(options.artifactDate),
       ].filter(Boolean).join('\n'),
       color: 0x2f80ed,
@@ -212,7 +212,7 @@ export function buildGatewayMessage(artifact, options = {}) {
   const lines = [
     '🏆 Gana v9 · Recomendaciones en revisión',
     '',
-    `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+    recommendationCountLine(counts),
     `🟡 ${status} · ${validation} · 💧 ${risk}`,
     '⚠️ Sin ejecución monetaria · Sin garantía',
     '',
@@ -420,6 +420,10 @@ export function recommendationCounts(recommendations) {
     else counts.parlay += 1;
     return counts;
   }, { parlay: 0, atomic: 0 });
+}
+
+function recommendationCountLine(counts) {
+  return `📦 ${counts.parlay} ${counts.parlay === 1 ? 'parlay' : 'parlays'} · 📌 ${counts.atomic} ${counts.atomic === 1 ? 'simple' : 'simples'}`;
 }
 
 export function recommendationKind(recommendation) {

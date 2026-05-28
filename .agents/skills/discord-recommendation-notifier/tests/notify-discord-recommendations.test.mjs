@@ -24,7 +24,7 @@ describe('discord recommendation notifier', () => {
     assert.deepEqual(payload.allowed_mentions, { parse: [] });
     assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones');
     assert.equal(payload.embeds.length, 3);
-    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 0 simples/);
+    assert.match(payload.embeds[0].description, /📦 1 parlay · 📌 0 simples/);
     assert.match(payload.embeds[1].title, /1️⃣ Team A vs Team B/);
     assert.match(payload.embeds[1].description, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
@@ -43,7 +43,7 @@ describe('discord recommendation notifier', () => {
     const message = buildGatewayMessage(sampleArtifact(), { max: 1 });
 
     assert.match(message, /🏆 Gana v9 · Recomendaciones en revisión/);
-    assert.match(message, /📦 1 parlays · 📌 0 simples/);
+    assert.match(message, /📦 1 parlay · 📌 0 simples/);
     assert.match(message, /1️⃣ Team A vs Team B/);
     assert.match(message, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(message, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
@@ -56,7 +56,7 @@ describe('discord recommendation notifier', () => {
     const payload = buildDiscordPayload(sampleArtifactWithAtomic(), { max: 2 });
     const message = buildGatewayMessage(sampleArtifactWithAtomic(), { max: 2 });
 
-    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 1 simples/);
+    assert.match(payload.embeds[0].description, /📦 1 parlay · 📌 1 simple/);
     assert.match(payload.embeds[2].title, /📌 Simple · Team C vs Team D · h2h away/);
     assert.match(payload.embeds[2].description, /> ⚽ Team C vs Team D: h2h away @ 1.18/);
     assert.match(payload.embeds[2].description, /💵 Stake 10/);

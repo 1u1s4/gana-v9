@@ -515,6 +515,7 @@ function requiredValidationTarget(flags: Record<string, string | true>): RunVali
     ...(date && { date }),
     ...(predictionId && { predictionId }),
     ...(parlayId && { parlayId }),
+    ...(optionalStringFlag(flags, 'recommendation-artifact') && { recommendationArtifact: optionalStringFlag(flags, 'recommendation-artifact') }),
   };
 }
 
@@ -642,6 +643,7 @@ async function buildDailyMetrics(ctx: HeadlessCommandContext | CommandContext, f
     date: requireDateFlag(flags),
     days: optionalPositiveIntegerFlag(flags, 'days'),
     scope: optionalStringFlag(flags, 'scope'),
+    recommendationArtifact: optionalStringFlag(flags, 'recommendation-artifact'),
     persist,
   }, ctx.runtime);
 }
@@ -2165,10 +2167,10 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana parlay --run-id RUN_ID --portfolio low-variance|balanced|totals|high-conviction|market-diverse|parlay-oro|parlay-diamante${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay analyze --date YYYY-MM-DD --top 9 --bankroll 100 --profile-scope core${RESET}`);
   console.log(`  ${CYAN}pnpm gana parlay analyze --run-ids RUN_ID_A,RUN_ID_B --top 9 --bankroll 100 --profile-scope all${RESET}`);
-  console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD${RESET}`);
+  console.log(`  ${CYAN}pnpm gana validate --date YYYY-MM-DD --recommendation-artifact PATH${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --prediction-id ID${RESET}`);
   console.log(`  ${CYAN}pnpm gana validate --parlay-id ID${RESET}`);
-  console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false${RESET}`);
+  console.log(`  ${CYAN}pnpm gana metrics daily --date YYYY-MM-DD --days 3 --persist true|false --recommendation-artifact PATH${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);

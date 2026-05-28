@@ -18,6 +18,7 @@ Archivos principales:
 - `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs`
 - `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs`
 - `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-validation-stats.mjs`
+- `scripts/gana-council-review-notify.mjs`
 - `.agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs`
 - `.agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs`
 
@@ -58,6 +59,7 @@ Reglas:
 - Usar emojis en titulos/campos para escaneo rapido.
 - Mantener cada recomendacion compacta: selecciones en blockquote y metricas en una linea.
 - Renderizar `kind: "atomic-prediction"` como `🎯 Simple · ...`; son "parlays de una sola seleccion" analiticos, no instrucciones de ejecucion.
+- Nunca publicar etiquetas de fixture basadas en UUID o `Fixture ...` si existe metadata persistida; el Daily E2E hidrata nombres desde los `fixtures.json` de los runs fuente antes de crear el artifact final.
 - No enviar instrucciones monetarias, enlaces de pago, automatizacion de apuesta ni promesas de resultado.
 - Usar "exposicion analitica" / `Expo`, no lenguaje operativo de ejecucion.
 
@@ -167,8 +169,8 @@ El formato canonico de validaciones es:
 
 Wrappers versionados:
 
-- `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, corre `pnpm gana validate --date DATE`, corre `pnpm gana metrics daily --date DATE --scope daily-DATE`, y notifica las estadisticas a Discord.
-- `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de hoy en `America/Guatemala`, corre E2E completo Codex+Gemini con low-odds threshold `1.20`, y notifica recomendaciones.
+- `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, localiza el artifact publicado para esa fecha, corre `pnpm gana validate --date DATE --recommendation-artifact PATH`, corre `pnpm gana metrics daily --date DATE --scope daily-DATE --recommendation-artifact PATH`, notifica las estadisticas a Discord y genera feedback del council.
+- `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de manana en `America/Guatemala`, corre E2E completo Codex+Gemini con low-odds threshold `1.20`, pasa recomendaciones por council gate y notifica recomendaciones.
 - `scripts/gana-previous-day-validation-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
 - `scripts/gana-daily-e2e-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
 - `scripts/install-gana-hermes-cron.sh`: instala los jobs en Hermes cron.
@@ -186,6 +188,8 @@ Jobs esperados:
 gana-v9-validate-yesterday-discord  0 7 * * *
 gana-v9-daily-e2e-discord           0 10 * * *
 ```
+
+Los wrappers tienen locks por fecha bajo `.artifacts/gana-v9/cron/locks/` para evitar doble envio si Hermes cron y el crontab fallback quedan activos al mismo tiempo. Usar `--force` solo para reprocesos manuales deliberados.
 
 Detalles adicionales: `docs/daily-operations-cron.md`.
 
@@ -229,6 +233,29 @@ La cobertura valida:
 - Fallback de texto plano via Hermes gateway.
 - Fallback webhook.
 - Descubrimiento del artifact mas reciente.
+
+## Council gate y feedback
+
+El artifact final `daily-parlay-recommendations.json` incluye:
+
+- `councilCandidateRecommendations`: candidatos evaluados por el council, incluyendo los rechazados para auditoria.
+- `council`: decision por recomendacion (`approve`, `review`, `reject`), score y feedback.
+- `publishedTargets`: `predictionIds` y `parlayIds` usados por validacion/metricas.
+- `persistencePolicy`: deja fijo que el scope operativo diario son solo recomendaciones publicadas.
+
+El gate del council es bloqueante: candidatos con edge negativo, riesgo duro, edge inflado o score bajo quedan `reject` y no pasan a `recommendations`. El mensaje de council en Discord debe mostrar cada decision con partido, seleccion, odds, confianza, edge, stake, senales y razones resumidas; no basta una lista de scores.
+
+El mensaje del council debe mantenerse simple para uso operativo: resumen, picks para publicar/revisar y picks para no publicar con motivo breve en espanol. Si ningun parlay sobrevive al primer gate pero hay simples fuertes, el Daily E2E arma parlays de revision desde esas simples aprobadas por council para mantener siempre cobertura de parlays sin publicar parlays con edge negativo.
+
+El resultado del council se envia con:
+
+```bash
+node scripts/gana-council-review-notify.mjs \
+  --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD-full/daily-parlay-recommendations.json \
+  --gateway-target discord:1494071165453467721
+```
+
+Despues de validar, `scripts/gana-council-feedback.mjs` crea `council-feedback.json` y notifica el desempeno por decision/senal para cerrar el loop de mejora.
 
 ## Artifact esperado
 

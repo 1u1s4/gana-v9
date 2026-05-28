@@ -44,14 +44,7 @@ DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
 export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
 
-pnpm gana validate --date "$DATE"
-
-pnpm gana metrics daily \
+exec node scripts/gana-validate-metrics-and-notify.mjs \
   --date "$DATE" \
   --scope "${GANA_METRICS_SCOPE:-daily-$DATE}" \
-  --persist "${GANA_METRICS_PERSIST:-true}"
-
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
-  --date "$DATE" \
-  --transport discord-native \
   --gateway-target "$DISCORD_TARGET"

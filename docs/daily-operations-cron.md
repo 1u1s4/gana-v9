@@ -4,8 +4,8 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 
 ## Horarios
 
-- `07:00` Guatemala: validar el dia anterior, recalcular daily metrics y notificar estadisticas a Discord.
-- `10:00` Guatemala: correr Daily E2E del dia actual con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, y notificar recomendaciones/parlays a Discord.
+- `07:00` Guatemala: validar el dia anterior contra el artifact de recomendaciones publicado, recalcular daily metrics solo de picks publicados y notificar estadisticas a Discord.
+- `10:00` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, council gate, y notificar recomendaciones/parlays a Discord.
 - `13:00` Guatemala: correr strategy review del dia anterior cerrado, usando Codex GPT-5.5 con reasoning X-High, y actualizar el log central de mejoras del Harness.
 
 ## Scripts operativos
@@ -19,9 +19,11 @@ scripts/gana-previous-day-validation-notify.sh
 Este script:
 
 1. Calcula ayer en `America/Guatemala`.
-2. Ejecuta `pnpm gana validate --date YYYY-MM-DD`.
-3. Ejecuta `pnpm gana metrics daily --date YYYY-MM-DD --scope daily-YYYY-MM-DD`.
-4. Envia `daily-metrics.json` a Discord con embeds nativos usando Hermes gateway.
+2. Localiza el `daily-parlay-recommendations.json` publicado para esa fecha.
+3. Ejecuta `pnpm gana validate --date YYYY-MM-DD --recommendation-artifact PATH`.
+4. Ejecuta `pnpm gana metrics daily --date YYYY-MM-DD --scope daily-YYYY-MM-DD --recommendation-artifact PATH`.
+5. Envia `daily-metrics.json` y el mirror validado a Discord con embeds nativos usando Hermes gateway.
+6. Genera `council-feedback.json` para retroalimentar el gate del siguiente ciclo.
 
 Daily E2E y recomendaciones del dia:
 
@@ -31,12 +33,15 @@ scripts/gana-daily-e2e-notify.sh
 
 Este script:
 
-1. Calcula hoy en `America/Guatemala`.
+1. Calcula manana en `America/Guatemala`.
 2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --web live --parlay-profile portfolio-v2`.
 3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`, `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES=10000`) para cubrir el universo diario disponible y low-odds elegibles.
-4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto; low-odds significa exclusivamente mercado `h2h` casa/visitante con cuota menor o igual al umbral.
+4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto; low-odds cubre `h2h` casa/visitante y `double_chance` `home_or_draw`/`draw_or_away` dentro del umbral.
 5. Genera `portfolio-v2`, que incluye `parlay-diamante` como perfil conservador diario objetivo 1.10-1.20.
-6. Envia `daily-parlay-recommendations.json` a Discord con embeds nativos usando Hermes gateway.
+6. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
+7. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
+8. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
+9. Envia `daily-parlay-recommendations.json` y el resumen accionable del council a Discord con embeds nativos usando Hermes gateway.
 
 Strategy review del dia anterior:
 
@@ -149,6 +154,7 @@ Preview de estadisticas sin enviar:
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
   --date YYYY-MM-DD \
+  --recommendation-artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD-full/daily-parlay-recommendations.json \
   --dry-run \
   --gateway-target discord:1494071165453467721
 ```

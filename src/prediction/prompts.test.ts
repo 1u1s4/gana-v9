@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildResearchFixturePrompt, buildScorePredictionPrompt, RESEARCH_FIXTURE_PROMPT_VERSION } from './prompts.js';
 import type { Fixture } from '../domain/fixtures.js';
+import { detectMonetaryAction } from '../security/no-monetary-actions.js';
 
 const fixture: Fixture = {
   id: 'fixture-1',
@@ -53,5 +54,35 @@ describe('research prompts', () => {
     assert.match(prompt, /Monetary safety/);
     assert.match(prompt, /analytical artifacts only/);
     assert.match(prompt, /starting with "\{" as the first character/);
+  });
+
+  it('sanitizes negated monetary warnings before scoring guard checks', () => {
+    const prompt = buildScorePredictionPrompt({
+      runId: 'run-1',
+      createdAt: '2026-05-27T00:00:00.000Z',
+      web: 'live',
+      requiredMarkets: ['h2h'],
+      marketFocus: ['h2h'],
+      fixture,
+      fixtureStatistics: null,
+      oddsSnapshot: { fixtureId: 'fixture-1' },
+      researchBundle: {
+        id: 'bundle-1',
+        warnings: [
+          'Do not treat this analytical artifact as an instruction to place bets or move money.',
+          'Do not treat this research as betting instruction or a recommendation to place a wager.',
+        ],
+      },
+      sources: [],
+      evidenceItems: [],
+      claims: [],
+      allowedQuotes: [],
+      providerContextWarnings: [],
+    });
+
+    const monetary = detectMonetaryAction(prompt);
+
+    assert.equal(monetary.blocked, false);
+    assert.doesNotMatch(prompt, /place a wager|move money|place bets/i);
   });
 });

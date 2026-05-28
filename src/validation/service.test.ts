@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import { createRuntimeContext } from '../runtime/context.js';
@@ -408,6 +411,64 @@ describe('runValidation parlay and date targets', () => {
     assert.deepEqual(parlayQueries.map((query) => query.skip), [0]);
     assert.equal(predictionQueries[0].timezone, 'America/Guatemala');
     assert.equal(parlayQueries[0].timezone, 'America/Guatemala');
+  });
+
+  it('validates only targets from a published recommendations artifact when provided', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const root = mkdtempSync(join(tmpdir(), 'gana-validation-recommendations-'));
+    const recommendationArtifact = join(root, 'daily-parlay-recommendations.json');
+    writeFileSync(recommendationArtifact, JSON.stringify({
+      date: '2026-04-25',
+      recommendations: [
+        {
+          kind: 'parlay',
+          parlayId: 'parlay-1',
+          legs: [{ predictionId: 'prediction-parlay-leg-1' }],
+        },
+        {
+          kind: 'atomic-prediction',
+          predictionId: 'prediction-atomic-1',
+          parlayId: 'atomic-prediction-atomic-1',
+          legs: [{ predictionId: 'prediction-atomic-1' }],
+        },
+      ],
+    }));
+    const predictionReads: string[] = [];
+    const parlayReads: string[] = [];
+
+    const result = await runValidation(cfg, { date: '2026-04-25', recommendationArtifact }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: fetcher(),
+      repositories: repositories({
+        predictions: {
+          findById: async (id: string) => {
+            predictionReads.push(id);
+            return prediction({ id });
+          },
+          listForFixtureDate: async () => {
+            throw new Error('date-wide prediction validation should not run');
+          },
+        },
+        parlays: {
+          ...repositories().parlays,
+          findById: async (id: string) => {
+            parlayReads.push(id);
+            return repositories().parlays.findById(id);
+          },
+          listForFixtureDate: async () => {
+            throw new Error('date-wide parlay validation should not run');
+          },
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(predictionReads, ['prediction-parlay-leg-1', 'prediction-atomic-1']);
+    assert.deepEqual(parlayReads, ['parlay-1']);
+    assert.equal(result.validations.length, 3);
+    assert.equal(result.target.recommendationArtifact, recommendationArtifact);
   });
 
   it('keeps date validation pending when unsettled fixtures exist alongside already lost settled targets', async () => {

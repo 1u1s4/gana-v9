@@ -13,6 +13,8 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 
 - Daily recommendations artifact: `daily-parlay-recommendations.json`
 - Recommendation types: ranked parlays plus `atomic-prediction` entries, which are high-confidence single-selection recommendations shaped like one-leg parlays.
+- Council review artifact: `recommendation-council.json`, embedded into the final recommendations artifact as `council`.
+- Council feedback artifact: `council-feedback.json`, generated after validation from the published recommendations and validation artifacts.
 - Transport: native Discord embeds via Hermes gateway config by default (`--transport discord-native`), plain Hermes gateway text with `--transport hermes-gateway`, or webhook with `--transport webhook`
 - Gateway target: the Gana Discord channel by default, or a specific target from Hermes such as `discord:#general`
 - Discord webhook: `DISCORD_WEBHOOK_URL` or `--webhook-url` only when using `--transport webhook`
@@ -70,6 +72,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Header embed format: `🏆 Gana v9 · Recomendaciones`, parlay/simple counts, and artifact date as `DD/MM/YYYY`.
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
+- Do not publish raw fixture UUIDs or `Fixture ...` placeholders when persisted fixture metadata is available; the daily artifact should already carry hydrated display labels from source-run `fixtures.json`.
 - Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
 - Native Discord recommendation blocks are color-coded: yellow for the principal/rank-1 parlay, green for secondary parlays, and purple for simple recommendations.
 - Preserve the established style in future sends: emoji-led scan lines, native Discord boxes, blockquoted selections, compact metrics, and the final manual-review control.
@@ -81,6 +84,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Do not include payment links, bookmaker instructions, auto-execution language, or monetary execution claims.
 - Validation stat notifications must use the same native embed policy and must label the output as analytical statistics.
 - Validation notifications should include the recommendation mirror unless `--no-recommendation-mirror` is explicitly provided. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.
+- Council notifications must be decision-useful and easy to read: show a short summary, picks to publish/review, and picks to block with a brief Spanish reason. A bare list of scores is not acceptable.
 
 ## Style Persistence
 
@@ -94,8 +98,8 @@ Use `scripts/notify-discord-daily-stats.mjs` for validation/day-after statistics
 
 Repo-level cron wrappers:
 
-- `scripts/gana-daily-e2e-and-notify.mjs`: runs full daily E2E for today's Guatemala date and sends recommendations.
-- `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date, builds daily metrics, and sends stats.
+- `scripts/gana-daily-e2e-and-notify.mjs`: runs full daily E2E for tomorrow's Guatemala date, applies the recommendation council gate, sends recommendations, and sends the council result.
+- `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date scoped to the published recommendations artifact, builds daily metrics scoped to those same published targets, sends stats, and sends council feedback.
 - `scripts/install-gana-hermes-cron.sh`: installs Hermes cron jobs at 7am/10am America/Guatemala.
 - `scripts/install-gana-cron.mjs`: installs a system crontab fallback at 7am/10am America/Guatemala.
 

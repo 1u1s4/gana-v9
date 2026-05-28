@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
@@ -10,7 +10,7 @@ const TIMEZONE = 'America/Guatemala';
 const ARTIFACT_ROOT = '.artifacts/gana-v9';
 
 const args = parseArgs(process.argv.slice(2));
-const date = args.date ?? guatemalaDate(0);
+const date = args.date ?? guatemalaDate(1);
 const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
 const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
@@ -20,8 +20,13 @@ if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
 }
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}.log`);
 const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
+const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `daily-e2e-${date}.lock`);
 
 mkdirSync(dirname(logPath), { recursive: true });
+if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, dailyBatchId, startedAt: new Date().toISOString() })) {
+  console.log(JSON.stringify({ ok: true, skipped: true, reason: 'daily-e2e already ran or is running for this date', date, dailyBatchId, lockPath }, null, 2));
+  process.exit(0);
+}
 const startedAt = new Date();
 const command = [
   'gana',
@@ -82,6 +87,21 @@ try {
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
     console.log(notify.stdout.trim());
+    const councilNotify = spawnSync('node', [
+      'scripts/gana-council-review-notify.mjs',
+      '--artifact', recommendationsPath,
+      '--transport', 'discord-native',
+      '--gateway-target', gatewayTarget,
+    ], {
+      cwd: REPO_ROOT,
+      env,
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    writeLogLine(logFd, councilNotify.stdout.trim());
+    if (councilNotify.stderr.trim()) writeLogLine(logFd, councilNotify.stderr.trim());
+    if (councilNotify.status !== 0) throw new Error(`council notification failed with exit ${councilNotify.status}`);
+    console.log(councilNotify.stdout.trim());
     if (result.status !== 0) {
       writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
     }
@@ -120,9 +140,32 @@ function parseArgs(argv) {
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));
+    else if (arg === '--force') parsed.force = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return parsed;
+}
+
+function acquireOnce(path, ttlMs, payload) {
+  mkdirSync(dirname(path), { recursive: true });
+  if (existsSync(path)) {
+    const ageMs = Date.now() - statSync(path).mtimeMs;
+    if (ageMs < ttlMs) return false;
+    rmSync(path, { force: true });
+  }
+  let fd;
+  try {
+    fd = openSync(path, 'wx');
+  } catch (err) {
+    if (err?.code === 'EEXIST') return false;
+    throw err;
+  }
+  try {
+    writeSync(fd, `${JSON.stringify(payload, null, 2)}\n`);
+  } finally {
+    closeSync(fd);
+  }
+  return true;
 }
 
 function guatemalaDate(offsetDays) {

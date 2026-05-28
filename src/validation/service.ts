@@ -10,6 +10,7 @@ import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { getPrismaClient } from '../storage/db.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
+import { readRecommendationArtifactTargets } from '../recommendations/artifact.js';
 import type {
   ArtifactRecord,
   FixtureRecord,
@@ -39,6 +40,7 @@ export interface RunValidationInput {
   date?: string;
   predictionId?: string;
   parlayId?: string;
+  recommendationArtifact?: string;
 }
 
 export interface ValidationGateResult {
@@ -188,7 +190,7 @@ export async function runValidation(
       ? [await validatePredictionTarget(validationContext, input.predictionId, evaluatedAt, runId)]
       : input.parlayId
         ? [await validateParlayTarget(validationContext, input.parlayId, evaluatedAt, runId)]
-        : await validateDateTarget(validationContext, input.date as string, evaluatedAt, runId, config.apiFootball.timezone);
+        : await validateDateTarget(validationContext, input, evaluatedAt, runId, config.apiFootball.timezone);
 
     const analytics = buildValidationAnalytics(pending);
     const gateResult = gateFromValidations(pending.map((item) => item.view));
@@ -235,11 +237,29 @@ export async function runValidation(
 
 async function validateDateTarget(
   context: ValidationExecutionContext,
-  date: string,
+  input: RunValidationInput & { date?: string },
   evaluatedAt: string,
   runId: string,
   timezone?: string,
 ): Promise<PendingValidation[]> {
+  const date = input.date as string;
+  if (input.recommendationArtifact) {
+    const targets = readRecommendationArtifactTargets(input.recommendationArtifact);
+    const predictions = await Promise.all(targets.predictionIds.map((predictionId) => context.repositories.predictions.findById(predictionId)));
+    const parlays = await Promise.all(targets.parlayIds.map((parlayId) => context.repositories.parlays.findById(parlayId)));
+    const predictionValidations = await mapLimit(
+      predictions.filter((prediction): prediction is PredictionRecord => Boolean(prediction)),
+      DATE_VALIDATION_CONCURRENCY,
+      (prediction) => validatePredictionRecord(context, prediction, evaluatedAt, runId),
+    );
+    const parlayValidations = await mapLimit(
+      parlays.filter((parlay): parlay is ParlayRecord => Boolean(parlay)),
+      DATE_VALIDATION_CONCURRENCY,
+      (parlay) => validateParlayRecord(context, parlay, evaluatedAt, runId),
+    );
+    return [...predictionValidations, ...parlayValidations];
+  }
+
   const [predictions, parlays] = await Promise.all([
     listAllFixtureDateRecords((query) => context.repositories.predictions.listForFixtureDate(date, query), {
       status: VALIDATABLE_STATUSES,
@@ -722,6 +742,9 @@ function blockedResult(
 function assertSingleTarget(input: RunValidationInput): void {
   const count = [input.date, input.predictionId, input.parlayId].filter((value) => typeof value === 'string' && value.trim()).length;
   if (count !== 1) throw new Error('validate requires exactly one of --date, --prediction-id, or --parlay-id.');
+  if (input.recommendationArtifact && !input.date) {
+    throw new Error('--recommendation-artifact can only be used with --date.');
+  }
 }
 
 function marketKey(value: string): MarketKey {

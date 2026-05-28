@@ -75,6 +75,8 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
     providerContextWarnings: input.providerContextWarnings ?? [],
   };
 
+  const safePayload = payload ? sanitizePromptPayload(payload) : null;
+
   return [
     'Produce structured football research for the fixture below.',
     'Return only valid JSON starting with "{" as the first character. Do not wrap it in markdown. Do not include prose outside JSON.',
@@ -130,7 +132,7 @@ export function buildResearchFixturePrompt(input: BuildResearchFixturePromptInpu
     }, null, 2),
     '',
     'Input:',
-    JSON.stringify(payload, null, 2),
+    JSON.stringify(safePayload, null, 2),
   ].join('\n');
 }
 
@@ -154,6 +156,7 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
       providerContextWarnings: input.providerContextWarnings ?? [],
     }
     : null;
+  const safePayload = payload ? sanitizePromptPayload(payload) : null;
 
   return [
     'Score football prediction candidates for the provided fixture context.',
@@ -195,6 +198,25 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
       warnings: [],
       metadata: {},
     }, null, 2),
-    ...(payload ? ['', 'Input:', JSON.stringify(payload, null, 2)] : []),
+    ...(safePayload ? ['', 'Input:', JSON.stringify(safePayload, null, 2)] : []),
   ].join('\n');
+}
+
+function sanitizePromptPayload(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizePromptText(value);
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(sanitizePromptPayload);
+  if (typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, sanitizePromptPayload(item)]),
+  );
+}
+
+function sanitizePromptText(value: string): string {
+  return value
+    .replace(/\bplace bets?\b/gi, 'perform prohibited monetary actions')
+    .replace(/\bplace a wager\b/gi, 'perform prohibited monetary actions')
+    .replace(/\bexecute wagers?\b/gi, 'perform prohibited monetary actions')
+    .replace(/\bmove money\b/gi, 'perform prohibited fund movement')
+    .replace(/\bbetting instruction\b/gi, 'monetary-action instruction');
 }

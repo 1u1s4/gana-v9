@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { AgentConfig } from '../config.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { lowOddsScanProviderConfig } from '../filters/low-odds.js';
@@ -21,6 +23,8 @@ import { updateRuntimeContext, type RuntimeContext } from '../runtime/context.js
 import { runPipeline, type RunPipelineResult } from '../runtime/run-service.js';
 import type { PipelineValidationMode, RunPipelineDependencies, RunPipelineInput } from '../runtime/pipeline.js';
 import { buildDailyProviderComparison, type DailyProviderComparison, type DailyProviderConsensus } from './comparison.js';
+import { applyCouncilDecisions, runRecommendationCouncil } from '../council/recommendation-council.js';
+import { recommendationArtifactTargets } from '../recommendations/artifact.js';
 
 export type DailyE2EProvider = Extract<AgentProvider, 'codex' | 'gemini'>;
 
@@ -142,6 +146,7 @@ const DAILY_PARLAY_RECOMMENDATION_LIMIT = 4;
 const DAILY_PARLAY_ANALYSIS_TOP = 12;
 const DAILY_FALLBACK_PARLAY_LIMIT = 3;
 const DAILY_FALLBACK_PARLAY_LEGS = 2;
+const DAILY_COUNCIL_COMPOSED_PARLAY_LIMIT = 3;
 const DAILY_PARLAY_CONSERVATIVE_MAX_ODDS = 2.2;
 const DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE = 0.7;
 const DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE = 0.78;
@@ -552,9 +557,44 @@ export async function runDailyE2E(
       parlayLegFixtureIds,
     ).slice(0, DAILY_ATOMIC_RECOMMENDATION_LIMIT);
   }
-  const finalRecommendations: DailyFinalRecommendation[] = applyDailyStakeRecommendations(
+  let finalRecommendations: DailyFinalRecommendation[] = applyDailyStakeRecommendations(
     [...parlayRecommendations, ...atomicRecommendations],
   );
+  let councilCandidateRecommendations = finalRecommendations;
+  let council = runRecommendationCouncil({
+    date: input.date,
+    dailyBatchId,
+    generatedAt: completedAt.toISOString(),
+    recommendations: councilCandidateRecommendations,
+    providerComparison: providerComparison.summary,
+    validationFreshness,
+  });
+  finalRecommendations = applyCouncilDecisions(finalRecommendations, council);
+  if (!finalRecommendations.some((recommendation) => recommendation.kind === 'parlay')) {
+    const composedParlays = buildCouncilComposedParlayRecommendations(finalRecommendations);
+    if (composedParlays.length) {
+      const parlayPredictionIds = recommendationLegPredictionIds(composedParlays);
+      const remainingAtomic = finalRecommendations.filter((recommendation) =>
+        recommendation.kind !== 'atomic-prediction' || !parlayPredictionIds.has(recommendation.predictionId)
+      );
+      councilCandidateRecommendations = applyDailyStakeRecommendations([
+        ...composedParlays,
+        ...remainingAtomic,
+      ]);
+      council = runRecommendationCouncil({
+        date: input.date,
+        dailyBatchId,
+        generatedAt: completedAt.toISOString(),
+        recommendations: councilCandidateRecommendations,
+        providerComparison: providerComparison.summary,
+        validationFreshness,
+      });
+      finalRecommendations = applyCouncilDecisions(councilCandidateRecommendations, council);
+    }
+  }
+  parlayRecommendations = finalRecommendations.filter((recommendation) => recommendation.kind === 'parlay');
+  atomicRecommendations = finalRecommendations.filter((recommendation): recommendation is AtomicPredictionRecommendation => recommendation.kind === 'atomic-prediction');
+  const publishedTargets = recommendationArtifactTargets({ recommendations: finalRecommendations });
   const offDateLegs = recommendationLegsOutsideRequestedDate(
     finalRecommendations,
     input.date,
@@ -644,23 +684,38 @@ export async function runDailyE2E(
       recommendations: finalRecommendations.length,
       parlayRecommendations: parlayRecommendations.length,
       atomicRecommendations: atomicRecommendations.length,
-      strictParlayRecommendations: strictParlayRecommendationCount,
-      fallbackParlayRecommendations: Math.max(0, parlayRecommendations.length - strictParlayRecommendationCount),
-      strictAtomicRecommendations: strictAtomicRecommendationCount,
-      fallbackAtomicRecommendations: Math.max(0, atomicRecommendations.length - strictAtomicRecommendationCount),
+      strictParlayRecommendations: parlayRecommendations.filter((recommendation) => recommendation.selectionMode !== 'analytical-fallback').length,
+      fallbackParlayRecommendations: parlayRecommendations.filter((recommendation) => recommendation.selectionMode === 'analytical-fallback').length,
+      strictAtomicRecommendations: atomicRecommendations.filter((recommendation) => recommendation.selectionMode !== 'analytical-fallback').length,
+      fallbackAtomicRecommendations: atomicRecommendations.filter((recommendation) => recommendation.selectionMode === 'analytical-fallback').length,
       comparisonItems: providerComparison.items.length,
       consensusPredictions: providerConsensus.summary.consensusPredictions,
+      councilApproved: council.approvedCount,
+      councilReviewRequired: council.reviewCount,
+      councilRejected: council.rejectedCount,
     },
+    council: {
+      version: council.councilVersion,
+      status: council.status,
+      approved: council.approvedCount,
+      reviewRequired: council.reviewCount,
+      rejected: council.rejectedCount,
+      panel: council.panel,
+      inspiredBy: council.inspiredBy,
+    },
+    publishedTargets,
     analyticalArtifactOnly: true,
     executionCapability: 'none',
   };
   const providerComparisonPath = writeJsonArtifact(dailyBatchId, 'daily-provider-comparison.json', providerComparison);
   const providerConsensusPath = writeJsonArtifact(dailyBatchId, 'daily-provider-consensus.json', providerConsensus);
+  const councilPath = writeJsonArtifact(dailyBatchId, 'recommendation-council.json', council);
   const summaryPath = writeJsonArtifact(dailyBatchId, 'daily-e2e-summary.json', summary);
   const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', jsonValue({
     dailyBatchId,
     date: input.date,
     sourceRunIds: parlayAnalysisRunIds,
+    councilCandidateRecommendations,
     recommendations: finalRecommendations,
     parlayRecommendations,
     atomicRecommendations,
@@ -689,6 +744,15 @@ export async function runDailyE2E(
         blockedRiskFlags: DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS,
       },
       validationFreshness,
+      councilGate: {
+        version: council.councilVersion,
+        panel: council.panel,
+        approveAt: council.policy.approveAt,
+        reviewAt: council.policy.reviewAt,
+        keepDecisions: council.policy.keepDecisions,
+        qualityGate: council.policy.qualityGate,
+        feedbackLoopArtifact: council.feedbackLoop.outcomeArtifact,
+      },
       atomicExcludesSelectedParlayLegs: true,
       atomicExcludesSelectedParlayFixtures: true,
       atomicMaxPerFixture: 1,
@@ -715,8 +779,18 @@ export async function runDailyE2E(
       ],
     },
     diagnostics: parlayAnalysis?.diagnostics ?? null,
+    council,
+    publishedTargets,
+    persistencePolicy: {
+      finalOperationalStore: 'daily-parlay-recommendations.json',
+      validationAndMetricsScope: 'published-recommendations-only',
+      predictionIds: publishedTargets.predictionIds,
+      parlayIds: publishedTargets.parlayIds,
+      candidatePredictions: 'used as transient analytical workspace for ranking, council review, and audit; not used as daily published scope',
+    },
     providerComparisonPath,
     providerConsensusPath,
+    councilPath,
     analyticalArtifactOnly: true,
     executionCapability: 'none',
   }));
@@ -1481,7 +1555,32 @@ function fallbackCandidateScore(candidate: AtomicPredictionCandidate): number {
   const parlayEligibleBonus = prediction.parlayEligible === false ? -0.25 : 0.08;
   const riskPenalty = fallbackRiskFlags(prediction).length * 0.025;
   const oddsPenalty = Math.log2(Math.max(1.01, prediction.odds)) * 0.04;
-  return round(statusBonus + parlayEligibleBonus + (prediction.confidence * 0.7) + (Math.max(0, candidate.edge) * 0.35) - riskPenalty - oddsPenalty, 6);
+  const focusBonus = fixtureFocusScore(candidate);
+  return round(statusBonus + parlayEligibleBonus + (prediction.confidence * 0.7) + (Math.max(0, candidate.edge) * 0.35) + focusBonus - riskPenalty - oddsPenalty, 6);
+}
+
+function fixtureFocusScore(candidate: Pick<AtomicPredictionCandidate, 'fixture' | 'display' | 'prediction'>): number {
+  const signals = fixtureFocusSignals(candidate);
+  return (signals.includes('low-odds') ? 0.035 : 0)
+    + (signals.includes('women-youth-development') ? 0.03 : 0);
+}
+
+function fixtureFocusSignals(candidate: Pick<AtomicPredictionCandidate, 'fixture' | 'display' | 'prediction'>): string[] {
+  const signals: string[] = [];
+  if (candidate.prediction.odds <= 1.3) signals.push('low-odds');
+  const text = [
+    candidate.fixture,
+    candidate.display?.fixtureLabel,
+    candidate.display?.homeTeamName,
+    candidate.display?.awayTeamName,
+    candidate.display?.leagueName,
+    ...(candidate.prediction.warnings ?? []),
+    candidate.prediction.rationale ?? '',
+  ].filter(Boolean).join(' ');
+  if (/\b(w|women|femenil|femenino|femenina|u-?1[7-9]|u-?2[0-3]|sub[- ]?1[7-9]|sub[- ]?2[0-3]|reserves?|ii|b)\b/i.test(text)) {
+    signals.push('women-youth-development');
+  }
+  return uniqueStrings(signals);
 }
 
 function toFallbackParlayRecommendation(candidates: AtomicPredictionCandidate[], rank: number): DailyFinalRecommendation {
@@ -1702,6 +1801,122 @@ function nearestStakeBucket(value: number): number {
   DAILY_STAKE_BUCKETS[0]);
 }
 
+function buildCouncilComposedParlayRecommendations(
+  recommendations: readonly DailyFinalRecommendation[],
+): DailyFinalRecommendation[] {
+  const atomic = recommendations
+    .filter((recommendation): recommendation is AtomicPredictionRecommendation => recommendation.kind === 'atomic-prediction')
+    .filter((recommendation) => recommendation.legs.length > 0)
+    .sort((a, b) =>
+      b.score - a.score
+      || b.expectedEdge - a.expectedEdge
+      || b.aggregateConfidence - a.aggregateConfidence
+      || a.combinedOdds - b.combinedOdds
+    );
+  const parlays: DailyFinalRecommendation[] = [];
+  const usedPredictionIds = new Set<string>();
+  const usedFixtureIds = new Set<string>();
+
+  for (let index = 0; index < atomic.length && parlays.length < DAILY_COUNCIL_COMPOSED_PARLAY_LIMIT; index += 1) {
+    const first = atomic[index] as AtomicPredictionRecommendation;
+    if (usedPredictionIds.has(first.predictionId) || usedFixtureIds.has(first.legs[0]?.fixtureId ?? '')) continue;
+    const second = atomic.find((candidate, candidateIndex) =>
+      candidateIndex > index
+      && !usedPredictionIds.has(candidate.predictionId)
+      && !usedFixtureIds.has(candidate.legs[0]?.fixtureId ?? '')
+      && candidate.legs[0]?.fixtureId !== first.legs[0]?.fixtureId
+    );
+    if (!second) break;
+    const parlay = councilComposedParlay([first, second], parlays.length + 1);
+    parlays.push(parlay);
+    for (const recommendation of [first, second]) {
+      usedPredictionIds.add(recommendation.predictionId);
+      const fixtureId = recommendation.legs[0]?.fixtureId;
+      if (fixtureId) usedFixtureIds.add(fixtureId);
+    }
+  }
+
+  return parlays;
+}
+
+function councilComposedParlay(
+  recommendations: [AtomicPredictionRecommendation, AtomicPredictionRecommendation],
+  rank: number,
+): DailyFinalRecommendation {
+  const legs = recommendations.map((recommendation) => ({
+    ...recommendation.legs[0],
+    banker: true,
+    bankerReason: `council-composed parlay leg: confidence ${round(recommendation.aggregateConfidence, 3)} edge ${round(recommendation.expectedEdge, 3)}`,
+  }));
+  const combinedOdds = round(legs.reduce((product, leg) => product * Number(leg.odds ?? 1), 1), 6);
+  const aggregateConfidence = round(legs.reduce((product, leg) => product * clamp(Number(leg.confidence ?? 0), 0.01, 0.99), 1), 6);
+  const adjustedProbability = round(clamp(aggregateConfidence, 0.01, 0.99), 6);
+  const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
+  const sourceRunIds = uniqueStrings(recommendations.flatMap((recommendation) => recommendation.sourceRunIds));
+  const providers = uniqueStrings(recommendations.flatMap((recommendation) => recommendation.providers));
+  const riskFlags = uniqueStrings([
+    'council-composed',
+    'review-required',
+    ...recommendations.flatMap((recommendation) => recommendation.riskFlags ?? [])
+      .filter((flag) => flag !== 'single-selection'),
+  ]);
+  const parlayId = `council-parlay-${createHash('sha256')
+    .update(legs.map((leg) => leg.predictionId).join('|'))
+    .digest('hex')
+    .slice(0, 16)}`;
+
+  return {
+    kind: 'parlay',
+    rank,
+    parlayId,
+    sourceRunId: sourceRunIds[0] ?? null,
+    sourceRunIds,
+    profile: 'low-variance',
+    validationStatus: 'unvalidated',
+    harnessStatus: 'review-required',
+    selectionMode: recommendations.some((recommendation) => recommendation.selectionMode === 'analytical-fallback')
+      ? 'analytical-fallback'
+      : 'promotion-gate',
+    fallbackReasons: ['council composed parlay from reviewed simple recommendations'],
+    combinedOdds,
+    aggregateConfidence,
+    adjustedProbability,
+    expectedEdge,
+    score: round((aggregateConfidence * 0.62) + (Math.max(0, expectedEdge) * 0.28) - (riskFlags.length * 0.01), 6),
+    exposure: {
+      units: 0,
+      percentOfAnalyticalBankroll: 0,
+      policy: 'council-composed-review-only-exposure',
+    },
+    stake: {
+      units: 0,
+      percentOfBankroll: 0,
+      policy: 'council-composed-review-only-stake',
+    },
+    bankerLegs: legs.map((leg) => ({
+      predictionId: leg.predictionId,
+      fixtureId: leg.fixtureId,
+      fixture: leg.fixture,
+      ...(leg.display ? { display: leg.display } : {}),
+      market: leg.market,
+      selection: leg.selection,
+      line: leg.line,
+      odds: leg.odds,
+      confidence: leg.confidence,
+      reason: leg.bankerReason ?? 'council-composed parlay leg',
+    })),
+    reasons: [
+      'council composed parlay: daily output requires parlay coverage',
+      'built from simple recommendations that passed the council review gate',
+      `providers: ${providers.join(', ') || 'unknown'}`,
+      `aggregate confidence ${round(aggregateConfidence, 3)}`,
+      `adjusted edge ${round(expectedEdge, 3)}`,
+    ],
+    riskFlags,
+    legs,
+  };
+}
+
 function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): AtomicPredictionRecommendation {
   const ordered = [...candidates].sort((a, b) =>
     b.prediction.confidence - a.prediction.confidence
@@ -1716,6 +1931,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
   const edge = round(average(ordered.map((candidate) => candidate.edge)), 6);
   const adjustedProbability = round(clamp(confidence * (providers.length > 1 ? 1.02 : 1), 0.01, 0.99), 6);
   const riskFlags = atomicRiskFlags(primary.prediction, providers.length);
+  const focusSignals = fixtureFocusSignals(primary);
   const leg = {
     predictionId: primary.prediction.id,
     fixtureId: primary.prediction.fixtureId,
@@ -1750,7 +1966,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     aggregateConfidence: confidence,
     adjustedProbability,
     expectedEdge: edge,
-    score: atomicRecommendationScore(confidence, edge, providers.length, riskFlags.length),
+    score: round(atomicRecommendationScore(confidence, edge, providers.length, riskFlags.length) + fixtureFocusScore(primary), 6),
     exposure: {
       units: 0,
       percentOfAnalyticalBankroll: 0,
@@ -1773,6 +1989,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
       `confidence ${round(confidence, 3)}`,
       `edge ${round(edge, 3)}`,
       providers.length > 1 ? `provider agreement: ${providers.join(', ')}` : `provider: ${primary.provider}`,
+      ...focusSignals.map((signal) => `focus signal: ${signal}`),
     ],
     riskFlags,
     legs: [leg],
@@ -1868,25 +2085,84 @@ function hydrateRecommendationDisplay<T extends DailyFinalRecommendation>(
 }
 
 function fixtureDisplayMap(fixtures: Fixture[]): Map<string, RecommendationLegDisplay> {
-  return new Map(fixtures.map((fixture) => {
-    const homeTeamName = fixture.homeTeamName ?? fixture.homeTeamId;
-    const awayTeamName = fixture.awayTeamName ?? fixture.awayTeamId;
-    return [fixture.id, {
-      fixtureLabel: `${homeTeamName} vs ${awayTeamName}`,
-      homeTeamName,
-      awayTeamName,
-      ...(fixture.competitionId ? { leagueName: String(fixture.competitionId) } : {}),
-      kickoffLocal: fixture.scheduledAt,
-    }];
-  }));
+  const displays = new Map<string, RecommendationLegDisplay>();
+  for (const fixture of fixtures) {
+    const display = fixtureDisplay(fixture);
+    if (!display) continue;
+    const existing = displays.get(fixture.id);
+    if (!existing || fixtureDisplayQuality(display) > fixtureDisplayQuality(existing)) {
+      displays.set(fixture.id, display);
+    }
+  }
+  return displays;
 }
 
 function displayFixturesFromPipelineResult(result: RunPipelineResult | undefined): Fixture[] {
   if (!result) return [];
   return [
+    ...displayFixturesFromArtifactDir(result.artifactDir),
     ...(result.fixtures ?? []),
     ...(result.lowOddsScan?.candidateFixtures ?? []),
   ];
+}
+
+function displayFixturesFromArtifactDir(artifactDir: string | undefined): Fixture[] {
+  if (!artifactDir) return [];
+  try {
+    const payload = JSON.parse(readFileSync(join(artifactDir, 'fixtures.json'), 'utf-8')) as unknown;
+    const fixtures = fixtureArrayFromPayload(payload);
+    return fixtures.filter(isFixtureLike);
+  } catch {
+    return [];
+  }
+}
+
+function fixtureArrayFromPayload(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === 'object' && Array.isArray((payload as { fixtures?: unknown }).fixtures)) {
+    return (payload as { fixtures: unknown[] }).fixtures;
+  }
+  return [];
+}
+
+function isFixtureLike(value: unknown): value is Fixture {
+  return Boolean(value)
+    && typeof value === 'object'
+    && typeof (value as { id?: unknown }).id === 'string';
+}
+
+function fixtureDisplay(fixture: Fixture): RecommendationLegDisplay | undefined {
+  const homeTeamName = preferredDisplayName(fixture.homeTeamName, fixture.homeTeamId);
+  const awayTeamName = preferredDisplayName(fixture.awayTeamName, fixture.awayTeamId);
+  if (!homeTeamName || !awayTeamName) return undefined;
+  const leagueName = preferredDisplayName((fixture as { competitionName?: unknown }).competitionName, fixture.competitionId);
+  return {
+    fixtureLabel: `${homeTeamName} vs ${awayTeamName}`,
+    homeTeamName,
+    awayTeamName,
+    ...(leagueName ? { leagueName } : {}),
+    kickoffLocal: fixture.scheduledAt,
+  };
+}
+
+function preferredDisplayName(...values: unknown[]): string | undefined {
+  const strings = values
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return strings.find((value) => !isUuidLike(value)) ?? strings[0];
+}
+
+function fixtureDisplayQuality(display: RecommendationLegDisplay): number {
+  return [
+    display.homeTeamName,
+    display.awayTeamName,
+    display.fixtureLabel,
+    display.leagueName,
+  ].reduce((score, value) => {
+    if (!value) return score;
+    return score + (shouldReplaceFixtureLabel(value) ? 0 : 1);
+  }, display.kickoffLocal ? 1 : 0);
 }
 
 function recommendationLegsOutsideRequestedDate(

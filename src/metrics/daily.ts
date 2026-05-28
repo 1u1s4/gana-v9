@@ -3,12 +3,14 @@ import type { AgentConfig } from '../config.js';
 import { writeArtifact } from '../runtime/artifacts.js';
 import { fixtureDateRange } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
+import { readRecommendationArtifactTargets, type RecommendationArtifactTargets } from '../recommendations/artifact.js';
 
 export interface RunDailyMetricsInput {
   date: string;
   days?: number;
   persist?: boolean;
   scope?: string;
+  recommendationArtifact?: string;
 }
 
 export interface DailyMetricsRunResult {
@@ -143,6 +145,9 @@ export async function runDailyMetrics(
 
   const db = deps.db ?? getPrismaClient() as unknown as DailyMetricsDb;
   const dates = rollingDates(input.date, days);
+  const recommendationTargets = input.recommendationArtifact
+    ? readRecommendationArtifactTargets(input.recommendationArtifact)
+    : undefined;
   const metrics: DailyMetricSnapshot[] = [];
   let persisted = 0;
 
@@ -152,6 +157,7 @@ export async function runDailyMetrics(
       timezone: config.apiFootball.timezone,
       scope,
       generatedAt,
+      recommendationTargets,
     });
     metrics.push(snapshot);
     if (persist) {
@@ -196,6 +202,9 @@ export async function runDailyMetrics(
     days,
     scope,
     generatedAt: generatedAt.toISOString(),
+    recommendationArtifact: input.recommendationArtifact ?? null,
+    targetPolicy: recommendationTargets ? 'published-recommendations-only' : 'all-persisted-targets',
+    recommendationTargets: recommendationTargets ?? null,
     persisted,
     metrics,
     analyticalArtifactOnly: true,
@@ -207,12 +216,15 @@ export async function runDailyMetrics(
 
 async function computeDailyMetricSnapshot(
   db: DailyMetricsDb,
-  input: { date: string; timezone: string; scope: string; generatedAt: Date },
+  input: { date: string; timezone: string; scope: string; generatedAt: Date; recommendationTargets?: RecommendationArtifactTargets },
 ): Promise<DailyMetricSnapshot> {
   const window = fixtureDateRange(input.date, input.timezone);
+  const predictionIdFilter = input.recommendationTargets ? { id: { in: input.recommendationTargets.predictionIds } } : {};
+  const parlayIdFilter = input.recommendationTargets ? { id: { in: input.recommendationTargets.parlayIds } } : {};
   const [predictions, parlays] = await Promise.all([
     db.prediction.findMany({
       where: {
+        ...predictionIdFilter,
         fixture: { scheduledAt: { gte: window.start, lt: window.end } },
       },
       include: {
@@ -221,6 +233,7 @@ async function computeDailyMetricSnapshot(
     }),
     db.parlay.findMany({
       where: {
+        ...parlayIdFilter,
         legs: { some: { fixture: { scheduledAt: { gte: window.start, lt: window.end } } } },
       },
       include: {

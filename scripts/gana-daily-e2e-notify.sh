@@ -38,7 +38,7 @@ require_command() {
 require_command node
 require_command pnpm
 
-DATE="${GANA_DAILY_DATE:-$(gt_date 0)}"
+DATE="${GANA_DAILY_DATE:-$(gt_date 1)}"
 DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
 
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
