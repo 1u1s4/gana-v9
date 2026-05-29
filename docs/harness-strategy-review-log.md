@@ -293,3 +293,24 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Add a parlay aggregate-confidence dead-zone rule for 80-89% (proposed) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/ranker.ts
 - [medium] Shift portfolio-v2 exploration toward balanced and market-diverse profiles (needs-more-data) — src/daily/e2e.ts, src/parlay/service.ts
 - [medium] Raise low-price double_chance value requirements (ready-for-implementation) — src/scoring/edge-gate.ts, src/prediction/service.ts, src/parlay/eligibility.ts
+
+## 2026-05-29 · strategy-2026-05-28
+
+- Run: strategy-review-2026-05-28-c81cd6da
+- Dates: 2026-05-28
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-28-c81cd6da/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-28-c81cd6da/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 55-39 hit 58.5% (129 total)
+- Parlays: 0-4 hit 0.0% (4 total)
+
+### Proposed Modifications
+
+- [high] Require positive-edge minimum-confidence fallback parlays (ready-for-implementation) — src/daily/e2e.ts
+- [high] Quarantine non-core parlay profiles from operational validation (ready-for-implementation) — src/parlay/service.ts, src/daily/e2e.ts, src/parlay/analysis.ts
+- [high] Add bucket-level validation coverage gates (ready-for-implementation) — src/daily/e2e.ts, src/strategy-review/daily.ts, src/metrics/daily.ts
+- [medium] Raise promotion floors for low-confidence and high-odds singles (proposed) — src/prediction/service.ts, src/prediction/gates.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+- [high] Convert low-liquidity youth and development signal from bonus to risk gate (proposed) — src/daily/e2e.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Throttle BTTS, corners, and fragile totals until evidence is market-specific (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, src/daily/e2e.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
