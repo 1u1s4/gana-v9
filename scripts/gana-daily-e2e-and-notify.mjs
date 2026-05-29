@@ -15,6 +15,7 @@ const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
 const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
+const notBefore = args.notBefore ?? process.env.GANA_DAILY_E2E_NOT_BEFORE ?? '10:15';
 if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
   throw new Error('--provider-concurrency must be a positive integer.');
 }
@@ -23,6 +24,19 @@ const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatch
 const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `daily-e2e-${date}.lock`);
 
 mkdirSync(dirname(logPath), { recursive: true });
+if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
+  console.log(JSON.stringify({
+    ok: true,
+    skipped: true,
+    reason: 'daily-e2e not-before guard',
+    date,
+    dailyBatchId,
+    notBefore,
+    timezone: TIMEZONE,
+    now: guatemalaTimeParts(),
+  }, null, 2));
+  process.exit(0);
+}
 if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, dailyBatchId, startedAt: new Date().toISOString() })) {
   console.log(JSON.stringify({ ok: true, skipped: true, reason: 'daily-e2e already ran or is running for this date', date, dailyBatchId, lockPath }, null, 2));
   process.exit(0);
@@ -139,6 +153,7 @@ function parseArgs(argv) {
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
+    else if (arg === '--not-before') parsed.notBefore = requireValue(argv, ++index, arg);
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));
     else if (arg === '--force') parsed.force = true;
     else throw new Error(`Unknown argument: ${arg}`);
@@ -176,6 +191,30 @@ function guatemalaDate(offsetDays) {
     month: '2-digit',
     day: '2-digit',
   }).format(base);
+}
+
+function hasReachedGuatemalaWallClock(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) throw new Error('--not-before must use HH:MM in America/Guatemala.');
+  const current = guatemalaTimeParts();
+  const requiredMinutes = (Number(match[1]) * 60) + Number(match[2]);
+  const currentMinutes = (current.hour * 60) + current.minute;
+  return currentMinutes >= requiredMinutes;
+}
+
+function guatemalaTimeParts() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+  return {
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
 }
 
 function requireValue(argv, index, flag) {

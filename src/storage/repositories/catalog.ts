@@ -77,6 +77,10 @@ export function createCompetitionRepository(db: Pick<StoragePrismaClient, 'compe
       });
     },
 
+    findById(id: string): Promise<CompetitionRecord | null> {
+      return db.competition.findUnique({ where: { id } });
+    },
+
     list(query: CompetitionListQuery = {}): Promise<CompetitionRecord[]> {
       return db.competition.findMany({
         where: compactData({
@@ -116,6 +120,10 @@ export function createTeamRepository(db: Pick<StoragePrismaClient, 'team'>) {
       return db.team.findUnique({
         where: { providerId_providerTeamId: { providerId, providerTeamId } },
       });
+    },
+
+    findById(id: string): Promise<TeamRecord | null> {
+      return db.team.findUnique({ where: { id } });
     },
 
     listByProvider(providerId: string, take?: number): Promise<TeamRecord[]> {

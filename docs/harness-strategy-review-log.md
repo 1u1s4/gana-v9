@@ -270,3 +270,26 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Honor requested market scope in low-odds selection (proposed) — src/filters/low-odds-selector.ts, src/daily/e2e.ts
 - [high] Add sample-size guard before threshold retuning (ready-for-implementation) — src/strategy-review/daily.ts, src/scoring/edge-gate.ts, src/parlay/rules.ts, src/parlay/ranker.ts
 - [medium] Harden analytical fallback eligibility and telemetry (proposed) — src/daily/e2e.ts
+
+## 2026-05-28 · strategy-2026-05-27
+
+- Run: strategy-review-2026-05-27-451a6cf5
+- Dates: 2026-05-27
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-27-451a6cf5/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-27-451a6cf5/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 492-214 hit 69.7% (983 total)
+- Parlays: 20-10 hit 66.7% (30 total)
+
+### Proposed Modifications
+
+- [high] Quarantine corners from promotion until settlement reliability is proven (ready-for-implementation) — src/prediction/gates.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Remove low-odds-top and parlay-diamante from strict final promotion until they recover (ready-for-implementation) — src/daily/e2e.ts, src/parlay/analysis.ts, src/council/recommendation-council.ts
+- [high] Add low-liquidity as a hard final-selection risk for low-price parlays (ready-for-implementation) — src/daily/e2e.ts, src/council/recommendation-council.ts, src/parlay/analysis.ts
+- [high] Add market-level validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts
+- [medium] Tighten H2H draw and away gates (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [medium] Add a parlay aggregate-confidence dead-zone rule for 80-89% (proposed) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/ranker.ts
+- [medium] Shift portfolio-v2 exploration toward balanced and market-diverse profiles (needs-more-data) — src/daily/e2e.ts, src/parlay/service.ts
+- [medium] Raise low-price double_chance value requirements (ready-for-implementation) — src/scoring/edge-gate.ts, src/prediction/service.ts, src/parlay/eligibility.ts

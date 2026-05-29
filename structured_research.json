@@ -1,525 +1,168 @@
 {
   "sources": [
     {
-      "id": "source_1",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF9zdRTqXoN8VWV0Slb9nfhxle7QZSOyuYo1tHqOkEYgCzUH04uSw1i-YK99mBMZzIIXfwNNTY_jZykHpD1sWQP0buDwftkY5dKTAdvEDFARdN2CTgjH59qFhQ37ZH5tqTb0Il2J2bDz8xjRchrigs0nYeWC9aLStaV383jzOhHy-q6OB9gY7xdnh7eLpfd-W6WVpBZLKUCMacy7rsgeQBhWRbqOrjL6uy4mB4lUlk=",
-      "title": "dailysports.net",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_2",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGWfgOhg1JuKoe491IcNoud8ebSlcO68ZeK49saOR5Y32UHL_NrnnKH3co5_47OtB_6jRtzerYcR9ytDdvRwsw3Shux97WPrFEX_Kn7AGhgIWYg5dQ86HKhtPImNksH4equQd8B3GgdulHQJdKAfK1HcafJRTwyMSPS9qdqjcN1xn0LEufKe03Z80Y_8BGZw7vaaFRjRF7Fpf3Lf8IRw_uImbycZyaosdyqAVqifnBlwvh3JNs=",
-      "title": "ratingbet.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_3",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHfW5T2m6jxuizfTVFdWIrMo-hkXQB_fYjMRaz4GDbWUVVGJOJaCKYdiVYqmgbWqGvEaeRXB5mWYPVsXNsknQxvOi8QMs7BjZw8VUek06FwNAz9kPdf9Tjae8vQkm0Xj3IPKkGrzCZyqZcqLkLl6j6uU46RGDmT5veSRiQddUJ6XticjIrql3YhFlpU8qBxV3ULzGYvy0bXPN2aN2g==",
-      "title": "onefootball.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_4",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEd4c-cb7UZTWHjQGfAMh_soVeP8DZRk3hikOy6y_ji59zjNGhAob5IWPz1JPO1tMVH7luH2SWF0DYrBXKqw4BbC2-ryYZpGpXWV0lx-iM_wr4phZ9AVLYa68xP2J5aM30ZzQoOGRcMWuodWENHK6EiJjcVJuaAf_sfRSdj_AM_50V9vMdN9w9Ye0bL0db5miVACcIatSNjnAT7ILNfgpWRkL6oH-xQhg4TNw==",
-      "title": "sportsgambler.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_5",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGNQs8QYHR_fOwPLhoZIKhDYKFEio_HI5KSJtuWoqEo_fCu2JLmtQcCaSkGiiLlKR_uFaGysFjtq02pCPz5ZUjjws8GfSheHZHm6HZi-Ytk0gVT7_4OoLgbs7zR_iSB-kmG6pZEav7T5Msdoo84N8g=",
-      "title": "livescores.biz",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_6",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHwm4M8dqJJijeg54p0c5bXqkzUg3spN5rEquXPNq116n6-XCXZPilh8sn-MvdjxeMMMwybKrXJAxQdK_nPEvPyS2S__wDaG6tX1rrPKITURI7Tf39-4R954RLcj62duE8B6x2xWEsfF_89So7i3w==",
-      "title": "futbol24.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_7",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE9ERbyB52MS3aPxbzZK9oWPmwY9OAgl02G2V3cAnKTxXselDG8SniaCLgs38N9yLBvJw4dxY2XapjeflNdF6gB0HtxErMMqhpzp3HEpngXNmuR507gz84n58eBTghSC9MqL2X0bKMZwWpC0PX2L_N0wXXtxfkNNJ2a7XprzbGDqih3g7W_QBuN2g==",
-      "title": "fbref.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_8",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGg_f_KokQJgk_8sz8cySxSu4wN869fwOfYzPP7ikLvALPiVyY7nvdknOm0iH2RUKoMgHU076598TNSfBn3xekyMVA8ipf4rmNZIJ-_TkY5LBvvgE3MNqeTSvg94inYq5EsVG-db-YdszkIU2fZObeaNdMePk_rgHr-dE9qZlIdc5qRoSyvWlzxRzLdxiwLLy9xTF-iVr0_rZIjfw==",
-      "title": "sportsmole.co.uk",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_9",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHuR6OPDrqu7fygONjIlAfrhOjIaFBaHjz5ddKcjJf9L28v-Sg49jjRWN1vqq2BTXuXWpQzr7Ao2ryfoobDsmxo2N0JAQY8Af2A8A3vBA81v72naGIvM0SdbUIotcPORXPIcrHplLqQnzabCGRcyc9gMR9EtAvNN1oX5XgZ7JduPXrZ3TtzX9ehbc0exYQ56nroycs=",
-      "title": "aiscore.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_10",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF_JTk7bVQ2cVuQA6lCcOKuGgJfNtWP2KXN76ILh5WVjFGTbUkNysgEibpP46DT4rM31lmjfYurqPz3JdTR9ZVNdwDXM0kjllCqkhKTJNIj5OgWbLbkqTPXK04REwZUqqrEMGjEVjPArLViJiygmV0D0iqqDX6xGVuxD3P0HZ4J-ihbxY7wQIlbl1DgmA6810jfv2gw5phjloUOtZ8z-A=",
-      "title": "reddit.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
-      "id": "source_11",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEOZLxjeRUp5NAKvACixUhC-WjD0TPJojkxTs1UygdvjQpNQdJrnftxLO_q1xH9UyKYnbpUQxGsg5Gf35Yx2GNFcZeV3JqHO9J7Jm8SOpMwszAFjT9GOFzebzOPYyskYTasBEtN3f3hGz6l9Bnk_vvii37J",
-      "title": "sofascore.com",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "metadata": {}
-    },
-    {
       "id": "source_api_football_fixture",
       "type": "api-football",
-      "url": "n/a",
-      "title": "API-Football Fixture Data",
-      "capturedAt": "2026-05-27T16:46:51.850Z",
-      "hash": "1535317",
+      "url": null,
+      "title": "API-Football Fixture Snapshot",
+      "capturedAt": "2026-05-28T17:09:27.822Z",
+      "hash": "aa5b26a9-951e-4a9e-b8ea-dac8b924088a",
       "metadata": {
-        "fixtureId": "1f25ea85-7b07-443c-a9af-cc049a437d02",
-        "providerFixtureId": "1535317"
+        "provider": "api-football",
+        "providerFixtureId": "1541610"
       }
     },
     {
-      "id": "source_api_football_statistics",
-      "type": "api-football",
-      "url": "n/a",
-      "title": "API-Football Statistics Data",
-      "capturedAt": "2026-05-27T16:46:54.668Z",
-      "hash": "480bf547-64cd-4fcc-9151-9134443db2d5",
+      "id": "source_odds_snapshot",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "Odds Market Snapshot",
+      "capturedAt": "2026-05-28T17:09:29.498Z",
+      "hash": "f12ecb4d-72ca-4686-bec3-66069bff07d5",
       "metadata": {
-        "fixtureId": "1f25ea85-7b07-443c-a9af-cc049a437d02"
+        "provider": "gana",
+        "bookmakers": ["Bet365", "Pinnacle"]
       }
     },
     {
-      "id": "source_api_football_odds",
-      "type": "api-football",
-      "url": "n/a",
-      "title": "API-Football Odds Data",
-      "capturedAt": "2026-05-27T16:46:55.495Z",
-      "hash": "9f123f3e-f5f5-4e0f-8921-8981572f063d",
-      "metadata": {
-        "fixtureId": "1f25ea85-7b07-443c-a9af-cc049a437d02"
-      }
+      "id": "source_web_search_1",
+      "type": "web-search",
+      "url": "https://tips.gg/football/mypa-vs-pepo-lappeenranta/",
+      "title": "MyPa vs PEPO Lappeenranta Football Prediction, Statistics & Head to Head",
+      "capturedAt": "2026-05-28T17:10:15.000Z",
+      "hash": null,
+      "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence_match_overview_1",
-      "sourceId": "source_1",
-      "claimIds": [],
-      "snippet": "The Copa Libertadores Group E finale between Corinthians and Platense is scheduled for May 28, 2026, at the Neo Química Arena in São Paulo.",
-      "summary": "Match details for Corinthians vs Platense on May 28, 2026, at Neo Química Arena.",
+      "id": "evidence_h2h_odds",
+      "sourceId": "source_odds_snapshot",
+      "claimIds": ["claim_h2h_away_win"],
+      "snippet": "h2h away price: 1.48 (Bet365), 1.55 (Pinnacle)",
+      "summary": "Bookmaker odds strongly favor an away win for PEPO, with an implied probability of over 64%.",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_h2h_web",
+      "sourceId": "source_web_search_1",
+      "claimIds": ["claim_h2h_away_win"],
+      "snippet": "PEPO is the current league leader and remains undefeated... MyPa is currently struggling, particularly in defense... Last Meeting: MyPa 1–6 PEPO.",
+      "summary": "Web sources confirm PEPO is first in the league and undefeated, while MyPa is in poor form, having lost all home games and suffering a recent 1-6 defeat to PEPO.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_corinthians_qualification",
-      "sourceId": "source_2",
-      "claimIds": [],
-      "snippet": "Corinthians have already secured qualification to the Round of 16 as group leaders.",
-      "summary": "Corinthians have secured qualification to the Round of 16 in Copa Libertadores.",
+      "id": "evidence_goals_over_odds",
+      "sourceId": "source_odds_snapshot",
+      "claimIds": ["claim_goals_over_2_5"],
+      "snippet": "goals_over_under over 2.5 price: 1.36 (Bet365)",
+      "summary": "The odds for over 2.5 goals are very low (1.36), indicating a high market expectation for a high-scoring match.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_platense_stakes",
-      "sourceId": "source_2",
-      "claimIds": [],
-      "snippet": "Platense (7 pts) sits in 2nd place but needs a result to guarantee their spot, as Independiente Santa Fe (5 pts) and Peñarol (4 pts) are still in contention.",
-      "summary": "Platense needs a result to secure their qualification for the next round.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_last_meeting",
-      "sourceId": "source_4",
-      "claimIds": [],
-      "snippet": "Corinthians won 2-0 away in Argentina (April 2026).",
-      "summary": "Corinthians defeated Platense 2-0 in their last encounter in April 2026.",
-      "confidence": 0.9,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_overall_record",
-      "sourceId": "source_5",
-      "claimIds": [],
-      "snippet": "Overall Record: 1 Match, 1 Corinthians win, 0 Draws, 0 Platense wins.",
-      "summary": "Corinthians have won the only head-to-head match against Platense.",
-      "confidence": 0.9,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_corinthians_home_streak",
-      "sourceId": "source_6",
-      "claimIds": [],
-      "snippet": "Corinthians: ... on a 6-game winning streak at home across all competitions, most recently defeating Atlético Mineiro 1-0 in Série A.",
-      "summary": "Corinthians are on a 6-game home winning streak, including a recent 1-0 win against Atlético Mineiro.",
+      "id": "evidence_goals_over_web",
+      "sourceId": "source_web_search_1",
+      "claimIds": ["claim_goals_over_2_5"],
+      "snippet": "MyPa has conceded 19 goals in their last 5 matches... Final Score Prediction: MyPa 1–3 PEPO.",
+      "summary": "MyPa has a very poor defensive record, and predictions from web sources suggest a final score of 1-3, which is over 2.5 goals.",
       "confidence": 0.85,
       "metadata": {}
     },
     {
-      "id": "evidence_corinthians_defensive_strength",
-      "sourceId": "source_7",
-      "claimIds": [],
-      "snippet": "Defensive Strength: Corinthians have conceded only 2 goals in their last 6 home games.",
-      "summary": "Corinthians have a strong home defense, conceding only 2 goals in their last 6 home matches.",
+      "id": "evidence_btts_yes_odds",
+      "sourceId": "source_odds_snapshot",
+      "claimIds": ["claim_btts_yes"],
+      "snippet": "btts yes price: 1.53 (Bet365)",
+      "summary": "The odds for Both Teams to Score are 1.53, implying a probability of approximately 65%.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_btts_yes_web",
+      "sourceId": "source_web_search_1",
+      "claimIds": ["claim_btts_yes"],
+      "snippet": "Despite MyPa's poor form, they often manage to find the net at home, and PEPO has kept only one clean sheet in their last five outings.",
+      "summary": "Web sources state that while MyPa is in poor form, they tend to score at home, and PEPO's defense is not impenetrable.",
+      "confidence": 0.75,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_double_chance_web",
+      "sourceId": "source_web_search_1",
+      "claimIds": ["claim_double_chance"],
+      "snippet": "PEPO is unbeaten in their last 5 league encounters against MyPa (4 wins, 1 draw).",
+      "summary": "PEPO has a strong head-to-head record against MyPa, having not lost in their last 5 league meetings.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_platense_form",
-      "sourceId": "source_6",
-      "claimIds": [],
-      "snippet": "Platense: Struggling for consistency with 3 losses in their last 5 matches. Their last outing was a 2-1 defeat to Independiente Santa Fe.",
-      "summary": "Platense is in poor form, with 3 losses in their last 5 games, including a 2-1 defeat to Independiente Santa Fe.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_platense_away_record",
-      "sourceId": "source_7",
-      "claimIds": [],
-      "snippet": "They have won only once in their last 8 away games.",
-      "summary": "Platense has a poor away record, with only one win in their last 8 away matches.",
-      "confidence": 0.85,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_platense_suspension_injuries",
-      "sourceId": "source_11",
-      "claimIds": [],
-      "snippet": "Platense will be without Guido Mainero (suspended). ...injury crisis (Cuesta, Goni, and Portillo are sidelined).",
-      "summary": "Platense has several key players out due to suspension (Guido Mainero) and injuries (Cuesta, Goni, Portillo).",
-      "confidence": 0.9,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_corinthians_libertadores_goals",
-      "sourceId": "source_2",
-      "claimIds": [],
-      "snippet": "Corinthians average 1.6 goals per game in the Libertadores.",
-      "summary": "Corinthians averages 1.6 goals per game in the Libertadores tournament.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_platense_libertadores_goals",
-      "sourceId": "source_2",
-      "claimIds": [],
-      "snippet": "Platense average 1.2 goals per game but have a negative goal difference (-1).",
-      "summary": "Platense averages 1.2 goals per game in Libertadores with a negative goal difference.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_bet365_home",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'h2h', selection: 'home', line: null, price: 1.67, impliedProbability: 0.5988023952095809, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.67 for a Corinthians win (H2H).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_bet365_draw",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'h2h', selection: 'draw', line: null, price: 3.5, impliedProbability: 0.2857142857142857, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 3.5 for a draw (H2H).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_bet365_away",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'h2h', selection: 'away', line: null, price: 6, impliedProbability: 0.16666666666666666, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 6.0 for a Platense win (H2H).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_pinnacle_home",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'h2h', selection: 'home', line: null, price: 1.67, impliedProbability: 0.5988023952095809, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 1.67 for a Corinthians win (H2H).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_pinnacle_draw",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'h2h', selection: 'draw', line: null, price: 3.45, impliedProbability: 0.2898550724637681, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 3.45 for a draw (H2H).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_h2h_odds_pinnacle_away",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'h2h', selection: 'away', line: null, price: 5.79, impliedProbability: 0.17271157167530224, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 5.79 for a Platense win (H2H).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_bet365_over_1_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'over', line: 1.5, price: 1.44, impliedProbability: 0.6944444444444444, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.44 for Over 1.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_bet365_under_1_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'under', line: 1.5, price: 2.62, impliedProbability: 0.38167938931297707, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 2.62 for Under 1.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_bet365_over_2_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'over', line: 2.5, price: 2.5, impliedProbability: 0.4, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 2.50 for Over 2.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_bet365_under_2_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'under', line: 2.5, price: 1.5, impliedProbability: 0.6666666666666666, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.50 for Under 2.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_pinnacle_over_1_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'over', line: 1.5, price: 1.49, impliedProbability: 0.6711409395973155, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 1.49 for Over 1.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_pinnacle_under_1_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'under', line: 1.5, price: 2.6, impliedProbability: 0.3846153846153846, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 2.60 for Under 1.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_pinnacle_over_2_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'over', line: 2.5, price: 2.5, impliedProbability: 0.4, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 2.50 for Over 2.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_over_under_pinnacle_under_2_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'goals_over_under', selection: 'under', line: 2.5, price: 1.52, impliedProbability: 0.6578947368421053, bookmaker: 'Pinnacle'}",
-      "summary": "Pinnacle offers odds of 1.52 for Under 2.5 Goals.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_btts_bet365_yes",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'btts', selection: 'yes', line: null, price: 2.38, impliedProbability: 0.42016806722689076, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 2.38 for Both Teams to Score (Yes).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_btts_bet365_no",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'btts', selection: 'no', line: null, price: 1.53, impliedProbability: 0.6535947712418301, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.53 for Both Teams to Score (No).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_double_chance_bet365_home_or_draw",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'double_chance', selection: 'home_or_draw', line: null, price: 1.14, impliedProbability: 0.8771929824561404, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.14 for Corinthians to Win or Draw (Double Chance).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_double_chance_bet365_home_or_away",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'double_chance', selection: 'home_or_away', line: null, price: 1.3, impliedProbability: 0.7692307692307692, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.30 for Corinthians or Platense to Win (Double Chance).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_double_chance_bet365_draw_or_away",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'double_chance', selection: 'draw_or_away', line: null, price: 2.1, impliedProbability: 0.47619047619047616, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 2.10 for Draw or Platense to Win (Double Chance).",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_corners_over_under_bet365_over_8_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'corners_over_under', selection: 'over', line: 8.5, price: 1.73, impliedProbability: 0.5780346820809249, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 1.73 for Over 8.5 Corners.",
-      "confidence": 1.0,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_corners_over_under_bet365_under_8_5",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "{market: 'corners_over_under', selection: 'under', line: 8.5, price: 2, impliedProbability: 0.5, bookmaker: 'Bet365'}",
-      "summary": "Bet365 offers odds of 2.00 for Under 8.5 Corners.",
-      "confidence": 1.0,
+      "id": "evidence_double_chance_odds",
+      "sourceId": "source_odds_snapshot",
+      "claimIds": ["claim_double_chance"],
+      "snippet": "double_chance draw_or_away price: 1.12 (Bet365)",
+      "summary": "The odds for a draw or PEPO win are extremely low at 1.12, suggesting the market sees this outcome as almost certain.",
+      "confidence": 0.98,
       "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim_corinthians_favored_h2h",
-      "statement": "Corinthians is heavily favored to win the match against Platense, reflected in their strong home form, previous H2H victory, and Platense's poor away form and injury issues.",
+      "id": "claim_h2h_away_win",
+      "statement": "PEPO is the strong favorite to win the match against MyPa.",
       "subject": {
         "type": "market",
-        "id": "1f25ea85-7b07-443c-a9af-cc049a437d02",
-        "market": "h2h"
+        "id": "cae127b1-2a42-433b-89be-caa018b80bbd",
+        "market": "h2h",
+        "selection": "away"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_corinthians_qualification",
-        "evidence_h2h_last_meeting",
-        "evidence_h2h_overall_record",
-        "evidence_corinthians_home_streak",
-        "evidence_corinthians_defensive_strength",
-        "evidence_platense_form",
-        "evidence_platense_away_record",
-        "evidence_platense_suspension_injuries",
-        "evidence_h2h_odds_bet365_home",
-        "evidence_h2h_odds_pinnacle_home"
-      ],
+      "evidenceIds": ["evidence_h2h_odds", "evidence_h2h_web"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_goals_over_under_2_5",
-      "statement": "There is a moderate expectation for under 2.5 goals in the match, supported by both team's average goals per game and Corinthians' strong defense at home.",
+      "id": "claim_goals_over_2_5",
+      "statement": "The match is highly likely to have over 2.5 goals.",
       "subject": {
         "type": "market",
-        "id": "1f25ea85-7b07-443c-a9af-cc049a437d02",
-        "market": "goals_over_under"
+        "id": "cae127b1-2a42-433b-89be-caa018b80bbd",
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 2.5
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_corinthians_defensive_strength",
-        "evidence_corinthians_libertadores_goals",
-        "evidence_platense_libertadores_goals",
-        "evidence_goals_over_under_bet365_over_2_5",
-        "evidence_goals_over_under_bet365_under_2_5",
-        "evidence_goals_over_under_pinnacle_over_2_5",
-        "evidence_goals_over_under_pinnacle_under_2_5"
-      ],
+      "evidenceIds": ["evidence_goals_over_odds", "evidence_goals_over_web"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_btts_no",
-      "statement": "It is more likely that both teams will not score, given Corinthians' strong home defense and Platense's struggles in scoring, especially away and with key players missing.",
+      "id": "claim_btts_yes",
+      "statement": "It is likely that both teams will score.",
       "subject": {
         "type": "market",
-        "id": "1f25ea85-7b07-443c-a9af-cc049a437d02",
-        "market": "btts"
+        "id": "cae127b1-2a42-433b-89be-caa018b80bbd",
+        "market": "btts",
+        "selection": "yes"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_corinthians_defensive_strength",
-        "evidence_platense_form",
-        "evidence_platense_away_record",
-        "evidence_platense_suspension_injuries",
-        "evidence_btts_bet365_yes",
-        "evidence_btts_bet365_no"
-      ],
+      "evidenceIds": ["evidence_btts_yes_odds", "evidence_btts_yes_web"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_double_chance_home_or_draw",
-      "statement": "Corinthians winning or drawing is highly probable, considering their strong form, securing qualification, and Platense's struggles.",
+      "id": "claim_double_chance",
+      "statement": "PEPO is highly likely to win or draw the match.",
       "subject": {
         "type": "market",
-        "id": "1f25ea85-7b07-443c-a9af-cc049a437d02",
-        "market": "double_chance"
+        "id": "cae127b1-2a42-433b-89be-caa018b80bbd",
+        "market": "double_chance",
+        "selection": "draw_or_away"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_corinthians_qualification",
-        "evidence_corinthians_home_streak",
-        "evidence_platense_form",
-        "evidence_platense_away_record",
-        "evidence_double_chance_bet365_home_or_draw"
-      ],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_corners_over_under_8_5",
-      "statement": "Odds suggest a slight leaning towards over 8.5 corners, but no specific statistical evidence was found in the web search to strongly support either over or under.",
-      "subject": {
-        "type": "market",
-        "id": "1f25ea85-7b07-443c-a9af-cc049a437d02",
-        "market": "corners_over_under"
-      },
-      "supportLevel": "neutral",
-      "evidenceIds": [
-        "evidence_corners_over_under_bet365_over_8_5",
-        "evidence_corners_over_under_bet365_under_8_5"
-      ],
+      "evidenceIds": ["evidence_double_chance_odds", "evidence_double_chance_web"],
       "conflictStatus": "none",
       "metadata": {}
     }
@@ -527,14 +170,24 @@
   "gateResult": {
     "verdict": "promotable",
     "reasons": [
-      "Structured research generated with sufficient evidence and web-search evidence included."
+      "Research is supported by strong, consistent evidence from both bookmaker odds and web search results for the majority of required markets."
     ],
-    "warnings": []
+    "warnings": [
+      "Coverage for the 'corners_over_under' market was not possible due to a lack of available data from the provided sources."
+    ]
   },
   "warnings": [],
   "metadata": {
     "marketCoverage": {
-      "skippedMarkets": []
+      "providedMarkets": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "btts"
+      ],
+      "skippedMarkets": [
+        "corners_over_under"
+      ]
     }
   }
 }

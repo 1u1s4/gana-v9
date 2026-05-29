@@ -2150,7 +2150,7 @@ function preferredDisplayName(...values: unknown[]): string | undefined {
     .filter((value): value is string => typeof value === 'string')
     .map((value) => value.trim())
     .filter(Boolean);
-  return strings.find((value) => !isUuidLike(value)) ?? strings[0];
+  return strings.find((value) => !isUuidLike(value));
 }
 
 function fixtureDisplayQuality(display: RecommendationLegDisplay): number {

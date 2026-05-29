@@ -717,7 +717,19 @@ export async function createApiFootballPersistence(
       },
       resolveFixtureByProviderFixtureId: async (providerFixtureId) => {
         const record = await repositories.fixtures.findByProviderKey(provider.id, providerFixtureId);
-        return record ? fixtureFromStoredRecord(record) : null;
+        if (!record) return null;
+        const [homeTeam, awayTeam, competition] = await Promise.all([
+          record.homeTeamId ? repositories.teams.findById(record.homeTeamId) : null,
+          record.awayTeamId ? repositories.teams.findById(record.awayTeamId) : null,
+          record.competitionId ? repositories.competitions.findById(record.competitionId) : null,
+        ]);
+        const raw = rawFixtureMetadata(record.metadata);
+        return fixtureFromStoredRecord(record, {
+          homeTeamName: homeTeam?.name ?? rawNestedString(raw, 'teams', 'home', 'name'),
+          awayTeamName: awayTeam?.name ?? rawNestedString(raw, 'teams', 'away', 'name'),
+          competitionName: competition?.name ?? rawNestedString(raw, 'league', 'name'),
+          leagueId: numericString(competition?.providerCompetitionId ?? rawNestedString(raw, 'league', 'id')),
+        });
       },
       persistOddsSnapshot: async (snapshot) => {
         const marketAnalytics = buildOddsMarketAnalytics(snapshot.quotes);
@@ -1127,6 +1139,7 @@ function fixtureFromRecord(record: {
     provider: API_FOOTBALL_PROVIDER,
     providerFixtureId: record.providerFixtureId,
     competitionId: record.competitionId ?? undefined,
+    competitionName: normalized.competition?.name,
     leagueId: normalized.competition ? Number(normalized.competition.providerCompetitionId) : undefined,
     season: record.season ?? undefined,
     homeTeamId: record.homeTeamId ?? normalized.homeTeam?.providerTeamId ?? 'unknown-home-team',
@@ -1148,9 +1161,17 @@ function fixtureFromRecord(record: {
 function fixtureWithNormalizedNames(fixture: Fixture, normalized: NormalizedFixture): Fixture {
   return {
     ...fixture,
+    competitionName: fixture.competitionName ?? normalized.competition?.name,
     homeTeamName: fixture.homeTeamName ?? normalized.homeTeam?.name,
     awayTeamName: fixture.awayTeamName ?? normalized.awayTeam?.name,
   };
+}
+
+interface StoredFixtureRelations {
+  homeTeamName?: string;
+  awayTeamName?: string;
+  competitionName?: string;
+  leagueId?: number;
 }
 
 function fixtureFromStoredRecord(record: {
@@ -1165,17 +1186,22 @@ function fixtureFromStoredRecord(record: {
   scoreHome: number | null;
   scoreAway: number | null;
   includedByFilters: JsonValue | null;
+  metadata: JsonValue | null;
   createdAt: Date;
   updatedAt: Date;
-}): Fixture {
+}, relations: StoredFixtureRelations = {}): Fixture {
   return {
     id: record.id,
     provider: API_FOOTBALL_PROVIDER,
     providerFixtureId: record.providerFixtureId,
     competitionId: record.competitionId ?? undefined,
+    competitionName: relations.competitionName,
+    leagueId: relations.leagueId,
     season: record.season ?? undefined,
     homeTeamId: record.homeTeamId ?? 'unknown-home-team',
     awayTeamId: record.awayTeamId ?? 'unknown-away-team',
+    homeTeamName: relations.homeTeamName,
+    awayTeamName: relations.awayTeamName,
     scheduledAt: (record.scheduledAt ?? new Date(0)).toISOString(),
     status: toFixtureStatus(record.status),
     scoreHome: record.scoreHome ?? undefined,
@@ -1200,6 +1226,7 @@ function fallbackFixtureFromNormalized(normalized: NormalizedFixture): Fixture {
     id: `${API_FOOTBALL_PROVIDER}:${normalized.providerFixtureId}`,
     provider: API_FOOTBALL_PROVIDER,
     providerFixtureId: normalized.providerFixtureId,
+    competitionName: normalized.competition?.name,
     leagueId: normalized.competition ? Number(normalized.competition.providerCompetitionId) : undefined,
     season: normalized.season ?? undefined,
     homeTeamId: normalized.homeTeam?.providerTeamId ?? 'unknown-home-team',
@@ -1214,4 +1241,26 @@ function fallbackFixtureFromNormalized(normalized: NormalizedFixture): Fixture {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function rawFixtureMetadata(metadata: JsonValue | null | undefined): Record<string, unknown> {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+  const raw = (metadata as { raw?: unknown }).raw;
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+}
+
+function rawNestedString(source: Record<string, unknown>, ...path: string[]): string | undefined {
+  let current: unknown = source;
+  for (const key of path) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  if (typeof current === 'number' && Number.isFinite(current)) return String(current);
+  return typeof current === 'string' && current.trim() ? current.trim() : undefined;
+}
+
+function numericString(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 }

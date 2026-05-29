@@ -1,131 +1,118 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "f9cf451b-e7e3-4895-a1fa-4c948241d71f",
+      "oddsQuoteId": "bb17df8a-549f-4255-8fdc-da56deefac27",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 1.9,
+      "odds": 1.85,
       "probability": 0.55,
       "modelProbability": 0.55,
-      "marketFairProbability": 0.503585,
-      "edge": 0.046415,
-      "confidence": 0.64,
+      "marketFairProbability": 0.480049,
+      "edge": 0.069951,
+      "confidence": 0.75,
       "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_h2h_bet365_home",
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_web_penarol_motivation"
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_rustavi_form",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_goals_scored_defense",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
       ],
       "claimIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_home_odds",
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_penarol_motivation"
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_form",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_home_advantage",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_defense_rustavi",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_home",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_h2h"
       ],
-      "rationale": "Penarol needs a win to qualify for Copa Sudamericana playoffs, giving them strong motivation to secure victory at home.",
+      "rationale": "FC Rustavi has a strong home advantage with a 67% win rate and a solid defense. While the explicit prediction suggests 'Draw or FC Rustavi (1X)' and a 'likely 1-1 score', a home win remains a strong possibility given their home form.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "5e94441f-17fc-41c3-a96c-4c0a1b5f1b9d",
+      "oddsQuoteId": "9c42a208-ba01-41a3-a6cb-8b7b5aefdbe5",
+      "market": "h2h",
+      "selection": "draw",
+      "line": null,
+      "odds": 3.25,
+      "probability": 0.38,
+      "modelProbability": 0.38,
+      "marketFairProbability": 0.273259,
+      "edge": 0.106741,
+      "confidence": 0.70,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_h2h_history",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
+      ],
+      "claimIds": [
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_draw",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_last_meeting",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_h2h"
+      ],
+      "rationale": "The last head-to-head meeting ended in a 1-1 draw, and the explicit prediction suggests a 'Draw or FC Rustavi (1X)' with a 'likely 1-1 score'. Both teams have shown capabilities for draws in their recent form.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "234fde73-12c4-4858-ae40-14cf9af4daac",
       "market": "double_chance",
       "selection": "home_or_draw",
       "line": null,
-      "odds": 1.18,
-      "probability": 0.77,
-      "modelProbability": 0.77,
-      "marketFairProbability": 0.399199,
-      "edge": 0.370801,
-      "confidence": 0.95,
+      "odds": 1.22,
+      "probability": 0.88,
+      "modelProbability": 0.88,
+      "marketFairProbability": 0.376821,
+      "edge": 0.503179,
+      "confidence": 0.90,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_double_chance_bet365_home_or_draw",
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_web_penarol_motivation",
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_web_santafe_motivation"
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_rustavi_form",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_h2h_history",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
       ],
       "claimIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_double_chance_home_or_draw_odds",
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_penarol_motivation",
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_h2h_santafe_motivation"
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_form",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_home_advantage",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_last_meeting",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_h2h"
       ],
-      "rationale": "Penarol's strong motivation to win combined with Santa Fe's potential to play for a draw makes a home win or draw highly probable.",
-      "warnings": [
-        "High overround and low liquidity for double_chance market suggests potential unreliability of marketFairProbability."
-      ]
+      "rationale": "The prediction explicitly suggests 'Draw or FC Rustavi (1X)', strongly supported by Rustavi's home advantage and defensive strength. The last H2H was also a draw, making this a highly probable outcome.",
+      "warnings": []
     },
     {
-      "oddsQuoteId": "a5e7f29a-b9cf-400a-9883-846cbaa4cc37",
+      "oddsQuoteId": "37fa4d19-24b0-4662-8d86-389700fc7aad",
       "market": "goals_over_under",
-      "selection": "over",
+      "selection": "under",
       "line": 2.5,
-      "odds": 2.3,
-      "probability": 0.45,
-      "modelProbability": 0.45,
-      "marketFairProbability": 0.416681,
-      "edge": 0.033319,
-      "confidence": 0.52,
-      "confidenceBand": "medium",
+      "odds": 1.80,
+      "probability": 0.65,
+      "modelProbability": 0.65,
+      "marketFairProbability": 0.526316,
+      "edge": 0.123684,
+      "confidence": 0.80,
+      "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_goals_over_under_bet365_over_2_5"
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_goals_scored_defense",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
       ],
       "claimIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_goals_over_2_5_odds"
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_goals_under_2_5",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_defense_rustavi",
+        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_goals"
       ],
-      "rationale": "Both teams have motivation to score; Penarol to win, Santa Fe potentially for a Libertadores R16 spot, which could lead to an open game.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "89a2fbb7-0f42-4227-88ae-0e6efcda51a0",
-      "market": "corners_over_under",
-      "selection": "over",
-      "line": 8.5,
-      "odds": 1.82,
-      "probability": 0.58,
-      "modelProbability": 0.58,
-      "marketFairProbability": 0.537429,
-      "edge": 0.042571,
-      "confidence": 0.67,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_corners_over_under_bet365_over_8_5"
-      ],
-      "claimIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_corners_over_8_5_odds"
-      ],
-      "rationale": "High-stakes match for both teams could lead to more attacking play and thus more corners.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "6c46b510-56d6-4e0c-addc-895636e5bd02",
-      "market": "btts",
-      "selection": "yes",
-      "line": null,
-      "odds": 2,
-      "probability": 0.52,
-      "modelProbability": 0.52,
-      "marketFairProbability": 0.466667,
-      "edge": 0.053333,
-      "confidence": 0.63,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:evidence_btts_bet365_yes"
-      ],
-      "claimIds": [
-        "120542d9-e5cc-4afd-a526-2429f3c48c45:claim_btts_yes_odds"
-      ],
-      "rationale": "With both teams highly motivated to achieve their respective qualification goals, an open game with goals from both sides is expected.",
+      "rationale": "The prediction explicitly suggests 'Under 2.5 Goals' with a 'likely 1-1 score'. Rustavi has a strong defense, conceding only 0.87 goals per match. Both teams' combined goal-scoring averages further support a lower-scoring game.",
       "warnings": []
     }
   ],
   "warnings": [
-    "Used a heuristic for modelProbability and confidence calculation due to lack of explicit model data. Confidence capped at 0.95."
+    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
+    "market btts skipped/review-required: missing odds quotes for requested market"
   ],
   "metadata": {}
 }

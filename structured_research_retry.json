@@ -1,199 +1,160 @@
+
 {
   "sources": [
     {
-      "id": "source_1",
-      "type": "api-football",
+      "id": "provider_snapshot_odds",
+      "type": "provider-snapshot",
       "url": null,
-      "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-27T16:16:14.837Z",
-      "hash": "5a48e4701c046e96c9eeeca14aa2659af6d341af4c6700c49f089e581e04d22a",
+      "title": "Provider Odds Snapshot",
+      "capturedAt": "2026-05-28T17:06:27.750Z",
+      "hash": "c98c9da7-2baf-41c5-a36f-7fc5ea8e6ded",
       "metadata": {
-        "provider": "api-football",
-        "providerSnapshotId": "8d6ba681-865e-4d60-bd18-d4815ad9af8d"
+        "provider": "api-football"
       }
     },
     {
-      "id": "source_2",
+      "id": "web_search_footystats",
       "type": "web-search",
-      "url": "https://www.sofascore.com/instituto-ac-cordoba-reserve-velez-sarsfield-reserve/uExcscob",
-      "title": "Vélez Sársfield Res. vs Instituto Res. live score, H2H and lineups | Sofascore",
-      "capturedAt": "2026-05-27T16:17:00.000Z",
+      "url": "https://footystats.org/austria/sv-donaufeld-wien-vs-sg-elektra-h2h-stats",
+      "title": "FootyStats: Donaufeld vs Elektra H2H",
+      "capturedAt": "2026-05-28T17:12:00.000Z",
       "hash": null,
       "metadata": {}
     },
     {
-      "id": "source_3",
+      "id": "web_search_wincomparator",
       "type": "web-search",
-      "url": "https://www.aiscore.com/match-velez-sarsfield-reserves-vs-instituto-ac-cordoba-reserves/vlon2khwcz9wdli",
-      "title": "Velez Sarsfield Reserves vs Instituto AC Cordoba Reserves live score",
-      "capturedAt": "2026-05-27T16:17:00.000Z",
-      "hash": null,
-      "metadata": {}
-    },
-    {
-      "id": "source_4",
-      "type": "web-search",
-      "url": "https://www.365scores.com/football/match/velez-sarsfield-instituto/1000/1000/10/1512434#",
-      "title": "Velez Sarsfield vs Instituto AC Cordoba | Match Overview",
-      "capturedAt": "2026-05-27T16:17:00.000Z",
+      "url": "https://www.wincomparator.com/football-austria/regionalliga-ost/fach-donaufeld-twl-elektra-2026-05-29",
+      "title": "WinComparator: Fach-Donaufeld vs TWL Elektra",
+      "capturedAt": "2026-05-28T17:12:00.000Z",
       "hash": null,
       "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence_1",
-      "sourceId": "source_1",
-      "claimIds": ["claim_1", "claim_2", "claim_3"],
-      "snippet": "Bet365: home: 1.5, draw: 3.4, away: 6.25",
-      "summary": "Bet365 odds heavily favor a home win for Vélez Sársfield Res. at 1.5, implying a 66.7% probability, compared to an away win at 6.25.",
+      "id": "evidence_h2h_odds",
+      "sourceId": "provider_snapshot_odds",
+      "claimIds": ["claim_h2h_home_win"],
+      "snippet": "h2h, selection: home, price: 1.07",
+      "summary": "Bookmaker odds heavily favor a home win at 1.07.",
       "confidence": 0.95,
       "metadata": {}
     },
     {
-      "id": "evidence_2",
-      "sourceId": "source_3",
-      "claimIds": ["claim_1"],
-      "snippet": "Vélez Sársfield Res. has historically dominated this fixture. Total Meetings: 6 (since 2023), Vélez Sársfield Res. Wins: 4, Draws: 2, Instituto Res. Wins: 0.",
-      "summary": "Vélez Sársfield Res. is unbeaten in their last 6 encounters against Instituto Res., winning 4 and drawing 2.",
+      "id": "evidence_form_elektra",
+      "sourceId": "web_search_wincomparator",
+      "claimIds": ["claim_h2h_home_win", "claim_goals_over"],
+      "snippet": "TWL Elektra (Last 5 Matches): Loss, Loss, Loss, Loss, Loss.",
+      "summary": "TWL Elektra is on a 5-game losing streak, being outscored 21-2.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_3",
-      "sourceId": "source_2",
-      "claimIds": ["claim_1"],
-      "snippet": "League Position: 1st (Group A). Recent Form: W-D-W-W-W. They are in exceptional form, currently leading the table with 35 points from 14 matches.",
-      "summary": "Vélez Sársfield Res. are in dominant form, leading their group and coming into the match with a strong winning streak.",
+      "id": "evidence_h2h_history",
+      "sourceId": "web_search_footystats",
+      "claimIds": ["claim_h2h_home_win"],
+      "snippet": "Donaufeld is unbeaten in their last 6 matches against TWL Elektra (4 wins, 2 draws).",
+      "summary": "Donaufeld has a dominant head-to-head record against Elektra.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_goals_over_odds",
+      "sourceId": "provider_snapshot_odds",
+      "claimIds": ["claim_goals_over"],
+      "snippet": "goals_over_under, selection: over, line: 2.5, price: 1.25",
+      "summary": "Odds for Over 2.5 goals are very low (1.25), indicating a high likelihood of goals.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_4",
-      "sourceId": "source_1",
-      "claimIds": ["claim_4"],
-      "snippet": "Bet365: Over 2.5: 2.0, Under 2.5: 1.8",
-      "summary": "The goals market odds are tightly priced, with a slight favor towards Under 2.5 goals at 1.8, but Over 2.5 at 2.0 is also seen as very possible.",
-      "confidence": 0.9,
+      "id": "evidence_btts_h2h",
+      "sourceId": "web_search_footystats",
+      "claimIds": ["claim_btts_yes"],
+      "snippet": "Last Meeting: TWL Elektra 2–2 SR Donaufeld",
+      "summary": "The last head-to-head match ended in a 2-2 draw.",
+      "confidence": 0.6,
       "metadata": {}
     },
     {
-      "id": "evidence_5",
-      "sourceId": "source_4",
-      "claimIds": ["claim_4"],
-      "snippet": "Scoring Power: Vélez Sársfield Res. averages 2.21 goals per game, while conceding only 0.57 goals per game.",
-      "summary": "Vélez has a high goal-scoring average and a very strong defense, suggesting they can control the scoreline.",
-      "confidence": 0.85,
-      "metadata": {}
-    },
-    {
-        "id": "evidence_6",
-        "sourceId": "source_1",
-        "claimIds": ["claim_5"],
-        "snippet": "No direct odds for BTTS were provided in the snapshot.",
-        "summary": "There is no direct evidence for the BTTS market in the provided odds snapshot.",
-        "confidence": 1.0,
-        "metadata": {}
-    },
-    {
-        "id": "evidence_7",
-        "sourceId": "source_4",
-        "claimIds": ["claim_5"],
-        "snippet": "Defensive Solidity: Vélez has a 50% clean sheet rate this season, making them very difficult to break down.",
-        "summary": "With a 50% clean sheet rate, Vélez's defense is very strong, making it less likely for both teams to score.",
-        "confidence": 0.8,
-        "metadata": {}
-    },
-    {
-        "id": "evidence_8",
-        "sourceId": "source_1",
-        "claimIds": ["claim_2"],
-        "snippet": "Bet365: home_or_draw: 1.07",
-        "summary": "The double chance market for 'home or draw' is priced at 1.07, indicating an extremely high probability of Vélez avoiding defeat.",
-        "confidence": 0.98,
+        "id": "evidence_double_chance",
+        "sourceId": "provider_snapshot_odds",
+        "claimIds": ["claim_double_chance_not_draw_away"],
+        "snippet": "double_chance, selection: draw_or_away, price: 7.5",
+        "summary": "Odds for a draw or away win are very high (7.5), implying a low probability.",
+        "confidence": 0.9,
         "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim_1",
-      "statement": "Vélez Sársfield Res. is the strong favorite to win the match against Instituto Res.",
+      "id": "claim_h2h_home_win",
+      "statement": "Fach-Donaufeld is the overwhelming favorite to win.",
       "subject": {
         "type": "market",
-        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "id": "93dffe05-befe-4719-87e8-8b3102404ba2",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3"],
+      "evidenceIds": ["evidence_h2h_odds", "evidence_form_elektra", "evidence_h2h_history"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_2",
-      "statement": "Vélez Sársfield Res. is highly likely to win or draw the match.",
+      "id": "claim_goals_over",
+      "statement": "The match is very likely to have over 2.5 goals.",
       "subject": {
         "type": "market",
-        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
-        "market": "double_chance"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_8"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_3",
-      "statement": "Instituto Res. is a significant underdog with a low probability of winning.",
-      "subject": {
-        "type": "market",
-        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_2"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim_4",
-      "statement": "The match is likely to have under 2.5 goals, but it is a close call.",
-      "subject": {
-        "type": "market",
-        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
+        "id": "93dffe05-befe-4719-87e8-8b3102404ba2",
         "market": "goals_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_4", "evidence_5"],
+      "evidenceIds": ["evidence_goals_over_odds", "evidence_form_elektra"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_5",
-      "statement": "It is unlikely that both teams will score in this match.",
-      "subject": {
-        "type": "market",
-        "id": "3033f1d4-16ad-41d8-89e0-3017208e980b",
-        "market": "btts"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_6", "evidence_7"],
-      "conflictStatus": "none",
-      "metadata": {}
+        "id": "claim_btts_yes",
+        "statement": "Both teams may score in the match.",
+        "subject": {
+            "type": "market",
+            "id": "93dffe05-befe-4719-87e8-8b3102404ba2",
+            "market": "btts"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_btts_h2h"],
+        "conflictStatus": "none",
+        "metadata": {}
+    },
+    {
+        "id": "claim_double_chance_not_draw_away",
+        "statement": "It is unlikely that the result will be a draw or an away win.",
+        "subject": {
+            "type": "market",
+            "id": "93dffe05-befe-4719-87e8-8b3102404ba2",
+            "market": "double_chance"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_double_chance", "evidence_form_elektra"],
+        "conflictStatus": "none",
+        "metadata": {}
     }
   ],
   "gateResult": {
     "verdict": "promotable",
     "reasons": [
-      "Structured research is well-supported by a combination of API odds data and multiple web search sources providing statistical analysis, H2H records, and current team form.",
-      "All required markets except for corners_over_under have been analyzed with sufficient evidence."
+      "Structured research generated with sufficient evidence in minimal-retry mode."
     ],
     "warnings": []
   },
   "warnings": [],
   "metadata": {
-      "marketCoverage": {
-          "skippedMarkets": ["corners_over_under"],
-          "notes": "No reliable evidence for the corners market was found during the research process."
-      }
+    "marketCoverage": {
+        "skippedMarkets": [{
+            "market": "corners_over_under",
+            "reason": "No information found in minimal-retry mode."
+        }]
+    }
   }
 }

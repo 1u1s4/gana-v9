@@ -1,120 +1,197 @@
+
 {
   "sources": [
     {
       "id": "source_1",
-      "type": "web-search",
-      "url": "https://www.flashscore.com/match/KMTTADvg/",
-      "title": "Davao Aguilas vs Taguig Match Report",
-      "capturedAt": "2026-05-27T16:20:00.000Z",
-      "hash": null,
-      "metadata": {}
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "API-Football Fixture Snapshot",
+      "capturedAt": "2026-05-28T17:08:04.065Z",
+      "hash": "10f32ebf-6aa4-4a61-a896-a78e12e8ccaa",
+      "metadata": {
+        "provider": "api-football",
+        "fixtureId": "95897498-2af5-4162-92bc-1dd294e97c39"
+      }
     },
     {
       "id": "source_2",
       "type": "provider-snapshot",
       "url": null,
-      "title": "API-Football Fixture Snapshot",
-      "capturedAt": "2026-05-27T16:17:43.455Z",
-      "hash": "3b174cfd-110c-4fce-a74c-805b2bb58e45",
+      "title": "API-Football Odds Snapshot",
+      "capturedAt": "2026-05-28T17:08:05.745Z",
+      "hash": "47a3cdad-7f2e-4d38-846c-a198efbd5827",
       "metadata": {
-        "provider": "api-football"
+        "provider": "api-football",
+        "fixtureId": "95897498-2af5-4162-92bc-1dd294e97c39",
+        "oddsSnapshotId": "a533b0d8-e042-4df4-ab96-189ddf095703"
       }
     },
     {
       "id": "source_3",
-      "type": "provider-snapshot",
-      "url": null,
-      "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-27T16:17:44.746Z",
-      "hash": "7462546f-f4fd-4b92-bedd-2bf50907aec9",
-      "metadata": {
-        "provider": "api-football"
-      }
+      "type": "web-search",
+      "url": "https://www.forebet.com/en/predictions-tips-dainava-alyva-fk-ekranas-1529730",
+      "title": "Dainava vs Ekranas Prediction, H2H, Tip and Match Preview",
+      "capturedAt": "2026-05-28T17:10:00.000Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "source_4",
+      "type": "web-search",
+      "url": "https://www.windrawwin.com/predictions/dainava-alyva-vs-fk-ekranas/2026-05-29/1529730/",
+      "title": "Dainava Alyva vs FK Ekranas Prediction, Betting Tips, Odds & Stats",
+      "capturedAt": "2026-05-28T17:10:00.000Z",
+      "hash": null,
+      "metadata": {}
     }
   ],
   "evidenceItems": [
     {
       "id": "evidence_1",
-      "sourceId": "source_1",
-      "claimIds": ["claim_1", "claim_2"],
-      "snippet": "The match between Davao Aguilas and One Taguig FC on May 27, 2026, ended in a 1–1 draw.",
-      "summary": "The match ended in a 1-1 draw.",
-      "confidence": 1,
+      "sourceId": "source_2",
+      "claimIds": ["claim_1"],
+      "snippet": "h2h, home, 1.62",
+      "summary": "Bet365 offers odds of 1.62 for a Dainava home win.",
+      "confidence": 0.9,
       "metadata": {}
     },
     {
-        "id": "evidence_2",
-        "sourceId": "source_2",
-        "claimIds": ["claim_1", "claim_2"],
-        "snippet": "scoreHome: 1, scoreAway: 1",
-        "summary": "The final score was 1-1.",
-        "confidence": 1,
-        "metadata": {}
+      "id": "evidence_2",
+      "sourceId": "source_3",
+      "claimIds": ["claim_1"],
+      "snippet": "Dainava have a 75% win rate at home this season.",
+      "summary": "Dainava has demonstrated strong performance at their home stadium, winning 75% of their matches this season.",
+      "confidence": 0.85,
+      "metadata": {}
     },
     {
-        "id": "evidence_3",
-        "sourceId": "source_3",
-        "claimIds": ["claim_3"],
-        "snippet": "market: h2h, selection: draw, price: 4.75",
-        "summary": "Bet365 offered odds of 4.75 for a draw.",
-        "confidence": 0.9,
-        "metadata": {}
+      "id": "evidence_3",
+      "sourceId": "source_3",
+      "claimIds": ["claim_1"],
+      "snippet": "Ekranas has lost 80% of their away fixtures this season.",
+      "summary": "Ekranas struggles significantly in away games, having lost 80% of their matches on the road.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_4",
+      "sourceId": "source_2",
+      "claimIds": ["claim_2"],
+      "snippet": "goals_over_under, over, 2.5, 1.60",
+      "summary": "Bet365 offers odds of 1.60 for the match having over 2.5 goals.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_5",
+      "sourceId": "source_3",
+      "claimIds": ["claim_2"],
+      "snippet": "Over 2.5 goals have occurred in approximately 88% of their historical encounters.",
+      "summary": "Historically, matches between Dainava and Ekranas have been high-scoring, with over 2.5 goals in 88% of their games.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_6",
+      "sourceId": "source_4",
+      "claimIds": ["claim_3"],
+      "snippet": "Expert Tip: Both Teams to Score - Yes. Ekranas has scored in their last 8 consecutive games.",
+      "summary": "Ekranas has a consistent scoring record, finding the net in their last 8 matches. Dainava has scored in their last 5.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+     {
+      "id": "evidence_7",
+      "sourceId": "source_2",
+      "claimIds": ["claim_4"],
+      "snippet": "double_chance, home_or_draw, 1.12",
+      "summary": "Bet365 offers very low odds of 1.12 for a home win or a draw, suggesting a high probability for this outcome.",
+      "confidence": 0.95,
+      "metadata": {}
     }
   ],
   "claims": [
     {
       "id": "claim_1",
-      "statement": "The match resulted in a draw.",
+      "statement": "Dainava is favored to win the match against Ekranas.",
       "subject": {
         "type": "market",
-        "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
+        "id": "95897498-2af5-4162-92bc-1dd294e97c39",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_2"],
+      "evidenceIds": ["evidence_1", "evidence_2", "evidence_3"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-        "id": "claim_2",
-        "statement": "The total number of goals was 2.",
-        "subject": {
-            "type": "market",
-            "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
-            "market": "goals_over_under"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_1", "evidence_2"],
-        "conflictStatus": "none",
-        "metadata": {}
+      "id": "claim_2",
+      "statement": "The match is likely to have over 2.5 goals.",
+      "subject": {
+        "type": "market",
+        "id": "95897498-2af5-4162-92bc-1dd294e97c39",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4", "evidence_5"],
+      "conflictStatus": "none",
+      "metadata": {}
     },
     {
-        "id": "claim_3",
-        "statement": "The pre-match odds for a draw were around 4.75.",
-        "subject": {
-            "type": "market",
-            "id": "fbb485eb-e73f-4656-bb75-d960a786e05b",
-            "market": "h2h"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_3"],
-        "conflictStatus": "none",
-        "metadata": {}
+      "id": "claim_3",
+      "statement": "Both teams are likely to score.",
+      "subject": {
+        "type": "market",
+        "id": "95897498-2af5-4162-92bc-1dd294e97c39",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_6"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_4",
+      "statement": "Dainava is highly likely to either win or draw.",
+      "subject": {
+        "type": "market",
+        "id": "95897498-2af5-4162-92bc-1dd294e97c39",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_7", "evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {}
     }
   ],
   "gateResult": {
     "verdict": "promotable",
     "reasons": [
-      "Structured research generated with sufficient evidence from web search and provider snapshots."
+      "Structured research generated with sufficient evidence from provider data and web search."
     ],
-    "warnings": []
+    "warnings": [
+      "No data was available for the 'corners_over_under' market."
+    ]
   },
   "warnings": [],
   "metadata": {
-      "marketCoverage": {
-          "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
-          "analyzedMarkets": ["h2h", "goals_over_under"],
-          "skippedMarkets": ["double_chance", "corners_over_under", "btts"]
-      }
+    "marketCoverage": {
+      "requiredMarkets": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "corners_over_under",
+        "btts"
+      ],
+      "analyzedMarkets": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "btts"
+      ],
+      "skippedMarkets": [
+        "corners_over_under"
+      ]
+    }
   }
 }

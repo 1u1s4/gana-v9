@@ -7,6 +7,7 @@ export interface Fixture {
   provider: SportsProvider;
   providerFixtureId: string;
   competitionId?: CompetitionId;
+  competitionName?: string;
   leagueId?: number;
   season?: number;
   homeTeamId: TeamId;

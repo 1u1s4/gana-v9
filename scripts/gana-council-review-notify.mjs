@@ -146,9 +146,14 @@ function friendlyStatus(status) {
 
 function legFixtureLabel(leg) {
   const display = objectRecord(leg.display);
-  return stringValue(display.fixtureLabel)
-    || stringValue(leg.fixture)
+  return readableFixtureLabel(display.fixtureLabel)
+    || readableFixtureLabel(leg.fixture)
     || shortId(stringValue(leg.fixtureId, 'fixture'));
+}
+
+function readableFixtureLabel(value) {
+  const label = stringValue(value);
+  return label && !isUuidFixtureLabel(label) ? label : '';
 }
 
 function formatSelection(leg) {
@@ -180,6 +185,17 @@ function formatNumber(value, digits = 2) {
 
 function shortId(value) {
   return value.length > 12 ? `${value.slice(0, 8)}...` : value;
+}
+
+function isUuidFixtureLabel(value) {
+  const normalized = stringValue(value);
+  if (isUuidLike(normalized)) return true;
+  const parts = normalized.split(/\s+vs\.?\s+/i);
+  return parts.length === 2 && parts.every(isUuidLike);
+}
+
+function isUuidLike(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value).trim());
 }
 
 function parseArgs(argv) {
