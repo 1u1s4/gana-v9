@@ -99,7 +99,6 @@ Preview sin enviar:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --latest \
   --dry-run \
-  --gateway-target discord:1494071165453467721 \
   --max 3
 ```
 
@@ -109,7 +108,6 @@ Envio real con embeds nativos:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --latest \
   --transport discord-native \
-  --gateway-target discord:1494071165453467721 \
   --max 3
 ```
 
@@ -119,7 +117,6 @@ Envio de un artifact especifico:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json \
   --transport discord-native \
-  --gateway-target discord:1494071165453467721 \
   --max 3
 ```
 
@@ -132,7 +129,6 @@ Preview:
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
   --date YYYY-MM-DD \
-  --gateway-target discord:1494071165453467721 \
   --dry-run
 ```
 
@@ -141,8 +137,7 @@ Envio real:
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
   --date YYYY-MM-DD \
-  --transport discord-native \
-  --gateway-target discord:1494071165453467721
+  --transport discord-native
 ```
 
 `notify-discord-daily-stats.mjs` busca el `daily-metrics.json` mas reciente para la fecha indicada y, si existe, el artifact `validations.json` o `validations-blocked.json` correspondiente. `notify-discord-validation-stats.mjs` queda disponible para envios con paths explicitos de artifacts.
@@ -195,13 +190,26 @@ Detalles adicionales: `docs/daily-operations-cron.md`.
 
 ## Canal y runtime
 
-El target usado en pruebas fue:
+El target historico usado antes de dividir canales fue:
 
 ```text
 discord:1494071165453467721
 ```
 
 Evitar depender del home channel si Hermes reporta `Unknown Channel`; usar el ID numerico del canal.
+
+Los wrappers operativos pueden enrutar cada flujo a un canal distinto:
+
+```env
+GANA_DISCORD_RECOMMENDATIONS_TARGET=discord:1510040973218939022
+GANA_DISCORD_COUNCIL_TARGET=discord:1510041013304168649
+GANA_DISCORD_VALIDATION_TARGET=discord:1510041050255855616
+GANA_DISCORD_FEEDBACK_TARGET=discord:1510041074922557724
+GANA_DISCORD_STRATEGY_TARGET=discord:1510041100570591262
+GANA_DISCORD_ALERTS_TARGET=discord:1510041125614915756
+```
+
+Precedencia: target especifico del flujo, luego `--gateway-target`, luego `GANA_DISCORD_TARGET`, y finalmente `discord:1494071165453467721`. Los targets pueden usar `discord:CHANNEL_ID`, `discord:CHANNEL_ID:THREAD_ID` o alias resuelto por Hermes.
 
 El runtime Python estable para el gateway es:
 
@@ -222,6 +230,7 @@ Pruebas de la skill:
 ```bash
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs
+node .agents/skills/discord-recommendation-notifier/tests/discord-targets.test.mjs
 ```
 
 La cobertura valida:
@@ -251,8 +260,7 @@ El resultado del council se envia con:
 
 ```bash
 node scripts/gana-council-review-notify.mjs \
-  --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD-full/daily-parlay-recommendations.json \
-  --gateway-target discord:1494071165453467721
+  --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD-full/daily-parlay-recommendations.json
 ```
 
 Despues de validar, `scripts/gana-council-feedback.mjs` crea `council-feedback.json` y notifica el desempeno por decision/senal para cerrar el loop de mejora.

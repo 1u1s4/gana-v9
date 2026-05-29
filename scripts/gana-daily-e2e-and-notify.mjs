@@ -3,18 +3,20 @@ import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writ
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
+import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
-const DEFAULT_TARGET = 'discord:1494071165453467721';
 const TIMEZONE = 'America/Guatemala';
 const ARTIFACT_ROOT = '.artifacts/gana-v9';
 
 const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(1);
 const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
-const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
+const discordTargets = resolveDiscordTargets({ gatewayTarget: args.gatewayTarget });
+const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex,gemini';
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
+const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
 const notBefore = args.notBefore ?? process.env.GANA_DAILY_E2E_NOT_BEFORE ?? '10:15';
 if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
   throw new Error('--provider-concurrency must be a positive integer.');
@@ -46,10 +48,10 @@ const command = [
   'gana',
   'daily-e2e',
   '--date', date,
-  '--providers', 'codex,gemini',
+  '--providers', providers,
   '--provider-concurrency', String(providerConcurrency),
   '--threshold', String(args.threshold ?? 1.2),
-  '--web', 'live',
+  '--web', webMode,
   '--parlay-profile', parlayProfile,
   '--daily-batch-id', dailyBatchId,
 ];
@@ -89,7 +91,7 @@ try {
       '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs',
       '--artifact', recommendationsPath,
       '--transport', 'discord-native',
-      '--gateway-target', gatewayTarget,
+      '--gateway-target', discordTargets.recommendations,
       '--max', String(args.max ?? 14),
     ], {
       cwd: REPO_ROOT,
@@ -105,7 +107,7 @@ try {
       'scripts/gana-council-review-notify.mjs',
       '--artifact', recommendationsPath,
       '--transport', 'discord-native',
-      '--gateway-target', gatewayTarget,
+      '--gateway-target', discordTargets.council,
     ], {
       cwd: REPO_ROOT,
       env,
@@ -125,7 +127,7 @@ try {
 
   if (!handled) {
     const latest = existsSync(recommendationsPath) ? recommendationsPath : findLatestRecommendations(date);
-    await sendStatus(gatewayTarget, {
+    await sendStatus(discordTargets.alerts, {
       title: '⚠️ Gana v9 · Daily E2E requiere revisión',
       description: [
         `📅 ${date} · ${TIMEZONE}`,
@@ -136,7 +138,7 @@ try {
       ].join('\n'),
       color: 0xf2994a,
     });
-    console.log(JSON.stringify({ ok: false, date, dailyBatchId, logPath, recommendationsPath: latest, status: result.status, signal: result.signal }, null, 2));
+    console.log(JSON.stringify({ ok: false, date, dailyBatchId, logPath, recommendationsPath: latest, status: result.status, signal: result.signal, discordTargets }, null, 2));
     process.exitCode = result.status ?? 1;
   }
 } finally {
@@ -150,9 +152,11 @@ function parseArgs(argv) {
     if (arg === '--date') parsed.date = requireValue(argv, ++index, arg);
     else if (arg === '--daily-batch-id') parsed.dailyBatchId = requireValue(argv, ++index, arg);
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
+    else if (arg === '--providers') parsed.providers = requireValue(argv, ++index, arg);
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
+    else if (arg === '--web') parsed.web = requireValue(argv, ++index, arg);
     else if (arg === '--not-before') parsed.notBefore = requireValue(argv, ++index, arg);
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));
     else if (arg === '--force') parsed.force = true;

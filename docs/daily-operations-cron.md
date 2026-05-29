@@ -22,8 +22,8 @@ Este script:
 2. Localiza el `daily-parlay-recommendations.json` publicado para esa fecha.
 3. Ejecuta `pnpm gana validate --date YYYY-MM-DD --recommendation-artifact PATH`.
 4. Ejecuta `pnpm gana metrics daily --date YYYY-MM-DD --scope daily-YYYY-MM-DD --recommendation-artifact PATH`.
-5. Envia `daily-metrics.json` y el mirror validado a Discord con embeds nativos usando Hermes gateway.
-6. Genera `council-feedback.json` para retroalimentar el gate del siguiente ciclo.
+5. Envia `daily-metrics.json` y el mirror validado al canal de validaciones con embeds nativos usando Hermes gateway.
+6. Genera `council-feedback.json` y lo envia al canal de feedback para retroalimentar el gate del siguiente ciclo.
 
 Daily E2E y recomendaciones del dia:
 
@@ -41,7 +41,7 @@ Este script:
 6. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
 7. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
 8. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
-9. Envia `daily-parlay-recommendations.json` y el resumen accionable del council a Discord con embeds nativos usando Hermes gateway.
+9. Envia `daily-parlay-recommendations.json` al canal de recomendaciones y el resumen accionable del council al canal de council con embeds nativos usando Hermes gateway.
 
 Strategy review del dia anterior:
 
@@ -57,7 +57,7 @@ Este script:
 4. Ejecuta `pnpm gana strategy-review --date YYYY-MM-DD --scope strategy-YYYY-MM-DD`.
 5. Fuerza Codex como proveedor del analisis, con `GANA_STRATEGY_REVIEW_MODEL=gpt-5.5` y `GANA_STRATEGY_REVIEW_REASONING_EFFORT=xhigh` por defecto.
 6. Genera `strategy-review.json`, `strategy-review.md` y actualiza `docs/harness-strategy-review-log.md` con propuestas de cambio al Harness.
-7. Notifica Discord con un mensaje tecnico: resumen de rendimiento, patrones efectivos/fallidos y cambios propuestos por archivo/prioridad/verificacion.
+7. Notifica el canal de strategy review con un mensaje tecnico: resumen de rendimiento, patrones efectivos/fallidos y cambios propuestos por archivo/prioridad/verificacion.
 
 ## Variables
 
@@ -65,7 +65,14 @@ Ambos scripts cargan `.env` si existe.
 
 Variables utiles:
 
-- `GANA_DISCORD_TARGET`: target Discord. Default: `discord:1494071165453467721`.
+- `GANA_DISCORD_TARGET`: target Discord global. Default final: `discord:1494071165453467721`.
+- `GANA_DISCORD_RECOMMENDATIONS_TARGET`: canal para recomendaciones diarias.
+- `GANA_DISCORD_COUNCIL_TARGET`: canal para decision/resumen del council.
+- `GANA_DISCORD_VALIDATION_TARGET`: canal para validaciones y mirror validado.
+- `GANA_DISCORD_FEEDBACK_TARGET`: canal para feedback post-validacion del council.
+- `GANA_DISCORD_STRATEGY_TARGET`: canal para strategy review tecnico.
+- `GANA_DISCORD_ALERTS_TARGET`: canal para fallos/alertas operativas.
+- Precedencia de targets: variable especifica del flujo, luego `--gateway-target`, luego `GANA_DISCORD_TARGET`, luego el canal historico.
 - `GANA_DAILY_DATE`: fuerza fecha para Daily E2E.
 - `GANA_VALIDATION_DATE`: fuerza fecha para validacion/metricas.
 - `GANA_CRON_MAX_FIXTURES_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_FIXTURES_PER_RUN`.
@@ -79,7 +86,7 @@ Variables utiles:
 - `GANA_PARLAY_PROFILE`: default `portfolio-v2`; incluye `parlay-diamante`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`.
 - `AGENT_CODEX_FALLBACK_MODELS`: default cron `gpt-5.4-mini`.
 - `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
-- `GANA_DISCORD_MAX_SELECTIONS`: default `5`.
+- `GANA_DISCORD_MAX_SELECTIONS`: default `14`.
 - `GANA_METRICS_PERSIST`: default `true`.
 - `GANA_STRATEGY_REVIEW_DATE`: fuerza fecha para strategy review diario.
 - `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-5.5`.
@@ -155,8 +162,7 @@ Preview de estadisticas sin enviar:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
   --date YYYY-MM-DD \
   --recommendation-artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD-full/daily-parlay-recommendations.json \
-  --dry-run \
-  --gateway-target discord:1494071165453467721
+  --dry-run
 ```
 
 Preview de recomendaciones sin enviar:
@@ -164,6 +170,5 @@ Preview de recomendaciones sin enviar:
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --latest \
-  --dry-run \
-  --gateway-target discord:1494071165453467721
+  --dry-run
 ```

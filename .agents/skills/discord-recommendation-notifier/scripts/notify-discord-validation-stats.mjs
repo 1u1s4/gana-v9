@@ -6,9 +6,9 @@ import {
   sendDiscordPayload,
   sendHermesGatewayMessage,
 } from './notify-discord-recommendations.mjs';
+import { resolveDiscordTarget } from './discord-targets.mjs';
 
 const DEFAULT_TRANSPORT = 'discord-native';
-const DEFAULT_GATEWAY_TARGET = 'discord';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 
 export function parseArgs(argv) {
@@ -18,7 +18,7 @@ export function parseArgs(argv) {
     date: undefined,
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
     transport: DEFAULT_TRANSPORT,
-    gatewayTarget: DEFAULT_GATEWAY_TARGET,
+    gatewayTarget: undefined,
     hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
     dryRun: false,
     username: 'Gana Hermes',
@@ -39,6 +39,7 @@ export function parseArgs(argv) {
     else throw new Error(`Unknown argument: ${arg}`);
   }
 
+  args.gatewayTarget = resolveDiscordTarget('validation', { gatewayTarget: args.gatewayTarget });
   return args;
 }
 

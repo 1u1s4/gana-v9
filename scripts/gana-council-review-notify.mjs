@@ -2,8 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
-
-const DEFAULT_TARGET = 'discord:1494071165453467721';
+import { resolveDiscordTarget } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const artifactPath = resolve(args.artifact);
@@ -11,7 +10,7 @@ const artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
 const payload = buildPayload(artifact);
 
 if (args.dryRun) {
-  console.log(JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify({ dryRun: true, artifact: artifactPath, target: args.gatewayTarget, payload }, null, 2));
 } else {
   if (args.transport !== 'discord-native') throw new Error('gana-council-review-notify currently supports --transport discord-native.');
   const result = sendDiscordNativePayload(args.gatewayTarget, payload);
@@ -202,7 +201,7 @@ function parseArgs(argv) {
   const parsed = {
     artifact: '',
     transport: 'discord-native',
-    gatewayTarget: process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET,
+    gatewayTarget: undefined,
     dryRun: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -214,6 +213,7 @@ function parseArgs(argv) {
     else throw new Error(`Unknown argument: ${arg}`);
   }
   if (!parsed.artifact) throw new Error('--artifact is required.');
+  parsed.gatewayTarget = resolveDiscordTarget('council', { gatewayTarget: parsed.gatewayTarget });
   return parsed;
 }
 

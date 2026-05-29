@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { sendDiscordNativePayload } from './notify-discord-recommendations.mjs';
+import { resolveDiscordTarget } from './discord-targets.mjs';
 
-const DEFAULT_TARGET = 'discord:1494071165453467721';
 const DEFAULT_TRANSPORT = 'discord-native';
 const MAX_CHANGES = 7;
 const DESCRIPTION_LIMIT = 3500;
@@ -15,7 +15,7 @@ export function parseArgs(argv) {
   const args = {
     artifact: undefined,
     transport: DEFAULT_TRANSPORT,
-    gatewayTarget: process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET,
+    gatewayTarget: undefined,
     hermesPython: process.env.HERMES_GATEWAY_PYTHON,
     dryRun: false,
     username: 'Gana Hermes',
@@ -33,6 +33,7 @@ export function parseArgs(argv) {
     else throw new Error(`Unknown argument: ${arg}`);
   }
 
+  args.gatewayTarget = resolveDiscordTarget('strategy', { gatewayTarget: args.gatewayTarget });
   return args;
 }
 
@@ -253,7 +254,7 @@ function usage() {
   ].join('\n');
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
     console.log(usage());

@@ -53,13 +53,24 @@ La operacion diaria usa hora Guatemala (`America/Guatemala`) y notifica por Disc
 ```bash
 node scripts/gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD
 node scripts/gana-daily-e2e-and-notify.mjs --date YYYY-MM-DD
-node scripts/install-gana-cron.mjs --gateway-target discord:1494071165453467721
+node scripts/install-gana-cron.mjs
 ```
 
 Cron operativo:
 
 - 7:00: valida el dia anterior, calcula `daily-metrics`, y envia estadisticas.
 - 10:00: corre E2E diario full para el dia siguiente y envia parlays/recomendaciones.
+
+Los envios pueden dividirse por flujo con variables opcionales:
+
+- `GANA_DISCORD_RECOMMENDATIONS_TARGET`
+- `GANA_DISCORD_COUNCIL_TARGET`
+- `GANA_DISCORD_VALIDATION_TARGET`
+- `GANA_DISCORD_FEEDBACK_TARGET`
+- `GANA_DISCORD_STRATEGY_TARGET`
+- `GANA_DISCORD_ALERTS_TARGET`
+
+Cada una cae a `--gateway-target`, luego `GANA_DISCORD_TARGET`, y finalmente al canal operativo actual.
 
 Documentacion: `docs/discord-recommendation-notifications.md`.
 
@@ -157,7 +168,6 @@ El formato canonico persiste en el script de la skill y usa cajas nativas de Dis
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --latest \
   --transport discord-native \
-  --gateway-target discord:1494071165453467721 \
   --max 3
 ```
 

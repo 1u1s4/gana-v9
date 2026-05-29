@@ -3,15 +3,15 @@ import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writ
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
+import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
-const DEFAULT_TARGET = 'discord:1494071165453467721';
 const TIMEZONE = 'America/Guatemala';
 const ARTIFACT_ROOT = '.artifacts/gana-v9';
 
 const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(-1);
-const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
+const discordTargets = resolveDiscordTargets({ gatewayTarget: args.gatewayTarget });
 const runSlug = `validation-${date}`;
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${runSlug}.log`);
 const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `${runSlug}.lock`);
@@ -36,6 +36,8 @@ try {
   const recommendationArtifact = args.recommendationArtifact ?? findLatestRecommendation(date);
   const validationArgs = ['gana', 'validate', '--date', date];
   const metricsArgs = ['gana', 'metrics', 'daily', '--date', date, '--scope', args.scope ?? `daily-${date}`];
+  const metricsPersist = args.persist ?? process.env.GANA_METRICS_PERSIST;
+  if (metricsPersist !== undefined) metricsArgs.push('--persist', String(metricsPersist));
   if (recommendationArtifact) {
     validationArgs.push('--recommendation-artifact', recommendationArtifact);
     metricsArgs.push('--recommendation-artifact', recommendationArtifact);
@@ -51,7 +53,7 @@ try {
       '--date', date,
       '--metrics-artifact', metricsArtifact,
       '--transport', 'discord-native',
-      '--gateway-target', gatewayTarget,
+      '--gateway-target', discordTargets.validation,
     ];
     if (validationsArtifact) notifyArgs.push('--validation-artifact', validationsArtifact);
     if (recommendationArtifact) notifyArgs.push('--recommendation-artifact', recommendationArtifact);
@@ -71,7 +73,7 @@ try {
         '--recommendation-artifact', recommendationArtifact,
         '--validation-artifact', validationsArtifact,
         '--transport', 'discord-native',
-        '--gateway-target', gatewayTarget,
+        '--gateway-target', discordTargets.feedback,
       ], {
         cwd: REPO_ROOT,
         env,
@@ -88,7 +90,7 @@ try {
   }
 
   if (!handled) {
-    await sendDiscordNativePayload(gatewayTarget, {
+    await sendDiscordNativePayload(discordTargets.alerts, {
       username: 'Gana Hermes',
       allowed_mentions: { parse: [] },
       content: '',
@@ -104,7 +106,7 @@ try {
         color: 0xf2994a,
       }],
     });
-    console.log(JSON.stringify({ ok: false, date, logPath, validationsArtifact, metricsArtifact, validationStatus: validation.status, metricsStatus: metrics.status }, null, 2));
+    console.log(JSON.stringify({ ok: false, date, logPath, validationsArtifact, metricsArtifact, validationStatus: validation.status, metricsStatus: metrics.status, discordTargets }, null, 2));
     process.exitCode = metrics.status ?? validation.status ?? 1;
   }
 } finally {
@@ -131,6 +133,7 @@ function parseArgs(argv) {
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--scope') parsed.scope = requireValue(argv, ++index, arg);
     else if (arg === '--recommendation-artifact') parsed.recommendationArtifact = requireValue(argv, ++index, arg);
+    else if (arg === '--persist') parsed.persist = requireValue(argv, ++index, arg);
     else if (arg === '--force') parsed.force = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }

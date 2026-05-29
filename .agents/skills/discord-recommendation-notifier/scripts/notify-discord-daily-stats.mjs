@@ -17,10 +17,10 @@ import {
   sendDiscordPayload,
   sendHermesGatewayMessage,
 } from './notify-discord-recommendations.mjs';
+import { resolveDiscordTarget } from './discord-targets.mjs';
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
 const DEFAULT_TRANSPORT = 'discord-native';
-const DEFAULT_GATEWAY_TARGET = 'discord:1494071165453467721';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DEFAULT_TIMEZONE = 'America/Guatemala';
 const DEFAULT_MAX_RECOMMENDATIONS = 8;
@@ -37,7 +37,7 @@ export function parseArgs(argv) {
     timezone: DEFAULT_TIMEZONE,
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
     transport: DEFAULT_TRANSPORT,
-    gatewayTarget: DEFAULT_GATEWAY_TARGET,
+    gatewayTarget: undefined,
     hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
     dryRun: false,
     includeRecommendationMirror: true,
@@ -70,6 +70,7 @@ export function parseArgs(argv) {
 
   if (args.previousDay && args.date) throw new Error('Use either --date or --previous-day, not both.');
   if (args.previousDay) args.date = dateInTimezone(addDays(new Date(), -1), args.timezone);
+  args.gatewayTarget = resolveDiscordTarget('validation', { gatewayTarget: args.gatewayTarget });
   return args;
 }
 
@@ -659,7 +660,7 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

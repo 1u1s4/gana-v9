@@ -2,6 +2,7 @@
 import { mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { resolveDiscordTarget } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -10,7 +11,7 @@ const ARTIFACT_ROOT = '.artifacts/gana-v9';
 const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(-1);
 const scope = args.scope ?? `strategy-${date}`;
-const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? 'discord:1494071165453467721';
+const gatewayTarget = resolveDiscordTarget('strategy', { gatewayTarget: args.gatewayTarget });
 const notify = args.notify !== 'false';
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `strategy-review-${date}.log`);
 

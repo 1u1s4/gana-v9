@@ -2,8 +2,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
-
-const DEFAULT_TARGET = 'discord:1494071165453467721';
+import { resolveDiscordTarget } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const recommendationPath = resolve(args.recommendationArtifact);
@@ -12,12 +11,12 @@ const recommendationArtifact = JSON.parse(readFileSync(recommendationPath, 'utf8
 const validationArtifact = JSON.parse(readFileSync(validationPath, 'utf8'));
 const feedback = buildCouncilFeedback(recommendationArtifact, validationArtifact, recommendationPath, validationPath);
 const feedbackPath = join(dirname(recommendationPath), 'council-feedback.json');
-writeFileSync(feedbackPath, `${JSON.stringify(feedback, null, 2)}\n`);
 
 const payload = buildPayload(feedback);
 if (args.dryRun) {
-  console.log(JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify({ dryRun: true, artifact: feedbackPath, target: args.gatewayTarget, payload }, null, 2));
 } else {
+  writeFileSync(feedbackPath, `${JSON.stringify(feedback, null, 2)}\n`);
   if (args.transport !== 'discord-native') throw new Error('gana-council-feedback currently supports --transport discord-native.');
   const result = sendDiscordNativePayload(args.gatewayTarget, payload);
   console.log(JSON.stringify({ ok: true, artifact: feedbackPath, target: args.gatewayTarget, result }, null, 2));
@@ -144,7 +143,7 @@ function parseArgs(argv) {
     recommendationArtifact: '',
     validationArtifact: '',
     transport: 'discord-native',
-    gatewayTarget: process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET,
+    gatewayTarget: undefined,
     dryRun: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -158,6 +157,7 @@ function parseArgs(argv) {
   }
   if (!parsed.recommendationArtifact) throw new Error('--recommendation-artifact is required.');
   if (!parsed.validationArtifact) throw new Error('--validation-artifact is required.');
+  parsed.gatewayTarget = resolveDiscordTarget('feedback', { gatewayTarget: parsed.gatewayTarget });
   return parsed;
 }
 

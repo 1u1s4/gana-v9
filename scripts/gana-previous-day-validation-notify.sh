@@ -39,7 +39,7 @@ require_command node
 require_command pnpm
 
 DATE="${GANA_VALIDATION_DATE:-$(gt_date -1)}"
-DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
+# Flow-specific GANA_DISCORD_*_TARGET values are resolved inside the Node wrapper.
 
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
 export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
@@ -47,4 +47,4 @@ export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
 exec node scripts/gana-validate-metrics-and-notify.mjs \
   --date "$DATE" \
   --scope "${GANA_METRICS_SCOPE:-daily-$DATE}" \
-  --gateway-target "$DISCORD_TARGET"
+  --persist "${GANA_METRICS_PERSIST:-true}"

@@ -39,7 +39,7 @@ require_command node
 require_command pnpm
 
 DATE="${GANA_DAILY_DATE:-$(gt_date 1)}"
-DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
+# Flow-specific GANA_DISCORD_*_TARGET values are resolved inside the Node wrapper.
 
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
 export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
@@ -54,8 +54,9 @@ export AGENT_CODEX_SANDBOX="${AGENT_CODEX_SANDBOX:-danger-full-access}"
 
 exec node scripts/gana-daily-e2e-and-notify.mjs \
   --date "$DATE" \
-  --gateway-target "$DISCORD_TARGET" \
+  --providers "${GANA_DAILY_PROVIDERS:-codex,gemini}" \
   --threshold "$GANA_LOW_ODDS_THRESHOLD" \
   --provider-concurrency "$GANA_DAILY_PROVIDER_CONCURRENCY" \
+  --web "${GANA_WEB_MODE:-live}" \
   --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}" \
-  --max "${GANA_DISCORD_MAX_SELECTIONS:-8}"
+  --max "${GANA_DISCORD_MAX_SELECTIONS:-14}"

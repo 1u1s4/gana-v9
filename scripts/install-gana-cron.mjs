@@ -1,20 +1,26 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { DISCORD_TARGET_ENV, resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
-const DEFAULT_TARGET = 'discord:1494071165453467721';
 const args = parseArgs(process.argv.slice(2));
-const gatewayTarget = args.gatewayTarget ?? process.env.GANA_DISCORD_TARGET ?? DEFAULT_TARGET;
+const env = { ...loadDotEnv(), ...process.env };
+const gatewayTarget = args.gatewayTarget ?? env.GANA_DISCORD_TARGET;
+const targetFlag = gatewayTarget ? ` --gateway-target ${shellQuote(gatewayTarget)}` : '';
+const targetEnvPrefix = discordTargetEnvPrefix();
+const discordTargets = resolveDiscordTargets({ gatewayTarget, env });
 const begin = '# BEGIN gana-v9 daily operations';
 const end = '# END gana-v9 daily operations';
 const block = [
   begin,
   'MAILTO=""',
   'TZ=America/Guatemala',
-  `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`node scripts/gana-validate-metrics-and-notify.mjs --gateway-target ${gatewayTarget} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`)}`,
-  `15 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`node scripts/gana-daily-e2e-and-notify.mjs --gateway-target ${gatewayTarget} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
-  `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`node scripts/gana-strategy-review.mjs >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`)}`,
+  `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-validate-metrics-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`)}`,
+  `15 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-daily-e2e-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
+  `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-strategy-review.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`)}`,
   end,
 ].join('\n');
 
@@ -24,15 +30,21 @@ const next = replaceBlock(current, block);
 if (args.print) {
   console.log(next);
 } else {
-  const child = spawnSync('crontab', ['-'], {
-    input: next.endsWith('\n') ? next : `${next}\n`,
+  const tempDir = mkdtempSync(join(tmpdir(), 'gana-crontab-'));
+  const tempPath = join(tempDir, 'crontab.txt');
+  writeFileSync(tempPath, next.endsWith('\n') ? next : `${next}\n`);
+  const child = spawnSync('crontab', [tempPath], {
     encoding: 'utf8',
   });
-  if (child.error) throw child.error;
-  if (child.status !== 0) {
-    throw new Error(`crontab install failed with exit ${child.status}: ${(child.stderr || child.stdout || '').trim()}`);
+  try {
+    if (child.error) throw child.error;
+    if (child.status !== 0) {
+      throw new Error(`crontab install failed with exit ${child.status}: ${(child.stderr || child.stdout || '').trim()}`);
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
-  console.log(JSON.stringify({ ok: true, gatewayTarget, timezone: 'America/Guatemala' }, null, 2));
+  console.log(JSON.stringify({ ok: true, gatewayTarget: gatewayTarget ?? null, discordTargets, timezone: 'America/Guatemala' }, null, 2));
 }
 
 function parseArgs(argv) {
@@ -62,6 +74,31 @@ function replaceBlock(current, block) {
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function sourceEnvCommand() {
+  return 'if [ -f .env ]; then set -a; source .env; set +a; fi;';
+}
+
+function discordTargetEnvPrefix() {
+  const assignments = Object.values(DISCORD_TARGET_ENV)
+    .filter((key) => process.env[key])
+    .map((key) => `${key}=${shellQuote(process.env[key])}`);
+  return assignments.length ? `${assignments.join(' ')} ` : '';
+}
+
+function loadDotEnv() {
+  const path = resolve(REPO_ROOT, '.env');
+  if (!existsSync(path)) return {};
+  const values = {};
+  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+    const [key, ...rest] = line.split('=');
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+    values[key] = rest.join('=').trim().replace(/^(['"])(.*)\1$/, '$2');
+  }
+  return values;
 }
 
 function escapeRegex(value) {

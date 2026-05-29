@@ -3,11 +3,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { resolveDiscordTarget } from './discord-targets.mjs';
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
 const DEFAULT_MAX_SELECTIONS = 14;
 const DEFAULT_TRANSPORT = 'discord-native';
-const DEFAULT_GATEWAY_TARGET = 'discord:1494071165453467721';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DISCORD_FIELD_LIMIT = 1024;
 const DISCORD_DESCRIPTION_LIMIT = 4096;
@@ -22,7 +22,7 @@ export function parseArgs(argv) {
     artifactRoot: DEFAULT_ARTIFACT_ROOT,
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
     transport: DEFAULT_TRANSPORT,
-    gatewayTarget: DEFAULT_GATEWAY_TARGET,
+    gatewayTarget: undefined,
     hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
     dryRun: false,
     latest: false,
@@ -48,6 +48,7 @@ export function parseArgs(argv) {
     else throw new Error(`Unknown argument: ${arg}`);
   }
 
+  args.gatewayTarget = resolveDiscordTarget('recommendations', { gatewayTarget: args.gatewayTarget });
   return args;
 }
 
@@ -919,7 +920,7 @@ async function main() {
   }, null, 2));
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

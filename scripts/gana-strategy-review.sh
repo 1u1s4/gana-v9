@@ -39,7 +39,7 @@ require_command node
 require_command pnpm
 
 DATE="${GANA_STRATEGY_REVIEW_DATE:-$(gt_date -1)}"
-DISCORD_TARGET="${GANA_DISCORD_TARGET:-discord:1494071165453467721}"
+# Flow-specific GANA_DISCORD_*_TARGET values are resolved inside the Node wrapper.
 
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
 export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
@@ -51,5 +51,4 @@ exec node scripts/gana-strategy-review.mjs \
   --date "$DATE" \
   --scope "${GANA_STRATEGY_REVIEW_SCOPE:-strategy-$DATE}" \
   --agent "${GANA_STRATEGY_REVIEW_AGENT:-true}" \
-  --notify "${GANA_STRATEGY_REVIEW_NOTIFY:-true}" \
-  --gateway-target "$DISCORD_TARGET"
+  --notify "${GANA_STRATEGY_REVIEW_NOTIFY:-true}"

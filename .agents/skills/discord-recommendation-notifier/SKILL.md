@@ -22,6 +22,7 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
 - Strategy review artifact: `strategy-review.json`, produced by `pnpm gana strategy-review`, for technical Harness change notifications.
+- Optional channel routing by flow: `GANA_DISCORD_RECOMMENDATIONS_TARGET`, `GANA_DISCORD_COUNCIL_TARGET`, `GANA_DISCORD_VALIDATION_TARGET`, `GANA_DISCORD_FEEDBACK_TARGET`, `GANA_DISCORD_STRATEGY_TARGET`, and `GANA_DISCORD_ALERTS_TARGET`. Each falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, then the default Gana channel.
 
 ## Workflow
 
@@ -35,7 +36,7 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 3. Send with native Discord embed boxes through Hermes gateway config:
 
    ```bash
-   node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact PATH --gateway-target discord:CHANNEL_ID
+   node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact PATH
    ```
 
 4. If explicitly using a webhook instead of the gateway:
@@ -50,16 +51,14 @@ For validation statistics, send native Discord boxes from daily metrics:
 
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs \
-  --date YYYY-MM-DD \
-  --gateway-target discord:CHANNEL_ID
+  --date YYYY-MM-DD
 ```
 
 For Harness strategy review change notifications:
 
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-strategy-review.mjs \
-  --artifact .artifacts/gana-v9/runs/RUN_ID/strategy-review.json \
-  --gateway-target discord:CHANNEL_ID
+  --artifact .artifacts/gana-v9/runs/RUN_ID/strategy-review.json
 ```
 
 The strategy review notifier should stay technical and compact: include review scope/date range, model/reasoning, prediction/parlay hit-rate context, effective/failure patterns, proposed Harness changes with priority/status/files/rationale/impact/verification, and a final analytical-only note.
@@ -102,6 +101,7 @@ Repo-level cron wrappers:
 - `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date scoped to the published recommendations artifact, builds daily metrics scoped to those same published targets, sends stats, and sends council feedback.
 - `scripts/install-gana-hermes-cron.sh`: installs Hermes cron jobs at 7am/10am America/Guatemala.
 - `scripts/install-gana-cron.mjs`: installs a system crontab fallback at 7am/10am America/Guatemala.
+- `.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs`: centralizes flow-specific Discord target resolution for notifiers and repo-level cron wrappers.
 
 Useful commands:
 
@@ -109,10 +109,11 @@ Useful commands:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --dry-run
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 3
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 14 --single-message
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --transport discord-native --gateway-target discord:CHANNEL_ID
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --dry-run
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --gateway-target discord:CHANNEL_ID --test-label "Esto es una prueba"
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --transport discord-native
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --dry-run
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --test-label "Esto es una prueba"
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-strategy-review.mjs --artifact .artifacts/gana-v9/runs/RUN_ID/strategy-review.json --dry-run
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-recommendations.test.mjs
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs
+node .agents/skills/discord-recommendation-notifier/tests/discord-targets.test.mjs
 ```
