@@ -222,6 +222,17 @@ interface DailyValidationFreshness {
   reasons: string[];
 }
 
+interface DailyRunDiagnostics {
+  emptyRun: boolean;
+  reasons: string[];
+  totalProviderPredictions: number;
+  totalProviderPromotablePredictions: number;
+  persistedParlays: number;
+  analyzedParlays: number;
+  recommendations: number;
+  providerPredictionCounts: Record<string, { predictions: number; promotable: number }>;
+}
+
 export interface AtomicPredictionRecommendation {
   kind: 'atomic-prediction';
   rank: number;
@@ -634,6 +645,16 @@ export async function runDailyE2E(
     verdict: family.verdict ?? null,
     persistedParlays: family.persistedParlayIds?.length ?? 0,
   }]));
+  const runDiagnostics = dailyRunDiagnostics({
+    providers,
+    providerRuns,
+    providerPipelineResults,
+    parlayFamilies,
+    parlayAnalysis,
+    metrics,
+    validationFreshness,
+    recommendations: finalRecommendations,
+  });
   const summary = {
     dailyBatchId,
     date: input.date,
@@ -665,6 +686,7 @@ export async function runDailyE2E(
       error: metrics.error,
     } : null,
     validationFreshness,
+    runDiagnostics,
     sharedInputs: {
       pairedProviders,
       providerModels: Object.fromEntries(providers.map((provider) => [
@@ -779,6 +801,7 @@ export async function runDailyE2E(
       ],
     },
     diagnostics: parlayAnalysis?.diagnostics ?? null,
+    runDiagnostics,
     council,
     publishedTargets,
     persistencePolicy: {
@@ -1042,6 +1065,53 @@ function providerPredictionCounts(result: RunPipelineResult | undefined): { pred
   return {
     predictions: predictions.length,
     promotable: predictions.filter((prediction) => prediction.status === 'promotable').length,
+  };
+}
+
+function dailyRunDiagnostics(input: {
+  providers: readonly DailyE2EProvider[];
+  providerRuns: readonly DailyProviderRunResult[];
+  providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>;
+  parlayFamilies: readonly DailyParlayFamilyResult[];
+  parlayAnalysis: ParlayAnalysisRunResult | undefined;
+  metrics: DailyMetricsRunResult | undefined;
+  validationFreshness: DailyValidationFreshness;
+  recommendations: readonly DailyFinalRecommendation[];
+}): DailyRunDiagnostics {
+  const providerPredictionCountsByProvider = Object.fromEntries(input.providers.map((provider) => [
+    provider,
+    providerPredictionCounts(input.providerPipelineResults[provider]),
+  ]));
+  const totalProviderPredictions = Object.values(providerPredictionCountsByProvider)
+    .reduce((sum, counts) => sum + counts.predictions, 0);
+  const totalProviderPromotablePredictions = Object.values(providerPredictionCountsByProvider)
+    .reduce((sum, counts) => sum + counts.promotable, 0);
+  const persistedParlays = input.parlayFamilies.reduce((sum, family) => sum + (family.persistedParlayIds?.length ?? 0), 0);
+  const analyzedParlays = input.parlayAnalysis?.analyzed ?? 0;
+  const recommendations = input.recommendations.length;
+  const reasons: string[] = [];
+
+  if (totalProviderPredictions === 0) reasons.push('provider pipelines produced zero predictions');
+  if (totalProviderPromotablePredictions === 0 && totalProviderPredictions > 0) reasons.push('provider pipelines produced zero promotable predictions');
+  for (const run of input.providerRuns) {
+    if (!run.ok) reasons.push(`${run.provider} provider blocked${run.error ? `: ${run.error}` : ''}`);
+  }
+  if (!persistedParlays) reasons.push('no persisted parlay candidates were produced');
+  if (!input.parlayAnalysis) reasons.push('parlay analysis was skipped because no usable source run ids were available');
+  else if (!analyzedParlays) reasons.push('parlay analysis found zero candidates');
+  if (!input.metrics?.ok) reasons.push(`daily metrics unavailable${input.metrics?.error ? `: ${input.metrics.error}` : ''}`);
+  if (input.validationFreshness.status === 'empty') reasons.push(...input.validationFreshness.reasons);
+  if (!recommendations) reasons.push('no final recommendations survived promotion, fallback, and council gates');
+
+  return {
+    emptyRun: totalProviderPredictions === 0 && persistedParlays === 0 && analyzedParlays === 0 && recommendations === 0,
+    reasons: uniqueStrings(reasons),
+    totalProviderPredictions,
+    totalProviderPromotablePredictions,
+    persistedParlays,
+    analyzedParlays,
+    recommendations,
+    providerPredictionCounts: providerPredictionCountsByProvider,
   };
 }
 
@@ -2266,6 +2336,10 @@ function buildDailyReport(summary: any, recommendationsPath: string): string {
     `simples: ${counts.atomicRecommendations ?? 0}`,
     `fallbackParlays: ${counts.fallbackParlayRecommendations ?? 0}`,
     `fallbackSimples: ${counts.fallbackAtomicRecommendations ?? 0}`,
+    '',
+    '## Diagnostics',
+    `emptyRun: ${Boolean(summary.runDiagnostics?.emptyRun)}`,
+    ...((summary.runDiagnostics?.reasons ?? []).map((reason: string) => `- ${reason}`)),
     '',
     'Artifact analitico. No ejecuta apuestas ni garantiza resultados.',
     '',

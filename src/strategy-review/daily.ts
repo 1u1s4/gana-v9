@@ -30,6 +30,7 @@ export interface StrategyReviewResult {
   reasoningEffort: string;
   dailyReviews: DailyStrategyReview[];
   historySummary: StrategyHistorySummary;
+  diagnostics: StrategyReviewDiagnostics;
   agentReview: StrategyAgentReview;
   error?: string;
 }
@@ -43,6 +44,7 @@ export interface DailyStrategyReview {
   topFailures: ReviewItem[];
   topEffective: ReviewItem[];
   recommendationArtifact?: RecommendationArtifactAudit;
+  diagnostics: DailyStrategyDiagnostics;
 }
 
 export interface TargetReviewSummary {
@@ -115,6 +117,27 @@ export interface StrategyHistorySummary {
   weakestBuckets: ReviewBucket[];
   strongestBuckets: ReviewBucket[];
   recurringIssues: string[];
+}
+
+export interface DailyStrategyDiagnostics {
+  emptyReview: boolean;
+  reasons: string[];
+  recommendationArtifactPresent: boolean;
+  recommendationArtifactRecommendations: number;
+}
+
+export interface StrategyReviewDiagnostics {
+  emptyReview: boolean;
+  reasons: string[];
+  datesWithoutPredictions: string[];
+  datesWithoutParlays: string[];
+  datesWithoutRecommendationArtifact: string[];
+  recommendationArtifacts: {
+    totalRecommendations: number;
+    parlays: number;
+    atomicPredictions: number;
+    duplicateParlays: number;
+  };
 }
 
 export interface StrategyAgentReview {
@@ -227,6 +250,7 @@ export async function runStrategyReview(
     ]);
     allPredictionRows.push(...predictionRows);
     allParlayRows.push(...parlayRows);
+    const recommendationArtifact = auditRecommendationArtifacts(config, date, deps);
     dailyReviews.push({
       date,
       sourceWindowStart: window.start.toISOString(),
@@ -235,11 +259,13 @@ export async function runStrategyReview(
       parlays: summarizeRows(parlayRows),
       topFailures: topRows([...predictionRows, ...parlayRows], 'lost'),
       topEffective: topRows([...predictionRows, ...parlayRows], 'won'),
-      recommendationArtifact: auditRecommendationArtifacts(config, date, deps),
+      recommendationArtifact,
+      diagnostics: dailyStrategyDiagnostics(predictionRows, parlayRows, recommendationArtifact),
     });
   }
 
   const historySummary = buildHistorySummary(dates, allPredictionRows, allParlayRows);
+  const diagnostics = strategyReviewDiagnostics(dailyReviews);
   const agentReview = await buildAgentReview(config, {
     runId,
     scope,
@@ -249,6 +275,7 @@ export async function runStrategyReview(
     dates,
     dailyReviews,
     historySummary,
+    diagnostics,
     enabled: input.agent !== false,
     deps,
   });
@@ -265,6 +292,7 @@ export async function runStrategyReview(
     dates,
     dailyReviews,
     historySummary,
+    diagnostics,
     agentReview,
   };
   const artifactPath = artifactWriter(runId, 'strategy-review.json', payload);
@@ -285,6 +313,7 @@ export async function runStrategyReview(
     reasoningEffort,
     dailyReviews,
     historySummary,
+    diagnostics,
     agentReview,
   };
 }
@@ -312,6 +341,19 @@ function blockedResult(
       weakestBuckets: [],
       strongestBuckets: [],
       recurringIssues: [],
+    },
+    diagnostics: {
+      emptyReview: true,
+      reasons: [error],
+      datesWithoutPredictions: [],
+      datesWithoutParlays: [],
+      datesWithoutRecommendationArtifact: [],
+      recommendationArtifacts: {
+        totalRecommendations: 0,
+        parlays: 0,
+        atomicPredictions: 0,
+        duplicateParlays: 0,
+      },
     },
     agentReview: {
       status: 'blocked',
@@ -522,6 +564,60 @@ function buildHistorySummary(
   };
 }
 
+function dailyStrategyDiagnostics(
+  predictionRows: readonly ReviewRow[],
+  parlayRows: readonly ReviewRow[],
+  recommendationArtifact: RecommendationArtifactAudit | undefined,
+): DailyStrategyDiagnostics {
+  const reasons: string[] = [];
+  if (!predictionRows.length) reasons.push('no persisted predictions found for the review date');
+  if (!parlayRows.length) reasons.push('no persisted parlays found for the review date');
+  if (!recommendationArtifact) reasons.push('no daily recommendation artifact found for the review date');
+  else if (recommendationArtifact.total === 0) reasons.push('daily recommendation artifact contains zero recommendations');
+  return {
+    emptyReview: predictionRows.length === 0 && parlayRows.length === 0 && (!recommendationArtifact || recommendationArtifact.total === 0),
+    reasons,
+    recommendationArtifactPresent: Boolean(recommendationArtifact),
+    recommendationArtifactRecommendations: recommendationArtifact?.total ?? 0,
+  };
+}
+
+function strategyReviewDiagnostics(dailyReviews: readonly DailyStrategyReview[]): StrategyReviewDiagnostics {
+  const datesWithoutPredictions = dailyReviews
+    .filter((day) => day.predictions.total === 0)
+    .map((day) => day.date);
+  const datesWithoutParlays = dailyReviews
+    .filter((day) => day.parlays.total === 0)
+    .map((day) => day.date);
+  const datesWithoutRecommendationArtifact = dailyReviews
+    .filter((day) => !day.recommendationArtifact)
+    .map((day) => day.date);
+  const recommendationArtifacts = dailyReviews.reduce((summary, day) => ({
+    totalRecommendations: summary.totalRecommendations + (day.recommendationArtifact?.total ?? 0),
+    parlays: summary.parlays + (day.recommendationArtifact?.parlays ?? 0),
+    atomicPredictions: summary.atomicPredictions + (day.recommendationArtifact?.atomicPredictions ?? 0),
+    duplicateParlays: summary.duplicateParlays + (day.recommendationArtifact?.duplicateParlays ?? 0),
+  }), {
+    totalRecommendations: 0,
+    parlays: 0,
+    atomicPredictions: 0,
+    duplicateParlays: 0,
+  });
+  const reasons: string[] = [];
+  if (datesWithoutPredictions.length) reasons.push(`${datesWithoutPredictions.length} reviewed date(s) had zero persisted predictions`);
+  if (datesWithoutParlays.length) reasons.push(`${datesWithoutParlays.length} reviewed date(s) had zero persisted parlays`);
+  if (datesWithoutRecommendationArtifact.length) reasons.push(`${datesWithoutRecommendationArtifact.length} reviewed date(s) had no recommendation artifact`);
+  if (!recommendationArtifacts.totalRecommendations) reasons.push('recommendation artifacts contributed zero published recommendations');
+  return {
+    emptyReview: dailyReviews.length === 0 || dailyReviews.every((day) => day.diagnostics.emptyReview),
+    reasons,
+    datesWithoutPredictions,
+    datesWithoutParlays,
+    datesWithoutRecommendationArtifact,
+    recommendationArtifacts,
+  };
+}
+
 async function buildAgentReview(
   config: AgentConfig,
   input: {
@@ -533,6 +629,7 @@ async function buildAgentReview(
     dates: string[];
     dailyReviews: DailyStrategyReview[];
     historySummary: StrategyHistorySummary;
+    diagnostics: StrategyReviewDiagnostics;
     enabled: boolean;
     deps: StrategyReviewDependencies;
   },
@@ -590,15 +687,18 @@ function strategyReviewPrompt(input: {
   dates: string[];
   dailyReviews: DailyStrategyReview[];
   historySummary: StrategyHistorySummary;
+  diagnostics?: StrategyReviewDiagnostics;
 }): string {
   const compact = {
     scope: input.scope,
     dates: input.dates,
     historySummary: input.historySummary,
+    diagnostics: input.diagnostics,
     dailyReviews: input.dailyReviews.map((day) => ({
       date: day.date,
       predictions: day.predictions,
       parlays: day.parlays,
+      diagnostics: day.diagnostics,
       topFailures: day.topFailures.slice(0, 8).map(agentSafeReviewItem),
       topEffective: day.topEffective.slice(0, 8).map(agentSafeReviewItem),
       recommendationArtifact: day.recommendationArtifact,
@@ -683,6 +783,10 @@ function renderStrategyReviewMarkdown(payload: any): string {
     '',
     ...listOrNone(payload.historySummary.recurringIssues),
     '',
+    `## Diagnostics`,
+    '',
+    ...listOrNone(payload.diagnostics?.reasons ?? []),
+    '',
     `## Weakest Buckets`,
     '',
     ...bucketLines(payload.historySummary.weakestBuckets),
@@ -720,6 +824,7 @@ function renderStrategyReviewMarkdown(payload: any): string {
         lines.push(`Duplicate parlays: ${day.recommendationArtifact.duplicateParlays}`);
       }
     }
+    if (day.diagnostics?.reasons?.length) lines.push(...day.diagnostics.reasons.map((reason) => `Diagnostic: ${reason}`));
     lines.push('');
   }
   return `${lines.join('\n')}\n`;
@@ -749,6 +854,7 @@ function updateCentralDoc(existing: string, payload: any, artifactPath: string, 
     `- Agent status: ${agent.status}`,
     `- Predictions: ${summaryShort(payload.historySummary.predictions)}`,
     `- Parlays: ${summaryShort(payload.historySummary.parlays)}`,
+    ...(payload.diagnostics?.reasons?.length ? [`- Diagnostics: ${payload.diagnostics.reasons.join('; ')}`] : []),
     '',
     '### Proposed Modifications',
     '',

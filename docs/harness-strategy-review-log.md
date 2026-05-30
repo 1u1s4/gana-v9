@@ -314,3 +314,34 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Raise promotion floors for low-confidence and high-odds singles (proposed) — src/prediction/service.ts, src/prediction/gates.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
 - [high] Convert low-liquidity youth and development signal from bonus to risk gate (proposed) — src/daily/e2e.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
 - [medium] Throttle BTTS, corners, and fragile totals until evidence is market-specific (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, src/daily/e2e.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-05-29 · harness-applied-codebase-sweep
+
+- Source review: strategy-2026-05-25
+- Objective: apply the mechanical, low-risk empty-run diagnostics item during the codebase sweep, without changing promotion thresholds or portfolio policy.
+- Status: implemented and verified.
+
+### Applied Modifications
+
+- [high] Empty-run diagnostics — `src/daily/e2e.ts`, `src/daily/e2e.test.ts`, `src/strategy-review/daily.ts`
+  - Daily E2E summaries and recommendation artifacts now include `runDiagnostics` with provider prediction counts, persisted/analyzed parlay counts, final recommendation count, empty-run status, and actionable reasons.
+  - Daily markdown reports now surface `emptyRun` and the diagnostic reasons.
+  - Strategy review artifacts and markdown now include per-day diagnostics and aggregate review diagnostics for zero-prediction, zero-parlay, and missing recommendation-artifact cases.
+  - The strategy-review agent prompt now receives those diagnostics in its compact payload.
+- Codebase sweep support changes — `src/retrieval/corpus.ts`, `src/retrieval/corpus.test.ts`, `.env.example`, `package-lock.json`, `docs/planes/20-barrido-codigo-2026-05-29.md`
+  - Retrieval corpus parsing now ignores malformed sections instead of producing undefined-id documents.
+  - npm lockfile is synchronized with `package.json`.
+  - `.env.example` no longer carries local user paths or the removed Cursor model path.
+  - The full sweep plan and prioritized backlog are documented in `docs/planes/20-barrido-codigo-2026-05-29.md`.
+
+### Verification
+
+- `npm ci --dry-run`
+- `npm run typecheck`
+- `npm test`
+- `npm run db:validate`
+- `npm run build`
+
+### Deferred
+
+- Threshold, market freshness, profile quarantine, and bucket-level validation gate proposals remain open for focused implementation because they change promotion behavior and need dedicated tests plus sample-size guard review.

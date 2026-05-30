@@ -160,12 +160,16 @@ describe('runDailyE2E', () => {
     assert.equal(summary.counts.recommendations, 1);
     assert.equal(summary.counts.atomicRecommendations, 1);
     assert.equal(summary.providerComparison.summary.comparablePredictions, 1);
+    assert.equal(summary.runDiagnostics.emptyRun, false);
+    assert.equal(summary.runDiagnostics.totalProviderPredictions, 1);
     const report = readFileSync(result.reportPath, 'utf-8');
     assert.match(report, /total: 1/);
     assert.match(report, /simples: 1/);
+    assert.match(report, /emptyRun: false/);
     assert.match(report, /Artifact analitico\. No ejecuta apuestas/);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.executionCapability, 'none');
+    assert.equal(recommendations.runDiagnostics.emptyRun, false);
     assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');
     assert.equal(recommendations.recommendations[0].stakeRecommendation.stake, 10);
     assert.equal(recommendations.recommendations[0].stakeRecommendation.percentOfBankroll, 0.1);
