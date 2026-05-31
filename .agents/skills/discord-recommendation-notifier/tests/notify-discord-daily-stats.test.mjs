@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { chdir, cwd, env as processEnv } from 'node:process';
 import {
   buildDiscordPayload,
   buildGatewayMessage,
@@ -118,7 +119,30 @@ describe('discord daily stats notifier', () => {
     const root = join(tmpdir(), `gana-daily-stats-dry-${Date.now()}`);
     mkdirSync(root, { recursive: true });
     writeFileSync(join(root, 'daily-metrics.json'), JSON.stringify(sampleMetricsArtifact()));
-    const args = parseArgs(['--artifact-root', root, '--date', '2026-05-14', '--dry-run', '--gateway-target', 'discord:123']);
+    const originalCwd = cwd();
+    const originalValidationTarget = processEnv.GANA_DISCORD_VALIDATION_TARGET;
+    const originalGlobalTarget = processEnv.GANA_DISCORD_TARGET;
+    delete processEnv.GANA_DISCORD_VALIDATION_TARGET;
+    delete processEnv.GANA_DISCORD_TARGET;
+
+    let args;
+    try {
+      chdir(root);
+      args = parseArgs(['--artifact-root', root, '--date', '2026-05-14', '--dry-run', '--gateway-target', 'discord:123']);
+    } finally {
+      chdir(originalCwd);
+      if (originalValidationTarget === undefined) {
+        delete processEnv.GANA_DISCORD_VALIDATION_TARGET;
+      } else {
+        processEnv.GANA_DISCORD_VALIDATION_TARGET = originalValidationTarget;
+      }
+      if (originalGlobalTarget === undefined) {
+        delete processEnv.GANA_DISCORD_TARGET;
+      } else {
+        processEnv.GANA_DISCORD_TARGET = originalGlobalTarget;
+      }
+    }
+
     const result = await runDailyStatsNotification(args);
 
     assert.equal(result.dryRun, true);

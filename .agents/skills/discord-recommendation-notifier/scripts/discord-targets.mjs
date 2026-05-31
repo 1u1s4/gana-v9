@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 export const DEFAULT_DISCORD_TARGET = 'discord:1494071165453467721';
 
 export const DISCORD_TARGET_ENV = {
@@ -12,7 +15,7 @@ export const DISCORD_TARGET_ENV = {
 export const DISCORD_TARGET_FLOWS = Object.freeze(Object.keys(DISCORD_TARGET_ENV));
 
 export function resolveDiscordTarget(flow, options = {}) {
-  const env = options.env ?? process.env;
+  const env = options.env ?? runtimeEnv();
   const envKey = DISCORD_TARGET_ENV[flow];
   if (!envKey) throw new Error(`Unknown Discord target flow: ${flow}`);
 
@@ -37,4 +40,29 @@ function cleanTarget(value) {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+let cachedDotEnv;
+
+function runtimeEnv() {
+  return { ...loadDotEnv(), ...process.env };
+}
+
+function loadDotEnv() {
+  const path = resolve(process.cwd(), '.env');
+  if (cachedDotEnv?.path === path) return cachedDotEnv.values;
+  const values = {};
+  if (!existsSync(path)) {
+    cachedDotEnv = { path, values };
+    return values;
+  }
+  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim().replace(/^export\s+/, '');
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+    const [key, ...rest] = line.split('=');
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+    values[key] = rest.join('=').trim().replace(/^(['"])(.*)\1$/, '$2');
+  }
+  cachedDotEnv = { path, values };
+  return values;
 }

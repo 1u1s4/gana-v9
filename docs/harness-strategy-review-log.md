@@ -345,3 +345,46 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 ### Deferred
 
 - Threshold, market freshness, profile quarantine, and bucket-level validation gate proposals remain open for focused implementation because they change promotion behavior and need dedicated tests plus sample-size guard review.
+
+## 2026-05-30 · strategy-2026-05-29
+
+- Run: strategy-review-2026-05-29-8589087e
+- Dates: 2026-05-29
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-29-8589087e/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-29-8589087e/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 222-156 hit 58.7% (499 total)
+- Parlays: 11-12 hit 47.8% (25 total)
+
+### Proposed Modifications
+
+- [high] Restrict portfolio-v2 generation to validated conservative profiles (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/analysis.ts, src/daily/e2e.test.ts, src/parlay/service.test.ts, src/parlay/analysis.test.ts
+- [high] Lower high-combined-odds parlay ceiling to below 2.00 (ready-for-implementation) — src/parlay/analysis.ts, src/daily/e2e.ts, src/parlay/service.ts, src/parlay/analysis.test.ts, src/daily/e2e.test.ts
+- [high] Add market-level validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/daily/e2e.test.ts
+- [medium] Raise prediction promotion floor and add totals/BTTS market floors (proposed) — src/prediction/service.ts, skills/score-prediction-v2/prompt.md, src/prediction/service.test.ts
+- [medium] Demote duplicate winner-family exposure per fixture (proposed) — src/prediction/service.ts, src/daily/e2e.ts, skills/score-prediction-v2/prompt.md, src/prediction/service.test.ts, src/daily/e2e.test.ts
+- [medium] Add development/thin-fixture low-odds overconfidence feedback loop (proposed) — skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/prediction/service.ts, src/council/recommendation-council.ts, src/prediction/service.test.ts
+
+## 2026-05-30 · strategy-2026-05-29
+
+- Run: strategy-review-2026-05-29-94329ce7
+- Dates: 2026-05-29
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-29-94329ce7/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-05-29-94329ce7/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 222-156 hit 58.7% (499 total)
+- Parlays: 11-12 hit 47.8% (25 total)
+
+### Proposed Modifications
+
+- [high] Add bucket-level validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/strategy-review/daily.ts
+- [high] Penalize fair-probability-capped low-price double_chance (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, src/daily/e2e.ts, src/council/recommendation-council.ts, skills/score-prediction-v2/prompt.md
+- [high] Hard quarantine promoted parlays at combined odds >= 2.00 (ready-for-implementation) — src/daily/e2e.ts, src/parlay/analysis.ts, src/parlay/service.ts
+- [high] Exclude non-core and unknown profiles from operational validation scope (ready-for-implementation) — src/parlay/service.ts, src/daily/e2e.ts, src/parlay/analysis.ts, src/metrics/daily.ts
+- [medium] Tighten BTTS and goals-over promotion rules (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Run post-settlement validation before strategy review output (ready-for-implementation) — src/daily/e2e.ts, src/validation/service.ts, src/metrics/daily.ts, scripts/gana-strategy-review.mjs
+- [medium] Move semantic duplicate filtering before parlay persistence (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/daily/e2e.ts

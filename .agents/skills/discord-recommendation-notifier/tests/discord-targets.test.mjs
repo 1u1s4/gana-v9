@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { chdir, cwd, env as processEnv } from 'node:process';
 import { describe, it } from 'node:test';
 import {
   DEFAULT_DISCORD_TARGET,
@@ -32,6 +36,42 @@ describe('discord target routing', () => {
 
   it('falls back to the current production channel when nothing is configured', () => {
     assert.equal(resolveDiscordTarget('alerts', { env: {} }), DEFAULT_DISCORD_TARGET);
+  });
+
+  it('loads flow-specific targets from .env in the current working directory', () => {
+    const originalCwd = cwd();
+    const tempDir = mkdtempSync(join(tmpdir(), 'gana-discord-targets-'));
+    const originalFlowTarget = processEnv.GANA_DISCORD_RECOMMENDATIONS_TARGET;
+    const originalGlobalTarget = processEnv.GANA_DISCORD_TARGET;
+    delete processEnv.GANA_DISCORD_RECOMMENDATIONS_TARGET;
+    delete processEnv.GANA_DISCORD_TARGET;
+
+    try {
+      writeFileSync(
+        join(tempDir, '.env'),
+        'export GANA_DISCORD_RECOMMENDATIONS_TARGET=discord:from-dotenv\n',
+      );
+      chdir(tempDir);
+
+      const target = resolveDiscordTarget('recommendations', {
+        gatewayTarget: 'discord:global-cli',
+      });
+
+      assert.equal(target, 'discord:from-dotenv');
+    } finally {
+      chdir(originalCwd);
+      if (originalFlowTarget === undefined) {
+        delete processEnv.GANA_DISCORD_RECOMMENDATIONS_TARGET;
+      } else {
+        processEnv.GANA_DISCORD_RECOMMENDATIONS_TARGET = originalFlowTarget;
+      }
+      if (originalGlobalTarget === undefined) {
+        delete processEnv.GANA_DISCORD_TARGET;
+      } else {
+        processEnv.GANA_DISCORD_TARGET = originalGlobalTarget;
+      }
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('resolves all supported operational flows', () => {
