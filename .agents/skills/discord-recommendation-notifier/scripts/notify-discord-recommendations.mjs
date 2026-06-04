@@ -87,7 +87,7 @@ export function buildDiscordPayloads(artifact, options = {}) {
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   if (!recommendations.length) return [buildDiscordPayloadPage([], options)];
   const pages = recommendations.length > DISCORD_SELECTION_EMBEDS_PER_MESSAGE
-    ? chunk(recommendations, DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE)
+    ? paginateDiscordSelectionEmbeds(recommendations)
     : [recommendations];
   return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
     ...options,
@@ -820,6 +820,28 @@ function chunk(values, size) {
     chunks.push(values.slice(index, index + size));
   }
   return chunks;
+}
+
+function paginateDiscordSelectionEmbeds(recommendations) {
+  const pages = [];
+  let index = 0;
+  while (index < recommendations.length) {
+    const remaining = recommendations.length - index;
+    const isFirst = pages.length === 0;
+    let capacity;
+    if (isFirst) {
+      capacity = remaining <= DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE
+        ? DISCORD_SELECTION_EMBEDS_PER_MESSAGE
+        : DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE;
+    } else {
+      capacity = remaining <= DISCORD_EMBED_LIMIT
+        ? DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE
+        : DISCORD_EMBED_LIMIT;
+    }
+    pages.push(recommendations.slice(index, index + capacity));
+    index += capacity;
+  }
+  return pages;
 }
 
 function chunkLinesByLimit(lines, limit) {

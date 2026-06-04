@@ -201,11 +201,11 @@ describe('agentic provider helpers', () => {
     }
   });
 
-  it('defaults Gemini to Pro before Flash fallbacks', () => {
+  it('defaults Gemini to the newest Pro models before older fallbacks', () => {
     assert.deepEqual(
       AGENT_PROVIDER_DEFAULT_MODELS.gemini.slice(0, 3),
-      ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+      ['gemini-3.1-pro', 'gemini-3-pro', 'gemini-2.5-pro'],
     );
-    assert.equal(selectDefaultModelForProvider('gemini'), 'gemini-2.5-pro');
+    assert.equal(selectDefaultModelForProvider('gemini'), 'gemini-3.1-pro');
   });
 });

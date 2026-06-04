@@ -291,7 +291,7 @@ const DEFAULTS: AgentConfig = {
   codexFallbackModels: ['gpt-5.4-mini'],
   geminiHome: join(process.env.HOME ?? '', '.gemini'),
   geminiModelListPath: 'config/gemini-models.json',
-  geminiFallbackModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
+  geminiFallbackModels: ['gemini-3-pro', 'gemini-2.5-pro', 'gemini-2.5-flash'],
   geminiApprovalMode: 'default',
 };
 

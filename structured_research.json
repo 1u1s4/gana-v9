@@ -1,184 +1,211 @@
-
 {
   "sources": [
     {
-      "id": "provider-snapshot-fixture",
+      "id": "source_1",
+      "type": "web-search",
+      "url": "https://galwaybayfm.ie/sports/ireland-face-netherlands-in-crucial-world-cup-qualifier-in-cork-on-friday-night/",
+      "title": "Ireland face Netherlands in crucial World Cup qualifier in Cork on Friday night",
+      "capturedAt": "2026-06-04T16:35:00.000Z",
+      "hash": "e9c2f3a1",
+      "metadata": {}
+    },
+    {
+      "id": "source_2",
+      "type": "web-search",
+      "url": "https://www.balls.ie/football/republic-of-ireland-netherlands-world-cup-qualifier-preview-596543",
+      "title": "Republic of Ireland v Netherlands: Everything To Know About Crucial World Cup Qualifier",
+      "capturedAt": "2026-06-04T16:35:00.000Z",
+      "hash": "a4d6bfe8",
+      "metadata": {}
+    },
+    {
+      "id": "source_3",
       "type": "provider-snapshot",
       "url": null,
       "title": "API-Football Fixture Snapshot",
-      "capturedAt": "2026-05-31T17:04:10.942Z",
-      "hash": "1c13b8d0-5915-4e90-9ad5-021dd445c227",
+      "capturedAt": "2026-06-04T16:30:09.378Z",
+      "hash": "abb11ad8-4e12-427a-b5eb-5b21925934ea",
       "metadata": {
         "provider": "api-football",
-        "providerFixtureId": "1526836"
+        "snapshotId": "abb11ad8-4e12-427a-b5eb-5b21925934ea"
       }
     },
     {
-      "id": "provider-snapshot-odds",
+      "id": "source_4",
       "type": "provider-snapshot",
       "url": null,
       "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-05-31T17:04:12.338Z",
-      "hash": "379538ca-7c24-456f-9347-c98a28a2e266",
+      "capturedAt": "2026-06-04T16:30:10.792Z",
+      "hash": "b5e1cd86-a991-4cf2-9c22-66a6d0fd3fa7",
       "metadata": {
         "provider": "api-football",
-        "providerFixtureId": "1526836",
-        "bookmakerCount": 2
+        "snapshotId": "b5e1cd86-a991-4cf2-9c22-66a6d0fd3fa7"
       }
-    },
-    {
-      "id": "web-search-forebet",
-      "type": "web-search",
-      "url": "https://www.forebet.com/en/predictions/brunei-darussalam/super-league/barra-fc-brusque-fc-1526836",
-      "title": "Forebet: Barra FC vs Brusque FC Prediction",
-      "capturedAt": "2026-05-31T17:05:00.000Z",
-      "hash": null,
-      "metadata": {}
-    },
-    {
-      "id": "web-search-fctables",
-      "type": "web-search",
-      "url": "https://www.fctables.com/h2h/barra-fc/brusque/",
-      "title": "FC Tables: Barra FC vs Brusque H2H",
-      "capturedAt": "2026-05-31T17:05:00.000Z",
-      "hash": null,
-      "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence-h2h-dominance",
-      "sourceId": "web-search-fctables",
-      "claimIds": ["claim-h2h-away-win", "claim-double-chance-draw-away"],
-      "snippet": "Brusque won all recent 7 matches against Barra FC.",
-      "summary": "Historical head-to-head data shows Brusque has won all of the last 7 matches against Barra.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence-form-table",
-      "sourceId": "web-search-forebet",
-      "claimIds": ["claim-h2h-away-win", "claim-double-chance-draw-away"],
-      "snippet": "Brusque are in 2nd place in the table, while Barra FC are in 14th place.",
-      "summary": "Brusque is in significantly better form, sitting 2nd in the league standings with 17 points, compared to Barra in 14th with 10 points.",
+      "id": "evidence_1",
+      "sourceId": "source_4",
+      "claimIds": ["claim_1", "claim_2"],
+      "snippet": "h2h, selection: away, price: 1.53",
+      "summary": "The average odds for a Netherlands win are around 1.53, implying a ~65% probability.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence-odds-h2h",
-      "sourceId": "provider-snapshot-odds",
-      "claimIds": ["claim-h2h-away-win"],
-      "snippet": "Pinnacle odds for away win: 3.75, Bet365 odds for away win: 3.60",
-      "summary": "The betting odds from multiple bookmakers favor Barra as the winner, but Brusque has value as an underdog given their H2H record.",
-      "confidence": 0.8,
+      "id": "evidence_2",
+      "sourceId": "source_1",
+      "claimIds": ["claim_1", "claim_2"],
+      "snippet": "The Republic of Ireland will be without the suspended Denise O’Sullivan and Emily Murphy for the game.",
+      "summary": "Two key Republic of Ireland players, Denise O'Sullivan and Emily Murphy, are suspended for the match, significantly weakening the team.",
+      "confidence": 0.95,
       "metadata": {}
     },
     {
-        "id": "evidence-under-goals-stats",
-        "sourceId": "web-search-forebet",
-        "claimIds": ["claim-under-2-5-goals"],
-        "snippet": "70% of Barra's recent matches have ended with Under 2.5 goals.",
-        "summary": "A high percentage of Barra's recent games have been low-scoring, with 70% finishing under the 2.5 goal line.",
+      "id": "evidence_3",
+      "sourceId": "source_2",
+      "claimIds": ["claim_1"],
+      "snippet": "The Dutch have never lost a competitive fixture to Ireland and won 2-1 when the sides met back in March.",
+      "summary": "The Netherlands has a dominant head-to-head record against Ireland, having never lost a competitive match and winning the most recent encounter 2-1.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_4",
+      "sourceId": "source_4",
+      "claimIds": ["claim_3"],
+      "snippet": "btts, selection: yes, price: 1.65",
+      "summary": "Bookmakers have priced 'Both Teams to Score - Yes' as the favored outcome at odds of 1.65.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+        "id": "evidence_5",
+        "sourceId": "source_1",
+        "claimIds": ["claim_3"],
+        "snippet": "The last meeting between the sides in March saw the Netherlands win 2-1.",
+        "summary": "Both teams scored in the most recent match between the two nations.",
+        "confidence": 0.8,
+        "metadata": {}
+    },
+    {
+        "id": "evidence_6",
+        "sourceId": "source_4",
+        "claimIds": ["claim_4"],
+        "snippet": "goals_over_under, selection: over, line: 2.5, price: 1.62",
+        "summary": "The odds for 'Over 2.5 goals' are around 1.62, indicating bookmakers expect a higher-scoring game.",
         "confidence": 0.85,
         "metadata": {}
     },
     {
-        "id": "evidence-odds-under-goals",
-        "sourceId": "provider-snapshot-odds",
-        "claimIds": ["claim-under-2-5-goals"],
-        "snippet": "Under 2.5 goals priced at 1.50 (Pinnacle) and 1.50 (Bet365).",
-        "summary": "The odds across bookmakers strongly suggest a low-scoring game, with the price for Under 2.5 goals being quite low.",
-        "confidence": 0.9,
+        "id": "evidence_7",
+        "sourceId": "source_2",
+        "claimIds": ["claim_4"],
+        "snippet": "Final Score Prediction: Republic of Ireland 1-2 Netherlands",
+        "summary": "Web search predictions suggest a 2-1 final score, which is over 2.5 total goals.",
+        "confidence": 0.75,
         "metadata": {}
     },
     {
-        "id": "evidence-btts-no-odds",
-        "sourceId": "provider-snapshot-odds",
-        "claimIds": ["claim-btts-no"],
-        "snippet": "BTTS 'No' is priced at 1.62 by Bet365.",
-        "summary": "The odds for 'Both Teams to Score: No' are short (1.62), indicating a higher probability that at least one team will fail to score.",
-        "confidence": 0.8,
+        "id": "evidence_8",
+        "sourceId": "source_4",
+        "claimIds": ["claim_5"],
+        "snippet": "double_chance, selection: home_or_draw, price: 2.40",
+        "summary": "The odds for Republic of Ireland to get a result (win or draw) are high at 2.40, suggesting it's an unlikely outcome.",
+        "confidence": 0.9,
         "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim-h2h-away-win",
-      "statement": "Brusque is likely to win the match against Barra.",
+      "id": "claim_1",
+      "statement": "Netherlands Women are the strong favorites to win the match against Republic of Ireland W.",
       "subject": {
         "type": "market",
-        "id": "6327aed5-8ec5-4aa1-9760-dcfea8621c95",
+        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence-h2h-dominance", "evidence-form-table", "evidence-odds-h2h"],
+      "evidenceIds": [
+        "evidence_1",
+        "evidence_2",
+        "evidence_3"
+      ],
       "conflictStatus": "none",
-      "metadata": {
-          "selection": "away"
-      }
+      "metadata": {}
     },
     {
-        "id": "claim-double-chance-draw-away",
-        "statement": "Brusque has a high probability of winning or drawing the match.",
-        "subject": {
-          "type": "market",
-          "id": "6327aed5-8ec5-4aa1-9760-dcfea8621c95",
-          "market": "double_chance"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence-h2h-dominance", "evidence-form-table"],
-        "conflictStatus": "none",
-        "metadata": {
-            "selection": "draw_or_away"
-        }
+      "id": "claim_2",
+      "statement": "A win for Republic of Ireland W is unlikely given their key player suspensions and the opponent's strength.",
+      "subject": {
+        "type": "market",
+        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_1", "evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {}
     },
     {
-        "id": "claim-under-2-5-goals",
-        "statement": "The total number of goals in the match is likely to be under 2.5.",
-        "subject": {
-          "type": "market",
-          "id": "6327aed5-8ec5-4aa1-9760-dcfea8621c95",
-          "market": "goals_over_under"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence-under-goals-stats", "evidence-odds-under-goals"],
-        "conflictStatus": "none",
-        "metadata": {
-            "selection": "under",
-            "line": 2.5
-        }
+      "id": "claim_3",
+      "statement": "It is likely that both teams will score during the match.",
+      "subject": {
+        "type": "market",
+        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4", "evidence_5"],
+      "conflictStatus": "none",
+      "metadata": {}
     },
     {
-        "id": "claim-btts-no",
-        "statement": "It is likely that both teams will not score in the match.",
-        "subject": {
-          "type": "market",
-          "id": "6327aed5-8ec5-4aa1-9760-dcfea8621c95",
-          "market": "btts"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence-btts-no-odds"],
-        "conflictStatus": "none",
-        "metadata": {
-            "selection": "no"
-        }
+      "id": "claim_4",
+      "statement": "The total number of goals in the match is expected to be over 2.5.",
+      "subject": {
+        "type": "market",
+        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_6", "evidence_7"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_5",
+      "statement": "The Netherlands are highly probable to at least draw the match.",
+      "subject": {
+        "type": "market",
+        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_8", "evidence_3"],
+      "conflictStatus": "none",
+      "metadata": {}
     }
   ],
   "gateResult": {
     "verdict": "promotable",
     "reasons": [
-      "Structured research generated with sufficient evidence from both provider data and web search.",
-      "Clear historical dominance and form difference supports the primary claims."
+      "Structured research is well-supported by provider odds and external web search analysis.",
+      "Key player suspensions for Republic of Ireland are a significant factor identified in multiple sources, strongly influencing the market analysis.",
+      "Consensus between betting odds and external analysis on the likely outcomes (Netherlands win, BTTS, Over 2.5)."
     ],
-    "warnings": [
-        "No specific evidence found for the 'corners_over_under' market beyond odds."
-    ]
+    "warnings": []
   },
   "warnings": [],
   "metadata": {
-      "runId": "42b37f97-da8e-45ea-9939-83a997988281",
-      "marketCoverage": {
-          "skippedMarkets": ["corners_over_under"]
-      }
+    "marketCoverage": {
+      "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
+      "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
+      "skippedMarkets": [{
+        "market": "corners_over_under",
+        "reason": "No available data or predictions for corner markets from provider snapshots or web search."
+      }]
+    }
   }
 }

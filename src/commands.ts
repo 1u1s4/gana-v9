@@ -219,7 +219,10 @@ function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
     ...(Array.isArray(repoList) ? repoList : []).map((model: any) => typeof model === 'string' ? model : model?.id ?? model?.name),
     ...Object.keys(settings?.modelConfigs?.modelDefinitions ?? {}),
     ...Object.keys(settings?.modelConfigs?.customAliases ?? {}),
+    'gemini-3.1-pro',
+    'gemini-3-pro',
     'gemini-3-pro-preview',
+    'gemini-3-flash',
     'gemini-3-flash-preview',
     'gemini-2.5-pro',
     'gemini-2.5-flash',
@@ -2174,7 +2177,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-2.5-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-3.1-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

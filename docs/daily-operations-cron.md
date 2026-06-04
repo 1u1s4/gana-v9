@@ -81,6 +81,8 @@ Variables utiles:
 - `GANA_LOW_ODDS_THRESHOLD`: default `1.20`.
 - `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES`: default `10000`; permite que el barrido low-odds revise la pizarra diaria completa.
 - `GANA_DAILY_PROVIDERS`: default `codex,gemini`.
+- `GANA_DAILY_CODEX_MODEL`: default `gpt-5.5`.
+- `GANA_DAILY_GEMINI_MODEL`: default `gemini-3.1-pro`.
 - `GANA_DAILY_PROVIDER_CONCURRENCY`: default `2`.
 - `GANA_WEB_MODE`: default `live`.
 - `GANA_PARLAY_PROFILE`: default `portfolio-v2`; incluye `parlay-diamante`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`.

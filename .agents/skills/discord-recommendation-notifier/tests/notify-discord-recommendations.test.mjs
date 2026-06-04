@@ -185,6 +185,26 @@ describe('discord recommendation notifier', () => {
     assert.equal(payloads[0].embeds[5].color, 0x9b51e0);
   });
 
+  it('keeps exactly nine Discord selections within the native embed limit', () => {
+    const artifact = sampleArtifact();
+    artifact.recommendations = Array.from({ length: 9 }, (_, index) => ({
+      ...sampleArtifact().recommendations[0],
+      rank: index + 1,
+      parlayId: `parlay-${index + 1}`,
+      kind: index === 0 ? 'parlay' : 'atomic-prediction',
+    }));
+
+    const payloads = buildDiscordPayloads(artifact, { max: 9 });
+
+    assert.equal(payloads.length, 2);
+    assert.equal(payloads.every((payload) => payload.embeds.length <= 10), true);
+    assert.equal(payloads[0].embeds.length, 9);
+    assert.equal(payloads[1].embeds.length, 2);
+    assert.match(payloads[0].embeds[0].description, /📦 1 parlay · 📌 8 simples/);
+    assert.doesNotMatch(payloads[0].embeds.at(-1).description ?? '', /Revisión manual requerida/);
+    assert.match(payloads[1].embeds.at(-1).description, /Revisión manual requerida/);
+  });
+
   it('can pack fourteen selections into one native Discord message when requested', () => {
     const artifact = sampleArtifact();
     artifact.recommendations = Array.from({ length: 14 }, (_, index) => ({

@@ -1,118 +1,106 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "bb17df8a-549f-4255-8fdc-da56deefac27",
+      "oddsQuoteId": "5cfdd335-1a75-4ee3-a0a6-9886b14e626a",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 1.85,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.480049,
-      "edge": 0.069951,
-      "confidence": 0.75,
-      "confidenceBand": "medium",
+      "odds": 1.47,
+      "probability": 0.680272,
+      "modelProbability": 0.680272,
+      "marketFairProbability": 0.638915,
+      "edge": 0.041357,
+      "confidence": 0.95,
+      "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_rustavi_form",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_goals_scored_defense",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_1",
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_2",
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_3"
       ],
       "claimIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_form",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_home_advantage",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_defense_rustavi",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_home",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_h2h"
+        "2a60af90-d693-47db-b73d-88e96e606ced:claim_1"
       ],
-      "rationale": "FC Rustavi has a strong home advantage with a 67% win rate and a solid defense. While the explicit prediction suggests 'Draw or FC Rustavi (1X)' and a 'likely 1-1 score', a home win remains a strong possibility given their home form.",
+      "rationale": "Kudrivka is the strong favorite, supported by favorable odds (1.47), dominant head-to-head record (2-0 wins), and Ahrobiznes Volochysk's poor offensive performance.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "9c42a208-ba01-41a3-a6cb-8b7b5aefdbe5",
-      "market": "h2h",
-      "selection": "draw",
-      "line": null,
-      "odds": 3.25,
-      "probability": 0.38,
-      "modelProbability": 0.38,
-      "marketFairProbability": 0.273259,
-      "edge": 0.106741,
-      "confidence": 0.70,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_h2h_history",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
-      ],
-      "claimIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_draw",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_last_meeting",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_h2h"
-      ],
-      "rationale": "The last head-to-head meeting ended in a 1-1 draw, and the explicit prediction suggests a 'Draw or FC Rustavi (1X)' with a 'likely 1-1 score'. Both teams have shown capabilities for draws in their recent form.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "234fde73-12c4-4858-ae40-14cf9af4daac",
+      "oddsQuoteId": "192e4972-a4e2-45cc-8ca2-b692b20d591a",
       "market": "double_chance",
       "selection": "home_or_draw",
       "line": null,
-      "odds": 1.22,
-      "probability": 0.88,
-      "modelProbability": 0.88,
-      "marketFairProbability": 0.376821,
-      "edge": 0.503179,
-      "confidence": 0.90,
+      "odds": 1.08,
+      "probability": 0.925926,
+      "modelProbability": 0.925926,
+      "marketFairProbability": 0.443616,
+      "edge": 0.48231,
+      "confidence": 0.95,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_rustavi_form",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_h2h_history",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_1",
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_2"
       ],
       "claimIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_form",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_rustavi_home_advantage",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_h2h_last_meeting",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_h2h"
+        "2a60af90-d693-47db-b73d-88e96e606ced:claim_4"
       ],
-      "rationale": "The prediction explicitly suggests 'Draw or FC Rustavi (1X)', strongly supported by Rustavi's home advantage and defensive strength. The last H2H was also a draw, making this a highly probable outcome.",
+      "rationale": "Kudrivka is heavily favored to win or draw, as indicated by strong odds (1.47 for win) and their dominant head-to-head record.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "37fa4d19-24b0-4662-8d86-389700fc7aad",
+      "oddsQuoteId": "e8da096d-9248-4f2a-a026-2dfb102960b3",
       "market": "goals_over_under",
       "selection": "under",
       "line": 2.5,
-      "odds": 1.80,
-      "probability": 0.65,
-      "modelProbability": 0.65,
-      "marketFairProbability": 0.526316,
-      "edge": 0.123684,
-      "confidence": 0.80,
+      "odds": 1.66,
+      "probability": 0.60241,
+      "modelProbability": 0.60241,
+      "marketFairProbability": 0.563158,
+      "edge": 0.039252,
+      "confidence": 0.85,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_4",
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_5"
+      ],
+      "claimIds": [
+        "2a60af90-d693-47db-b73d-88e96e606ced:claim_2"
+      ],
+      "rationale": "A low-scoring game is predicted, with 'under 2.5 goals' having favorable odds (1.66) and match previews expecting 1-0 or 2-0 scorelines.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "b9aea8f9-bafb-4376-a3cd-0580cdbcec04",
+      "market": "btts",
+      "selection": "no",
+      "line": null,
+      "odds": 1.59,
+      "probability": 0.628931,
+      "modelProbability": 0.628931,
+      "marketFairProbability": 0.59542,
+      "edge": 0.033511,
+      "confidence": 0.95,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_goals_scored_defense",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:evidence_prediction_draw_rustavi"
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_6",
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_3",
+        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_7"
       ],
       "claimIds": [
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_goals_under_2_5",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_defense_rustavi",
-        "5f320c00-dbfe-4578-bc25-da2a7992f44c:claim_prediction_goals"
+        "2a60af90-d693-47db-b73d-88e96e606ced:claim_3"
       ],
-      "rationale": "The prediction explicitly suggests 'Under 2.5 Goals' with a 'likely 1-1 score'. Rustavi has a strong defense, conceding only 0.87 goals per match. Both teams' combined goal-scoring averages further support a lower-scoring game.",
+      "rationale": "It is unlikely both teams will score, with 'BTTS No' favored (odds 1.59). Ahrobiznes Volochysk has a poor offensive record, and Kudrivka has kept clean sheets against them.",
       "warnings": []
     }
   ],
   "warnings": [
-    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
-    "market btts skipped/review-required: missing odds quotes for requested market"
+    "Market 'corners_over_under' skipped due to missing odds quotes for the requested market, as indicated in the research bundle warnings."
   ],
   "metadata": {}
 }

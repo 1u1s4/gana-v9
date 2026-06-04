@@ -1,10 +1,10 @@
 {
-  "updatedAt": "2026-04-25T11:32:26.447Z",
+  "updatedAt": "2026-05-31T17:32:34.487Z",
   "models": [
     {
       "id": "gemini-3-flash",
       "name": "Gemini 3 Flash",
-      "source": "gemini-cli"
+      "source": "fallback,gemini-cli"
     },
     {
       "id": "gemini-3-flash-base",
@@ -19,7 +19,7 @@
     {
       "id": "gemini-3-pro",
       "name": "Gemini 3 Pro",
-      "source": "gemini-cli"
+      "source": "fallback,gemini-cli"
     },
     {
       "id": "gemini-3-pro-preview",
@@ -34,7 +34,7 @@
     {
       "id": "gemini-3.1-pro",
       "name": "Gemini 3.1 Pro",
-      "source": "gemini-cli"
+      "source": "fallback,gemini-cli"
     },
     {
       "id": "gemini-3.1-pro-preview",

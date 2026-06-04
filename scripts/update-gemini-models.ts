@@ -16,7 +16,10 @@ interface GeminiModelList {
 const OUTPUT_PATH = resolve(process.argv[2] ?? process.env.GEMINI_MODEL_LIST_PATH ?? 'config/gemini-models.json');
 
 const FALLBACK_MODELS: GeminiModel[] = [
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', source: 'fallback' },
+  { id: 'gemini-3-pro', name: 'Gemini 3 Pro', source: 'fallback' },
   { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview', source: 'fallback' },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', source: 'fallback' },
   { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', source: 'fallback' },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', source: 'fallback' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', source: 'fallback' },
