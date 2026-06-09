@@ -25,7 +25,7 @@ describe('discord recommendation notifier', () => {
     assert.equal(payload.embeds[0].title, '🏆 Gana v9 · Recomendaciones');
     assert.equal(payload.embeds.length, 3);
     assert.match(payload.embeds[0].description, /📦 1 parlay · 📌 0 simples/);
-    assert.match(payload.embeds[1].title, /1️⃣ Team A vs Team B/);
+    assert.match(payload.embeds[1].title, /1️⃣ ⚖️ Team A vs Team B/);
     assert.match(payload.embeds[1].description, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
     assert.doesNotMatch(payload.embeds[1].description, /Expo/);
@@ -44,7 +44,7 @@ describe('discord recommendation notifier', () => {
 
     assert.match(message, /🏆 Gana v9 · Recomendaciones en revisión/);
     assert.match(message, /📦 1 parlay · 📌 0 simples/);
-    assert.match(message, /1️⃣ Team A vs Team B/);
+    assert.match(message, /1️⃣ ⚖️ Team A vs Team B/);
     assert.match(message, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
     assert.match(message, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
     assert.doesNotMatch(message, /Expo n\/a/);
@@ -61,6 +61,28 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[2].description, /> ⚽ Team C vs Team D: h2h away @ 1.18/);
     assert.match(payload.embeds[2].description, /💵 Stake 10/);
     assert.match(message, /2️⃣ 📌 Simple · Team C vs Team D · h2h away/);
+  });
+
+  it('labels parlay recommendation titles with profile-specific emojis', () => {
+    const base = sampleArtifact().recommendations[0];
+    const artifact = {
+      date: '2026-06-09',
+      recommendations: [
+        { ...base, rank: 1, profile: 'parlay-diamante', parlayId: 'diamante-1' },
+        { ...base, rank: 2, profile: 'parlay-refinado', parlayId: 'refinado-1' },
+        { ...base, rank: 3, profile: 'low-variance', parlayId: 'low-variance-1' },
+      ],
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 3 });
+    const message = buildGatewayMessage(artifact, { max: 3 });
+
+    assert.match(payload.embeds[1].title, /1️⃣ 💎 Team A vs Team B/);
+    assert.match(payload.embeds[2].title, /2️⃣ 🧠 Team A vs Team B/);
+    assert.match(payload.embeds[3].title, /3️⃣ 🛡️ Team A vs Team B/);
+    assert.match(message, /1️⃣ 💎 Team A vs Team B/);
+    assert.match(message, /2️⃣ 🧠 Team A vs Team B/);
+    assert.match(message, /3️⃣ 🛡️ Team A vs Team B/);
   });
 
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {

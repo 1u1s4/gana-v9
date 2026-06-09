@@ -539,7 +539,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.maxCombinedOdds, 2.2);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.semanticDuplicateSignature, 'fixtureId:market:selection:line');
-    assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.allowedProfiles, ['parlay-diamante', 'parlay-all-in', 'low-odds-top', 'low-variance']);
+    assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.allowedProfiles, ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance']);
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayFixtures, true);
     assert.deepEqual(recommendations.recommendationPolicy.demotedModels, ['gpt-5.4-mini']);
     assert.equal(recommendations.recommendationPolicy.stakeRecommendation.policy, 'bucketed-bankroll-percentage-confidence-edge-recommendation');
@@ -954,6 +954,7 @@ describe('runDailyE2E', () => {
     assert.equal(result.ok, true);
     assert.deepEqual(parlayCalls.map((call) => call.input.portfolio), [
       'parlay-diamante',
+      'parlay-refinado',
       'parlay-all-in',
       'low-odds-top',
       'low-variance',

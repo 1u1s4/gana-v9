@@ -1675,6 +1675,111 @@ describe('runParlayBuild', () => {
     assert.match(result.portfolio?.profiles[0].warnings.join('\n') ?? '', /fallback eligibility/);
   });
 
+  it('builds parlay-refinado from an LLM selection with retrospective prompt traceability', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    let prompt = '';
+    let artifactPayload: any;
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-06-09',
+      sourceRunId: 'source-run-refinado',
+      portfolio: 'parlay-refinado',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        prompt = String(input);
+        return { text: JSON.stringify({ parlays: [
+          {
+            title: 'Refinado A',
+            predictionIds: ['refinado-1', 'refinado-2'],
+            rationale: 'Two independent short-price legs from the strongest historical pattern.',
+            riskNotes: ['Low-liquidity is tolerated because both legs are short-price positive-edge promotable legs.'],
+          },
+        ] }) } as any;
+      },
+      writeArtifact: (_runId, name, payload) => {
+        if (name === 'parlay-refinado.json') artifactPayload = payload;
+        return `/tmp/${name}`;
+      },
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.equal(query.runId, 'source-run-refinado');
+            return [
+              prediction({ id: 'refinado-1', runId: 'source-run-refinado', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.18, confidence: 0.9, status: 'promotable', edge: 0.04, warnings: ['market liquidity warning'] }),
+              prediction({ id: 'refinado-2', runId: 'source-run-refinado', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'home', odds: 1.32, confidence: 0.82, status: 'promotable', edge: 0.05 }),
+              prediction({ id: 'corner-risk', runId: 'source-run-refinado', fixtureId: 'fixture-3', marketKey: 'corners_over_under', selectionKey: 'under', line: 9.5, odds: 1.5, confidence: 0.95, status: 'promotable', edge: 0.1 }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-refinado' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: `parlay-${persisted.length}` } as any;
+          },
+        },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.match(prompt, /Parlay refinado/);
+    assert.match(prompt, /Retrospective summary/);
+    assert.match(prompt, /settledParlays/);
+    assert.doesNotMatch(prompt, /corner-risk/);
+    assert.equal(result.portfolio?.profiles[0]?.profile, 'parlay-refinado');
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['refinado-1', 'refinado-2']);
+    assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'parlay-refinado');
+    assert.equal(persisted[0].parlay.metadata.promptVersion, 'llm-parlay-refinado-v1');
+    assert.equal(typeof persisted[0].parlay.metadata.candidateDiagnostics.llmPrompt, 'string');
+    assert.equal(typeof persisted[0].parlay.metadata.candidateDiagnostics.llmRawOutput, 'string');
+    assert.equal(artifactPayload.promptVersion, 'llm-parlay-refinado-v1');
+    assert.equal(artifactPayload.portfolio.diagnostics.agentOutputs[0].prompt, prompt);
+  });
+
+  it('rejects invalid parlay-refinado LLM output and uses documented fallback', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-06-09',
+      sourceRunId: 'source-run-refinado-fallback',
+      portfolio: 'parlay-refinado',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async () => ({ text: JSON.stringify({ parlays: [
+        {
+          title: 'Invalid duplicate',
+          predictionIds: ['fallback-1', 'fallback-1'],
+          rationale: 'This duplicates a prediction and must be rejected.',
+        },
+      ] }) }) as any,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            prediction({ id: 'fallback-1', runId: 'source-run-refinado-fallback', fixtureId: 'fixture-1', marketKey: 'double_chance', selectionKey: 'home_or_draw', odds: 1.15, confidence: 0.9, status: 'promotable', edge: 0.05 }),
+            prediction({ id: 'fallback-duplicate-fixture', runId: 'source-run-refinado-fallback', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.2, confidence: 0.88, status: 'promotable', edge: 0.04 }),
+            prediction({ id: 'fallback-2', runId: 'source-run-refinado-fallback', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'home', odds: 1.28, confidence: 0.86, status: 'promotable', edge: 0.04 }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-refinado-fallback' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.match(result.gateResult.warnings.join('\n'), /duplicate prediction id in same parlay/);
+    assert.match(result.gateResult.warnings.join('\n'), /deterministic parlay-refinado fallback/);
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['fallback-1', 'fallback-2']);
+  });
+
   it('writes a blocked artifact when database access is unavailable', async () => {
     const cfg = config({ databaseUrl: '' });
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

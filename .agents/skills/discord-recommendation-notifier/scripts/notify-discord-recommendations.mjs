@@ -468,6 +468,7 @@ function recommendationField(recommendation, index) {
 function recommendationEmbed(recommendation, index) {
   const rank = numberOrFallback(recommendation.rank, index + 1);
   const kind = recommendationKind(recommendation);
+  const typePrefix = recommendationTypePrefix(recommendation);
   const legLines = Array.isArray(recommendation.legs) && recommendation.legs.length
     ? recommendation.legs.slice(0, 8).map((leg) => `> ${formatCompactLeg(leg)}`)
     : ['> Sin detalle de selecciones.'];
@@ -476,7 +477,7 @@ function recommendationEmbed(recommendation, index) {
   }
   legLines.push(formatCompactMetricLine(recommendation));
   return {
-    title: `${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
+    title: `${rankEmoji(rank)} ${typePrefix}${recommendationTitle(recommendation)}`,
     description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
     color: kind === 'atomic-prediction' ? 0x9b51e0 : rank === 1 ? 0xf2c94c : 0x27ae60,
   };
@@ -507,8 +508,7 @@ function formatRecommendationLines(recommendation, index) {
 
 function formatCompactRecommendationLines(recommendation, index) {
   const rank = numberOrFallback(recommendation.rank, index + 1);
-  const kind = recommendationKind(recommendation);
-  const lines = [`${rankEmoji(rank)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`];
+  const lines = [`${rankEmoji(rank)} ${recommendationTypePrefix(recommendation)}${recommendationTitle(recommendation)}`];
 
   if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
     for (const leg of recommendation.legs.slice(0, 8)) {
@@ -522,6 +522,28 @@ function formatCompactRecommendationLines(recommendation, index) {
   lines.push(formatCompactMetricLine(recommendation));
   lines.push('');
   return lines;
+}
+
+export function recommendationTypePrefix(recommendation) {
+  if (recommendationKind(recommendation) === 'atomic-prediction') return '📌 Simple · ';
+  return `${parlayProfileEmoji(recommendation?.profile)} `;
+}
+
+export function parlayProfileEmoji(profile) {
+  const key = stringOrFallback(profile, '').toLowerCase();
+  if (key === 'parlay-diamante') return '💎';
+  if (key === 'parlay-refinado') return '🧠';
+  if (key === 'low-variance') return '🛡️';
+  if (key === 'low-odds-top') return '📉';
+  if (key === 'parlay-all-in') return '🚀';
+  if (key === 'parlay-oro') return '🥇';
+  if (key === 'balanced') return '⚖️';
+  if (key === 'high-conviction') return '🔥';
+  if (key === 'market-diverse') return '🧩';
+  if (key === 'totals') return '🥅';
+  if (key === 'conservative') return '🔒';
+  if (key === 'review') return '🔎';
+  return '🎟️';
 }
 
 export function recommendationTitle(recommendation) {

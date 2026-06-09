@@ -1,134 +1,278 @@
 {
-  "predictions": [
+  "sources": [
     {
-      "oddsQuoteId": "7b9216a8-d718-42e3-b3ce-75612e6e54d2",
-      "market": "h2h",
-      "selection": "home",
-      "line": null,
-      "odds": 2.27,
-      "probability": 0.50,
-      "modelProbability": 0.50,
-      "marketFairProbability": 0.42205,
-      "edge": 0.07795,
-      "confidence": 0.75,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:web_evidence_1",
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:web_evidence_2",
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:web_evidence_3",
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:evidence_odds_snapshot"
-      ],
-      "claimIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:claim_h2h_prediction"
-      ],
-      "rationale": "United Nordic is favored to win due to their strong home record and higher league position, supported by web search and odds data.",
-      "warnings": []
+      "id": "source_api_football",
+      "type": "api-football",
+      "url": null,
+      "title": "API-Football Fixture and Odds Data for KuPS vs VPS",
+      "capturedAt": "2026-06-09T16:39:44.303Z",
+      "hash": "b64bfc036584f6cef93afffc119766f1c971aac1407565d4ae8be72d211c03aa",
+      "metadata": {
+        "fixtureId": "298c2f99-0b1a-4bd8-95b0-6469f73117cc",
+        "providerFixtureId": "1548301",
+        "oddsSnapshotId": "80196807-92e3-45e5-87a0-4ee792183acc"
+      }
     },
     {
-      "oddsQuoteId": "3783bf15-3fc8-4cb9-8a13-722cff07b9a4",
-      "market": "double_chance",
-      "selection": "home_or_draw",
-      "line": null,
-      "odds": 1.36,
-      "probability": 0.72,
-      "modelProbability": 0.72,
-      "marketFairProbability": 0.346541,
-      "edge": 0.373459,
-      "confidence": 0.70,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:evidence_odds_snapshot"
-      ],
-      "claimIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:claim_double_chance_home_draw"
-      ],
-      "rationale": "United Nordic to win or draw is strongly supported by current odds and implied probability, aligning with their favored status.",
-      "warnings": [
-        "High edge detected, potentially due to large market overround or calculation of marketFairProbability in source data."
-      ]
+      "id": "source_web_1",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFJx1SSZkJmJT8vSLctfEK7DBBzPWQajOWuHdGgr2SModHBjJXFioeNQeNUYyMuhAxqlCOQJc1EenK5D7NCDBGgPhEIBHjh1RUvdb9gzlzVK1KenjK9CWoei4eSuwTCVc7PdyMwihPm_MTWispzexgTQVDwavK-0mo9_-k_iTujWhaG8A==",
+      "title": "soccervital.com",
+      "capturedAt": "2026-06-09T16:39:41.174Z",
+      "metadata": {}
     },
     {
-      "oddsQuoteId": "558b87a8-4bdd-4d11-8f85-1c1535a2ba5f",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 1.76,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.544394,
-      "edge": 0.005606,
-      "confidence": 0.30,
-      "confidenceBand": "low",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:web_evidence_4",
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:evidence_odds_snapshot"
-      ],
-      "claimIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:claim_goals_over_2_5"
-      ],
-      "rationale": "Prediction for Over 2.5 goals based on market implied probability, but with conflicting team form for United Nordic (Under 2.5 trend) and Ostersunds FK (higher-scoring games).",
-      "warnings": [
-        "Claim for goals_over_2_5 has conflicting information regarding team trends.",
-        "United Nordic shows a trend of Under 2.5 goals in recent fixtures.",
-        "Ostersunds FK has been in higher-scoring games."
-      ]
-    },
-    {
-      "oddsQuoteId": "31620fc3-f190-4cf6-a4ea-3f08e57ad073",
-      "market": "btts",
-      "selection": "yes",
-      "line": null,
-      "odds": 1.62,
-      "probability": 0.65,
-      "modelProbability": 0.65,
-      "marketFairProbability": 0.575916,
-      "edge": 0.074084,
-      "confidence": 0.80,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:web_evidence_3",
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:evidence_odds_snapshot"
-      ],
-      "claimIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:claim_btts"
-      ],
-      "rationale": "Strong evidence that Both Teams To Score 'Yes' is likely, with United Nordic having a consistent scoring record over their last 15 matches.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "3efff2f2-80b8-4747-84e0-0899eedb93b3",
-      "market": "corners_over_under",
-      "selection": "under",
-      "line": 9.5,
-      "odds": 1.82,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.523824,
-      "edge": 0.026176,
-      "confidence": 0.60,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:evidence_odds_snapshot"
-      ],
-      "claimIds": [
-        "7a9eacbc-57d3-41b1-a530-df248f0ad85f:claim_corners_over_9_5"
-      ],
-      "rationale": "Prediction for Under 9.5 corners based on higher market fair probability, with no specific claims or strong evidence for either over or under.",
-      "warnings": [
-        "No specific market-level evidence or claim found to strongly support Over or Under 9.5 corners, prediction based on market fair probability."
-      ]
+      "id": "source_web_2",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGuSLXsAXm88X_hN4C1vmOgUQUw0J49K7TPVAJY3YsAJFg0wgTM--mdtxAyzYqrAgVl2gC6xabLLufZH_m8IK-Gp8LevCg_wVtqLOEgAl9Js0StUDOZaVuO9T_zvJb3RTWChxii1ddyUI8QJQ1NCMWu8xsIt3mn5dO_34JN20SkZVJ7nQaFVwdyh_FTeqQ=",
+      "title": "mightytips.com",
+      "capturedAt": "2026-06-09T16:39:41.174Z",
+      "metadata": {}
     }
   ],
+  "evidenceItems": [
+    {
+      "id": "evidence_fixture_info",
+      "sourceId": "source_api_football",
+      "claimIds": [],
+      "snippet": "KuPS vs VPS, Suomen Cup, scheduled for 2026-06-10T14:00:00.000Z.",
+      "summary": "Fixture details: KuPS vs VPS, Suomen Cup, 2026-06-10.",
+      "confidence": 1.0,
+      "metadata": {
+        "fixture": {
+          "id": "298c2f99-0b1a-4bd8-95b0-6469f73117cc",
+          "homeTeamName": "KuPS",
+          "awayTeamName": "VPS",
+          "competitionName": "Suomen Cup",
+          "scheduledAt": "2026-06-10T14:00:00.000Z"
+        }
+      }
+    },
+    {
+      "id": "evidence_odds_h2h",
+      "sourceId": "source_api_football",
+      "claimIds": [],
+      "snippet": "H2H odds for KuPS: 1.83, Draw: 3.7/3.84, VPS: 3.6/3.75.",
+      "summary": "H2H odds: KuPS 1.83, Draw 3.7/3.84, VPS 3.6/3.75.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "h2h",
+        "odds": [
+          {
+            "selection": "home",
+            "price": 1.83
+          },
+          {
+            "selection": "draw",
+            "price": 3.7
+          },
+          {
+            "selection": "away",
+            "price": 3.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "evidence_odds_goals_over_under",
+      "sourceId": "source_api_football",
+      "claimIds": [],
+      "snippet": "Goals Over/Under odds for various lines (e.g., Over 2.5 @ 1.9, Under 2.5 @ 1.9).",
+      "summary": "Goals O/U odds: Over 2.5 @ 1.9, Under 2.5 @ 1.9.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "goals_over_under",
+        "odds": [
+          {
+            "line": 2.5,
+            "selection": "over",
+            "price": 1.9
+          },
+          {
+            "line": 2.5,
+            "selection": "under",
+            "price": 1.9
+          }
+        ]
+      }
+    },
+    {
+      "id": "evidence_odds_btts",
+      "sourceId": "source_api_football",
+      "claimIds": [],
+      "snippet": "BTTS Yes: 1.83, No: 1.83.",
+      "summary": "BTTS odds: Yes @ 1.83, No @ 1.83.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "btts",
+        "odds": [
+          {
+            "selection": "yes",
+            "price": 1.83
+          },
+          {
+            "selection": "no",
+            "price": 1.83
+          }
+        ]
+      }
+    },
+    {
+      "id": "evidence_odds_double_chance",
+      "sourceId": "source_api_football",
+      "claimIds": [],
+      "snippet": "Double Chance odds for Home or Draw: 1.28, Home or Away: 1.28, Draw or Away: 1.83.",
+      "summary": "DC odds: Home/Draw 1.28, Home/Away 1.28, Draw/Away 1.83.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "double_chance",
+        "odds": [
+          {
+            "selection": "home_or_draw",
+            "price": 1.28
+          },
+          {
+            "selection": "home_or_away",
+            "price": 1.28
+          },
+          {
+            "selection": "draw_or_away",
+            "price": 1.83
+          }
+        ]
+      }
+    },
+    {
+      "id": "evidence_web_h2h_recent",
+      "sourceId": "source_web_1",
+      "claimIds": [],
+      "snippet": "Their most recent clash on January 31, 2026 (Liiga Cup), ended in a 3–1 victory for KuPS.",
+      "summary": "KuPS won recent H2H 3-1 (Jan 2026 Liiga Cup).",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_web_kups_home_form",
+      "sourceId": "source_web_2",
+      "claimIds": [],
+      "snippet": "KuPS: Remains unbeaten at home this season (4 wins, 3 draws).",
+      "summary": "KuPS unbeaten at home (4 wins, 3 draws).",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_web_vps_offense",
+      "sourceId": "source_web_2",
+      "claimIds": [],
+      "snippet": "VPS: Boasts a highly potent offense, averaging 2.63 goals per match this season.",
+      "summary": "VPS has potent offense, averages 2.63 goals/match.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_web_match_prediction",
+      "sourceId": "source_web_2",
+      "claimIds": [],
+      "snippet": "Expect a competitive match, likely with both teams finding the net.",
+      "summary": "Competitive match expected; both teams likely to score.",
+      "confidence": 0.7,
+      "metadata": {}
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_h2h_kups_favored",
+      "statement": "KuPS is favored to win due to recent H2H dominance and strong home form.",
+      "subject": {
+        "type": "market",
+        "id": "298c2f99-0b1a-4bd8-95b0-6469f73117cc",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_odds_h2h",
+        "evidence_web_h2h_recent",
+        "evidence_web_kups_home_form"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_double_chance_kups_draw",
+      "statement": "KuPS is highly probable to win or draw the match.",
+      "subject": {
+        "type": "market",
+        "id": "298c2f99-0b1a-4bd8-95b0-6469f73117cc",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_odds_double_chance",
+        "evidence_odds_h2h",
+        "evidence_web_kups_home_form"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_goals_over_2_5",
+      "statement": "The match is likely to have over 2.5 goals due to VPS's potent offense and competitive outlook.",
+      "subject": {
+        "type": "market",
+        "id": "298c2f99-0b1a-4bd8-95b0-6469f73117cc",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_odds_goals_over_under",
+        "evidence_web_vps_offense",
+        "evidence_web_match_prediction"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_btts",
+      "statement": "Both teams are expected to score, considering VPS's attack and match competitiveness.",
+      "subject": {
+        "type": "market",
+        "id": "298c2f99-0b1a-4bd8-95b0-6469f73117cc",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_odds_btts",
+        "evidence_web_vps_offense",
+        "evidence_web_match_prediction"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    }
+  ],
+  "gateResult": {
+    "verdict": "review-required",
+    "reasons": [
+      "Structured research generated with sufficient evidence and web-search evidence included.",
+      "One or more required markets lacked odds quotes or sufficient evidence."
+    ],
+    "warnings": []
+  },
   "warnings": [],
-  "metadata": {}
+  "metadata": {
+    "marketCoverage": {
+      "totalMarkets": 5,
+      "coveredMarkets": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "btts"
+      ],
+      "skippedMarkets": [
+        {
+          "market": "corners_over_under",
+          "reason": "No odds quotes available for this market in the provided data."
+        }
+      ]
+    }
+  }
 }

@@ -38,6 +38,7 @@ export type DailyParlayProfile =
   | 'parlay-oro'
   | 'parlay-diamante'
   | 'parlay-all-in'
+  | 'parlay-refinado'
   | 'portfolio-v2';
 
 export interface RunDailyE2EInput {
@@ -158,7 +159,7 @@ const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
 const DAILY_STAKE_BUCKETS = [1, 5, 10, 15, 20, 25] as const;
 const VALIDATION_FRESHNESS_MIN_COVERAGE = 0.6;
 const VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE = 0.25;
-const DAILY_FINAL_PARLAY_ALLOWED_PROFILES = ['parlay-diamante', 'parlay-all-in', 'low-odds-top', 'low-variance'] as const;
+const DAILY_FINAL_PARLAY_ALLOWED_PROFILES = ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance'] as const;
 const DAILY_FINAL_PARLAY_BLOCKED_PROFILES = ['balanced', 'high-conviction', 'market-diverse', 'parlay-oro', 'default', 'review', 'totals', 'aggressive'] as const;
 const DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS = [
   'high-combined-odds',
@@ -1187,7 +1188,7 @@ function profilesToPortfolios(profile: DailyParlayProfile | undefined): Array<No
   if (!profile) return [];
   if (profile === 'safe-consensus') return ['low-variance'];
   if (profile === 'aggressive-analytical') return ['high-conviction'];
-  if (profile === 'portfolio-v2') return ['parlay-diamante', 'parlay-all-in', 'low-odds-top', 'low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
+  if (profile === 'portfolio-v2') return ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
   if (profile === 'balanced') return ['balanced'];
   return [profile];
 }
@@ -1218,6 +1219,8 @@ function selectDailyParlayRecommendations(
     && recommendation.combinedOdds <= 1.3,
   );
   if (diamante) add(diamante);
+  const refinado = recommendations.find((recommendation) => recommendation.profile === 'parlay-refinado');
+  if (refinado) add(refinado);
   const allIn = recommendations.find((recommendation) => recommendation.profile === 'parlay-all-in');
   if (allIn) add(allIn);
 
@@ -1245,6 +1248,14 @@ function isConservativeDailyParlayRecommendation(recommendation: ParlayAnalysisR
     const blocked = ['stale-source', 'corners-unverified', 'negative-portfolio-edge', 'historically-weak-profile'];
     if (blocked.some((flag) => riskFlags.has(flag))) return false;
     return recommendation.aggregateConfidence >= 0.48;
+  }
+  if (recommendation.profile === 'parlay-refinado') {
+    const riskFlags = new Set(recommendation.riskFlags ?? []);
+    for (const flag of DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS) {
+      if (riskFlags.has(flag)) return false;
+    }
+    if (riskFlags.has('high-combined-odds') || recommendation.combinedOdds > 2.1) return false;
+    return recommendation.aggregateConfidence >= DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE;
   }
   if ((recommendation.legs?.length ?? 0) > 3) return false;
   const riskFlags = new Set(recommendation.riskFlags ?? []);

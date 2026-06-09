@@ -60,6 +60,7 @@ const MAIN_PARLAY_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'promo
 const PORTFOLIO_PREDICTION_STATUSES: PredictionStatus[] = ['candidate', 'review-required', 'promotable'];
 const PARLAY_PORTFOLIO_PROMPT_VERSION = 'parlay-portfolio-v3';
 const PARLAY_ALL_IN_PROMPT_VERSION = 'llm-parlay-all-in-v1';
+const PARLAY_REFINADO_PROMPT_VERSION = 'llm-parlay-refinado-v1';
 const PARLAY_PORTFOLIO_SCHEMA_PATH = join(process.cwd(), 'skills/parlay-portfolio-v1/output.schema.json');
 const PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS', 120_000);
 const PORTFOLIO_MIN_CONFIDENCE = 0.72;
@@ -88,7 +89,7 @@ const LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS = 1.35;
 const LOW_VARIANCE_FALLBACK_MAX_LEG_ODDS = 1.35;
 const PARLAY_ORO_FALLBACK_MAX_LEG_ODDS = 1.45;
 
-type DeterministicParlayProfile = 'low-variance' | 'balanced' | 'totals' | 'high-conviction' | 'market-diverse' | 'parlay-oro' | 'parlay-diamante' | 'parlay-all-in';
+type DeterministicParlayProfile = 'low-variance' | 'balanced' | 'totals' | 'high-conviction' | 'market-diverse' | 'parlay-oro' | 'parlay-diamante' | 'parlay-all-in' | 'parlay-refinado';
 type ParlayPortfolioProfile = typeof PORTFOLIO_PROFILES[number]['key'] | typeof LOW_ODDS_TOP_PROFILE['key'] | DeterministicParlayProfile;
 type ParlayPortfolioProfileSpec = typeof PORTFOLIO_PROFILES[number] | typeof LOW_ODDS_TOP_PROFILE;
 
@@ -107,6 +108,7 @@ interface ParsedPortfolioOutput {
 
 interface DeterministicCandidateSelection {
   candidates: ParlayCandidate[];
+  prompt?: string;
   rawOutput: string;
   warnings: string[];
 }
@@ -195,6 +197,7 @@ export interface ParlayPortfolio {
     }>;
     agentOutputs?: Array<{
       profile: ParlayPortfolioProfile;
+      prompt?: string;
       rawOutput: string;
       noParlayReason?: string;
       warnings: string[];
@@ -799,7 +802,8 @@ function isDeterministicParlayProfile(value: unknown): value is DeterministicPar
     || value === 'market-diverse'
     || value === 'parlay-oro'
     || value === 'parlay-diamante'
-    || value === 'parlay-all-in';
+    || value === 'parlay-all-in'
+    || value === 'parlay-refinado';
 }
 
 async function runDeterministicParlayProfile(
@@ -849,6 +853,13 @@ async function runDeterministicParlayProfile(
       date: input.date,
       generatedAt,
     })
+    : profile === 'parlay-refinado'
+      ? await generateParlayRefinadoLlmCandidates(config, runtime, deps, pool, spec, {
+        portfolioId,
+        sourceRunId,
+        date: input.date,
+        generatedAt,
+      })
     : {
       candidates: deterministicCandidatesForProfile(profile, pool, spec),
       rawOutput: '',
@@ -894,11 +905,17 @@ async function runDeterministicParlayProfile(
         ? `deterministic ${profile} generated ${builds.length} analytical parlay(s) using fallback eligibility after strict pool had ${strictPool.length}/${baseSpec.minLegs} required leg(s)`
         : profile === 'parlay-all-in'
           ? `LLM-guided ${profile} generated ${builds.length} analytical parlay(s) from guarded safe pool`
+          : profile === 'parlay-refinado'
+            ? `LLM-guided ${profile} generated ${builds.length} analytical parlay(s) from retrospective guardrails`
           : `deterministic ${profile} generated ${builds.length} analytical parlay(s)`,
       ...candidateSelection.warnings,
     ]
     : [`${profile} pool has ${pool.length} eligible prediction(s); ${spec.minLegs} required`, ...candidateSelection.warnings];
-  const promptVersion = profile === 'parlay-all-in' ? PARLAY_ALL_IN_PROMPT_VERSION : `deterministic-${profile}-v1`;
+  const promptVersion = profile === 'parlay-all-in'
+    ? PARLAY_ALL_IN_PROMPT_VERSION
+    : profile === 'parlay-refinado'
+      ? PARLAY_REFINADO_PROMPT_VERSION
+      : `deterministic-${profile}-v1`;
   const portfolio: ParlayPortfolio = {
     id: portfolioId,
     sourceRunId,
@@ -928,6 +945,7 @@ async function runDeterministicParlayProfile(
       }],
       agentOutputs: [{
         profile,
+        prompt: candidateSelection.prompt,
         rawOutput: candidateSelection.rawOutput,
         noParlayReason: builds.length ? undefined : warnings[0],
         warnings,
@@ -980,6 +998,11 @@ async function runDeterministicParlayProfile(
           candidateDiagnostics: {
             expectedEdge: candidateMetricForBuild(entry.build, exposureCappedAccepted, 'expectedEdge'),
             correlationPenalty: candidateMetricForBuild(entry.build, exposureCappedAccepted, 'correlationPenalty'),
+            ...(profile === 'parlay-refinado' ? {
+              retrospective: PARLAY_REFINADO_RETROSPECTIVE,
+              llmPrompt: candidateSelection.prompt,
+              llmRawOutput: candidateSelection.rawOutput,
+            } : {}),
           },
         }),
         legs: entry.build.parlay.legs.map(toParlayLegInput),
@@ -1028,9 +1051,35 @@ interface DeterministicProfileSpec {
   allowMultipleLegsPerFixture?: boolean;
   averageAggregateConfidence?: boolean;
   allInSafeMode?: boolean;
-  maxReviewLegs?: number;
-  riskWeight: number;
+      maxReviewLegs?: number;
+      riskWeight: number;
 }
+
+const PARLAY_REFINADO_RETROSPECTIVE = {
+  sample: {
+    settledParlays: 513,
+    settledPredictions: 7560,
+    counterfactualRuns: 112,
+  },
+  observedParlayPatterns: [
+    'Best settled profiles by hit-rate: parlay-diamante 11/14 (0.786), low-odds-top 63/90 (0.700), low-variance 31/45 (0.689).',
+    'Two-leg parlays were materially stronger: 216/364 excluding void/push (0.593); three legs fell to 27/71 (0.380), four-plus were poor.',
+    'Combined odds 1.30-1.59 hit 65/94 (0.691), <1.30 hit 24/37 (0.649), 1.60-1.99 hit 73/118 (0.619); >=3.50 hit 8/60 (0.133).',
+    'Leg odds below 1.25 were the most stable; 1.70-1.99 legs were weak in parlays.',
+    'Double chance legs outperformed other markets in parlays; h2h away, totals, BTTS, corners and draw exposure were weaker or noisier.',
+    'Duplicate fixture exposure was observed rarely and lost; enforce exactly one leg per fixture.',
+  ],
+  failurePatterns: [
+    'Review-required, hard research warnings, negative edge, stale low-liquidity, draw exposure and parlay-ineligible legs were severe parlay failure signals.',
+    'Fragile low total over, especially low-priced over 1.5/2.5 with low edge, materially underperformed in parlays.',
+    'Over-sized parlays, high combined odds and aggressive/unknown profiles produced most of the worst losses.',
+    'Corners remained insufficiently reliable for parlay promotion without market-specific settlement evidence.',
+  ],
+  counterfactualTakeaway: [
+    'A pre-outcome selector using guarded 2-3 leg pools and 1.60-2.49 combined odds improved over loose high-odds construction but did not beat the strongest existing low-odds profiles.',
+    'Therefore refined selection should be LLM-first only after deterministic guardrails, and should prefer two independent short-price legs unless a third leg is clearly safer than omitted alternatives.',
+  ],
+} as const;
 
 function deterministicProfileSpec(profile: DeterministicParlayProfile): DeterministicProfileSpec {
   switch (profile) {
@@ -1050,6 +1099,8 @@ function deterministicProfileSpec(profile: DeterministicParlayProfile): Determin
       return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.1, maxOdds: 1.3, maxLegOdds: 1.22, targetParlays: 1, minConfidence: 0.88, minEdge: 0, markets: ['h2h', 'double_chance'], avoidDrawExposure: true, minAggregateConfidence: 0.78, reviewOnly: false, riskWeight: 0.9 };
     case 'parlay-all-in':
       return { profile, minLegs: 2, maxLegs: 8, minOdds: 1.01, maxOdds: 6, maxLegOdds: 1.25, targetParlays: 1, minConfidence: 0.68, minEdge: 0, markets: ['h2h', 'double_chance', 'goals_over_under'], avoidDrawExposure: true, allowFragileLowPriceDc: true, reviewOnly: true, allowMultipleLegsPerFixture: false, averageAggregateConfidence: true, allInSafeMode: true, maxReviewLegs: 2, riskWeight: 0.7 };
+    case 'parlay-refinado':
+      return { profile, minLegs: 2, maxLegs: 3, minOdds: 1.3, maxOdds: 2.1, maxLegOdds: 1.65, targetParlays: 1, minConfidence: 0.7, minEdge: 0.015, markets: ['h2h', 'double_chance', 'goals_over_under', 'btts'], avoidDrawExposure: true, allowFragileLowPriceDc: false, minAggregateConfidence: 0.5, reviewOnly: false, allowMultipleLegsPerFixture: false, maxReviewLegs: 0, riskWeight: 0.65 };
   }
 }
 
@@ -1094,6 +1145,8 @@ function deterministicProfileExclusionReasons(
   if (prediction.parlayEligible === false && !isAllInLowOddsSafeReview(prediction, spec)) reasons.push('not parlay eligible');
   const automaticReasons = spec.allInSafeMode
     ? automaticParlayRiskReasons(prediction).filter((reason) => !isAllInAllowedRiskReason(prediction, reason))
+    : spec.profile === 'parlay-refinado'
+      ? automaticParlayRiskReasons(prediction).filter((reason) => !isParlayRefinadoAllowedRiskReason(prediction, reason))
     : automaticParlayRiskReasons(prediction);
   reasons.push(...automaticReasons);
   if (hasHardResearchWarning(prediction) && !isAllInLowOddsSafeReview(prediction, spec)) reasons.push('hard research warning');
@@ -1115,6 +1168,18 @@ function deterministicProfileExclusionReasons(
   return [...new Set(reasons)];
 }
 
+function isParlayRefinadoAllowedRiskReason(prediction: ParlaySourcePrediction, reason: string): boolean {
+  const shortPrice = prediction.odds <= 1.25;
+  const strongLeg = prediction.confidence >= 0.8 && (prediction.edge ?? 0) >= 0.02;
+  if (reason === 'low-liquidity h2h short favorite' && prediction.odds <= 1.2 && prediction.confidence >= 0.86 && (prediction.edge ?? 0) >= 0.02) {
+    return true;
+  }
+  if (reason === 'low-liquidity prediction' && shortPrice && strongLeg && prediction.status === 'promotable') {
+    return true;
+  }
+  return false;
+}
+
 function deterministicCandidateBlockers(
   candidate: ParlayCandidate,
   pool: readonly ParlaySourcePrediction[],
@@ -1134,6 +1199,7 @@ function deterministicCandidateBlockers(
   }
   if (legs.length < spec.minLegs || legs.length > spec.maxLegs) blockers.push(`leg count outside ${spec.minLegs}-${spec.maxLegs}`);
   if (combinedOdds < spec.minOdds || combinedOdds > spec.maxOdds) blockers.push(`combined odds outside ${spec.minOdds}-${spec.maxOdds}`);
+  if (spec.profile === 'parlay-refinado' && candidate.expectedEdge <= 0) blockers.push('expected edge must be positive');
   if (spec.requireMarketDiversity && markets.size < Math.min(3, legs.length)) blockers.push('insufficient market diversity');
   if (spec.requireMarketDiversity && families.size < Math.min(2, legs.length)) blockers.push('insufficient market-family diversity');
   if (spec.minAggregateConfidence !== undefined) {
@@ -1348,6 +1414,378 @@ function validateParsedParlayAllInSelection(
   const blockers = correlationBlockers(selected);
   if (blockers.length) reasons.push(...blockers);
   return reasons.length ? { ok: false, reasons: uniqueStrings(reasons) } : { ok: true, predictions: selected };
+}
+
+async function generateParlayRefinadoLlmCandidates(
+  config: AgentConfig,
+  runtime: RuntimeContext,
+  deps: ParlayBuildDependencies,
+  pool: readonly ParlaySourcePrediction[],
+  spec: DeterministicProfileSpec,
+  context: {
+    portfolioId: string;
+    sourceRunId: string;
+    date: string;
+    generatedAt: string;
+  },
+): Promise<DeterministicCandidateSelection> {
+  const eligible = normalizeParlayRefinadoPool(pool
+    .filter((prediction) => isParlayRefinadoEligiblePrediction(prediction, spec))
+    .sort(compareParlayRefinadoSafety));
+  if (eligible.length < spec.minLegs) {
+    return {
+      candidates: [buildRejectedParlayRefinadoCandidate(pool)],
+      rawOutput: '',
+      warnings: [`parlay-refinado guarded pool has ${eligible.length} eligible leg(s); ${spec.minLegs} required`],
+    };
+  }
+
+  const prompt = buildParlayRefinadoSelectionPrompt({
+    ...context,
+    spec,
+    predictions: eligible.slice(0, 48),
+  });
+  let rawOutput = '';
+  try {
+    const result = await runParlayPortfolioAgent(deps.agentRunner ?? runAgentWithRetry, config, prompt, { runtime });
+    rawOutput = result.text;
+    const output = parsePortfolioAgentOutput(rawOutput);
+    const poolById = new Map(eligible.map((prediction) => [prediction.id, prediction]));
+    const rejectedReasons: string[] = [];
+    for (const [index, parsed] of output.parlays.entries()) {
+      const validation = validateParsedParlayRefinadoSelection(parsed, spec, poolById);
+      if (!validation.ok) {
+        rejectedReasons.push(`llm parlay ${index + 1} rejected: ${validation.reasons.join('; ')}`);
+        continue;
+      }
+      return {
+        candidates: [buildParlayRefinadoCandidate(validation.predictions, 'llm-refined-selection')],
+        prompt,
+        rawOutput,
+        warnings: uniqueStrings([
+          `parlay-refinado selected by ${PARLAY_REFINADO_PROMPT_VERSION}`,
+          ...(output.noParlayReason ? [`no-parlay-reason: ${output.noParlayReason}`] : []),
+          ...rejectedReasons,
+        ]),
+      };
+    }
+
+    return {
+      candidates: generateParlayRefinadoFallbackCandidates(eligible, spec),
+      prompt,
+      rawOutput,
+      warnings: uniqueStrings([
+        output.noParlayReason ? `no-parlay-reason: ${output.noParlayReason}` : 'parlay-refinado LLM returned no valid parlay',
+        ...rejectedReasons,
+        'deterministic parlay-refinado fallback selected guarded retrospective legs',
+      ]),
+    };
+  } catch (err: any) {
+    return {
+      candidates: generateParlayRefinadoFallbackCandidates(eligible, spec),
+      prompt,
+      rawOutput,
+      warnings: [
+        `parlay-refinado LLM selection failed: ${err?.message ?? String(err)}`,
+        'deterministic parlay-refinado fallback selected guarded retrospective legs',
+      ],
+    };
+  }
+}
+
+function buildParlayRefinadoSelectionPrompt(input: {
+  portfolioId: string;
+  sourceRunId: string;
+  date: string;
+  generatedAt: string;
+  spec: DeterministicProfileSpec;
+  predictions: readonly ParlaySourcePrediction[];
+}): string {
+  const compactPredictions = input.predictions.map((prediction, index) => ({
+    rank: index + 1,
+    id: prediction.id,
+    fixtureId: prediction.fixtureId,
+    market: prediction.market,
+    selection: prediction.selection,
+    line: prediction.line ?? null,
+    odds: prediction.odds,
+    fairProbability: probabilityForParlayOroLeg(prediction),
+    impliedProbability: prediction.impliedProbability ?? null,
+    estimatedProbability: prediction.estimatedProbability ?? null,
+    edge: prediction.edge ?? null,
+    confidence: prediction.confidence,
+    quality: prediction.quality,
+    status: prediction.status,
+    warnings: prediction.warnings ?? [],
+    riskTags: prediction.riskTags ?? [],
+    riskScore: prediction.riskScore ?? 0,
+    rationale: prediction.rationale ? truncateText(prediction.rationale, 180) : undefined,
+  }));
+
+  return [
+    `System prompt - Parlay refinado (${PARLAY_REFINADO_PROMPT_VERSION})`,
+    'You select exactly one refined analytical soccer parlay from already-scored atomic predictions.',
+    'Use the retrospective summary as decision context, but select only from today/run predictionPool. Do not use outcomes or future information.',
+    'Return JSON only. Do not include Markdown or commentary outside JSON.',
+    'Use only predictionIds from the provided pool.',
+    `Create exactly 1 parlay with ${input.spec.minLegs}-${input.spec.maxLegs} legs; prefer 2 legs unless the third is clearly as safe as the first two.`,
+    `Combined decimal odds must stay between ${input.spec.minOdds} and ${input.spec.maxOdds}; prefer 1.30-1.99.`,
+    'Use at most one leg per fixture. Duplicate fixture selections will be rejected.',
+    'Do not choose corners, draw-only h2h, home_or_away double chance, stale/research-warning legs, negative-edge legs, hard blockers, inflated double-chance edge, or fragile low total over legs.',
+    'Prefer independent short-price h2h home favorites, safe double chance home_or_draw/draw_or_away, and conservative under/BTTS no only when the rationale is stronger than result-market alternatives.',
+    'A low-liquidity tag alone may be tolerated only for very short, high-confidence, positive-edge legs; explain why it remains acceptable.',
+    'Reject volume when it adds fragility. A clean 2-leg parlay is better than a weaker 3-leg parlay.',
+    'The artifact is analytical only and has no monetary action capability.',
+    '',
+    'Retrospective summary:',
+    JSON.stringify(PARLAY_REFINADO_RETROSPECTIVE),
+    '',
+    'JSON schema:',
+    JSON.stringify({
+      parlays: [
+        {
+          title: 'Parlay refinado',
+          predictionIds: ['prediction-id-1', 'prediction-id-2'],
+          rationale: 'why these legs are the strongest available and why omitted candidates were weaker',
+          riskNotes: ['short risk note'],
+        },
+      ],
+      noParlayReason: 'optional short reason when no parlay should be generated',
+    }),
+    '',
+    'Context:',
+    JSON.stringify({
+      portfolioId: input.portfolioId,
+      sourceRunId: input.sourceRunId,
+      date: input.date,
+      generatedAt: input.generatedAt,
+      promptVersion: PARLAY_REFINADO_PROMPT_VERSION,
+      predictionPool: compactPredictions,
+    }),
+  ].join('\n');
+}
+
+function validateParsedParlayRefinadoSelection(
+  parsed: ParsedPortfolioParlay,
+  spec: DeterministicProfileSpec,
+  poolById: Map<string, ParlaySourcePrediction>,
+): { ok: true; predictions: ParlaySourcePrediction[] } | { ok: false; reasons: string[] } {
+  const reasons: string[] = [];
+  const uniquePredictionIds = [...new Set(parsed.predictionIds)];
+  if (uniquePredictionIds.length !== parsed.predictionIds.length) {
+    reasons.push('duplicate prediction id in same parlay');
+  }
+  if (uniquePredictionIds.length < spec.minLegs || uniquePredictionIds.length > spec.maxLegs) {
+    reasons.push(`selected ${uniquePredictionIds.length} legs, expected ${spec.minLegs}-${spec.maxLegs}`);
+  }
+  if (!parsed.rationale.trim()) reasons.push('missing rationale');
+
+  const predictions = uniquePredictionIds.map((id) => poolById.get(id));
+  for (const [index, prediction] of predictions.entries()) {
+    if (!prediction) reasons.push(`unknown prediction id: ${uniquePredictionIds[index]}`);
+  }
+  if (reasons.length) return { ok: false, reasons };
+
+  const selected = predictions.filter((prediction): prediction is ParlaySourcePrediction => Boolean(prediction));
+  const fixtureIds = selected.map((prediction) => prediction.fixtureId);
+  if (new Set(fixtureIds).size !== fixtureIds.length) reasons.push('duplicate fixture in parlay-refinado selection');
+  const reviewLegs = selected.filter((prediction) => prediction.status === 'review-required').length;
+  if (spec.maxReviewLegs !== undefined && reviewLegs > spec.maxReviewLegs) {
+    reasons.push(`selected ${reviewLegs} review-required legs, max ${spec.maxReviewLegs}`);
+  }
+  for (const prediction of selected) {
+    const blockers = parlayRefinadoHardBlockers(prediction, spec);
+    reasons.push(...blockers.map((blocker) => `${prediction.id}: ${blocker}`));
+  }
+  const combinedOdds = selected.reduce((product, prediction) => product * prediction.odds, 1);
+  if (combinedOdds < spec.minOdds || combinedOdds > spec.maxOdds) {
+    reasons.push(`combined odds ${round(combinedOdds)} outside parlay-refinado target ${spec.minOdds}-${spec.maxOdds}`);
+  }
+  const aggregateConfidence = calculateAggregateConfidence(selected);
+  if (spec.minAggregateConfidence !== undefined && aggregateConfidence < spec.minAggregateConfidence) {
+    reasons.push(`aggregate confidence ${round(aggregateConfidence)} below parlay-refinado floor ${spec.minAggregateConfidence}`);
+  }
+  const candidate = buildParlayRefinadoCandidate(selected, 'llm-refined-selection');
+  if (candidate.expectedEdge <= 0) {
+    reasons.push(`expected edge ${round(candidate.expectedEdge)} must be positive`);
+  }
+  const blockers = correlationBlockers(selected);
+  if (blockers.length) reasons.push(...blockers);
+  return reasons.length ? { ok: false, reasons: uniqueStrings(reasons) } : { ok: true, predictions: selected };
+}
+
+function generateParlayRefinadoFallbackCandidates(
+  pool: readonly ParlaySourcePrediction[],
+  spec: DeterministicProfileSpec,
+): ParlayCandidate[] {
+  const combinations: ParlaySourcePrediction[][] = [];
+  const sortedPool = [...pool].sort(compareParlayRefinadoSafety).slice(0, 36);
+  for (let size = spec.minLegs; size <= spec.maxLegs; size += 1) {
+    collectParlayRefinadoCombinations(sortedPool, spec, size, 0, [], combinations, 800);
+  }
+  const candidates = combinations
+    .map((predictions) => buildParlayRefinadoCandidate(predictions, 'deterministic-refined-fallback'))
+    .filter((candidate) => !deterministicCandidateBlockers(candidate, pool, spec).length)
+    .sort((a, b) =>
+      b.expectedEdge - a.expectedEdge
+      || b.combinedFairProbability - a.combinedFairProbability
+      || a.combinedMarketOdds - b.combinedMarketOdds
+      || a.riskScore - b.riskScore,
+    );
+  return candidates.length ? [candidates[0]] : [buildRejectedParlayRefinadoCandidate(pool)];
+}
+
+function collectParlayRefinadoCombinations(
+  pool: readonly ParlaySourcePrediction[],
+  spec: DeterministicProfileSpec,
+  size: number,
+  start: number,
+  current: ParlaySourcePrediction[],
+  output: ParlaySourcePrediction[][],
+  limit: number,
+): void {
+  if (output.length >= limit) return;
+  const currentOdds = current.reduce((product, prediction) => product * prediction.odds, 1);
+  if (currentOdds > spec.maxOdds) return;
+  if (current.length === size) {
+    if (currentOdds >= spec.minOdds && currentOdds <= spec.maxOdds) output.push([...current]);
+    return;
+  }
+  const remainingNeeded = size - current.length;
+  for (let index = start; index <= pool.length - remainingNeeded; index += 1) {
+    if (current.some((prediction) => prediction.fixtureId === pool[index].fixtureId)) continue;
+    current.push(pool[index]);
+    collectParlayRefinadoCombinations(pool, spec, size, index + 1, current, output, limit);
+    current.pop();
+    if (output.length >= limit) return;
+  }
+}
+
+function normalizeParlayRefinadoPool(pool: readonly ParlaySourcePrediction[]): ParlaySourcePrediction[] {
+  const byFixture = new Map<string, ParlaySourcePrediction[]>();
+  for (const prediction of pool) {
+    const group = byFixture.get(prediction.fixtureId) ?? [];
+    group.push(prediction);
+    byFixture.set(prediction.fixtureId, group);
+  }
+  return [...byFixture.values()]
+    .map((group) => [...group].sort(compareParlayRefinadoSafety)[0])
+    .sort(compareParlayRefinadoSafety);
+}
+
+function compareParlayRefinadoSafety(a: ParlaySourcePrediction, b: ParlaySourcePrediction): number {
+  return parlayRefinadoRiskTier(a) - parlayRefinadoRiskTier(b)
+    || a.odds - b.odds
+    || (probabilityForParlayOroLeg(b) - probabilityForParlayOroLeg(a))
+    || b.confidence - a.confidence
+    || (b.edge ?? 0) - (a.edge ?? 0)
+    || a.id.localeCompare(b.id);
+}
+
+function parlayRefinadoRiskTier(prediction: ParlaySourcePrediction): number {
+  if (prediction.status === 'promotable' && prediction.market === 'double_chance' && prediction.odds <= 1.22) return 0;
+  if (prediction.status === 'promotable' && prediction.market === 'h2h' && prediction.selection === 'home' && prediction.odds <= 1.25) return 1;
+  if (prediction.status === 'promotable' && prediction.market === 'double_chance' && prediction.odds <= 1.35) return 2;
+  if (prediction.status === 'promotable' && prediction.market === 'h2h' && prediction.odds <= 1.45) return 3;
+  if (prediction.status === 'promotable' && prediction.market === 'goals_over_under' && prediction.selection === 'under') return 4;
+  if (prediction.status === 'promotable' && prediction.market === 'btts' && prediction.selection === 'no') return 5;
+  return 8;
+}
+
+function selectParlayRefinadoLegs(
+  pool: readonly ParlaySourcePrediction[],
+  spec: DeterministicProfileSpec,
+): ParlaySourcePrediction[] {
+  const selected: ParlaySourcePrediction[] = [];
+  const usedFixtures = new Set<string>();
+  let combinedOdds = 1;
+  for (const prediction of pool) {
+    if (usedFixtures.has(prediction.fixtureId)) continue;
+    if (parlayRefinadoHardBlockers(prediction, spec).length) continue;
+    const nextOdds = combinedOdds * prediction.odds;
+    if (nextOdds > spec.maxOdds && selected.length >= spec.minLegs) continue;
+    selected.push(prediction);
+    usedFixtures.add(prediction.fixtureId);
+    combinedOdds = nextOdds;
+    if (selected.length >= spec.maxLegs) break;
+  }
+  if (selected.length > 2 && selected.reduce((product, prediction) => product * prediction.odds, 1) > 1.99) {
+    return selected.slice(0, 2);
+  }
+  return selected;
+}
+
+function isParlayRefinadoEligiblePrediction(prediction: ParlaySourcePrediction, spec: DeterministicProfileSpec): boolean {
+  if (prediction.blockers?.length) return false;
+  if (!['promotable', 'candidate'].includes(prediction.status)) return false;
+  if (spec.markets && !spec.markets.includes(prediction.market)) return false;
+  return parlayRefinadoHardBlockers(prediction, spec).length === 0;
+}
+
+function parlayRefinadoHardBlockers(prediction: ParlaySourcePrediction, spec: DeterministicProfileSpec): string[] {
+  const reasons: string[] = [];
+  if (prediction.blockers?.length) reasons.push('prediction blockers present');
+  if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
+  if (prediction.status === 'review-required' || prediction.status === 'blocked' || prediction.status === 'draft') reasons.push(`status ${prediction.status} not allowed`);
+  if (prediction.confidence < spec.minConfidence) reasons.push(`below confidence floor ${spec.minConfidence}`);
+  if ((prediction.edge ?? 0) < spec.minEdge) reasons.push(`edge below floor ${spec.minEdge}`);
+  if (spec.maxLegOdds !== undefined && prediction.odds > spec.maxLegOdds) reasons.push(`above leg odds ceiling ${spec.maxLegOdds}`);
+  if (prediction.market === 'corners_over_under') reasons.push('corners not allowed');
+  if (prediction.market === 'h2h' && prediction.selection === 'draw') reasons.push('draw h2h not allowed');
+  if (prediction.market === 'double_chance' && prediction.selection === 'home_or_away') reasons.push('draw exposure not allowed');
+  if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
+  if (hasRiskTag(prediction, 'negative_edge')) reasons.push('negative edge');
+  if (hasRiskTag(prediction, 'stale_low_liquidity')) reasons.push('stale low liquidity');
+  if (hasRiskTag(prediction, 'research_warning')) reasons.push('research warning');
+  if (hasRiskTag(prediction, 'inflated_double_chance_edge')) reasons.push('inflated double-chance edge');
+  if (hasRiskTag(prediction, 'fragile_low_total_over')) reasons.push('fragile low total over');
+  if (hasRiskTag(prediction, 'lineup_pending')) reasons.push('lineup pending');
+  if (hasRiskTag(prediction, 'selection_evidence_missing')) reasons.push('selection evidence missing');
+  if (hasRiskTag(prediction, 'h2h_away') && prediction.odds > 1.2) reasons.push('h2h away above short-price limit');
+  return uniqueStrings(reasons);
+}
+
+function buildParlayRefinadoCandidate(
+  predictions: readonly ParlaySourcePrediction[],
+  reason: string,
+): ParlayCandidate {
+  const legs = [...predictions];
+  const penalty = correlationPenalty(legs);
+  const combinedFairProbability = predictions.reduce((product, prediction) => product * probabilityForParlayOroLeg(prediction), 1) * (1 - penalty);
+  const combinedMarketOdds = predictions.reduce((product, prediction) => product * prediction.odds, 1);
+  const combinedFairOdds = combinedFairProbability > 0 ? 1 / combinedFairProbability : Infinity;
+  const expectedEdge = (combinedMarketOdds * combinedFairProbability) - 1;
+  const averageConfidence = predictions.reduce((sum, prediction) => sum + prediction.confidence, 0) / Math.max(1, predictions.length);
+  const sourceRisk = predictions.reduce((sum, prediction) => sum + (prediction.riskScore ?? 0), 0) / Math.max(1, predictions.length);
+  return {
+    parlayId: randomUUID(),
+    legs: predictions.map((prediction) => prediction.id),
+    combinedFairProbability,
+    combinedMarketOdds,
+    combinedFairOdds,
+    expectedEdge,
+    correlationPenalty: penalty,
+    diversityScore: new Set(predictions.map((prediction) => prediction.fixtureId)).size / Math.max(1, predictions.length),
+    riskScore: penalty + sourceRisk * 0.06 + (1 - averageConfidence) * 0.45,
+    reason: expectedEdge > 0.05 ? 'top-ev' : reason === 'llm-refined-selection' ? 'high-conviction' : 'low-variance',
+    blockers: [],
+  };
+}
+
+function buildRejectedParlayRefinadoCandidate(pool: readonly ParlaySourcePrediction[]): ParlayCandidate {
+  return {
+    parlayId: randomUUID(),
+    legs: [],
+    combinedFairProbability: 0,
+    combinedMarketOdds: 0,
+    combinedFairOdds: Infinity,
+    expectedEdge: 0,
+    correlationPenalty: 0,
+    diversityScore: 0,
+    riskScore: 1,
+    reason: 'rejected',
+    blockers: pool.length ? ['no-parlay-refinado-eligible-legs'] : ['no-predictions'],
+  };
 }
 
 function generateParlayAllInCandidates(
@@ -1692,7 +2130,7 @@ function buildFromCandidate(
     inclusionReason: 'included-eligible-prediction',
   }));
   const warnings = uniqueStrings([
-    profile === 'parlay-all-in'
+    profile === 'parlay-all-in' || profile === 'parlay-refinado'
       ? `included by LLM-guided ${profile}: ${candidate.reason}`
       : `included by deterministic ${profile}: ${candidate.reason}`,
     ...(candidate.correlationPenalty > 0 ? [`correlation penalty ${round(candidate.correlationPenalty)}`] : []),
@@ -1714,7 +2152,7 @@ function buildFromCandidate(
       aggregateConfidence: round(aggregateConfidence),
       aggregateQuality: round(calculateAggregateQuality(selected)),
       rationale: [
-        profile === 'parlay-all-in'
+        profile === 'parlay-all-in' || profile === 'parlay-refinado'
           ? `LLM-guided ${profile} analytical parlay selected from a guarded safe pool and validated before persistence.`
           : `Deterministic ${profile} analytical parlay selected by candidate-generator, ranker, diversifier, and correlation checks.`,
         `Expected edge ${round(candidate.expectedEdge)}; combined fair probability ${round(candidate.combinedFairProbability)}.`,
@@ -1741,7 +2179,7 @@ function buildFromCandidate(
 }
 
 function deterministicArtifactName(profile: DeterministicParlayProfile, blocked: boolean): string {
-  const base = profile === 'parlay-oro' || profile === 'parlay-diamante' || profile === 'parlay-all-in' ? profile : `parlay-${profile}`;
+  const base = profile === 'parlay-oro' || profile === 'parlay-diamante' || profile === 'parlay-all-in' || profile === 'parlay-refinado' ? profile : `parlay-${profile}`;
   return blocked ? `${base}-blocked.json` : `${base}.json`;
 }
 
@@ -2280,7 +2718,7 @@ function portfolioArtifactPayloadFor(
     date,
     generatedAt,
     parlayBuilderRuleVersion: PARLAY_BUILDER_RULE_VERSION,
-    promptVersion: PARLAY_PORTFOLIO_PROMPT_VERSION,
+    promptVersion: portfolio.promptVersion,
     analyticalArtifactOnly: true,
     qualityVerdict: gateResult.verdict,
     executionCapability: 'none',
