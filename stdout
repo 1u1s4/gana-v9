@@ -1,0 +1,86 @@
+{
+  "predictions": [
+    {
+      "oddsQuoteId": "cd799049-4132-429d-b8c7-11a01e92cafc",
+      "market": "h2h",
+      "selection": "draw",
+      "line": null,
+      "odds": 3.21,
+      "probability": 0.31,
+      "modelProbability": 0.31,
+      "marketFairProbability": 0.28847,
+      "edge": 0.02153,
+      "confidence": 0.65,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_2",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_3",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_4"
+      ],
+      "claimIds": [
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_2",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_3",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_5"
+      ],
+      "rationale": "First leg ended in a draw (1-1), and Livyi Bereh (home team) has strong recent form, making a draw a plausible outcome with a slight edge.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "9a1a8930-7c46-4e21-878b-10e76875ca2e",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": null,
+      "odds": 1.28,
+      "probability": 0.70,
+      "modelProbability": 0.70,
+      "marketFairProbability": 0.357143,
+      "edge": 0.342857,
+      "confidence": 0.70,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_2",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_3",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_6"
+      ],
+      "claimIds": [
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_2",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_3",
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_8"
+      ],
+      "rationale": "Livyi Bereh is in strong form (3 wins, 2 draws in last 5), and the first leg ended in a draw, making 'Home or Draw' a very likely outcome. Note: Market fair probability for this selection is unusually low.",
+      "warnings": ["Unusually low marketFairProbability detected for this selection, potentially impacting edge calculation validity."]
+    },
+    {
+      "oddsQuoteId": "d275f879-7153-4b62-b62a-6a4b9ccda54c",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.5,
+      "odds": 1.67,
+      "probability": 0.62,
+      "modelProbability": 0.62,
+      "marketFairProbability": 0.567128,
+      "edge": 0.052872,
+      "confidence": 0.75,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_5"
+      ],
+      "claimIds": [
+        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_6"
+      ],
+      "rationale": "Odds and evidence strongly indicate 'Under 2.5 Goals' is the more probable outcome.",
+      "warnings": []
+    }
+  ],
+  "warnings": [
+    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
+    "market btts skipped/review-required: missing odds quotes for requested market"
+  ],
+  "metadata": {}
+}

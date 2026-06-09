@@ -179,7 +179,7 @@ const DEFAULT_BANKROLL_UNITS = 100;
 const DEFAULT_MAX_PORTFOLIO_EXPOSURE = 0.08;
 const DEFAULT_MAX_PARLAY_EXPOSURE = 0.025;
 const DEFAULT_PROFILE_SCOPE: ParlayAnalysisProfileScope = 'core';
-const CORE_ANALYSIS_PROFILES = new Set(['default', 'balanced', 'high-conviction', 'parlay-diamante']);
+const CORE_ANALYSIS_PROFILES = new Set(['default', 'balanced', 'high-conviction', 'parlay-diamante', 'parlay-all-in']);
 const PURGED_ANALYSIS_PROFILES = new Set(['default', 'review', 'totals', 'balanced', 'high-conviction', 'market-diverse', 'parlay-oro', 'aggressive']);
 const MAX_RECOMMENDABLE_COMBINED_ODDS = 3.0;
 const MAX_RECOMMENDABLE_LEGS = 3;
@@ -463,7 +463,7 @@ function adjustedProbabilityFor(confidence: number, combinedOdds: number, profil
     if (flag === 'review-required') probability *= 0.94;
     if (flag === 'low-liquidity') probability *= 0.98;
     if (flag === 'stale-source') probability *= 0.7;
-    if (flag === 'low-liquidity-h2h-favorite') probability *= profile === 'parlay-diamante' ? 0.97 : 0.55;
+    if (flag === 'low-liquidity-h2h-favorite') probability *= profile === 'parlay-diamante' || profile === 'parlay-all-in' ? 0.97 : 0.55;
     if (flag === 'corners-unverified') probability *= 0.65;
     if (flag === 'negative-portfolio-edge') probability *= 0.65;
     if (flag === 'many-legs') probability *= 0.92;
@@ -476,6 +476,7 @@ function profileMultiplier(profile: string): number {
   switch (profile) {
     case 'low-odds-top': return 1.16;
     case 'parlay-diamante': return 1.2;
+    case 'parlay-all-in': return 1.08;
     case 'low-variance': return 1.06;
     case 'high-conviction': return 1.0;
     case 'balanced': return 1.0;
@@ -492,14 +493,14 @@ function rejectionReasonsFor(profile: string, odds: number, confidence: number, 
   if (!Number.isFinite(odds) || odds <= 1) reasons.push('invalid combined odds');
   if (!Number.isFinite(confidence) || confidence <= 0) reasons.push('invalid aggregate confidence');
   if (legs < 2) reasons.push('less than two legs');
-  if (legs > MAX_RECOMMENDABLE_LEGS) reasons.push(`more than ${MAX_RECOMMENDABLE_LEGS} legs after parlay purge`);
-  if (odds > MAX_RECOMMENDABLE_COMBINED_ODDS) reasons.push(`combined odds above purge ceiling ${MAX_RECOMMENDABLE_COMBINED_ODDS}`);
+  if (legs > MAX_RECOMMENDABLE_LEGS && profile !== 'parlay-all-in') reasons.push(`more than ${MAX_RECOMMENDABLE_LEGS} legs after parlay purge`);
+  if (odds > MAX_RECOMMENDABLE_COMBINED_ODDS && profile !== 'parlay-all-in') reasons.push(`combined odds above purge ceiling ${MAX_RECOMMENDABLE_COMBINED_ODDS}`);
   if (PURGED_ANALYSIS_PROFILES.has(profile)) reasons.push(`profile ${profile} is purged from final recommendations`);
   if (expectedEdge <= 0) reasons.push('non-positive adjusted edge');
   if (riskFlags.includes('stale-source')) reasons.push('stale source risk');
   if (riskFlags.includes('corners-unverified')) reasons.push('unverified corners risk');
   if (riskFlags.includes('negative-portfolio-edge')) reasons.push('negative portfolio edge');
-  if (riskFlags.includes('low-liquidity-h2h-favorite') && profile !== 'parlay-diamante') reasons.push('low-liquidity h2h short favorite');
+  if (riskFlags.includes('low-liquidity-h2h-favorite') && profile !== 'parlay-diamante' && profile !== 'parlay-all-in') reasons.push('low-liquidity h2h short favorite');
   return [...new Set(reasons)];
 }
 
@@ -516,7 +517,7 @@ function reasonsFor(profile: string, odds: number, confidence: number, probabili
 }
 
 function scoreFor(odds: number, confidence: number, probability: number, edge: number, riskFlags: string[], profile: string): number {
-  const profileBonus = profile === 'parlay-diamante' ? 0.1 : profile === 'low-odds-top' ? 0.08 : profile === 'low-variance' ? 0.03 : 0;
+  const profileBonus = profile === 'parlay-diamante' ? 0.1 : profile === 'low-odds-top' ? 0.08 : profile === 'parlay-all-in' ? 0.05 : profile === 'low-variance' ? 0.03 : 0;
   const oddsPenalty = odds > 2.2 ? 0.08 : odds > 3 ? 0.16 : 0;
   const riskPenalty = riskFlags.length * 0.06;
   return round((probability * 0.55) + (Math.max(0, edge) * 0.25) + (confidence * 0.2) + profileBonus - oddsPenalty - riskPenalty, 6);

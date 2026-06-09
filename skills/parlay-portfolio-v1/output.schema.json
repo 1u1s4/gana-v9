@@ -8,7 +8,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "predictionIds", "rationale"],
+        "required": ["title", "predictionIds", "rationale", "riskNotes", "duplicateFixtureJustification"],
         "properties": {
           "title": { "type": ["string", "null"] },
           "predictionIds": {
@@ -18,7 +18,7 @@
           },
           "rationale": { "type": "string", "minLength": 1 },
           "riskNotes": {
-            "type": "array",
+            "type": ["array", "null"],
             "items": { "type": "string", "minLength": 1 }
           },
           "duplicateFixtureJustification": { "type": ["string", "null"] }

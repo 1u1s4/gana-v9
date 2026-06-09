@@ -645,7 +645,7 @@ model Parlay {
   id                  String   @id @default(uuid()) @db.Char(36)
   runId               String?  @map("run_id") @db.Char(36)
   artifactId          String?  @map("artifact_id") @db.Char(36)
-  combinedOdds        Decimal? @map("combined_odds") @db.Decimal(12, 6)
+  combinedOdds        Decimal? @map("combined_odds") @db.Decimal(20, 6)
   aggregateConfidence Decimal  @map("aggregate_confidence") @db.Decimal(5, 4)
   aggregateQuality    Decimal  @map("aggregate_quality") @db.Decimal(5, 4)
   rationaleRedacted   String   @map("rationale_redacted") @db.Text

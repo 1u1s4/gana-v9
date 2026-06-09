@@ -196,12 +196,14 @@ function reviewRecommendation(recommendation: CouncilRecommendation, index: numb
   const odds = Math.max(1, numberOr(recommendation.combinedOdds, 1));
   const riskFlags = new Set(recommendation.riskFlags ?? []);
   const signals = recommendationSignals(recommendation);
-  const hardRiskCount = [...riskFlags].filter((flag) => HARD_RISK_FLAGS.has(flag)).length;
+  const hardRiskCount = [...riskFlags].filter((flag) => HARD_RISK_FLAGS.has(flag) && !(profile === 'parlay-all-in' && flag === 'low-liquidity-h2h-favorite')).length;
   const riskCount = [...riskFlags].filter((flag) => !METADATA_RISK_FLAGS.has(flag)).length;
   const fallbackPenalty = recommendation.selectionMode === 'analytical-fallback' ? 0.03 : 0;
   const oddsPenalty = odds > 2.5 ? Math.min(0.12, Math.log2(odds / 2.5) * 0.05) : 0;
   const profileBoost = profile === 'parlay-diamante'
     ? 0.08
+    : profile === 'parlay-all-in'
+      ? 0.04
     : profile === 'low-odds-top'
       ? 0.07
       : profile === 'low-variance'

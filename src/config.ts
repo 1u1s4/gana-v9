@@ -238,7 +238,7 @@ const DEFAULTS: AgentConfig = {
     kickoffWindowHours: 36,
     includeLiveFixtures: false,
     includeCompletedFixtures: false,
-    maxFixturesPerRun: 80,
+    maxFixturesPerRun: 10000,
     maxProviderRequestsPerRun: 500,
     maxAgenticResearchCallsPerRun: 80,
   },

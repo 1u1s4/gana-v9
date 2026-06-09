@@ -1416,6 +1416,224 @@ describe('runParlayBuild', () => {
     assert.deepEqual(artifactNames.slice(0, 2), ['parlay-diamante.json', 'parlays.json']);
   });
 
+  it('builds parlay-all-in from an LLM-selected safe pool without duplicate fixtures', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const persisted: any[] = [];
+    let promptText = '';
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-17',
+      sourceRunIds: ['source-run-codex', 'source-run-gemini'],
+      portfolio: 'parlay-all-in',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async (_config, input) => {
+        promptText = String(input);
+        return { text: JSON.stringify({ parlays: [{
+          title: 'LLM all-in safe set',
+          predictionIds: [
+            'duplicate-safer-odds',
+            'safe-2',
+            'safe-3',
+            'safe-4',
+            'safe-5',
+            'review-low-odds-1',
+          ],
+          rationale: 'These are the safest independent low-priced legs from the guarded pool.',
+          riskNotes: ['One low-priced review total is kept because it is a safer low line.'],
+        }] }) } as any;
+      },
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async (query) => {
+            assert.deepEqual(query.runIds, ['source-run-codex', 'source-run-gemini']);
+            return [
+              ...Array.from({ length: 10 }, (_, index) => prediction({
+                id: `safe-${index + 1}`,
+                runId: 'source-run-codex',
+                fixtureId: `fixture-safe-${index + 1}`,
+                marketKey: 'h2h',
+                selectionKey: index % 2 ? 'away' : 'home',
+                odds: 1.04 + (index * 0.01),
+                confidence: 0.82 - (index * 0.01),
+                edge: 0.02,
+                estimatedProbability: 0.9,
+                status: 'promotable',
+              })),
+              prediction({
+                id: 'duplicate-safer-odds',
+                runId: 'source-run-gemini',
+                fixtureId: 'fixture-safe-1',
+                marketKey: 'double_chance',
+                selectionKey: 'home_or_draw',
+                odds: 1.03,
+                confidence: 0.86,
+                edge: 0.02,
+                estimatedProbability: 0.92,
+                status: 'promotable',
+              }),
+              prediction({
+                id: 'review-low-odds-1',
+                runId: 'source-run-gemini',
+                fixtureId: 'fixture-review-1',
+                marketKey: 'goals_over_under',
+                selectionKey: 'over',
+                line: 2.5,
+                odds: 1.06,
+                confidence: 0.49,
+                edge: 0.04,
+                estimatedProbability: 0.86,
+                status: 'review-required',
+                metadata: { parlayEligible: false },
+                warnings: ['stale odds source', 'stale low-liquidity prediction requires review and is excluded from parlays'],
+              }),
+              prediction({
+                id: 'review-low-odds-2',
+                runId: 'source-run-gemini',
+                fixtureId: 'fixture-review-2',
+                marketKey: 'h2h',
+                selectionKey: 'home',
+                odds: 1.05,
+                confidence: 0.49,
+                edge: 0.03,
+                estimatedProbability: 0.86,
+                status: 'review-required',
+                metadata: { parlayEligible: false },
+                warnings: ['stale odds source', 'stale low-liquidity prediction requires review and is excluded from parlays'],
+              }),
+              prediction({
+                id: 'review-low-odds-3',
+                runId: 'source-run-gemini',
+                fixtureId: 'fixture-review-3',
+                marketKey: 'h2h',
+                selectionKey: 'home',
+                odds: 1.05,
+                confidence: 0.49,
+                edge: 0.03,
+                estimatedProbability: 0.86,
+                status: 'review-required',
+                metadata: { parlayEligible: false },
+                warnings: ['stale odds source', 'stale low-liquidity prediction requires review and is excluded from parlays'],
+              }),
+              prediction({
+                id: 'too-expensive',
+                runId: 'source-run-codex',
+                fixtureId: 'fixture-expensive',
+                marketKey: 'h2h',
+                selectionKey: 'home',
+                odds: 1.3,
+                confidence: 0.95,
+                edge: 0.04,
+                estimatedProbability: 0.8,
+                status: 'promotable',
+              }),
+            ] as any[];
+          },
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-parlay-all-in' }) as any },
+        parlays: {
+          createWithLegs: async (input) => {
+            persisted.push(input);
+            return { id: 'parlay-all-in-1' } as any;
+          },
+        },
+      },
+    });
+
+    const legs = result.build.parlay.legs;
+    assert.equal(result.ok, true);
+    assert.match(promptText, /Parlay all-in/);
+    assert.match(promptText, /LLM-first/);
+    assert.match(promptText, /Over 1\.5 or Over 2\.5/);
+    assert.equal(result.portfolio?.profiles[0].profile, 'parlay-all-in');
+    assert.equal(result.portfolio?.promptVersion, 'llm-parlay-all-in-v1');
+    assert.deepEqual(legs.map((leg) => leg.predictionId), [
+      'duplicate-safer-odds',
+      'safe-2',
+      'safe-3',
+      'safe-4',
+      'safe-5',
+      'review-low-odds-1',
+    ]);
+    assert.equal(new Set(legs.map((leg) => leg.fixtureId)).size, legs.length);
+    assert.equal(legs.filter((leg) => leg.status === 'review-required').length <= 2, true);
+    assert.equal(legs.some((leg) => leg.predictionId === 'too-expensive'), false);
+    assert.equal(legs.some((leg) => leg.predictionId === 'safe-1'), false);
+    assert.equal(legs.some((leg) => leg.predictionId === 'duplicate-safer-odds'), true);
+    assert.match(result.build.parlay.rationale, /LLM-guided parlay-all-in/);
+    assert.match(result.portfolio?.profiles[0].warnings.join('\n') ?? '', /selected by llm-parlay-all-in-v1/);
+    assert.equal(persisted[0].parlay.metadata.portfolioProfile, 'parlay-all-in');
+    assert.equal(persisted[0].parlay.metadata.promptVersion, 'llm-parlay-all-in-v1');
+    assert.equal(persisted[0].legs.length, 6);
+  });
+
+  it('falls back for parlay-all-in when the LLM selection violates guardrails', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+
+    const result = await runParlayBuild(cfg, {
+      date: '2026-05-17',
+      sourceRunId: 'source-run-all-in-fallback',
+      portfolio: 'parlay-all-in',
+    }, runtime, {
+      now: () => now,
+      agentRunner: async () => ({ text: JSON.stringify({ parlays: [{
+        title: 'Invalid duplicate fixture',
+        predictionIds: ['safe-1', 'duplicate-safer-odds'],
+        rationale: 'Invalid because both legs use the same fixture.',
+      }] }) }) as any,
+      writeArtifact: (_runId, name) => `/tmp/${name}`,
+      repositories: {
+        predictions: {
+          list: async () => [
+            ...Array.from({ length: 9 }, (_, index) => prediction({
+              id: `safe-${index + 1}`,
+              runId: 'source-run-all-in-fallback',
+              fixtureId: `fixture-safe-${index + 1}`,
+              marketKey: 'h2h',
+              selectionKey: index % 2 ? 'away' : 'home',
+              odds: 1.04 + (index * 0.01),
+              confidence: 0.84 - (index * 0.01),
+              edge: 0.02,
+              estimatedProbability: 0.9,
+              status: 'promotable',
+            })),
+            prediction({
+              id: 'duplicate-safer-odds',
+              runId: 'source-run-all-in-fallback',
+              fixtureId: 'fixture-safe-1',
+              marketKey: 'double_chance',
+              selectionKey: 'home_or_draw',
+              odds: 1.03,
+              confidence: 0.86,
+              edge: 0.02,
+              estimatedProbability: 0.92,
+              status: 'promotable',
+            }),
+          ] as any[],
+          listForFixtureDate: async () => [],
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact-parlay-all-in-fallback' }) as any },
+        parlays: { createWithLegs: async () => ({ id: 'parlay-all-in-fallback-1' }) as any },
+      },
+    });
+
+    const legs = result.build.parlay.legs;
+    assert.equal(result.ok, true);
+    assert.equal(result.portfolio?.promptVersion, 'llm-parlay-all-in-v1');
+    assert.equal(legs.length, 8);
+    assert.equal(new Set(legs.map((leg) => leg.fixtureId)).size, legs.length);
+    assert.equal(legs.some((leg) => leg.predictionId === 'duplicate-safer-odds'), true);
+    assert.equal(legs.some((leg) => leg.predictionId === 'safe-1'), false);
+    assert.match(result.portfolio?.profiles[0].warnings.join('\n') ?? '', /duplicate fixture/);
+    assert.match(result.portfolio?.profiles[0].warnings.join('\n') ?? '', /deterministic parlay-all-in fallback/);
+  });
+
   it('falls back for parlay-oro when the strict low-odds pool is empty', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
