@@ -1,6 +1,7 @@
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import { listApiFootballFixtures } from '../providers/sports/api-football.js';
+import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import type {
   FilterReason,
@@ -19,6 +20,10 @@ export interface FixtureDiscoveryResult {
   requestedTeams: RequestedTeamPresetView[];
 }
 
+export interface FixtureDiscoveryDeps {
+  listFixtures?: typeof listApiFootballFixtures;
+}
+
 interface FixtureDiscoveryRequest {
   league?: number;
   team?: number;
@@ -32,8 +37,10 @@ export async function discoverFixtures(
   config: AgentConfig,
   query: FixtureFilterQuery,
   runtime?: RuntimeContext,
+  deps: FixtureDiscoveryDeps = {},
 ): Promise<FixtureDiscoveryResult> {
   const filters = resolveFilterConfig(config, query);
+  const listFixtures = deps.listFixtures ?? listApiFootballFixtures;
   const leaguePresets = filters.useDefaultLeagues ? sortLeaguePresetsForDiscovery(await listLeaguePresets(config)) : [];
   const leaguePriorities = leaguePriorityMap(leaguePresets);
   const teamPresets = filters.useDefaultTeams ? await listTeamPresets(config) : [];
@@ -48,17 +55,11 @@ export async function discoverFixtures(
   }
 
   const byProviderFixtureId = new Map<string, { fixture: Fixture; reasons: Set<FilterReason> }>();
+  const recoverablePresetErrors: unknown[] = [];
   for (const batch of chunks(validRequests, FIXTURE_DISCOVERY_CONCURRENCY)) {
     const results = await Promise.all(batch.map(async (request) => ({
       request,
-      fixtures: await listApiFootballFixtures(config, {
-        date: filters.date,
-        timezone: filters.timezone,
-        ...(request.season !== undefined ? { season: request.season } : {}),
-        league: request.league,
-        team: request.team,
-        maxFixtures: filters.maxFixturesPerRun,
-      }, runtime),
+      fixtures: await listFixturesForDiscovery(listFixtures, config, filters, request, runtime, recoverablePresetErrors),
     })));
     for (const result of results) {
       for (const fixture of result.fixtures) {
@@ -66,6 +67,19 @@ export async function discoverFixtures(
         entry.reasons.add(result.request.reason);
         byProviderFixtureId.set(fixture.providerFixtureId, entry);
       }
+    }
+    if (!byProviderFixtureId.size && recoverablePresetErrors.length) break;
+  }
+  if (!byProviderFixtureId.size && recoverablePresetErrors.length && validRequests.some((request) => request.reason !== 'included-by-manual-query')) {
+    const fallbackFixtures = await listFixtures(config, {
+      date: filters.date,
+      timezone: filters.timezone,
+      maxFixtures: filters.maxFixturesPerRun,
+    }, runtime);
+    for (const fixture of fallbackFixtures) {
+      const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
+      entry.reasons.add('included-by-manual-query');
+      byProviderFixtureId.set(fixture.providerFixtureId, entry);
     }
   }
 
@@ -119,6 +133,42 @@ export async function discoverFixtures(
       providerLeagueId: team.providerLeagueId,
     })),
   };
+}
+
+async function listFixturesForDiscovery(
+  listFixtures: typeof listApiFootballFixtures,
+  config: AgentConfig,
+  filters: ReturnType<typeof resolveFilterConfig>,
+  request: FixtureDiscoveryRequest,
+  runtime: RuntimeContext | undefined,
+  recoverablePresetErrors: unknown[],
+): Promise<Fixture[]> {
+  try {
+    return await listFixtures(config, {
+      date: filters.date,
+      timezone: filters.timezone,
+      ...(request.season !== undefined ? { season: request.season } : {}),
+      league: request.league,
+      team: request.team,
+      maxFixtures: filters.maxFixturesPerRun,
+    }, runtime);
+  } catch (err) {
+    if (!isRecoverableSeasonAccessDiscoveryError(err)) throw err;
+    recoverablePresetErrors.push(err);
+    return [];
+  }
+}
+
+export function isRecoverableSeasonAccessDiscoveryError(error: unknown): boolean {
+  if (!isApiFootballProviderError(error) || error.endpointName !== 'fixtures') return false;
+  if (error.code === 'quota_exceeded' || error.code === 'rate_limited') return false;
+  const text = [
+    error.message,
+    typeof error.received === 'string' ? error.received : JSON.stringify(error.received),
+  ].filter(Boolean).join(' ');
+  return /free plans? do not have access to this season/i.test(text)
+    || /do not have access to this season/i.test(text)
+    || /try from 20\d{2} to 20\d{2}/i.test(text);
 }
 
 function sortLeaguePresetsForDiscovery<T extends { providerCompetitionId: string; name?: string | null; priority?: number | null }>(presets: T[]): T[] {

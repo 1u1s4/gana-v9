@@ -20,6 +20,7 @@ const block = [
   'TZ=America/Guatemala',
   `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-validate-metrics-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`)}`,
   `15 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-daily-e2e-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
+  `*/30 10-22 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-daily-e2e-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
   `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-strategy-review.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`)}`,
   end,
 ].join('\n');

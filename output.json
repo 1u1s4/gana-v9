@@ -1,106 +1,183 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "5cfdd335-1a75-4ee3-a0a6-9886b14e626a",
+      "oddsQuoteId": "2521ae14-6369-4ef2-b7ba-fa9186fdb8c6",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 1.47,
-      "probability": 0.680272,
-      "modelProbability": 0.680272,
-      "marketFairProbability": 0.638915,
-      "edge": 0.041357,
-      "confidence": 0.95,
+      "odds": 1.88,
+      "probability": 0.55,
+      "modelProbability": 0.55,
+      "marketFairProbability": 0.49288,
+      "edge": 0.11588,
+      "confidence": 0.94,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_1",
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_2",
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_3"
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_2",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_3"
       ],
       "claimIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:claim_1"
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_1"
       ],
-      "rationale": "Kudrivka is the strong favorite, supported by favorable odds (1.47), dominant head-to-head record (2-0 wins), and Ahrobiznes Volochysk's poor offensive performance.",
+      "rationale": "River Plate Res. is favored to win according to bookmakers, and the teams are closely matched with a history of draws.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "192e4972-a4e2-45cc-8ca2-b692b20d591a",
+      "oddsQuoteId": "75ae0f5e-426d-45ca-ab7d-3470a91a7ac6",
+      "market": "h2h",
+      "selection": "draw",
+      "line": null,
+      "odds": 3.5,
+      "probability": 0.30,
+      "modelProbability": 0.30,
+      "marketFairProbability": 0.265774,
+      "edge": 0.1287,
+      "confidence": 0.925,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_2",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_3"
+      ],
+      "claimIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_2"
+      ],
+      "rationale": "Head-to-head records show a high number of draws, and teams are closely matched in the league.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "da1f6767-f8ea-482e-be53-8899fae4665f",
+      "market": "h2h",
+      "selection": "away",
+      "line": null,
+      "odds": 3.9,
+      "probability": 0.15,
+      "modelProbability": 0.15,
+      "marketFairProbability": 0.241346,
+      "edge": -0.3789,
+      "confidence": 0.925,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_2",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_3"
+      ],
+      "claimIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_2"
+      ],
+      "rationale": "While teams are closely matched, bookmakers favor River Plate Res. and historical data suggests many draws, making an away win less probable.",
+      "warnings": [
+        "No strong direct evidence supporting an away win."
+      ]
+    },
+    {
+      "oddsQuoteId": "ceb68608-118b-4921-92d4-df66a1f6c6f8",
       "market": "double_chance",
       "selection": "home_or_draw",
       "line": null,
-      "odds": 1.08,
-      "probability": 0.925926,
-      "modelProbability": 0.925926,
-      "marketFairProbability": 0.443616,
-      "edge": 0.48231,
-      "confidence": 0.95,
+      "odds": 1.25,
+      "probability": 0.85,
+      "modelProbability": 0.85,
+      "marketFairProbability": 0.375993,
+      "edge": 1.2618,
+      "confidence": 0.94,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_1",
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_2"
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_2",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_3"
       ],
       "claimIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:claim_4"
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_1",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_2"
       ],
-      "rationale": "Kudrivka is heavily favored to win or draw, as indicated by strong odds (1.47 for win) and their dominant head-to-head record.",
+      "rationale": "River Plate Res. is favored to win and a draw is highly probable given historical head-to-head records and close league standings.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "e8da096d-9248-4f2a-a026-2dfb102960b3",
+      "oddsQuoteId": "5f3d6c57-2ec1-4067-963b-5594e9d02a4e",
       "market": "goals_over_under",
-      "selection": "under",
-      "line": 2.5,
-      "odds": 1.66,
-      "probability": 0.60241,
-      "modelProbability": 0.60241,
-      "marketFairProbability": 0.563158,
-      "edge": 0.039252,
+      "selection": "over",
+      "line": 1.75,
+      "odds": 1.33,
+      "probability": 0.75,
+      "modelProbability": 0.75,
+      "marketFairProbability": 0.697727,
+      "edge": 0.07489,
       "confidence": 0.85,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_4",
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_5"
-      ],
-      "claimIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:claim_2"
-      ],
-      "rationale": "A low-scoring game is predicted, with 'under 2.5 goals' having favorable odds (1.66) and match previews expecting 1-0 or 2-0 scorelines.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "b9aea8f9-bafb-4376-a3cd-0580cdbcec04",
-      "market": "btts",
-      "selection": "no",
-      "line": null,
-      "odds": 1.59,
-      "probability": 0.628931,
-      "modelProbability": 0.628931,
-      "marketFairProbability": 0.59542,
-      "edge": 0.033511,
-      "confidence": 0.95,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_6",
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_3",
-        "2a60af90-d693-47db-b73d-88e96e606ced:evidence_7"
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_5"
       ],
       "claimIds": [
-        "2a60af90-d693-47db-b73d-88e96e606ced:claim_3"
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_3",
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_5"
       ],
-      "rationale": "It is unlikely both teams will score, with 'BTTS No' favored (odds 1.59). Ahrobiznes Volochysk has a poor offensive record, and Kudrivka has kept clean sheets against them.",
+      "rationale": "Historical data strongly suggests at least 2 goals will be scored in this match.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "3dbc9d34-ff71-44c2-b898-14b048df7b37",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 9.5,
+      "odds": 1.9,
+      "probability": 0.50,
+      "modelProbability": 0.50,
+      "marketFairProbability": 0.5,
+      "edge": 0.0,
+      "confidence": 0.99,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_7"
+      ],
+      "claimIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_7"
+      ],
+      "rationale": "The bookmakers have set the line at 9.5 corners with equal odds, suggesting an expectation around 9-10 corners.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "cc3b6f47-fff0-40a2-8827-1fa2f8a4615d",
+      "market": "corners_over_under",
+      "selection": "under",
+      "line": 9.5,
+      "odds": 1.9,
+      "probability": 0.50,
+      "modelProbability": 0.50,
+      "marketFairProbability": 0.5,
+      "edge": 0.0,
+      "confidence": 0.99,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:evidence_7"
+      ],
+      "claimIds": [
+        "89f48fdd-6fe7-4c27-846c-9c28a56521af:claim_7"
+      ],
+      "rationale": "The bookmakers have set the line at 9.5 corners with equal odds, suggesting an expectation around 9-10 corners.",
       "warnings": []
     }
   ],
   "warnings": [
-    "Market 'corners_over_under' skipped due to missing odds quotes for the requested market, as indicated in the research bundle warnings."
+    "BTTS market skipped: no explicit odds quotes available for this market. Web search evidence suggests both teams are likely to score, but a promotable pick requires odds."
   ],
   "metadata": {}
 }

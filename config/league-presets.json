@@ -18,6 +18,7 @@
     { "id": "292", "name": "K League 1", "country": "South-Korea", "priority": 140, "enabled": true },
     { "id": "103", "name": "Eliteserien", "country": "Norway", "priority": 150, "enabled": true },
     { "id": "113", "name": "Allsvenskan", "country": "Sweden", "priority": 160, "enabled": true },
+    { "id": "666", "name": "Friendlies Women", "country": "World", "priority": 165, "enabled": true },
     { "id": "506", "name": "2. liga", "country": "Slovakia", "priority": 10000, "enabled": true },
     { "id": "219", "name": "2. Liga", "country": "Austria", "priority": 10000, "enabled": true },
     { "id": "685", "name": "3. liga - CFL B", "country": "Czech-Republic", "priority": 10000, "enabled": true },

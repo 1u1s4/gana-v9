@@ -1,211 +1,250 @@
 {
   "sources": [
     {
-      "id": "source_1",
-      "type": "web-search",
-      "url": "https://galwaybayfm.ie/sports/ireland-face-netherlands-in-crucial-world-cup-qualifier-in-cork-on-friday-night/",
-      "title": "Ireland face Netherlands in crucial World Cup qualifier in Cork on Friday night",
-      "capturedAt": "2026-06-04T16:35:00.000Z",
-      "hash": "e9c2f3a1",
-      "metadata": {}
-    },
-    {
-      "id": "source_2",
-      "type": "web-search",
-      "url": "https://www.balls.ie/football/republic-of-ireland-netherlands-world-cup-qualifier-preview-596543",
-      "title": "Republic of Ireland v Netherlands: Everything To Know About Crucial World Cup Qualifier",
-      "capturedAt": "2026-06-04T16:35:00.000Z",
-      "hash": "a4d6bfe8",
-      "metadata": {}
-    },
-    {
-      "id": "source_3",
+      "id": "provider_snapshot_fixture",
       "type": "provider-snapshot",
       "url": null,
-      "title": "API-Football Fixture Snapshot",
-      "capturedAt": "2026-06-04T16:30:09.378Z",
-      "hash": "abb11ad8-4e12-427a-b5eb-5b21925934ea",
+      "title": "Provider Fixture Snapshot",
+      "capturedAt": "2026-06-08T00:38:26.642Z",
+      "hash": "0f74f404-faf1-43c8-8750-e453d01674d9",
       "metadata": {
-        "provider": "api-football",
-        "snapshotId": "abb11ad8-4e12-427a-b5eb-5b21925934ea"
+        "provider": "api-football"
       }
     },
     {
-      "id": "source_4",
+      "id": "provider_snapshot_statistics",
       "type": "provider-snapshot",
       "url": null,
-      "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-06-04T16:30:10.792Z",
-      "hash": "b5e1cd86-a991-4cf2-9c22-66a6d0fd3fa7",
+      "title": "Provider Statistics Snapshot",
+      "capturedAt": "2026-06-08T00:38:27.216Z",
+      "hash": "e08e1047-cc59-45cb-b79d-c70a5c2c4d13",
       "metadata": {
-        "provider": "api-football",
-        "snapshotId": "b5e1cd86-a991-4cf2-9c22-66a6d0fd3fa7"
+        "provider": "api-football"
       }
+    },
+    {
+      "id": "provider_snapshot_odds",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "Provider Odds Snapshot",
+      "capturedAt": "2026-06-08T00:38:28.264Z",
+      "hash": "946763c7-6f7f-43d5-8a64-dbf18ef5d098",
+      "metadata": {
+        "provider": "api-football"
+      }
+    },
+    {
+      "id": "web_search_1",
+      "type": "web-search",
+      "url": "https://footystats.org/sweden/angelholms-ff-vs-bk-olympic-h2h-stats",
+      "title": "Ängelholms FF vs BK Olympic H2H Stats, Predictions & Head to Head",
+      "capturedAt": "2026-06-08T00:40:00.000Z",
+      "hash": null,
+      "metadata": {}
+    },
+    {
+      "id": "web_search_2",
+      "type": "web-search",
+      "url": "https://www.soccervital.com/match-prediction/angelholms-ff-vs-bk-olympic-1504451",
+      "title": "Ängelholms FF vs BK Olympic Prediction, 08 June 2026",
+      "capturedAt": "2026-06-08T00:40:00.000Z",
+      "hash": null,
+      "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence_1",
-      "sourceId": "source_4",
-      "claimIds": ["claim_1", "claim_2"],
-      "snippet": "h2h, selection: away, price: 1.53",
-      "summary": "The average odds for a Netherlands win are around 1.53, implying a ~65% probability.",
+      "id": "evidence_h2h_odds",
+      "sourceId": "provider_snapshot_odds",
+      "claimIds": ["claim_h2h_home_win"],
+      "snippet": "Bet365 H2H Home: 2.20, Pinnacle H2H Home: 2.15",
+      "summary": "Bookmakers favor Angelholms FF to win, with odds around 2.15-2.20.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_h2h_web",
+      "sourceId": "web_search_1",
+      "claimIds": ["claim_h2h_balanced", "claim_h2h_away_recent"],
+      "snippet": "Last 11 Meetings: 4 wins for Ängelholm, 4 wins for Olympic, 3 draws. Last League Meeting (August 2025): Ängelholm 0-3 BK Olympic.",
+      "summary": "The head-to-head record is balanced, but BK Olympic has won the last two encounters.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_2",
-      "sourceId": "source_1",
-      "claimIds": ["claim_1", "claim_2"],
-      "snippet": "The Republic of Ireland will be without the suspended Denise O’Sullivan and Emily Murphy for the game.",
-      "summary": "Two key Republic of Ireland players, Denise O'Sullivan and Emily Murphy, are suspended for the match, significantly weakening the team.",
-      "confidence": 0.95,
-      "metadata": {}
+        "id": "evidence_form_home_away",
+        "sourceId": "web_search_1",
+        "claimIds": ["claim_form"],
+        "snippet": "Ängelholms FF are yet to record a home victory (0W, 3D, 2L). BK Olympic is on a 4-match losing streak away from home.",
+        "summary": "Both teams exhibit poor form in their respective home/away roles. Angelholms FF has not won a home game this season, while BK Olympic has lost their last four away matches.",
+        "confidence": 0.95,
+        "metadata": {}
     },
     {
-      "id": "evidence_3",
-      "sourceId": "source_2",
-      "claimIds": ["claim_1"],
-      "snippet": "The Dutch have never lost a competitive fixture to Ireland and won 2-1 when the sides met back in March.",
-      "summary": "The Netherlands has a dominant head-to-head record against Ireland, having never lost a competitive match and winning the most recent encounter 2-1.",
-      "confidence": 0.9,
+      "id": "evidence_double_chance_web",
+      "sourceId": "web_search_1",
+      "claimIds": ["claim_double_chance"],
+      "snippet": "Main Prediction: Double Chance 1X (Ängelholm win or draw). Ängelholm's recent win against Rosengård provides momentum to finally secure points at home.",
+      "summary": "A web source predicts a double chance for Angelholms FF to win or draw, citing their recent win as a momentum builder.",
+      "confidence": 0.7,
       "metadata": {}
     },
-    {
-      "id": "evidence_4",
-      "sourceId": "source_4",
-      "claimIds": ["claim_3"],
-      "snippet": "btts, selection: yes, price: 1.65",
-      "summary": "Bookmakers have priced 'Both Teams to Score - Yes' as the favored outcome at odds of 1.65.",
+     {
+      "id": "evidence_double_chance_odds",
+      "sourceId": "provider_snapshot_odds",
+      "claimIds": ["claim_double_chance"],
+      "snippet": "Bet365 Double Chance Home/Draw: 1.33",
+      "summary": "The odds for Angelholms FF to win or draw are short (1.33), indicating a high probability.",
       "confidence": 0.85,
       "metadata": {}
     },
     {
-        "id": "evidence_5",
-        "sourceId": "source_1",
-        "claimIds": ["claim_3"],
-        "snippet": "The last meeting between the sides in March saw the Netherlands win 2-1.",
-        "summary": "Both teams scored in the most recent match between the two nations.",
-        "confidence": 0.8,
-        "metadata": {}
+      "id": "evidence_over_under_web",
+      "sourceId": "web_search_1",
+      "claimIds": ["claim_over_under"],
+      "snippet": "Goals Prediction: Over 2.5 Goals. Both teams have shown they can score but struggle to keep clean sheets.",
+      "summary": "A web source predicts over 2.5 goals, noting both teams' ability to score and their defensive weaknesses.",
+      "confidence": 0.75,
+      "metadata": {}
     },
     {
-        "id": "evidence_6",
-        "sourceId": "source_4",
-        "claimIds": ["claim_4"],
-        "snippet": "goals_over_under, selection: over, line: 2.5, price: 1.62",
-        "summary": "The odds for 'Over 2.5 goals' are around 1.62, indicating bookmakers expect a higher-scoring game.",
-        "confidence": 0.85,
-        "metadata": {}
+      "id": "evidence_over_under_odds",
+      "sourceId": "provider_snapshot_odds",
+      "claimIds": ["claim_over_under"],
+      "snippet": "Bet365 Over 2.5: 1.62, Pinnacle Over 2.5: 1.62",
+      "summary": "Bookmakers offer odds of 1.62 for over 2.5 goals, implying a probability of around 61.7%.",
+      "confidence": 0.8,
+      "metadata": {}
     },
     {
-        "id": "evidence_7",
-        "sourceId": "source_2",
-        "claimIds": ["claim_4"],
-        "snippet": "Final Score Prediction: Republic of Ireland 1-2 Netherlands",
-        "summary": "Web search predictions suggest a 2-1 final score, which is over 2.5 total goals.",
-        "confidence": 0.75,
-        "metadata": {}
+      "id": "evidence_btts_web",
+      "sourceId": "web_search_1",
+      "claimIds": ["claim_btts"],
+      "snippet": "BTTS (Both Teams to Score): There is a high probability (approx. 65%) of both teams finding the net given their recent defensive records.",
+      "summary": "A web source gives a high probability for both teams to score, based on their defensive records.",
+      "confidence": 0.7,
+      "metadata": {}
     },
     {
-        "id": "evidence_8",
-        "sourceId": "source_4",
-        "claimIds": ["claim_5"],
-        "snippet": "double_chance, selection: home_or_draw, price: 2.40",
-        "summary": "The odds for Republic of Ireland to get a result (win or draw) are high at 2.40, suggesting it's an unlikely outcome.",
-        "confidence": 0.9,
-        "metadata": {}
+      "id": "evidence_btts_odds",
+      "sourceId": "provider_snapshot_odds",
+      "claimIds": ["claim_btts"],
+      "snippet": "Bet365 BTTS Yes: 1.53",
+      "summary": "The odds for both teams to score are 1.53, suggesting it is a likely outcome.",
+      "confidence": 0.8,
+      "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim_1",
-      "statement": "Netherlands Women are the strong favorites to win the match against Republic of Ireland W.",
+      "id": "claim_h2h_home_win",
+      "statement": "Angelholms FF are the favorites to win the match.",
       "subject": {
         "type": "market",
-        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_1",
-        "evidence_2",
-        "evidence_3"
-      ],
+      "evidenceIds": ["evidence_h2h_odds"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_2",
-      "statement": "A win for Republic of Ireland W is unlikely given their key player suspensions and the opponent's strength.",
+      "id": "claim_h2h_balanced",
+      "statement": "The historical head-to-head record between the two teams is evenly balanced.",
       "subject": {
         "type": "market",
-        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_1", "evidence_2"],
+      "evidenceIds": ["evidence_h2h_web"],
       "conflictStatus": "none",
       "metadata": {}
     },
-    {
-      "id": "claim_3",
-      "statement": "It is likely that both teams will score during the match.",
+     {
+      "id": "claim_h2h_away_recent",
+      "statement": "BK Olympic won the last two matches against Angelholms FF.",
       "subject": {
         "type": "market",
-        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
-        "market": "btts"
+        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_4", "evidence_5"],
-      "conflictStatus": "none",
-      "metadata": {}
+      "evidenceIds": ["evidence_h2h_web"],
+      "conflictStatus": "conflict",
+      "metadata": {
+        "comment": "Conflicts with the claim that Angelholms FF are favorites."
+      }
     },
     {
-      "id": "claim_4",
-      "statement": "The total number of goals in the match is expected to be over 2.5.",
-      "subject": {
-        "type": "market",
-        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
-        "market": "goals_over_under"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_6", "evidence_7"],
-      "conflictStatus": "none",
-      "metadata": {}
+        "id": "claim_form",
+        "statement": "Both teams are in poor form, with Angelholms FF struggling at home and BK Olympic struggling away.",
+        "subject": {
+            "type": "team",
+            "id": "7ba8b784-6104-4006-9cf6-33ab65020975",
+            "teamName": "Angelholms FF"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_form_home_away"],
+        "conflictStatus": "none",
+        "metadata": {}
     },
     {
-      "id": "claim_5",
-      "statement": "The Netherlands are highly probable to at least draw the match.",
+      "id": "claim_double_chance",
+      "statement": "A win for Angelholms FF or a draw is a likely outcome.",
       "subject": {
         "type": "market",
-        "id": "581caf78-87b5-4f91-a0d8-7efbf250e62b",
+        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
         "market": "double_chance"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_8", "evidence_3"],
+      "evidenceIds": ["evidence_double_chance_web", "evidence_double_chance_odds"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_over_under",
+      "statement": "The match is likely to have over 2.5 goals.",
+      "subject": {
+        "type": "market",
+        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_over_under_web", "evidence_over_under_odds"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_btts",
+      "statement": "Both teams are likely to score.",
+      "subject": {
+        "type": "market",
+        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_btts_web", "evidence_btts_odds"],
       "conflictStatus": "none",
       "metadata": {}
     }
   ],
   "gateResult": {
-    "verdict": "promotable",
+    "verdict": "review-required",
     "reasons": [
-      "Structured research is well-supported by provider odds and external web search analysis.",
-      "Key player suspensions for Republic of Ireland are a significant factor identified in multiple sources, strongly influencing the market analysis.",
-      "Consensus between betting odds and external analysis on the likely outcomes (Netherlands win, BTTS, Over 2.5)."
+      "Research generated with sufficient evidence for most markets, but some required markets were skipped due to lack of data."
     ],
-    "warnings": []
+    "warnings": [
+       "No evidence was found for the corners_over_under market."
+    ]
   },
   "warnings": [],
   "metadata": {
-    "marketCoverage": {
-      "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
-      "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
-      "skippedMarkets": [{
-        "market": "corners_over_under",
-        "reason": "No available data or predictions for corner markets from provider snapshots or web search."
-      }]
-    }
+      "marketCoverage": {
+          "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
+          "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
+          "skippedMarkets": ["corners_over_under"]
+      }
   }
 }

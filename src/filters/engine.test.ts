@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AgentConfig } from '../config.js';
 import { DEFAULT_MARKETS } from '../domain/markets.js';
 import type { Fixture } from '../domain/fixtures.js';
-import { buildFixtureDiscoveryRequests, evaluateExclusions } from './engine.js';
+import { ApiFootballProviderError } from '../providers/sports/api-football-errors.js';
+import { buildFixtureDiscoveryRequests, discoverFixtures, evaluateExclusions } from './engine.js';
 
 function fixture(overrides: Partial<Fixture> = {}): Fixture {
   return {
@@ -52,6 +56,51 @@ describe('filter engine', () => {
       { league: 135, reason: 'included-by-default-league' },
       { league: 253, reason: 'included-by-default-league' },
     ]);
+  });
+
+  it('falls back to date-only discovery when default league requests are blocked by provider season access', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-fixture-discovery-'));
+    const leaguePresetsPath = join(dir, 'league-presets.json');
+    writeFileSync(leaguePresetsPath, JSON.stringify({
+      presetKey: 'test',
+      leagues: [{ id: '253', name: 'Major League Soccer', country: 'USA', enabled: true }],
+    }));
+    const calls: Array<{ league?: number; team?: number }> = [];
+    const fallbackFixture = fixture({
+      providerFixtureId: 'fallback-fixture',
+      leagueId: 999,
+      scheduledAt: '2026-06-07T12:00:00.000Z',
+    });
+
+    const result = await discoverFixtures({
+      ...config,
+      apiFootball: {
+        ...config.apiFootball,
+        leaguePresetsPath,
+      },
+    } as AgentConfig, {
+      date: '2026-06-07',
+      leaguesDefault: true,
+      fullDay: true,
+    }, undefined, {
+      listFixtures: async (_config, query) => {
+        calls.push({ league: query.league, team: query.team });
+        if (query.league !== undefined) {
+          throw new ApiFootballProviderError({
+            code: 'provider_unavailable',
+            endpointName: 'fixtures',
+            expected: 'API-Football response without provider errors.',
+            received: { plan: 'Free plans do not have access to this season, try from 2022 to 2024.' },
+          });
+        }
+        return [fallbackFixture];
+      },
+    });
+
+    assert.deepEqual(calls, [{ league: 253, team: undefined }, { league: undefined, team: undefined }]);
+    assert.equal(result.fixtures.length, 1);
+    assert.equal(result.fixtures[0]?.providerFixtureId, 'fallback-fixture');
+    assert.deepEqual(result.evaluations[0]?.includedReasons, ['included-by-manual-query']);
   });
 
   it('keeps scheduled fixtures inside the kickoff window', () => {

@@ -7,9 +7,11 @@ HERMES_SCRIPTS_DIR="${HERMES_SCRIPTS_DIR:-$HOME/.hermes/scripts}"
 
 VALIDATION_JOB_NAME="${GANA_VALIDATION_CRON_NAME:-gana-v9-validate-yesterday-discord}"
 DAILY_JOB_NAME="${GANA_DAILY_CRON_NAME:-gana-v9-daily-e2e-discord}"
+DAILY_CATCHUP_JOB_NAME="${GANA_DAILY_CATCHUP_CRON_NAME:-gana-v9-daily-e2e-catchup-discord}"
 STRATEGY_REVIEW_JOB_NAME="${GANA_STRATEGY_REVIEW_CRON_NAME:-gana-v9-strategy-review}"
 VALIDATION_SCHEDULE="${GANA_VALIDATION_CRON_SCHEDULE:-0 7 * * *}"
 DAILY_SCHEDULE="${GANA_DAILY_CRON_SCHEDULE:-15 10 * * *}"
+DAILY_CATCHUP_SCHEDULE="${GANA_DAILY_CATCHUP_CRON_SCHEDULE:-*/30 10-22 * * *}"
 STRATEGY_REVIEW_SCHEDULE="${GANA_STRATEGY_REVIEW_CRON_SCHEDULE:-0 13 * * *}"
 
 require_command() {
@@ -63,6 +65,7 @@ strategy_review_wrapper="$(write_wrapper gana_v9_strategy_review.sh "$REPO_ROOT/
 
 create_job_if_missing "$VALIDATION_JOB_NAME" "$VALIDATION_SCHEDULE" "$validation_wrapper"
 create_job_if_missing "$DAILY_JOB_NAME" "$DAILY_SCHEDULE" "$daily_wrapper"
+create_job_if_missing "$DAILY_CATCHUP_JOB_NAME" "$DAILY_CATCHUP_SCHEDULE" "$daily_wrapper"
 create_job_if_missing "$STRATEGY_REVIEW_JOB_NAME" "$STRATEGY_REVIEW_SCHEDULE" "$strategy_review_wrapper"
 
-hermes cron list | grep -A5 -E "Name:      ($VALIDATION_JOB_NAME|$DAILY_JOB_NAME|$STRATEGY_REVIEW_JOB_NAME)" || true
+hermes cron list | grep -A5 -E "Name:      ($VALIDATION_JOB_NAME|$DAILY_JOB_NAME|$DAILY_CATCHUP_JOB_NAME|$STRATEGY_REVIEW_JOB_NAME)" || true

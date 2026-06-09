@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
@@ -20,6 +20,7 @@ const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
 const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
 const notBefore = args.notBefore ?? process.env.GANA_DAILY_E2E_NOT_BEFORE ?? '10:15';
+const retryDelayMs = positiveMinutes(process.env.GANA_DAILY_EMPTY_RETRY_MINUTES, 120) * 60 * 1000;
 if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
   throw new Error('--provider-concurrency must be a positive integer.');
 }
@@ -41,8 +42,22 @@ if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
   }, null, 2));
   process.exit(0);
 }
-if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, dailyBatchId, startedAt: new Date().toISOString() })) {
-  console.log(JSON.stringify({ ok: true, skipped: true, reason: 'daily-e2e already ran or is running for this date', date, dailyBatchId, lockPath }, null, 2));
+let acquiredRunLock = false;
+const existingRunLock = !args.force && existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
+if (!args.force) {
+  acquiredRunLock = acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, dailyBatchId, status: 'running', startedAt: new Date().toISOString() });
+}
+if (!args.force && !acquiredRunLock) {
+  const retryAfter = typeof existingRunLock?.retryAfter === 'string' ? existingRunLock.retryAfter : undefined;
+  console.log(JSON.stringify({
+    ok: true,
+    skipped: true,
+    reason: retryAfter ? 'daily-e2e retry pending after empty or failed run' : 'daily-e2e already ran or is running for this date',
+    date,
+    dailyBatchId,
+    lockPath,
+    ...(retryAfter ? { retryAfter } : {}),
+  }, null, 2));
   process.exit(0);
 }
 const startedAt = new Date();
@@ -78,6 +93,7 @@ const env = {
 };
 
 const logFd = openSync(logPath, 'a');
+let sentRecommendations = false;
 try {
   let handled = false;
   writeLogLine(logFd, `started ${startedAt.toISOString()} ${command.join(' ')}`);
@@ -90,7 +106,8 @@ try {
   writeLogLine(logFd, `completed ${completedAt.toISOString()} status=${result.status} signal=${result.signal ?? 'none'}`);
   if (result.error) writeLogLine(logFd, `error ${result.error.message}`);
 
-  if (existsSync(recommendationsPath)) {
+  const selectionCount = existsSync(recommendationsPath) ? recommendationSelectionCount(recommendationsPath) : 0;
+  if (existsSync(recommendationsPath) && selectionCount > 0) {
     const notify = spawnSync('node', [
       '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs',
       '--artifact', recommendationsPath,
@@ -106,6 +123,7 @@ try {
     writeLogLine(logFd, notify.stdout.trim());
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
+    sentRecommendations = true;
     console.log(notify.stdout.trim());
     const councilNotify = spawnSync('node', [
       'scripts/gana-council-review-notify.mjs',
@@ -128,6 +146,9 @@ try {
     process.exitCode = 0;
     handled = true;
   }
+  if (existsSync(recommendationsPath) && selectionCount === 0) {
+    writeLogLine(logFd, `recommendations artifact contains zero selections; sending operational alert instead of empty Discord recommendations: ${recommendationsPath}`);
+  }
 
   if (!handled) {
     const latest = existsSync(recommendationsPath) ? recommendationsPath : findLatestRecommendations(date);
@@ -146,6 +167,18 @@ try {
     process.exitCode = result.status ?? 1;
   }
 } finally {
+  if (acquiredRunLock && !sentRecommendations) {
+    const retryAfter = new Date(Date.now() + retryDelayMs).toISOString();
+    writeRetryableLock(lockPath, {
+      date,
+      dailyBatchId,
+      status: 'retryable',
+      retryAfter,
+      updatedAt: new Date().toISOString(),
+      reason: 'daily-e2e produced no Discord recommendations',
+    });
+    writeLogLine(logFd, `daily-e2e lock marked retryable until ${retryAfter}`);
+  }
   closeSync(logFd);
 }
 
@@ -174,9 +207,19 @@ function parseArgs(argv) {
 function acquireOnce(path, ttlMs, payload) {
   mkdirSync(dirname(path), { recursive: true });
   if (existsSync(path)) {
-    const ageMs = Date.now() - statSync(path).mtimeMs;
-    if (ageMs < ttlMs) return false;
-    rmSync(path, { force: true });
+    const lock = readJsonFile(path);
+    if (typeof lock?.retryAfter === 'string') {
+      const retryAtMs = Date.parse(lock.retryAfter);
+      if (Number.isFinite(retryAtMs) && retryAtMs <= Date.now()) {
+        rmSync(path, { force: true });
+      } else {
+        return false;
+      }
+    } else {
+      const ageMs = Date.now() - statSync(path).mtimeMs;
+      if (ageMs < ttlMs) return false;
+      rmSync(path, { force: true });
+    }
   }
   let fd;
   try {
@@ -191,6 +234,25 @@ function acquireOnce(path, ttlMs, payload) {
     closeSync(fd);
   }
   return true;
+}
+
+function writeRetryableLock(path, payload) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function readJsonFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return undefined;
+  }
+}
+
+function positiveMinutes(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
 }
 
 function guatemalaDate(offsetDays) {
@@ -236,6 +298,17 @@ function requireValue(argv, index, flag) {
 function writeLogLine(fd, line) {
   if (!line) return;
   writeSync(fd, `${line}\n`);
+}
+
+function recommendationSelectionCount(path) {
+  try {
+    const artifact = JSON.parse(readFileSync(path, 'utf8'));
+    if (Array.isArray(artifact.recommendations)) return artifact.recommendations.length;
+    if (Array.isArray(artifact.selections)) return artifact.selections.length;
+    return 0;
+  } catch {
+    return 0;
+  }
 }
 
 function findLatestRecommendations(date) {

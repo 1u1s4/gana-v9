@@ -6,6 +6,7 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 
 - `07:00` Guatemala: validar el dia anterior contra el artifact de recomendaciones publicado, recalcular daily metrics solo de picks publicados y notificar estadisticas a Discord.
 - `10:15` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, council gate, y notificar recomendaciones/parlays a Discord.
+- `10:00-22:30` Guatemala, cada 30 minutos: catch-up idempotente del Daily E2E. Si el equipo estuvo dormido a las `10:15`, el wrapper vuelve a intentar al despertar; si el daily ya corrio, el lock diario evita duplicados.
 - `13:00` Guatemala: correr strategy review del dia anterior cerrado, usando Codex GPT-5.5 con reasoning X-High, y actualizar el log central de mejoras del Harness.
 
 ## Scripts operativos
@@ -111,10 +112,13 @@ Esto crea wrappers bajo `~/.hermes/scripts/` y registra tres jobs `--no-agent`:
 ```text
 gana-v9-validate-yesterday-discord  0 7 * * *
 gana-v9-daily-e2e-discord           15 10 * * *
+gana-v9-daily-e2e-catchup-discord   */30 10-22 * * *
 gana-v9-strategy-review             0 13 * * *
 ```
 
 Hermes cron muestra los `Next run` en la zona local configurada; en este host debe verse con offset `-06:00`.
+
+El fallback de sistema instalado por `scripts/install-gana-cron.mjs` agrega una segunda linea `*/30 10-22 * * *` para el Daily E2E. Esa linea existe para recuperar ejecuciones perdidas por sleep/darkwake; no debe duplicar publicaciones porque `scripts/gana-daily-e2e-and-notify.mjs` aplica guard de hora minima y lock por fecha. Si un intento produce cero selecciones, el wrapper no envia recomendaciones vacias y marca el lock como retryable para un nuevo catch-up posterior.
 
 Comando equivalente manual:
 
@@ -128,6 +132,13 @@ hermes cron create "0 7 * * *" \
 
 hermes cron create "15 10 * * *" \
   --name gana-v9-daily-e2e-discord \
+  --deliver origin \
+  --script gana_v9_daily_e2e_notify.sh \
+  --no-agent \
+  --workdir /Users/luisalvarado/Documents/GitHub/gana-v9
+
+hermes cron create "*/30 10-22 * * *" \
+  --name gana-v9-daily-e2e-catchup-discord \
   --deliver origin \
   --script gana_v9_daily_e2e_notify.sh \
   --no-agent \
