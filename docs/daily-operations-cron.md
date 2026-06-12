@@ -5,7 +5,7 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 ## Horarios
 
 - `07:00` Guatemala: validar el dia anterior contra el artifact de recomendaciones publicado, recalcular daily metrics solo de picks publicados y notificar estadisticas a Discord.
-- `10:15` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con los 3 enfoques diarios (`parlay-diamante`, `parlay-refinado`, `low-variance`), council gate, y notificar recomendaciones/parlays a Discord.
+- `10:15` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con los 3 enfoques diarios (`parlay-diamante`, `parlay-refinado`, `low-variance`), addendum de ligas obligatorias, council gate, y notificar recomendaciones/parlays a Discord.
 - `10:00-22:30` Guatemala, cada 30 minutos: catch-up idempotente del Daily E2E. Si el equipo estuvo dormido a las `10:15`, el wrapper vuelve a intentar al despertar; si el daily ya corrio, el lock diario evita duplicados.
 - `13:00` Guatemala: correr strategy review del dia anterior cerrado, usando Codex GPT-5.5 con reasoning X-High, y actualizar el log central de mejoras del Harness.
 
@@ -35,14 +35,15 @@ scripts/gana-daily-e2e-notify.sh
 Este script:
 
 1. Calcula manana en `America/Guatemala`.
-2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --web live --parlay-profile portfolio-v2`.
+2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026`.
 3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`, `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES=10000`) para cubrir el universo diario disponible y low-odds elegibles.
 4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto; low-odds cubre `h2h` casa/visitante y `double_chance` `home_or_draw`/`draw_or_away` dentro del umbral.
 5. Genera `portfolio-v2`, que publica como enfoques diarios `parlay-diamante`, `parlay-refinado` y `low-variance` cuando sobreviven las compuertas.
-6. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
-7. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
-8. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
-9. Envia `daily-parlay-recommendations.json` al canal de recomendaciones y el resumen accionable del council al canal de council con embeds nativos usando Hermes gateway.
+6. Genera `daily-required-league-recommendations.json` para ligas obligatorias; por defecto World Cup `1:World Cup:World:2026`. Este addendum audita cada fixture requerido, produce proyecciones atomicas cuando hay picks no bloqueados y marca los 3 enfoques de parlay como `selected` o `blocked` con razones.
+7. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
+8. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
+9. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
+10. Envia `daily-parlay-recommendations.json` al canal de recomendaciones y el resumen accionable del council al canal de council con embeds nativos usando Hermes gateway.
 
 Strategy review del dia anterior:
 
@@ -85,6 +86,7 @@ Variables utiles:
 - `GANA_DAILY_CODEX_MODEL`: default `gpt-5.5`.
 - `GANA_DAILY_GEMINI_MODEL`: default `gemini-3.1-pro`.
 - `GANA_DAILY_PROVIDER_CONCURRENCY`: default `2`.
+- `GANA_DAILY_REQUIRED_LEAGUES`: default `1:World Cup:World:2026`; acepta lista separada por comas en formato `leagueId:name:country:season`, o `off` para desactivar el addendum obligatorio.
 - `GANA_WEB_MODE`: default `live`.
 - `GANA_PARLAY_PROFILE`: default `portfolio-v2`; genera `parlay-diamante`, `parlay-refinado`, `parlay-all-in`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`; la publicacion diaria prioriza `parlay-diamante`, `parlay-refinado` y `low-variance`.
 - `AGENT_CODEX_FALLBACK_MODELS`: default cron `gpt-5.4-mini`.

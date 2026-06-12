@@ -43,7 +43,14 @@ export interface RunPipelineInput {
   web?: ResearchWebMode;
   validate?: PipelineValidationMode;
   markets?: MarketKey[];
+  priorityLeagues?: PipelinePriorityLeague[];
   metadata?: Record<string, unknown>;
+}
+
+export interface PipelinePriorityLeague {
+  providerCompetitionId: string;
+  name?: string | null;
+  season?: number | null;
 }
 
 export interface OddsSnapshotView {
@@ -506,10 +513,13 @@ export async function executeRunPipeline(
     lowOddsHitFixtures,
     fixtureDiscovery.fixtures,
   );
-  const localDateSelectedFixtures = mergedSelectedFixtures.filter((fixture) => (
+  const localDateEligibleFixtures = mergedSelectedFixtures.filter((fixture) => (
     fixtureLocalDateKey(fixture.scheduledAt, config.apiFootball.timezone) === input.date
   ));
-  const localDateExcludedFixtures = mergedSelectedFixtures.length - localDateSelectedFixtures.length;
+  const localDateExcludedFixtures = mergedSelectedFixtures.length - localDateEligibleFixtures.length;
+  const priorityLeagues = input.priorityLeagues ?? [];
+  const priorityFixtureCount = localDateEligibleFixtures.filter((fixture) => fixturePriorityIndex(fixture, priorityLeagues) !== null).length;
+  const localDateSelectedFixtures = prioritizeFixtureSlate(localDateEligibleFixtures, priorityLeagues);
   const selectedFixtureLimit = Math.max(1, config.apiFootball.maxFixturesPerRun);
   const selectedFixtures = localDateSelectedFixtures.slice(0, selectedFixtureLimit);
   const selectionCapped = localDateSelectedFixtures.length > selectedFixtures.length;
@@ -533,6 +543,8 @@ export async function executeRunPipeline(
     mergedFixtures: mergedSelectedFixtures.length,
     localDateEligibleFixtures: localDateSelectedFixtures.length,
     localDateExcludedFixtures,
+    priorityLeagues,
+    priorityFixtures: priorityFixtureCount,
     selectedFixtures: selectedFixtures.length,
     agenticFixtures: agenticFixtures.length,
     maxFixturesPerRun: selectedFixtureLimit,
@@ -591,6 +603,12 @@ export async function executeRunPipeline(
     return payload;
   });
   const research: FixtureResearchResult[] = researchPayload.results;
+  const researchBundleByProviderFixtureId = new Map(
+    research.flatMap((result) => {
+      const bundle = result.bundle;
+      return bundle?.providerFixtureId ? [[bundle.providerFixtureId, bundle] as const] : [];
+    }),
+  );
   steps.push(summarizeResultStep('research', research.map((result) => ({
     ok: result.ok,
     verdict: result.gateResult.verdict,
@@ -609,6 +627,7 @@ export async function executeRunPipeline(
             fixtureId: fixture.providerFixtureId,
             web: input.web ?? defaultWebMode(config),
             markets: marketScope,
+            researchBundle: researchBundleByProviderFixtureId.get(fixture.providerFixtureId),
             signal,
           }, runtime)),
           AGENT_FIXTURE_TIMEOUT_MS,
@@ -1515,6 +1534,36 @@ function mergeFixtureSlates(primary: Fixture[], secondary: Fixture[]): Fixture[]
   const merged = new Map<string, Fixture>();
   for (const fixture of [...primary, ...secondary]) merged.set(fixture.providerFixtureId, fixture);
   return [...merged.values()];
+}
+
+function prioritizeFixtureSlate(fixtures: Fixture[], priorityLeagues: readonly PipelinePriorityLeague[]): Fixture[] {
+  if (!priorityLeagues.length || fixtures.length < 2) return fixtures;
+  return fixtures
+    .map((fixture, index) => ({ fixture, index, priorityIndex: fixturePriorityIndex(fixture, priorityLeagues) }))
+    .sort((a, b) => {
+      if (a.priorityIndex === null && b.priorityIndex === null) return a.index - b.index;
+      if (a.priorityIndex === null) return 1;
+      if (b.priorityIndex === null) return -1;
+      return a.priorityIndex - b.priorityIndex || a.index - b.index;
+    })
+    .map((item) => item.fixture);
+}
+
+function fixturePriorityIndex(fixture: Fixture, priorityLeagues: readonly PipelinePriorityLeague[]): number | null {
+  const index = priorityLeagues.findIndex((league) => fixtureMatchesPriorityLeague(fixture, league));
+  return index === -1 ? null : index;
+}
+
+function fixtureMatchesPriorityLeague(fixture: Fixture, league: PipelinePriorityLeague): boolean {
+  const providerCompetitionId = String(league.providerCompetitionId ?? '').trim();
+  if (!providerCompetitionId) return false;
+  const idMatches = String(fixture.leagueId ?? fixture.competitionId ?? '') === providerCompetitionId;
+  const nameMatches = league.name && fixture.competitionName
+    ? fixture.competitionName.trim().toLowerCase() === league.name.trim().toLowerCase()
+    : false;
+  if (!idMatches && !nameMatches) return false;
+  if (league.season !== null && league.season !== undefined && fixture.season !== undefined && fixture.season !== league.season) return false;
+  return true;
 }
 
 function summarizeResultStep(

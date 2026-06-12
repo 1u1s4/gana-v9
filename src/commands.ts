@@ -57,7 +57,7 @@ import { runValidation, type RunValidationInput, type ValidationRunResult } from
 import type { ResearchWebMode } from './prediction/prompts.js';
 import { runCertification } from './evals/runner.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from './metrics/daily.js';
-import { runDailyE2E, type DailyE2ERunResult, type DailyE2EProvider, type DailyParlayProfile } from './daily/e2e.js';
+import { runDailyE2E, type DailyE2ERunResult, type DailyE2EProvider, type DailyParlayProfile, type DailyRequiredLeagueInput } from './daily/e2e.js';
 import { runStrategyReview, type StrategyReviewResult } from './strategy-review/daily.js';
 
 const DIM = '\x1b[2m';
@@ -564,6 +564,29 @@ function optionalDailyParlayProfileFlag(flags: Record<string, string | true>): D
   throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, parlay-oro, parlay-diamante, parlay-all-in, parlay-refinado, or portfolio-v2.');
 }
 
+function optionalDailyRequiredLeaguesFlag(flags: Record<string, string | true>): DailyRequiredLeagueInput[] | undefined {
+  const value = optionalStringFlag(flags, 'required-leagues');
+  if (value === undefined) return undefined;
+  if (/^(off|false|none|disabled|0)$/i.test(value)) return [];
+  return value.split(',')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => {
+      const [providerCompetitionId, name, country, seasonText] = token.split(':').map((part) => part.trim());
+      if (!providerCompetitionId) throw new Error('--required-leagues entries must include a provider league id.');
+      const season = seasonText ? Number(seasonText) : null;
+      if (season !== null && (!Number.isInteger(season) || season < 1900)) {
+        throw new Error('--required-leagues season must be a four-digit year.');
+      }
+      return {
+        providerCompetitionId,
+        ...(name ? { name } : {}),
+        ...(country ? { country } : {}),
+        ...(season !== null ? { season } : {}),
+      };
+    });
+}
+
 function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] } {
   return {
     date: requireDateFlag(flags),
@@ -694,6 +717,7 @@ async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, 
     validate: optionalRunValidationMode(flags) as DailyE2EValidationMode | undefined,
     markets: optionalMarketsFlag(flags),
     parlayProfile: optionalDailyParlayProfileFlag(flags),
+    requiredLeagues: optionalDailyRequiredLeaguesFlag(flags),
     persistMetrics,
     dailyBatchId: optionalStringFlag(flags, 'daily-batch-id'),
   }, ctx.runtime);
@@ -2184,7 +2208,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-3.1-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-3.1-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

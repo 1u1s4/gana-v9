@@ -1,143 +1,105 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "ec170c4d-96dd-4bf4-b858-2397c894bdd4",
+      "oddsQuoteId": "aca2ec36-571c-41b9-b8b3-24704bdf0ea5",
       "market": "h2h",
-      "selection": "away",
+      "selection": "home",
       "line": null,
-      "odds": 1.85,
-      "probability": 0.60,
-      "modelProbability": 0.60,
-      "marketFairProbability": 0.501237,
-      "edge": 0.098763,
+      "odds": 1.12,
+      "probability": 0.85,
+      "modelProbability": 0.85,
+      "marketFairProbability": 0.815558,
+      "edge": 0.034442,
       "confidence": 0.90,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_2",
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_h2h_away",
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_h2h_home"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_h2h_odds",
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_forebet_trends"
       ],
       "claimIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_h2h_away_win"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_h2h_home_favored"
       ],
-      "rationale": "Bray Wanderers are in strong form and are favored to win, as supported by web search predictions and favorable odds from bookmakers.",
+      "rationale": "Santos U20 are clear pre-match favorites based on Bet365 pricing and corroborating web trends, showing recent wins over Jabaquara U20.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "fee991b1-19d6-44d1-a3cd-a50050ee08a7",
+      "oddsQuoteId": "5ed7b9d7-c240-4e36-96bc-10a5fd74262d",
       "market": "double_chance",
-      "selection": "draw_or_away",
+      "selection": "home_or_draw",
       "line": null,
-      "odds": 1.22,
-      "probability": 0.85,
-      "modelProbability": 0.85,
-      "marketFairProbability": 0.375,
-      "edge": 0.475,
+      "odds": 1.01,
+      "probability": 0.98,
+      "modelProbability": 0.98,
+      "marketFairProbability": 0.468063,
+      "edge": 0.511937,
       "confidence": 0.90,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_double_chance_draw_or_away"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_double_chance_odds"
       ],
       "claimIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_double_chance_draw_or_away"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_double_chance_home_or_draw_short"
       ],
-      "rationale": "Bray Wanderers' strong form and favorite status make a draw or away win highly probable.",
+      "rationale": "The market strongly expects Santos U20 to avoid defeat, with home_or_draw priced extremely short at 1.01.",
       "warnings": [
-        "Market fair probability for double chance draw_or_away seems unusually low compared to implied probability."
+        "High overround in double chance market suggests potential inefficiency or low liquidity exaggeration."
       ]
     },
     {
-      "oddsQuoteId": "2cff94ea-3672-4aa4-8ccc-f9583dfcc28e",
+      "oddsQuoteId": "6da69677-446c-44ab-9778-324923931141",
       "market": "goals_over_under",
       "selection": "over",
       "line": 2.5,
-      "odds": 1.71,
-      "probability": 0.65,
-      "modelProbability": 0.65,
-      "marketFairProbability": 0.551316,
-      "edge": 0.098684,
-      "confidence": 0.85,
-      "confidenceBand": "high",
+      "odds": 1.4,
+      "probability": 0.70,
+      "modelProbability": 0.70,
+      "marketFairProbability": 0.662651,
+      "edge": 0.037349,
+      "confidence": 0.80,
+      "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_goals_over_2_5"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_goals_odds",
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_forebet_trends"
       ],
       "claimIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_goals_over_2_5"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_goals_over_2_5_favored"
       ],
-      "rationale": "Web search predicts a 1-2 score, implying 3 goals, and Bray Wanderers average 2.0 goals per match, supporting over 2.5 goals.",
+      "rationale": "Over 2.5 goals is favored by the odds and consistent with Santos U20's recent scoring trends reported online.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "82bcc589-67ae-427c-a94f-4c9673ed68ca",
-      "market": "btts",
-      "selection": "yes",
-      "line": null,
-      "odds": 1.62,
-      "probability": 0.68,
-      "modelProbability": 0.68,
-      "marketFairProbability": 0.575916,
-      "edge": 0.104084,
-      "confidence": 0.90,
-      "confidenceBand": "high",
+      "oddsQuoteId": "27918b15-05de-4162-98ef-ad542949083d",
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 10.5,
+      "odds": 1.73,
+      "probability": 0.55,
+      "modelProbability": 0.55,
+      "marketFairProbability": 0.536193,
+      "edge": 0.013807,
+      "confidence": 0.60,
+      "confidenceBand": "low",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_btts_yes"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_corners_odds",
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_forebet_trends"
       ],
       "claimIds": [
-        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_btts_yes"
+        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_corners_over_10_5_slight_favored"
       ],
-      "rationale": "Web search analysis indicates Both Teams To Score is a strong possibility, despite Treaty's struggles, as they often score at home.",
+      "rationale": "Over 10.5 corners is slightly favored by the odds, with limited supporting web-reported corner averages.",
       "warnings": []
     }
   ],
   "warnings": [
-    "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+    "market btts skipped/review-required: missing odds quotes for requested market"
   ],
-  "metadata": {
-    "promptVersion": "score-prediction-v2",
-    "runId": "71a88125-2c4b-4a45-ad32-0053eb70db06",
-    "createdAt": "2026-06-11T14:13:19.025Z",
-    "webMode": "live",
-    "marketCoverage": {
-      "warnings": [
-        "market corners_over_under skipped/review-required: missing odds quotes for requested market"
-      ],
-      "quotedMarkets": [
-        "btts",
-        "double_chance",
-        "goals_over_under",
-        "h2h"
-      ],
-      "skippedMarkets": [
-        {
-          "market": "corners_over_under",
-          "reason": "missing odds quotes for requested market"
-        }
-      ],
-      "evidenceMarkets": [
-        "btts",
-        "double_chance",
-        "goals_over_under",
-        "h2h"
-      ],
-      "requiredMarkets": [
-        "h2h",
-        "double_chance",
-        "goals_over_under",
-        "corners_over_under",
-        "btts"
-      ]
-    }
-  }
+  "metadata": {}
 }

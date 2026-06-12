@@ -30,6 +30,7 @@ import type {
   SourceRecordRecord,
   StoragePrismaClient,
 } from '../storage/types.js';
+import type { ResearchBundle } from '../evidence/types.js';
 import { aggregatePredictionGate, evaluateEvidenceGate, evaluatePredictionGates } from './gates.js';
 import { buildAtomicPrediction, qualityFromConfidence, scorePredictionCandidate } from './scoring.js';
 import { SCORE_PREDICTION_PROMPT_VERSION, buildScorePredictionPrompt, type ResearchWebMode } from './prompts.js';
@@ -53,6 +54,7 @@ export interface RunFixtureScoringInput {
   fixtureId: string;
   web?: ResearchWebMode;
   markets?: MarketKey[];
+  researchBundle?: ResearchBundle;
   signal?: AbortSignal;
 }
 
@@ -250,17 +252,17 @@ export async function runFixtureScoring(
   }
 
   const web = input.web ?? 'off';
-  let research = await latestResearchGraph(repositories, fixture.id);
+  let research = researchGraphFromBundle(input.researchBundle, fixture) ?? await latestResearchGraph(repositories, fixture.id);
   let webSearchCoverage = buildScoringWebSearchCoverage(research.sources, web, now(), config.provider);
   if (web === 'live' && !webSearchCoverage.ok) {
     if (deps.researchFixture) {
-      await deps.researchFixture(config, {
+      const refreshed = await deps.researchFixture(config, {
         fixtureId: fixture.providerFixtureId,
         web: 'live',
         markets: marketScope,
         signal: input.signal,
       }, runtime);
-      research = await latestResearchGraph(repositories, fixture.id);
+      research = researchGraphFromBundle(refreshed.bundle, fixture) ?? await latestResearchGraph(repositories, fixture.id);
       webSearchCoverage = buildScoringWebSearchCoverage(research.sources, web, now(), config.provider);
     }
     if (!webSearchCoverage.ok) {
@@ -634,6 +636,126 @@ async function latestResearchGraph(repositories: PredictionServiceRepositories, 
     repositories.claims.list({ bundleId: researchBundle.id, take: 500 }),
   ]);
   return { researchBundle, sources, evidenceItems, claims };
+}
+
+function researchGraphFromBundle(bundle: ResearchBundle | undefined, fixture: FixtureRecord): Awaited<ReturnType<typeof latestResearchGraph>> | null {
+  if (!bundle) return null;
+  if (bundle.fixtureId !== fixture.id || bundle.providerFixtureId !== fixture.providerFixtureId) return null;
+
+  const createdAt = dateValue(bundle.createdAt) ?? new Date();
+  const updatedAt = createdAt;
+  const bundleRecord: ResearchBundleRecord = {
+    id: bundle.id,
+    runId: bundle.runId,
+    fixtureId: bundle.fixtureId,
+    providerFixtureId: bundle.providerFixtureId,
+    artifactId: null,
+    status: bundle.gateResult.verdict,
+    gateResult: bundle.gateResult as JsonValue,
+    providerAgentic: bundle.providerAgentic,
+    model: bundle.model,
+    promptVersion: bundle.promptVersion,
+    warnings: bundle.warnings as JsonValue,
+    metadata: (bundle.metadata ?? null) as JsonValue | null,
+    createdAt,
+    updatedAt,
+  };
+
+  const sourceIdMap = new Map<string, string>();
+  const sources: SourceRecordRecord[] = bundle.sources.map((source) => {
+    const localId = String(source.id);
+    const id = scopedResearchId(bundle.id, localId);
+    sourceIdMap.set(localId, id);
+    return {
+      id,
+      bundleId: bundle.id,
+      runId: bundle.runId,
+      fixtureId: bundle.fixtureId,
+      artifactId: null,
+      providerSnapshotId: source.snapshotId ?? null,
+      sourceType: source.type,
+      url: source.url ?? null,
+      title: source.title ?? null,
+      externalId: source.externalId ?? source.snapshotId ?? source.artifactPath ?? null,
+      hash: source.hash ?? null,
+      capturedAt: dateValue(source.capturedAt) ?? createdAt,
+      warnings: null,
+      metadata: compactJson({
+        ...(source.metadata ?? {}),
+        artifactPath: source.artifactPath,
+        snapshotId: source.snapshotId,
+      }),
+      createdAt,
+    };
+  });
+
+  const evidenceSourceIds = new Map<string, string>();
+  const evidenceItems: EvidenceItemRecord[] = bundle.evidenceItems.map((evidence) => {
+    const localId = String(evidence.id);
+    const id = scopedResearchId(bundle.id, localId);
+    const sourceId = sourceIdMap.get(String(evidence.sourceId)) ?? String(evidence.sourceId);
+    evidenceSourceIds.set(localId, sourceId);
+    evidenceSourceIds.set(id, sourceId);
+    return {
+      id,
+      bundleId: bundle.id,
+      sourceId,
+      fixtureId: bundle.fixtureId,
+      artifactId: null,
+      kind: null,
+      snippetRedacted: evidence.snippet ?? null,
+      summaryRedacted: evidence.summary,
+      confidence: evidence.confidence,
+      claimIds: evidence.claimIds.map((claimId) => scopedResearchId(bundle.id, String(claimId))) as JsonValue,
+      warnings: null,
+      metadata: (evidence.metadata ?? null) as JsonValue | null,
+      createdAt,
+      updatedAt,
+    };
+  });
+
+  const claims: ClaimRecord[] = bundle.claims.map((claim) => {
+    const evidenceIds = claim.evidenceIds.map((evidenceId) => scopedResearchId(bundle.id, String(evidenceId)));
+    const marketKey = claim.subject.type === 'market' && typeof claim.subject.market === 'string'
+      ? claim.subject.market
+      : null;
+    return {
+      id: scopedResearchId(bundle.id, String(claim.id)),
+      bundleId: bundle.id,
+      fixtureId: bundle.fixtureId,
+      sourceId: firstEvidenceSourceId(evidenceIds, evidenceSourceIds),
+      statement: claim.statement,
+      subjectType: claim.subject.type,
+      subjectKey: claim.subject.id ?? claim.subject.market ?? null,
+      marketKey,
+      selectionKey: null,
+      line: null,
+      supportLevel: claim.supportLevel,
+      confidence: null,
+      evidenceIds: evidenceIds as JsonValue,
+      conflictStatus: claim.conflictStatus,
+      critical: false,
+      warnings: null,
+      metadata: (claim.metadata ?? null) as JsonValue | null,
+      createdAt,
+      updatedAt,
+    };
+  });
+
+  return { researchBundle: bundleRecord, sources, evidenceItems, claims };
+}
+
+function scopedResearchId(bundleId: string, localId: string): string {
+  const scoped = `${bundleId}:${localId}`;
+  return scoped.length <= 120 ? scoped : scoped.slice(0, 120);
+}
+
+function firstEvidenceSourceId(evidenceIds: string[], evidenceSourceIds: Map<string, string>): string | null {
+  for (const evidenceId of evidenceIds) {
+    const sourceId = evidenceSourceIds.get(evidenceId);
+    if (sourceId) return sourceId;
+  }
+  return null;
 }
 
 function buildScoringWebSearchCoverage(

@@ -18,6 +18,7 @@ const codexModel = args.codexModel ?? process.env.GANA_DAILY_CODEX_MODEL;
 const geminiModel = args.geminiModel ?? process.env.GANA_DAILY_GEMINI_MODEL;
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
+const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026';
 const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
 const notBefore = args.notBefore ?? process.env.GANA_DAILY_E2E_NOT_BEFORE ?? '10:15';
 const retryDelayMs = positiveMinutes(process.env.GANA_DAILY_EMPTY_RETRY_MINUTES, 120) * 60 * 1000;
@@ -70,6 +71,7 @@ const command = [
   '--threshold', String(args.threshold ?? 1.2),
   '--web', webMode,
   '--parlay-profile', parlayProfile,
+  '--required-leagues', requiredLeagues,
   '--daily-batch-id', dailyBatchId,
 ];
 if (codexModel) command.push('--codex-model', codexModel);
@@ -85,6 +87,7 @@ const env = {
   AGENT_NATIVE_WEB_SEARCH_MODE: process.env.AGENT_NATIVE_WEB_SEARCH_MODE ?? 'live',
   GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,
   GANA_DAILY_PROVIDER_CONCURRENCY: process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? String(providerConcurrency),
+  GANA_DAILY_REQUIRED_LEAGUES: process.env.GANA_DAILY_REQUIRED_LEAGUES ?? requiredLeagues,
   GANA_LOW_ODDS_THRESHOLD: process.env.GANA_LOW_ODDS_THRESHOLD ?? String(args.threshold ?? 1.2),
   GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES: process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? process.env.GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? '10000',
   GANA_MAX_FIXTURES_PER_RUN: process.env.GANA_MAX_FIXTURES_PER_RUN ?? '10000',
@@ -195,6 +198,7 @@ function parseArgs(argv) {
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
+    else if (arg === '--required-leagues') parsed.requiredLeagues = requireValue(argv, ++index, arg);
     else if (arg === '--web') parsed.web = requireValue(argv, ++index, arg);
     else if (arg === '--not-before') parsed.notBefore = requireValue(argv, ++index, arg);
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));

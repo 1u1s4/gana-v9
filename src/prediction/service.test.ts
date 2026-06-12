@@ -219,6 +219,90 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted, false);
   });
 
+  it('uses an explicit fresh research bundle for live scoring before falling back to repository lookup', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let agentCalled = false;
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, {
+      fixtureId: '1001',
+      web: 'live',
+      markets: ['h2h'],
+      researchBundle: {
+        id: 'research-bundle-web',
+        runId: 'research-run-web',
+        fixtureId: 'fixture-1',
+        providerFixtureId: '1001',
+        sources: [{
+          id: 'source-web',
+          type: 'web-search',
+          url: 'https://example.com/team-a-team-b-preview',
+          title: 'Team A vs Team B preview',
+          capturedAt: now.toISOString(),
+        }],
+        evidenceItems: [{
+          id: 'evidence-web',
+          sourceId: 'source-web',
+          claimIds: ['claim-web'],
+          summary: 'Fresh web research supports the scheduled fixture and home selection.',
+          confidence: 0.8,
+        }],
+        claims: [{
+          id: 'claim-web',
+          statement: 'Fresh web research supports home selection.',
+          subject: { type: 'market', id: 'fixture-1', market: 'h2h' },
+          supportLevel: 'supported',
+          evidenceIds: ['evidence-web'],
+          conflictStatus: 'none',
+        }],
+        gateResult: { verdict: 'promotable', reasons: ['fresh web research available'], warnings: [] },
+        providerAgentic: 'codex',
+        model: 'gpt-5.5',
+        promptVersion: 'research-fixture-v1',
+        createdAt: now.toISOString(),
+        warnings: [],
+      },
+    }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => {
+        agentCalled = true;
+        return {
+          text: JSON.stringify({
+            predictions: [{
+              oddsQuoteId: 'odds-quote-1',
+              market: 'h2h',
+              selection: 'home',
+              line: null,
+              odds: 2.1,
+              probability: 0.56,
+              confidence: 0.75,
+              evidenceIds: ['research-bundle-web:evidence-web'],
+              claimIds: ['research-bundle-web:claim-web'],
+              rationale: 'Home selection is supported by fresh web evidence.',
+              warnings: [],
+            }],
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(agentCalled, true);
+    assert.notEqual(result.gateResult.verdict, 'blocked');
+    assert.equal(persisted.length, 1);
+    assert.equal(persisted[0].researchBundleId, 'research-bundle-web');
+    assert.deepEqual(persisted[0].evidenceIds, ['research-bundle-web:evidence-web']);
+  });
+
   it('applies market/model calibration when enough historical samples exist', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

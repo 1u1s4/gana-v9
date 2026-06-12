@@ -108,6 +108,7 @@ function successfulPipelineDeps(input: {
   date: string;
   now?: string;
   scoreFixture?: RunPipelineDependencies['scoreFixture'];
+  researchFixture?: RunPipelineDependencies['researchFixture'];
   validateRun?: RunPipelineDependencies['validateRun'];
   buildParlay?: RunPipelineDependencies['buildParlay'];
   analyzeParlays?: RunPipelineDependencies['analyzeParlays'];
@@ -172,13 +173,13 @@ function successfulPipelineDeps(input: {
       payloadHash: 'hash',
       quotes: [lowOddsQuote(input.target)],
     })),
-    researchFixture: async () => {
+    researchFixture: input.researchFixture ?? (async () => {
       input.calls.push('research');
       return {
         ok: true,
         gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
       };
-    },
+    }),
     scoreFixture: input.scoreFixture ?? (async () => {
       input.calls.push('score');
       return {
@@ -532,6 +533,80 @@ describe('executeRunPipeline', () => {
     const handoff = readFileSync(result.handoffPath, 'utf-8');
     assert.match(handoff, /handoff\.parlay: no-parlay-today/);
     assert.match(handoff, /parlayRecommendations: 1/);
+  });
+
+  it('passes per-fixture research-results bundles into scoring by provider fixture id', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture({ providerFixtureId: '1001' });
+    const calls: string[] = [];
+    const scoringResearchBundleIds: Array<string | undefined> = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-research-to-score',
+      date: '2026-04-29',
+      researchFixture: async (_cfg, input) => ({
+        ok: true,
+        bundle: {
+          id: `research-bundle-${input.fixtureId}`,
+          runId: 'run-research-to-score',
+          fixtureId: target.id,
+          providerFixtureId: input.fixtureId,
+          sources: [{
+            id: 'source-web',
+            type: 'web-search',
+            url: 'https://example.com/team-a-team-b-preview',
+            title: 'Team A vs Team B preview',
+            capturedAt: '2026-04-29T12:00:00.000Z',
+          }],
+          evidenceItems: [{
+            id: 'evidence-web',
+            sourceId: 'source-web',
+            claimIds: ['claim-web'],
+            summary: 'Fresh web research supports the scheduled fixture.',
+            confidence: 0.8,
+          }],
+          claims: [{
+            id: 'claim-web',
+            statement: 'Fresh web research supports the scheduled fixture.',
+            subject: { type: 'fixture', id: target.id },
+            supportLevel: 'supported',
+            evidenceIds: ['evidence-web'],
+            conflictStatus: 'none',
+          }],
+          gateResult: { verdict: 'promotable', reasons: ['fresh web research available'], warnings: [] },
+          providerAgentic: 'codex',
+          model: 'gpt-5.5',
+          promptVersion: 'research-fixture-v1',
+          createdAt: '2026-04-29T12:00:00.000Z',
+          warnings: [],
+        },
+        gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+      }),
+      scoreFixture: async (_cfg, input) => {
+        scoringResearchBundleIds.push(input.researchBundle?.id);
+        return {
+          ok: true,
+          runId: 'run-research-to-score',
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          predictions: [predictionRecord({
+            runId: 'run-research-to-score',
+            fixtureId: target.id,
+            providerFixtureId: target.providerFixtureId,
+          })],
+        };
+      },
+    }));
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(scoringResearchBundleIds, ['research-bundle-1001']);
   });
 
   it('uses injected artifact exporter on successful runs', async () => {
@@ -1339,6 +1414,158 @@ describe('executeRunPipeline', () => {
     assert.match(selected.warnings.join('\n'), /selected fixtures capped from 3 to 2/);
     assert.equal(evaluation.counts.selectedFixtures, 2);
     assert.equal(evaluation.fixtureSelection.capped, true);
+  });
+
+  it('prioritizes required league fixtures before selected and agentic fixture caps', async () => {
+    const config = testConfig();
+    (config.apiFootball as any).maxFixturesPerRun = 2;
+    (config.apiFootball as any).maxAgenticResearchCallsPerRun = 2;
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const generalA = fixture({
+      id: 'fixture-general-a',
+      providerFixtureId: '1001',
+      leagueId: 39,
+      competitionId: '39',
+      competitionName: 'Premier League',
+    });
+    const generalB = fixture({
+      id: 'fixture-general-b',
+      providerFixtureId: '1002',
+      leagueId: 253,
+      competitionId: '253',
+      competitionName: 'Major League Soccer',
+    });
+    const canadaBosnia = fixture({
+      id: 'fixture-canada-bosnia',
+      providerFixtureId: '1539000',
+      leagueId: 1,
+      competitionId: '1',
+      competitionName: 'World Cup',
+      season: 2026,
+      homeTeamName: 'Canada',
+      awayTeamName: 'Bosnia & Herzegovina',
+    });
+    const usaParaguay = fixture({
+      id: 'fixture-usa-paraguay',
+      providerFixtureId: '1489370',
+      leagueId: 1,
+      competitionId: '1',
+      competitionName: 'World Cup',
+      season: 2026,
+      homeTeamName: 'USA',
+      awayTeamName: 'Paraguay',
+    });
+    const fixtures = [generalA, generalB, canadaBosnia, usaParaguay];
+    const byProviderFixtureId = new Map(fixtures.map((target) => [target.providerFixtureId, target]));
+    const researched: string[] = [];
+    const scored: string[] = [];
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      web: 'off',
+      validate: false,
+      markets: ['h2h'],
+      priorityLeagues: [{ providerCompetitionId: '1', name: 'World Cup', season: 2026 }],
+    }, runtime, {
+      createRunId: () => 'run-required-league-priority',
+      now: () => new Date('2026-04-29T12:00:00.000Z'),
+      discoverFixtures: async () => ({
+        fixtures,
+        evaluations: fixtures.map((target) => ({
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        })),
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      fetchOddsSnapshot: async (_config, providerFixtureId) => {
+        const target = byProviderFixtureId.get(providerFixtureId) ?? generalA;
+        return {
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          oddsSnapshotId: `odds-snapshot-${target.providerFixtureId}`,
+          providerSnapshotId: `provider-snapshot-${target.providerFixtureId}`,
+          quoteRecordIds: {
+            'test-book|h2h|home|': `odds-quote-${target.providerFixtureId}`,
+          },
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: 'hash',
+          quotes: [lowOddsQuoteFor(target, { price: 1.8, impliedProbability: 1 / 1.8 })],
+        };
+      },
+      discoverLowOddsFixtures: async () => ({
+        fixtures,
+        evaluations: fixtures.map((target) => ({
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          includedReasons: ['included-by-manual-query'],
+          excludedReasons: [],
+          eligible: true,
+        })),
+        requestedLeagues: [],
+        requestedTeams: [],
+      }),
+      researchFixture: async (_config, input) => {
+        researched.push(input.fixtureId);
+        return { ok: true, gateResult: { verdict: 'promotable', reasons: [], warnings: [] } };
+      },
+      scoreFixture: async (_config, input) => {
+        scored.push(input.fixtureId);
+        return {
+          ok: true,
+          runId: 'run-required-league-priority',
+          fixtureId: input.fixtureId,
+          providerFixtureId: input.fixtureId,
+          gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+          predictions: [predictionRecord({
+            runId: 'run-required-league-priority',
+            providerFixtureId: input.fixtureId,
+            oddsQuoteId: `odds-quote-${input.fixtureId}`,
+          })],
+        } as any;
+      },
+      buildParlay: async () => ({
+        ok: false,
+        runId: 'run-required-league-priority',
+        date: '2026-04-29',
+        gateResult: { verdict: 'blocked', reasons: ['no predictions found'], warnings: [] },
+        build: {
+          parlay: {
+            id: 'parlay-1',
+            sourceRunId: 'run-required-league-priority',
+            legs: [],
+            aggregateConfidence: 0,
+            aggregateQuality: 0,
+            rationale: 'test',
+            warnings: [],
+            status: 'blocked',
+            generatedAt: '2026-04-29T12:00:00.000Z',
+          },
+          evaluations: [],
+          config: {
+            minLegs: 2,
+            maxLegs: 4,
+            allowMultipleLegsPerFixture: false,
+            minPredictionConfidence: 0,
+          },
+        },
+      }),
+    });
+
+    assert.deepEqual(researched, ['1539000', '1489370']);
+    assert.deepEqual(scored, ['1539000', '1489370']);
+
+    const selected = JSON.parse(readFileSync(join(result.artifactDir, 'selected-fixtures.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.deepEqual(selected.fixtures.map((item: { providerFixtureId: string }) => item.providerFixtureId), ['1539000', '1489370']);
+    assert.equal(selected.priorityFixtures, 2);
+    assert.equal(selected.selectedFixtures, 2);
+    assert.equal(selected.capped, true);
+    assert.equal(evaluation.fixtureSelection.priorityFixtures, 2);
   });
 
   it('filters low-odds expanded fixtures to the requested local date before research and scoring', async () => {

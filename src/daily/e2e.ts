@@ -426,6 +426,7 @@ export async function runDailyE2E(
   const pairedProviders = providers;
   const providerAgentic = providers.join(',');
   const marketScope = normalizeMarketScope(input.markets, effectiveConfig.apiFootball.defaultMarkets);
+  const requiredLeagues = normalizeRequiredLeagues(input.requiredLeagues);
   const progress = createDailyProgressSnapshot({
     dailyBatchId,
     date: input.date,
@@ -505,6 +506,11 @@ export async function runDailyE2E(
       web: input.web,
       validate: input.validate,
       markets: marketScope,
+      priorityLeagues: requiredLeagues.map((league) => ({
+        providerCompetitionId: league.providerCompetitionId,
+        name: league.name,
+        season: league.season,
+      })),
       metadata: {
         dailyBatchId,
         dailyRole: provider,
@@ -755,7 +761,6 @@ export async function runDailyE2E(
   if (offDateLegs.length) {
     throw new Error(`daily recommendations include fixture legs outside requested date ${input.date}: ${offDateLegs.slice(0, 5).join('; ')}`);
   }
-  const requiredLeagues = normalizeRequiredLeagues(input.requiredLeagues);
   const requiredLeagueArtifact = buildRequiredLeagueRecommendations({
     dailyBatchId,
     date: input.date,

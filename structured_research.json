@@ -1,194 +1,432 @@
 {
   "sources": [
     {
-      "id": "source_api_fixture",
+      "id": "source_api_football_fixture",
       "type": "api-football",
-      "url": null,
-      "title": "API Football Fixture Snapshot",
-      "capturedAt": "2026-06-11T16:44:17.478Z",
-      "hash": "01ca7361-9746-47fc-aaba-80dec3d9a7a7",
+      "url": "N/A",
+      "title": "API-Football Fixture Data",
+      "capturedAt": "2026-06-11T13:10:21.368Z",
+      "hash": "1539000",
       "metadata": {
-        "provider": "api-football",
-        "fixtureId": "49769adc-7d77-4339-adab-246d1597c99e"
+        "providerFixtureId": "1539000"
       }
     },
     {
-      "id": "source_api_odds",
+      "id": "source_api_football_stats",
+      "type": "api-football",
+      "url": "N/A",
+      "title": "API-Football Fixture Statistics",
+      "capturedAt": "2026-06-12T09:16:35.354Z",
+      "hash": "6e1083e9-2254-4c46-8453-5491758b346e",
+      "metadata": {
+        "providerSnapshotId": "6e1083e9-2254-4c46-8453-5491758b346e"
+      }
+    },
+    {
+      "id": "source_provider_snapshot_odds",
       "type": "provider-snapshot",
-      "url": null,
-      "title": "Provider Odds Snapshot",
-      "capturedAt": "2026-06-11T16:44:19.327Z",
-      "hash": "ac230c5d-b6e8-476f-aa25-bb2b9e9470d7",
+      "url": "N/A",
+      "title": "Odds Snapshot from Bet365 and Pinnacle",
+      "capturedAt": "2026-06-12T09:16:36.355Z",
+      "hash": "56fdd1e8-ff46-4fbf-829f-3ccc7c4de464",
       "metadata": {
-        "providerFixtureId": "1527081",
-        "bookmakers": ["Bet365", "Pinnacle"]
+        "oddsSnapshotId": "7e1c93e2-8aad-411d-89de-28d6ce524cea"
       }
     },
     {
-      "id": "source_web_1",
+      "id": "source_web_sportsgambler",
       "type": "web-search",
-      "url": "https://livescores.biz/h2h/para-hills-knights-vs-fk-beograd",
-      "title": "Para Hills Knights vs FK Beograd H2H stats - livescores.biz",
-      "capturedAt": "2026-06-11T16:50:00.000Z",
-      "hash": null,
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEg9JPi9PPy6U_PJBcOkUCAg-NLUKtlEV_7yEi2bTCUpsMeuv0LxgFzDzg2zXmnTppXQhKRendqr_h1q4XQHbmlDvH9CNjkjQUQwk2u2OemZFvvDdbbZM3r-QleIMIfVnSYwoTXG2fmjxnt39qxGp0OSHaFn9zMqv-kDGm4GzeTvQjy4AFi4mntG1vJXIcUCKDap5NK8wjag4ataEUF8FJWN9K94_b0Teaw7lE--SP",
+      "title": "Canada vs Bosnia & Herzegovina World Cup 2026 Prediction & Betting Tips",
+      "capturedAt": "2026-06-12T09:16:32.626Z",
+      "hash": "web_search_sportsgambler",
       "metadata": {}
     },
     {
-      "id": "source_web_2",
+      "id": "source_web_myworldcupguide",
       "type": "web-search",
-      "url": "https://www.flashscore.com/match/some-id",
-      "title": "Match Preview and Team Form Analysis",
-      "capturedAt": "2026-06-11T16:50:00.000Z",
-      "hash": null,
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEzA8pDBKbjjDk8aQCdvJPzkngMxfwzv5tKUl-9HytrQurNkRHD87fhbi5g6L9p0qpovdGCAXkeFeO7OVZ3Qygz70xjBZBI_hVuEMTp1nxItWwJQUfdiEJLA6d9X2ep_NSbHbGAViiqGKn2w4zQC9tXs7o2BEmqeZqBxDGllrEt1_3e",
+      "title": "2026 FIFA World Cup Group B: Canada vs Bosnia & Herzegovina",
+      "capturedAt": "2026-06-12T09:16:32.626Z",
+      "hash": "web_search_myworldcupguide",
       "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence_h2h_odds",
-      "sourceId": "source_api_odds",
-      "claimIds": ["claim_h2h_away", "claim_double_chance_da", "claim_double_chance_ha"],
-      "snippet": "H2H Away Price: 1.14 (Bet365), 1.14 (Pinnacle)",
-      "summary": "FK Beograd are strong favorites to win, with an implied probability of approximately 87.7%.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_form_home",
-      "sourceId": "source_web_2",
-      "claimIds": ["claim_h2h_away"],
-      "snippet": "Para Hills Knights: 12th Place | 2 Points (0W, 2D, 11L) | GD: -45 (8 Scored, 53 Conceded)",
-      "summary": "Para Hills Knights are winless in the 2026 season and are at the bottom of the league table, having conceded 53 goals in 13 matches.",
+      "id": "evidence_h2h_bet365_home",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Canada to win: 1.85 (implied probability: 54.05%)",
+      "summary": "Bet365 quotes Canada to win at 1.85.",
       "confidence": 0.9,
-      "metadata": {}
+      "metadata": {
+        "market": "h2h",
+        "selection": "home",
+        "price": 1.85,
+        "bookmaker": "Bet365"
+      }
     },
     {
-      "id": "evidence_form_away",
-      "sourceId": "source_web_2",
-      "claimIds": ["claim_h2h_away", "claim_btts_no"],
-      "snippet": "FK Beograd: 6th Place | 18 Points (5W, 3D, 5L) | GD: +4 (22 Scored, 18 Conceded)",
-      "summary": "FK Beograd are in 6th place with a positive goal difference and have been in strong form, recently on a three-match winning streak.",
+      "id": "evidence_h2h_bet365_draw",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for a draw: 3.5 (implied probability: 28.57%)",
+      "summary": "Bet365 quotes a draw at 3.5.",
       "confidence": 0.9,
-      "metadata": {}
+      "metadata": {
+        "market": "h2h",
+        "selection": "draw",
+        "price": 3.5,
+        "bookmaker": "Bet365"
+      }
     },
     {
-      "id": "evidence_h2h_previous",
-      "sourceId": "source_web_1",
-      "claimIds": ["claim_h2h_away", "claim_goals_over_3_5"],
-      "snippet": "Last Meeting (March 13, 2026): FK Beograd 5–0 Para Hills Knights",
-      "summary": "The most recent head-to-head match resulted in a dominant 5-0 victory for FK Beograd.",
-      "confidence": 0.95,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_goals_odds",
-      "sourceId": "source_api_odds",
-      "claimIds": ["claim_goals_over_3_5"],
-      "snippet": "Goals Over/Under 3.5: Over Price 1.62 (Bet365), 1.57 (Pinnacle)",
-      "summary": "The odds for 'Over 3.5 goals' suggest a high probability of a high-scoring match, with an implied probability of over 60%.",
+      "id": "evidence_h2h_bet365_away",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Bosnia & Herzegovina to win: 4.5 (implied probability: 22.22%)",
+      "summary": "Bet365 quotes Bosnia & Herzegovina to win at 4.5.",
       "confidence": 0.9,
-      "metadata": {}
+      "metadata": {
+        "market": "h2h",
+        "selection": "away",
+        "price": 4.5,
+        "bookmaker": "Bet365"
+      }
     },
     {
-      "id": "evidence_btts_home_scoring_rate",
-      "sourceId": "source_web_2",
-      "claimIds": ["claim_btts_no"],
-      "snippet": "Para Hills Knights... (8 Scored, 53 Conceded)",
-      "summary": "Para Hills Knights have a very low scoring record, with only 8 goals scored in 13 league matches this season.",
+      "id": "evidence_h2h_pinnacle_home",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Pinnacle odds for Canada to win: 1.86 (implied probability: 53.76%)",
+      "summary": "Pinnacle quotes Canada to win at 1.86.",
+      "confidence": 0.9,
+      "metadata": {
+        "market": "h2h",
+        "selection": "home",
+        "price": 1.86,
+        "bookmaker": "Pinnacle"
+      }
+    },
+    {
+      "id": "evidence_goals_over_bet365_1_5",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Over 1.5 Goals: 1.4 (implied probability: 71.43%)",
+      "summary": "Bet365 quotes Over 1.5 Goals at 1.4.",
+      "confidence": 0.9,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 1.5,
+        "price": 1.4,
+        "bookmaker": "Bet365"
+      }
+    },
+    {
+      "id": "evidence_goals_under_bet365_1_5",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Under 1.5 Goals: 3 (implied probability: 33.33%)",
+      "summary": "Bet365 quotes Under 1.5 Goals at 3.",
+      "confidence": 0.9,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "under",
+        "line": 1.5,
+        "price": 3,
+        "bookmaker": "Bet365"
+      }
+    },
+    {
+      "id": "evidence_btts_bet365_yes",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Both Teams To Score (Yes): 2 (implied probability: 50%)",
+      "summary": "Bet365 quotes BTTS Yes at 2.",
+      "confidence": 0.9,
+      "metadata": {
+        "market": "btts",
+        "selection": "yes",
+        "price": 2,
+        "bookmaker": "Bet365"
+      }
+    },
+    {
+      "id": "evidence_double_chance_bet365_home_draw",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Canada or Draw (Double Chance): 1.18 (implied probability: 84.75%)",
+      "summary": "Bet365 quotes Canada or Draw at 1.18.",
+      "confidence": 0.9,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "home_or_draw",
+        "price": 1.18,
+        "bookmaker": "Bet365"
+      }
+    },
+    {
+      "id": "evidence_corners_over_bet365_8_5",
+      "sourceId": "source_provider_snapshot_odds",
+      "claimIds": [],
+      "snippet": "Bet365 odds for Over 8.5 Corners: 1.8 (implied probability: 55.56%)",
+      "summary": "Bet365 quotes Over 8.5 Corners at 1.8.",
+      "confidence": 0.9,
+      "metadata": {
+        "market": "corners_over_under",
+        "selection": "over",
+        "line": 8.5,
+        "price": 1.8,
+        "bookmaker": "Bet365"
+      }
+    },
+    {
+      "id": "evidence_web_prediction",
+      "sourceId": "source_web_sportsgambler",
+      "claimIds": [],
+      "snippet": "Match Prediction: Canada 2-1 Bosnia & Herzegovina. Expect a high-intensity start from Canada, fueled by a raucous Toronto crowd.",
+      "summary": "Sportsgambler.com predicts a 2-1 victory for Canada and highlights home-field advantage.",
+      "confidence": 0.8,
+      "metadata": {
+        "predictedScore": "Canada 2-1 Bosnia & Herzegovina"
+      }
+    },
+    {
+      "id": "evidence_web_canada_form",
+      "sourceId": "source_web_sportsgambler",
+      "claimIds": [],
+      "snippet": "Canada Form: Unbeaten in their last 8 matches. They recently defeated Uzbekistan 2-0 and drew 1-1 with Ireland in their send-off games.",
+      "summary": "Canada is in good form, unbeaten in their last 8 matches.",
       "confidence": 0.85,
       "metadata": {}
     },
     {
-        "id": "evidence_dc_odds",
-        "sourceId": "source_api_odds",
-        "claimIds": ["claim_double_chance_da", "claim_double_chance_ha"],
-        "snippet": "Double Chance Draw/Away: 1.02 (Bet365)",
-        "summary": "The 'Draw or Away' double chance market has a price of 1.02, indicating an extremely high probability (approx 98%) for this outcome.",
-        "confidence": 0.98,
-        "metadata": {}
+      "id": "evidence_web_bosnia_form",
+      "sourceId": "source_web_sportsgambler",
+      "claimIds": [],
+      "snippet": "Bosnia Form: Riding a wave of momentum after their playoff heroics, though they played out low-scoring draws against Panama and North Macedonia in recent weeks.",
+      "summary": "Bosnia & Herzegovina is riding momentum but had recent low-scoring draws.",
+      "confidence": 0.75,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_web_injuries",
+      "sourceId": "source_web_sportsgambler",
+      "claimIds": [],
+      "snippet": "Jesse Marsch has some significant injury headaches. Midfielder Marcelo Flores is out with a knee injury, and defender Moïse Bombito is a major doubt.",
+      "summary": "Canada has injury concerns with Marcelo Flores out and Moïse Bombito doubtful.",
+      "confidence": 0.7,
+      "metadata": {
+        "team": "Canada",
+        "playerStatus": "injuries"
+      }
+    },
+    {
+      "id": "evidence_web_first_competitive",
+      "sourceId": "source_web_sportsgambler",
+      "claimIds": [],
+      "snippet": "Head-to-Head: The teams have met twice in friendlies. Bosnia won 1-0 in 2013, and they played to a 0-0 draw in 2019. This is their first competitive meeting.",
+      "summary": "This is the first competitive meeting between Canada and Bosnia & Herzegovina.",
+      "confidence": 0.9,
+      "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim_h2h_away",
-      "statement": "FK Beograd is heavily favored to win against Para Hills Knights.",
+      "id": "claim_h2h_canada_win",
+      "statement": "Canada is favored to win the match against Bosnia & Herzegovina according to bookmakers.",
       "subject": {
         "type": "market",
-        "id": "49769adc-7d77-4339-adab-246d1597c99e",
-        "market": "h2h"
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "h2h",
+        "selection": "home"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_odds", "evidence_form_home", "evidence_form_away", "evidence_h2h_previous"],
+      "evidenceIds": ["evidence_h2h_bet365_home", "evidence_h2h_pinnacle_home"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_double_chance_da",
-      "statement": "The 'Draw or Away' outcome for the double chance market is highly probable.",
+      "id": "claim_h2h_draw",
+      "statement": "A draw in the match between Canada and Bosnia & Herzegovina has odds indicating it is less likely than a Canada win but more likely than a Bosnia win.",
       "subject": {
         "type": "market",
-        "id": "49769adc-7d77-4339-adab-246d1597c99e",
-        "market": "double_chance"
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "h2h",
+        "selection": "draw"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_odds", "evidence_dc_odds"],
+      "evidenceIds": ["evidence_h2h_bet365_draw"],
       "conflictStatus": "none",
-      "metadata": { "selection": "draw_or_away" }
+      "metadata": {}
     },
     {
-        "id": "claim_double_chance_ha",
-        "statement": "The 'Home or Away' outcome for the double chance market is probable.",
-        "subject": {
-          "type": "market",
-          "id": "49769adc-7d77-4339-adab-246d1597c99e",
-          "market": "double_chance"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_h2h_odds", "evidence_dc_odds"],
-        "conflictStatus": "none",
-        "metadata": { "selection": "home_or_away" }
-      },
-    {
-      "id": "claim_goals_over_3_5",
-      "statement": "The match is likely to feature over 3.5 goals.",
+      "id": "claim_h2h_bosnia_win",
+      "statement": "Bosnia & Herzegovina winning the match against Canada is considered the least likely outcome by bookmakers.",
       "subject": {
         "type": "market",
-        "id": "49769adc-7d77-4339-adab-246d1597c99e",
-        "market": "goals_over_under"
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "h2h",
+        "selection": "away"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_goals_odds", "evidence_h2h_previous", "evidence_form_home"],
+      "evidenceIds": ["evidence_h2h_bet365_away"],
       "conflictStatus": "none",
-      "metadata": {"line": 3.5, "selection": "over"}
+      "metadata": {}
     },
     {
-      "id": "claim_btts_no",
-      "statement": "It is unlikely that both teams will score.",
+      "id": "claim_goals_over_1_5",
+      "statement": "There is a high implied probability for Over 1.5 Goals in the match.",
       "subject": {
         "type": "market",
-        "id": "49769adc-7d77-4339-adab-246d1597c99e",
-        "market": "btts"
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 1.5
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_btts_home_scoring_rate", "evidence_form_away"],
+      "evidenceIds": ["evidence_goals_over_bet365_1_5"],
       "conflictStatus": "none",
-      "metadata": {"selection": "no"}
+      "metadata": {}
+    },
+    {
+      "id": "claim_goals_under_1_5",
+      "statement": "There is a lower implied probability for Under 1.5 Goals in the match.",
+      "subject": {
+        "type": "market",
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "goals_over_under",
+        "selection": "under",
+        "line": 1.5
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_goals_under_bet365_1_5"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_btts_yes",
+      "statement": "Both Teams To Score (Yes) has even odds, indicating a balanced probability.",
+      "subject": {
+        "type": "market",
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "btts",
+        "selection": "yes"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_btts_bet365_yes"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_double_chance_home_draw",
+      "statement": "Canada to win or draw is highly favored by bookmakers.",
+      "subject": {
+        "type": "market",
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "double_chance",
+        "selection": "home_or_draw"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_double_chance_bet365_home_draw"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_corners_over_8_5",
+      "statement": "Over 8.5 Corners in the match has an implied probability slightly above 50%.",
+      "subject": {
+        "type": "market",
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756",
+        "market": "corners_over_under",
+        "selection": "over",
+        "line": 8.5
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_corners_over_bet365_8_5"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_predicted_score",
+      "statement": "Sportsgambler.com predicts Canada to win 2-1 against Bosnia & Herzegovina.",
+      "subject": {
+        "type": "fixture",
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_prediction"],
+      "conflictStatus": "none",
+      "metadata": {
+        "predictedScore": "Canada 2-1 Bosnia & Herzegovina"
+      }
+    },
+    {
+      "id": "claim_canada_form",
+      "statement": "Canada is currently in good form, being unbeaten in their last 8 matches.",
+      "subject": {
+        "type": "team",
+        "id": "2cae3a9d-a549-4757-ae7b-2f9d7e276b4f",
+        "name": "Canada"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_canada_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_bosnia_form",
+      "statement": "Bosnia & Herzegovina is riding momentum from playoff heroics but recently had low-scoring draws.",
+      "subject": {
+        "type": "team",
+        "id": "1555d738-5ae1-440e-babb-b47681d21c7f",
+        "name": "Bosnia & Herzegovina"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_bosnia_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_canada_injuries",
+      "statement": "Canada has injury concerns with Marcelo Flores out and Moïse Bombito doubtful for the match.",
+      "subject": {
+        "type": "team",
+        "id": "2cae3a9d-a549-4757-ae7b-2f9d7e276b4f",
+        "name": "Canada"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_injuries"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_first_competitive_meeting",
+      "statement": "This match marks the first competitive meeting between Canada and Bosnia & Herzegovina.",
+      "subject": {
+        "type": "fixture",
+        "id": "52f2c17b-88cc-4d17-a826-0d725ed4b756"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_first_competitive"],
+      "conflictStatus": "none",
+      "metadata": {}
     }
   ],
   "gateResult": {
-    "verdict": "review-required",
+    "verdict": "promotable",
     "reasons": [
-      "Research generated for most required markets, but coverage is incomplete."
+      "Structured research generated with sufficient evidence.",
+      "Web-search evidence included as webMode is live."
     ],
-    "warnings": [
-        "Could not find sufficient evidence to make a claim for the 'corners_over_under' market."
-    ]
+    "warnings": []
   },
   "warnings": [],
   "metadata": {
-      "marketCoverage": {
-          "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
-          "skippedMarkets": ["corners_over_under"]
-      }
+    "marketCoverage": {
+      "skippedMarkets": []
+    }
   }
 }

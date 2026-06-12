@@ -216,6 +216,7 @@ export function buildFixtureDiscoveryRequests(
   for (const league of leaguePresets) {
     requests.push({
       league: Number(league.providerCompetitionId),
+      ...(league.season !== null && league.season !== undefined ? { season: league.season } : {}),
       reason: 'included-by-default-league',
     });
   }

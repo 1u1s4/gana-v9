@@ -1,15 +1,325 @@
 {
-  "parlays": [
+  "sources": [
     {
-      "title": "Parlay refinado",
-      "predictionIds": [
-        "49cb79f4-0981-46a9-bd75-22c75ce3efed",
-        "44ca2714-f256-48c3-8054-4a5937008558"
-      ],
-      "rationale": "Selected FK Zalgiris Vilnius (H2H Home) due to excellent odds (1.11) with no associated warnings or risk tags, aligning with the preference for independent short-price home favorites. This prediction exhibits high confidence and a clear rationale from historical data and form. Selected Sydney United (Double Chance Draw or Away) for its strong probability (odds 1.28) and acceptable 'low-liquidity' tag, which is tolerated for high-confidence, positive-edge legs as per instructions. Its rationale also implies strong market analysis. The combined odds of 1.4208 fall within the optimal range of 1.30-1.99. Both legs are from different fixtures, satisfying the 'at most one leg per fixture' rule. Omitted candidates either had 'fragile_low_price_dc', 'low_confidence', or belonged to market types (like BTTS, Over 2.5 goals) that have shown to be weaker or noisier in retrospective summaries, or were explicitly flagged as 'fragile low total over' which materially underperformed. These would add fragility rather than safety to the parlay, hence prioritizing a clean 2-leg parlay.",
-      "riskNotes": [
-        "The Sydney United leg has low liquidity, which can sometimes lead to volatility, but its high confidence and edge mitigate this risk as per the instructions."
-      ]
+      "id": "source_api_football_fixture",
+      "type": "api-football",
+      "url": "N/A",
+      "title": "API-Football Fixture Data",
+      "capturedAt": "2026-06-12T08:50:39.805Z",
+      "hash": "1547252",
+      "metadata": {
+        "fixtureId": "00d44060-b558-4380-87f2-0d90ed6ebb40"
+      }
+    },
+    {
+      "id": "source_api_football_odds",
+      "type": "api-football",
+      "url": "N/A",
+      "title": "API-Football Odds Snapshot",
+      "capturedAt": "2026-06-12T08:50:41.766Z",
+      "hash": "76130bfc-feff-4e28-89ae-14f6a9e0e5a7",
+      "metadata": {
+        "oddsSnapshotId": "f20b9765-8641-414c-91fe-a5c4a0f93fb5"
+      }
+    },
+    {
+      "id": "source_web_playmakerstats",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFVgpjP__lmacfOszWCR6Mi2INAF9cWh0Kgfq0U4qMlr9VQ8fXh9mq5C0fuQQi5w00LT0a6V_EXrmvxG25BRY9vhb8TMvKZri8de7xHHr-9ZPHREw-ike2CqjgopZ_QLFbXTWkitsYEj8yx31ufxSEBJJDL",
+      "title": "playmakerstats.com",
+      "capturedAt": "2026-06-12T08:50:35.979Z",
+      "hash": "web_search_1",
+      "metadata": {}
     }
-  ]
+  ],
+  "evidenceItems": [
+    {
+      "id": "evidence_h2h_dominance",
+      "sourceId": "source_web_playmakerstats",
+      "claimIds": [],
+      "snippet": "Grêmio Prudente holds the upper hand in recent meetings. Last Meeting: Grêmio Prudente defeated Tanabi 2–0 on May 30, 2025. Overall: Tanabi has struggled to secure a victory against Grêmio Prudente in their most recent recorded youth matchups.",
+      "summary": "Grêmio Prudente U20 has a historical advantage over Tanabi SP U20, winning their last encounter 2-0 in May 2025.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_win_probability",
+      "sourceId": "source_web_playmakerstats",
+      "claimIds": [],
+      "snippet": "Statistical models favor Grêmio Prudente with approximately a 70% win probability, largely due to their home-field advantage and historical H2H dominance.",
+      "summary": "Statistical models predict a 70% win probability for Grêmio Prudente U20, supported by home advantage and H2H records.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_h2h_odds_home",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "h2h, selection: home, price: 1.53",
+      "summary": "Odds for Gremio Prudente U20 to win (H2H home) are 1.53.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "h2h",
+        "selection": "home",
+        "price": 1.53
+      }
+    },
+    {
+      "id": "evidence_h2h_odds_draw",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "h2h, selection: draw, price: 3.75",
+      "summary": "Odds for a draw (H2H draw) are 3.75.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "h2h",
+        "selection": "draw",
+        "price": 3.75
+      }
+    },
+    {
+      "id": "evidence_h2h_odds_away",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "h2h, selection: away, price: 5",
+      "summary": "Odds for Tanabi SP U20 to win (H2H away) are 5.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "h2h",
+        "selection": "away",
+        "price": 5
+      }
+    },
+    {
+      "id": "evidence_goals_over_2_5_odds",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "goals_over_under, selection: over, line: 2.5, price: 1.8",
+      "summary": "Odds for over 2.5 goals are 1.8.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 2.5,
+        "price": 1.8
+      }
+    },
+    {
+      "id": "evidence_goals_under_2_5_odds",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "goals_over_under, selection: under, line: 2.5, price: 2",
+      "summary": "Odds for under 2.5 goals are 2.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "under",
+        "line": 2.5,
+        "price": 2
+      }
+    },
+    {
+      "id": "evidence_double_chance_home_draw_odds",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "double_chance, selection: home_or_draw, price: 1.17",
+      "summary": "Odds for Gremio Prudente U20 to win or draw (Double Chance home_or_draw) are 1.17.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "home_or_draw",
+        "price": 1.17
+      }
+    },
+    {
+      "id": "evidence_double_chance_home_away_odds",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "double_chance, selection: home_or_away, price: 1.22",
+      "summary": "Odds for either team to win (Double Chance home_or_away) are 1.22.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "home_or_away",
+        "price": 1.22
+      }
+    },
+    {
+      "id": "evidence_double_chance_draw_away_odds",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "double_chance, selection: draw_or_away, price: 2.1",
+      "summary": "Odds for Tanabi SP U20 to win or draw (Double Chance draw_or_away) are 2.1.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "draw_or_away",
+        "price": 2.1
+      }
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_h2h_home_win",
+      "statement": "Gremio Prudente U20 is favored to win against Tanabi SP U20.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_h2h_dominance",
+        "evidence_win_probability",
+        "evidence_h2h_odds_home",
+        "evidence_h2h_odds_away"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "home",
+        "price": 1.53
+      }
+    },
+    {
+      "id": "claim_h2h_draw",
+      "statement": "A draw between Gremio Prudente U20 and Tanabi SP U20 has odds of 3.75.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_h2h_odds_draw"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "draw",
+        "price": 3.75
+      }
+    },
+    {
+      "id": "claim_h2h_away_win",
+      "statement": "Tanabi SP U20 to win against Gremio Prudente U20 has odds of 5.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_h2h_odds_away"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "away",
+        "price": 5
+      }
+    },
+    {
+      "id": "claim_goals_over_2_5",
+      "statement": "The odds for over 2.5 goals in the match are 1.8.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_goals_over_2_5_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "over",
+        "line": 2.5,
+        "price": 1.8
+      }
+    },
+    {
+      "id": "claim_goals_under_2_5",
+      "statement": "The odds for under 2.5 goals in the match are 2.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_goals_under_2_5_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "under",
+        "line": 2.5,
+        "price": 2
+      }
+    },
+    {
+      "id": "claim_double_chance_home_draw",
+      "statement": "Gremio Prudente U20 to win or draw has odds of 1.17.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_double_chance_home_draw_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "home_or_draw",
+        "price": 1.17
+      }
+    },
+    {
+      "id": "claim_double_chance_home_away",
+      "statement": "Either Gremio Prudente U20 or Tanabi SP U20 to win has odds of 1.22.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_double_chance_home_away_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "home_or_away",
+        "price": 1.22
+      }
+    },
+    {
+      "id": "claim_double_chance_draw_away",
+      "statement": "Tanabi SP U20 to win or draw has odds of 2.1.",
+      "subject": {
+        "type": "market",
+        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_double_chance_draw_away_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "draw_or_away",
+        "price": 2.1
+      }
+    }
+  ],
+  "gateResult": {
+    "verdict": "promotable",
+    "reasons": [
+      "Structured research generated with sufficient evidence including web-search and API-Football data for all required markets."
+    ],
+    "warnings": []
+  },
+  "warnings": [],
+  "metadata": {
+    "marketCoverage": {
+      "skippedMarkets": []
+    }
+  }
 }

@@ -102,6 +102,22 @@ describe('discord recommendation notifier', () => {
     assert.match(message, /🎛️ Enfoques: 🚫 💎 parlay-diamante · ✅ 🧠 parlay-refinado @ 1.43 · 🚫 🛡️ low-variance/);
   });
 
+  it('includes the required league prediction and parlay addendum in native and gateway output', () => {
+    const artifact = sampleArtifactWithRequiredLeague();
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+    const requiredEmbed = payload.embeds.find((embed) => /Obligatorio/.test(embed.title ?? ''));
+
+    assert.ok(requiredEmbed);
+    assert.match(requiredEmbed.title, /World Cup/);
+    assert.match(requiredEmbed.description, /✅ Canada vs Bosnia & Herzegovina: 1 promotables \/ 1 preds/);
+    assert.match(requiredEmbed.description, /🚫 USA vs Paraguay: sin predicción válida/);
+    assert.match(requiredEmbed.description, /📌 Canada vs Bosnia & Herzegovina: h2h home @ 1.87/);
+    assert.match(requiredEmbed.description, /🎛️ Parlays obligatorios: ✅ 💎 parlay-diamante @ 1.22 · 🚫 🧠 parlay-refinado · 🚫 🛡️ low-variance/);
+    assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
+  });
+
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
     const artifact = sampleArtifactWithAtomic();
     const uuidA = 'a28f3e87-bc59-4e9e-b1fd-062759061d86';
@@ -281,6 +297,24 @@ describe('discord recommendation notifier', () => {
     assert.equal(loaded.recommendations.length, 1);
   });
 
+  it('loads required league addendum from the sibling artifact path', () => {
+    const root = join(tmpdir(), `gana-discord-required-${Date.now()}`);
+    mkdirSync(root, { recursive: true });
+    const requiredPath = join(root, 'daily-required-league-recommendations.json');
+    const recommendationsPath = join(root, 'daily-parlay-recommendations.json');
+    writeFileSync(requiredPath, JSON.stringify(sampleRequiredLeagueRecommendations()));
+    writeFileSync(recommendationsPath, JSON.stringify({
+      ...sampleArtifact(),
+      requiredLeagueRecommendationsPath: 'daily-required-league-recommendations.json',
+    }));
+
+    const loaded = loadRecommendations(recommendationsPath);
+    const payload = buildDiscordPayload(loaded.artifact, { max: 1 });
+
+    assert.equal(loaded.artifact.requiredLeagueRecommendations.atomicProjections.length, 1);
+    assert.match(payload.embeds.find((embed) => /Obligatorio/.test(embed.title ?? ''))?.description ?? '', /Canada vs Bosnia/);
+  });
+
   it('parses CLI arguments and posts to the provided fetch implementation', async () => {
     const args = parseArgs(['--artifact', 'artifact.json', '--webhook-url', 'https://discord.test/webhook', '--transport', 'webhook', '--max', '3', '--single-message']);
     const calls = [];
@@ -439,6 +473,68 @@ function sampleArtifactWithAtomic() {
           banker: true,
         }],
       },
+    ],
+  };
+}
+
+function sampleArtifactWithRequiredLeague() {
+  return {
+    ...sampleArtifact(),
+    requiredLeagueRecommendations: sampleRequiredLeagueRecommendations(),
+  };
+}
+
+function sampleRequiredLeagueRecommendations() {
+  return {
+    coverage: {
+      fixtureCount: 2,
+      coveredFixtures: 1,
+      missingPredictionFixtures: 1,
+      status: 'review-required',
+      fixtures: [
+        {
+          fixture: 'Canada vs Bosnia & Herzegovina',
+          providerFixtureId: '1539000',
+          status: 'covered',
+          predictionCount: 1,
+          promotableCount: 1,
+          display: {
+            fixtureLabel: 'Canada vs Bosnia & Herzegovina',
+            leagueName: 'World Cup',
+          },
+          league: { name: 'World Cup', country: 'World', providerCompetitionId: '1', season: 2026 },
+        },
+        {
+          fixture: 'USA vs Paraguay',
+          providerFixtureId: '1489370',
+          status: 'missing-predictions',
+          predictionCount: 0,
+          promotableCount: 0,
+          display: {
+            fixtureLabel: 'USA vs Paraguay',
+            leagueName: 'World Cup',
+          },
+          league: { name: 'World Cup', country: 'World', providerCompetitionId: '1', season: 2026 },
+        },
+      ],
+    },
+    goalCheck: {
+      status: 'review-required',
+      nextActions: ['retry research/scoring for 1489370 (USA vs Paraguay) with fresh web evidence'],
+    },
+    atomicProjections: [{
+      fixture: 'Canada vs Bosnia & Herzegovina',
+      providerFixtureId: '1539000',
+      market: 'h2h',
+      selection: 'home',
+      odds: 1.87,
+      confidence: 0.63,
+      status: 'promotable',
+    }],
+    parlayProjections: [
+      { profile: 'parlay-diamante', status: 'selected', combinedOdds: 1.22, legs: [] },
+      { profile: 'parlay-refinado', status: 'blocked', combinedOdds: null, legs: [] },
+      { profile: 'low-variance', status: 'blocked', combinedOdds: null, legs: [] },
     ],
   };
 }

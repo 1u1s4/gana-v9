@@ -1052,6 +1052,154 @@ describe('runDailyE2E', () => {
     assert.equal(new Set(parlayRuntimeIds).size, parlayRuntimeIds.length);
   });
 
+  it('writes required-league coverage when World Cup fixtures are missing predictions', async () => {
+    const ctx = context();
+    const canadaBosnia = {
+      ...fixture('2026-06-12T19:00:00.000Z'),
+      id: 'fixture-canada-bosnia',
+      providerFixtureId: '1539000',
+      leagueId: 1,
+      season: 2026,
+      competitionName: 'World Cup',
+      homeTeamName: 'Canada',
+      awayTeamName: 'Bosnia & Herzegovina',
+    };
+    const usaParaguay = {
+      ...fixture('2026-06-13T01:00:00.000Z'),
+      id: 'fixture-usa-paraguay',
+      providerFixtureId: '1489370',
+      leagueId: 1,
+      season: 2026,
+      competitionName: 'World Cup',
+      homeTeamName: 'USA',
+      awayTeamName: 'Paraguay',
+    };
+    const pipelineInputs: any[] = [];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-06-12',
+      providers: ['codex', 'gemini'],
+      providerConcurrency: 2,
+      parlayProfile: 'portfolio-v2',
+      persistMetrics: false,
+      dailyBatchId: 'daily-world-cup-required-coverage',
+      requiredLeagues: [{ providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 }],
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        pipelineInputs.push(input);
+        const runId = `${config.provider}-run`;
+        return {
+          ok: true,
+          runId,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'review-required',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures: [canadaBosnia, usaParaguay],
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 2, hitCount: 0, hits: [], candidateFixtures: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [
+            {
+              ok: false,
+              runId,
+              fixtureId: 'fixture-canada-bosnia',
+              providerFixtureId: '1539000',
+              gateResult: {
+                verdict: 'blocked',
+                reasons: ['fresh live web research missing'],
+                warnings: ['score --web live requires a fresh research bundle'],
+              },
+              predictions: [],
+            },
+            {
+              ok: true,
+              runId,
+              fixtureId: 'fixture-usa-paraguay',
+              providerFixtureId: '1489370',
+              gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+              predictions: [{
+                ...highConfidencePrediction(runId),
+                id: `${config.provider}-usa-paraguay-h2h`,
+                fixtureId: 'fixture-usa-paraguay',
+                providerFixtureId: '1489370',
+                odds: 1.98,
+                confidence: 0.9,
+                edge: 0.057,
+              }],
+            },
+          ],
+          parlay: {
+            ok: true,
+            runId,
+            gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: [`${config.provider}-parlay`],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'parlay-run',
+        date: input.date,
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+        build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 1.4, aggregateConfidence: 0.8, aggregateQuality: 0.8 } },
+        persistedParlayIds: [`${runtime.runId}-persisted`],
+      }) as any,
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: input.runIds?.length ?? 0,
+        top: [],
+        diagnostics: { generatedAt: '2026-06-12T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 1, profileScopedAnalyzed: 1, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 1, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(pipelineInputs.length, 2);
+    assert.deepEqual(pipelineInputs.map((input) => input.priorityLeagues), [
+      [{ providerCompetitionId: '1', name: 'World Cup', season: 2026 }],
+      [{ providerCompetitionId: '1', name: 'World Cup', season: 2026 }],
+    ]);
+    assert.equal(result.requiredLeagueRecommendations?.status, 'review-required');
+    assert.equal(result.requiredLeagueRecommendations?.missingPredictionFixtures, 1);
+    const required = JSON.parse(readFileSync(join(result.artifactDir, 'daily-required-league-recommendations.json'), 'utf-8'));
+    assert.equal(required.coverage.fixtureCount, 2);
+    assert.equal(required.coverage.coveredFixtures, 1);
+    assert.equal(required.coverage.missingPredictionFixtures, 1);
+    assert.equal(required.coverage.fixtures.find((item: any) => item.providerFixtureId === '1539000').status, 'missing-predictions');
+    assert.equal(required.atomicProjections.length, 1);
+    assert.equal(required.atomicProjections[0].fixture, 'USA vs Paraguay');
+    assert.deepEqual(required.atomicProjections[0].providers, ['codex', 'gemini']);
+    assert.equal(required.parlayProjections.length, 3);
+    assert.equal(required.parlayProjections.every((item: any) => item.status === 'blocked'), true);
+    assert.equal(required.goalCheck.status, 'review-required');
+    assert.equal(required.goalCheck.nextActions.some((action: string) => action.includes('1539000')), true);
+    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
+    assert.equal(summary.requiredLeagueGoalCheck.status, 'review-required');
+    assert.equal(summary.counts.requiredLeagueMissingPredictionFixtures, 1);
+    assert.equal(summary.runDiagnostics.reasons.some((reason: string) => reason.includes('required league atomic-projection-coverage')), true);
+    const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    assert.equal(recommendations.requiredLeagueGoalCheck.status, 'review-required');
+    assert.equal(recommendations.recommendationPolicy.requiredLeagueAddendum.missingPredictionFixtures, 1);
+  });
+
   it('rejects non-native daily providers before running', async () => {
     const ctx = context();
     await assert.rejects(
