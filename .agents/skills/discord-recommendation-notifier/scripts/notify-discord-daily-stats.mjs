@@ -375,7 +375,7 @@ function formatValidationMirrorMetricLine(recommendation, status) {
   const parts = [
     `> 📊 Resultado ${statusIcon(status)} ${status}`,
     `Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
-    `🧠 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    `🍀 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
     `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
     stake ? `💵 Stake ${stake}` : undefined,
   ];
@@ -515,7 +515,7 @@ function formatMetricDescription(metrics, topTitle, topBuckets, includeEdge) {
   if (!metrics) return '> Sin datos.';
   const lines = [
     `> ✅ ${num(metrics.won)} · ❌ ${num(metrics.lost)} · ➖ ${num(metrics.voided)} · ⏳ ${num(metrics.pending)} · 🚫 ${num(metrics.blocked)} · ⚪ ${num(metrics.unvalidated)}`,
-    `> 📌 Total ${num(metrics.total)} · 📈 Hit ${formatHitRate(metrics.hitRate)} · 🎲 Odds ${formatNumber(metrics.avgOdds, 3)} · 🧠 Conf ${formatConfidence(metrics.avgConfidence)}${includeEdge ? ` · 📊 Edge ${formatSignedPercent(metrics.avgEdge)}` : ''}`,
+    `> 📌 Total ${num(metrics.total)} · 📈 Hit ${formatHitRate(metrics.hitRate)} · 🎲 Odds ${formatNumber(metrics.avgOdds, 3)} · 🍀 Conf ${formatConfidence(metrics.avgConfidence)}${includeEdge ? ` · 📊 Edge ${formatSignedPercent(metrics.avgEdge)}` : ''}`,
   ];
   const bucketLines = formatBucketLines(topTitle, topBuckets);
   if (bucketLines.length) lines.push(...bucketLines);

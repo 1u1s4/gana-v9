@@ -27,7 +27,7 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[0].description, /📦 1 parlay · 📌 0 simples/);
     assert.match(payload.embeds[1].title, /1️⃣ ⚖️ Team A vs Team B/);
     assert.match(payload.embeds[1].description, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
-    assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
+    assert.match(payload.embeds[1].description, /> 📊 Odds 2.1 · 🍀 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
     assert.doesNotMatch(payload.embeds[1].description, /Expo/);
     assert.doesNotMatch(JSON.stringify(payload), /\bbet\b/i);
   });
@@ -46,7 +46,7 @@ describe('discord recommendation notifier', () => {
     assert.match(message, /📦 1 parlay · 📌 0 simples/);
     assert.match(message, /1️⃣ ⚖️ Team A vs Team B/);
     assert.match(message, /> ⚽ Team A vs Team B: h2h home @ 1.4/);
-    assert.match(message, /> 📊 Odds 2.1 · 🧠 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
+    assert.match(message, /> 📊 Odds 2.1 · 🍀 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
     assert.doesNotMatch(message, /Expo n\/a/);
     assert.match(message, /🛡️ Revisión manual requerida antes de promoción/);
     assert.doesNotMatch(message, /\bbet\b/i);
@@ -132,9 +132,10 @@ describe('discord recommendation notifier', () => {
     assert.match(requiredEmbed.description, /📌 1 predicción obligatoria · 🎛️ 1\/3 parlays seleccionados/);
     assert.match(predictionEmbed.description, /✅ Canada vs Bosnia & Herzegovina/);
     assert.match(predictionEmbed.description, /Canada gana @ 1.87/);
-    assert.match(parlayEmbed.description, /✅ 💎 parlay-diamante · 1 selección/);
+    assert.match(parlayEmbed.description, /💎 parlay-diamante/);
+    assert.doesNotMatch(parlayEmbed.description, /✅ 💎 parlay-diamante · 1 selección/);
     assert.match(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
-    assert.match(parlayEmbed.description, /📊 Cuota 1.22 · 🧠 Conf 63%/);
+    assert.match(parlayEmbed.description, /📊 Cuota 1.22 · 🍀 Conf 63%/);
     assert.match(parlayEmbed.description, /🚫 🧠 parlay-refinado/);
     assert.doesNotMatch(JSON.stringify(payload), /Sin selecciones/);
     assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
@@ -240,7 +241,8 @@ describe('discord recommendation notifier', () => {
     const payload = buildDiscordPayload(artifact, { max: 1 });
     const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
 
-    assert.match(parlayEmbed.description, /✅ 💎 parlay-diamante · 2 selecciones/);
+    assert.match(parlayEmbed.description, /💎 parlay-diamante/);
+    assert.doesNotMatch(parlayEmbed.description, /✅ 💎 parlay-diamante · 2 selecciones/);
     assert.match(parlayEmbed.description, /🚫 🧠 parlay-refinado/);
     assert.match(parlayEmbed.description, /Duplicado de parlay-diamante; no se publica cupón idéntico\./);
     assert.doesNotMatch(parlayEmbed.description, /identical required-league parlay/);

@@ -652,14 +652,16 @@ function formatRequiredLeagueParlayLines(data) {
     const icon = status === 'selected' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
     const profile = stringOrFallback(projection?.profile, 'profile unknown');
     const legs = Array.isArray(projection?.legs) ? projection.legs : [];
-    const legCount = legs.length ? ` · ${legs.length} ${legs.length === 1 ? 'selección' : 'selecciones'}` : '';
-    lines.push(`${icon} ${parlayProfileEmoji(profile)} ${profile}${legCount}`);
+    const heading = status === 'selected'
+      ? `${parlayProfileEmoji(profile)} ${profile}`
+      : `${icon} ${parlayProfileEmoji(profile)} ${profile}`;
+    lines.push(heading);
     for (const leg of legs.slice(0, 3)) {
       lines.push(`   ${formatRequiredLeagueParlayLeg(leg)}`);
     }
     const metrics = [
       Number.isFinite(projection?.combinedOdds) ? `📊 Cuota ${formatNumber(projection.combinedOdds, 2)}` : undefined,
-      Number.isFinite(projection?.aggregateConfidence) ? `🧠 Conf ${formatPercent(projection.aggregateConfidence)}` : undefined,
+      Number.isFinite(projection?.aggregateConfidence) ? `🍀 Conf ${formatPercent(projection.aggregateConfidence)}` : undefined,
     ].filter(Boolean);
     if (metrics.length) {
       lines.push(`   ${metrics.join(' · ')}`);
@@ -1077,7 +1079,7 @@ function formatCompactMetricLine(recommendation) {
   const stake = formatStakeRecommendation(recommendation);
   const parts = [
     `> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
-    `🧠 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    `🍀 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
     `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
     stake ? `💵 Stake ${stake}` : undefined,
   ];

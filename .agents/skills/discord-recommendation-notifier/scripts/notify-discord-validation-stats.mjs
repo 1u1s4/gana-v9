@@ -123,7 +123,7 @@ function metricEmbed(title, metrics, options) {
   const lines = [
     `> Total ${numberOrZero(metrics.total)} · ✅ ${numberOrZero(metrics.won)}W-${numberOrZero(metrics.lost)}L · ↩️ ${numberOrZero(metrics.voided)} void`,
     `> 📈 Hit ${formatNullablePercent(metrics.hitRate)} · ⏳ ${numberOrZero(metrics.pending)} pending · 🧾 ${numberOrZero(metrics.unvalidated)} unvalidated`,
-    `> 📊 Avg odds ${formatNullableNumber(metrics.avgOdds, 2)} · 🧠 Avg conf ${formatNullablePercent(metrics.avgConfidence)}${metrics.avgEdge === undefined ? '' : ` · Edge ${formatNullablePercent(metrics.avgEdge)}`}`,
+    `> 📊 Avg odds ${formatNullableNumber(metrics.avgOdds, 2)} · 🍀 Avg conf ${formatNullablePercent(metrics.avgConfidence)}${metrics.avgEdge === undefined ? '' : ` · Edge ${formatNullablePercent(metrics.avgEdge)}`}`,
   ];
   if (options.buckets.length) {
     lines.push(`> 🔎 Top ${options.buckets.map((bucket) => `${bucket.label}: ${bucket.won}-${bucket.lost} (${formatNullablePercent(bucket.hitRate)})`).join(' · ')}`);

@@ -31,7 +31,7 @@ describe('discord daily stats notifier', () => {
     assert.match(payload.embeds[0].description, /📅 2026-05-14 · America\/Guatemala/);
     assert.match(payload.embeds[1].title, /🎯 Predicciones/);
     assert.match(payload.embeds[1].description, /> ✅ 8 · ❌ 2 · ➖ 1 · ⏳ 3 · 🚫 0 · ⚪ 1/);
-    assert.match(payload.embeds[1].description, /> 📌 Total 15 · 📈 Hit 80% · 🎲 Odds 1.72 · 🧠 Conf 69% · 📊 Edge \+5.5%/);
+    assert.match(payload.embeds[1].description, /> 📌 Total 15 · 📈 Hit 80% · 🎲 Odds 1.72 · 🍀 Conf 69% · 📊 Edge \+5.5%/);
     assert.match(payload.embeds[2].title, /🧩 Parlays/);
     assert.match(payload.embeds[3].description, /> Gate: won/);
     assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
