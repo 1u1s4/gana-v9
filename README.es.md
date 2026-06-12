@@ -1,5 +1,7 @@
 # Gana Agent TUI
 
+![Banner analitico de terminal para Gana v9](docs/assets/gana-v9-readme-banner.png)
+
 [English](README.md)
 
 Gana v9 es una TUI de agentes y un harness operativo para investigacion de futbol, revision de cuotas, scoring de predicciones, construccion de parlays, validacion, dashboards y reportes a Discord. Esta diseñado para flujos de revision humana y no ejecuta acciones monetarias.

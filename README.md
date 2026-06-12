@@ -1,5 +1,7 @@
 # Gana Agent TUI
 
+![Gana v9 analytical terminal banner](docs/assets/gana-v9-readme-banner.png)
+
 [Español](README.es.md)
 
 Gana v9 is an analytical terminal agent and operations harness for football/soccer research, odds review, prediction scoring, parlay construction, validation, dashboards, and Discord reporting. It is designed for human review workflows and explicitly does not execute monetary actions.
