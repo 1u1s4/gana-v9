@@ -206,16 +206,18 @@ export function buildRequiredLeagueRecommendations(input: {
   requiredLeagues: readonly DailyRequiredLeagueDefinition[];
 }): DailyRequiredLeagueArtifact {
   const coverageFixtures = collectRequiredLeagueCoverageFixtures(input);
-  const atomicProjections = buildRequiredLeagueAtomicProjections({
+  const atomicProjectionDrafts = buildRequiredLeagueAtomicProjectionDrafts({
     ...input,
     coverageFixtures,
   });
+  const atomicProjections = selectRequiredLeagueAtomicProjections(atomicProjectionDrafts);
   const parlayProjections = input.requiredLeagues.flatMap((league) => {
     const leagueFixtures = coverageFixtures.filter((fixture) => sameRequiredLeague(fixture.league, league));
     if (!leagueFixtures.length) return [];
     return buildRequiredLeagueParlayProjections(
       league,
       atomicProjections.filter((projection) => sameRequiredLeague(projection.league, league)),
+      atomicProjectionDrafts.filter((projection) => sameRequiredLeague(projection.league, league)),
       leagueFixtures.length,
     );
   });
@@ -271,7 +273,7 @@ export function buildRequiredLeagueRecommendations(input: {
     ? []
     : uniqueStrings([
       ...missingPredictionFixtures.map((fixture) => `retry research/scoring for ${fixture.providerFixtureId} (${fixture.fixture}) with fresh web evidence`),
-      ...(parlayBlocked ? ['rerun required-league addendum after every required fixture has a non-blocked projection'] : []),
+      ...(parlayBlocked ? ['rerun required-league addendum after every required fixture has enough alternate non-blocked projections for three unique parlays'] : []),
     ]);
 
   return {
@@ -299,7 +301,7 @@ export function buildRequiredLeagueRecommendations(input: {
       defaultRequiredLeagues: DAILY_REQUIRED_LEAGUE_DEFAULTS,
       parlayProfiles: DAILY_PREFERRED_PARLAY_PROFILE_ORDER,
       atomicSelection: 'best non-blocked prediction per required fixture, promotable preferred over review-required',
-      parlaySelection: 'two distinct required-league fixtures per approach, review-only analytical addendum',
+      parlaySelection: 'two distinct required-league fixtures per approach, using alternate non-blocked projections to keep the three approaches unique',
     },
     analyticalArtifactOnly: true,
     executionCapability: 'none',
@@ -391,7 +393,7 @@ function coverageFixtureFromPipelineResults(
   };
 }
 
-function buildRequiredLeagueAtomicProjections(input: {
+function buildRequiredLeagueAtomicProjectionDrafts(input: {
   providers: readonly DailyE2EProvider[];
   providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>;
   timezone?: string;
@@ -437,6 +439,12 @@ function buildRequiredLeagueAtomicProjections(input: {
       || b.confidence - a.confidence
       || a.odds - b.odds
     );
+  return drafts;
+}
+
+function selectRequiredLeagueAtomicProjections(
+  drafts: readonly DailyRequiredLeagueAtomicProjection[],
+): DailyRequiredLeagueAtomicProjection[] {
   const selected: DailyRequiredLeagueAtomicProjection[] = [];
   const usedFixtureIds = new Set<string>();
   for (const projection of drafts) {
@@ -511,11 +519,21 @@ function toRequiredLeagueAtomicProjection(
 function buildRequiredLeagueParlayProjections(
   league: DailyRequiredLeagueDefinition,
   atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
+  parlayCandidates: readonly DailyRequiredLeagueAtomicProjection[],
   fixtureCount: number,
 ): DailyRequiredLeagueParlayProjection[] {
+  const usedSignatures = new Set<string>();
+  const anchorPredictionIds = new Set(atomicProjections.map((projection) => projection.predictionId));
   const projections = DAILY_PREFERRED_PARLAY_PROFILE_ORDER.map((profile) => {
-    const legs = selectRequiredLeagueParlayLegs(profile, atomicProjections);
-    if (fixtureCount < 2 || legs.length < 2) {
+    const selected = selectRequiredLeagueParlayLegs(
+      profile,
+      parlayCandidates,
+      usedSignatures,
+      profile === 'parlay-diamante' ? anchorPredictionIds : undefined,
+    );
+    const legs = selected?.legs ?? [];
+    const availableFixtureCount = new Set(parlayCandidates.map((projection) => projection.fixtureId)).size;
+    if (!selected || fixtureCount < 2 || availableFixtureCount < 2 || legs.length < 2) {
       return {
         kind: 'required-league-parlay-projection',
         profile,
@@ -531,11 +549,19 @@ function buildRequiredLeagueParlayProjections(
         legs: [],
         reasons: uniqueStrings([
           fixtureCount < 2 ? 'fewer than two required-league fixtures were scheduled or discovered' : '',
-          legs.length < 2 ? 'fewer than two required-league fixtures have non-blocked projections' : '',
+          availableFixtureCount < 2 ? 'fewer than two required-league fixtures have non-blocked projections' : '',
+          fixtureCount >= 2 && availableFixtureCount >= 2 && legs.length < 2
+            ? `fewer than ${usedSignatures.size + 1} unique required-league parlay signatures are available`
+            : '',
         ]),
-        riskFlags: ['required-league-addendum', 'blocked'],
+        riskFlags: uniqueStrings([
+          'required-league-addendum',
+          'blocked',
+          ...(fixtureCount >= 2 && availableFixtureCount >= 2 ? ['duplicate-required-league-parlay', 'insufficient-required-league-parlay-diversity'] : []),
+        ]),
       } satisfies DailyRequiredLeagueParlayProjection;
     }
+    usedSignatures.add(selected.signature);
     const combinedOdds = round(legs.reduce((product, projection) => product * projection.odds, 1), 6);
     const aggregateConfidence = round(legs.reduce((product, projection) => product * clamp(projection.confidence, 0.01, 0.99), 1), 6);
     const adjustedProbability = round(clamp(aggregateConfidence, 0.01, 0.99), 6);
@@ -560,7 +586,7 @@ function buildRequiredLeagueParlayProjections(
       legs: legs.map(requiredLeagueParlayLeg),
       reasons: [
         `required league ${league.name ?? league.providerCompetitionId}`,
-        `generated ${profile} addendum from ${legs.length} distinct required fixtures`,
+        `generated ${profile} addendum from ${legs.length} distinct required fixtures with a unique required-league signature`,
         `providers: ${providers.join(', ') || 'unknown'}`,
       ],
       riskFlags: uniqueStrings([
@@ -570,47 +596,19 @@ function buildRequiredLeagueParlayProjections(
       ]),
     } satisfies DailyRequiredLeagueParlayProjection;
   });
-  return dedupeRequiredLeagueParlayProjections(projections);
+  return projections;
 }
 
-function dedupeRequiredLeagueParlayProjections(
-  projections: readonly DailyRequiredLeagueParlayProjection[],
-): DailyRequiredLeagueParlayProjection[] {
-  const selectedBySignature = new Map<string, DailyRequiredLeagueParlayProjection>();
-  return projections.map((projection) => {
-    if (projection.status !== 'selected') return projection;
-    const signature = requiredLeagueParlaySignature(projection);
-    const duplicateOf = selectedBySignature.get(signature);
-    if (!duplicateOf) {
-      selectedBySignature.set(signature, projection);
-      return projection;
-    }
-    return {
-      ...projection,
-      status: 'blocked',
-      parlayId: null,
-      combinedOdds: null,
-      aggregateConfidence: null,
-      adjustedProbability: null,
-      expectedEdge: null,
-      sourceRunIds: [],
-      providers: [],
-      legs: [],
-      reasons: uniqueStrings([
-        `duplicate of ${duplicateOf.profile}; identical required-league parlay is not published twice`,
-        ...projection.reasons,
-      ]),
-      riskFlags: uniqueStrings([
-        ...projection.riskFlags,
-        'duplicate-required-league-parlay',
-        'blocked',
-      ]),
-    };
-  });
+interface RequiredLeagueParlayLegSelection {
+  legs: DailyRequiredLeagueAtomicProjection[];
+  signature: string;
+  score: number;
 }
 
-function requiredLeagueParlaySignature(projection: DailyRequiredLeagueParlayProjection): string {
-  return projection.legs
+function requiredLeagueParlayLegsSignature(
+  legs: readonly Pick<DailyRequiredLeagueAtomicProjection, 'fixtureId' | 'predictionId' | 'market' | 'selection' | 'line' | 'odds'>[],
+): string {
+  return legs
     .map((leg) => [
       leg.fixtureId,
       leg.predictionId,
@@ -626,18 +624,73 @@ function requiredLeagueParlaySignature(projection: DailyRequiredLeagueParlayProj
 function selectRequiredLeagueParlayLegs(
   profile: typeof DAILY_PREFERRED_PARLAY_PROFILE_ORDER[number],
   atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
-): DailyRequiredLeagueAtomicProjection[] {
+  usedSignatures: ReadonlySet<string>,
+  anchorPredictionIds?: ReadonlySet<string>,
+): RequiredLeagueParlayLegSelection | undefined {
   const ordered = [...atomicProjections]
-    .sort((a, b) => requiredLeagueParlayLegScore(profile, b) - requiredLeagueParlayLegScore(profile, a));
-  const selected: DailyRequiredLeagueAtomicProjection[] = [];
-  const usedFixtureIds = new Set<string>();
-  for (const projection of ordered) {
-    if (usedFixtureIds.has(projection.fixtureId)) continue;
-    selected.push(projection);
-    usedFixtureIds.add(projection.fixtureId);
-    if (selected.length >= 2) break;
+    .sort((a, b) =>
+      requiredLeagueParlayLegScore(profile, b) - requiredLeagueParlayLegScore(profile, a)
+      || requiredAtomicProjectionScore(b) - requiredAtomicProjectionScore(a)
+      || a.odds - b.odds
+      || a.predictionId.localeCompare(b.predictionId)
+    );
+  const combinations: RequiredLeagueParlayLegSelection[] = [];
+  const seenSignatures = new Set<string>();
+  for (let leftIndex = 0; leftIndex < ordered.length; leftIndex += 1) {
+    const left = ordered[leftIndex] as DailyRequiredLeagueAtomicProjection;
+    for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
+      const right = ordered[rightIndex] as DailyRequiredLeagueAtomicProjection;
+      if (left.fixtureId === right.fixtureId) continue;
+      const legs = [left, right].sort(compareRequiredLeagueParlayLegOrder);
+      const signature = requiredLeagueParlayLegsSignature(legs);
+      if (seenSignatures.has(signature)) continue;
+      seenSignatures.add(signature);
+      combinations.push({
+        legs,
+        signature,
+        score: requiredLeagueParlaySelectionScore(profile, legs, anchorPredictionIds),
+      });
+    }
   }
-  return selected;
+  return combinations
+    .sort((a, b) =>
+      b.score - a.score
+      || b.legs.reduce((sum, leg) => sum + leg.confidence, 0) - a.legs.reduce((sum, leg) => sum + leg.confidence, 0)
+      || a.signature.localeCompare(b.signature)
+    )
+    .find((combination) => !usedSignatures.has(combination.signature));
+}
+
+function compareRequiredLeagueParlayLegOrder(
+  a: DailyRequiredLeagueAtomicProjection,
+  b: DailyRequiredLeagueAtomicProjection,
+): number {
+  const aTime = Date.parse(a.display?.kickoffLocal ?? '');
+  const bTime = Date.parse(b.display?.kickoffLocal ?? '');
+  const aHasTime = Number.isFinite(aTime);
+  const bHasTime = Number.isFinite(bTime);
+  if (aHasTime && bHasTime && aTime !== bTime) return aTime - bTime;
+  if (aHasTime !== bHasTime) return aHasTime ? -1 : 1;
+  return a.fixture.localeCompare(b.fixture);
+}
+
+function requiredLeagueParlaySelectionScore(
+  profile: typeof DAILY_PREFERRED_PARLAY_PROFILE_ORDER[number],
+  legs: readonly DailyRequiredLeagueAtomicProjection[],
+  anchorPredictionIds?: ReadonlySet<string>,
+): number {
+  const combinedOdds = legs.reduce((product, projection) => product * projection.odds, 1);
+  const aggregateConfidence = legs.reduce((product, projection) => product * clamp(projection.confidence, 0.01, 0.99), 1);
+  const expectedEdge = (combinedOdds * clamp(aggregateConfidence, 0.01, 0.99)) - 1;
+  const averageLegScore = average(legs.map((projection) => requiredLeagueParlayLegScore(profile, projection)));
+  const lowVariancePenalty = profile === 'low-variance' ? Math.log2(Math.max(1.01, combinedOdds)) * 0.1 : 0;
+  const refinedEdgeBonus = profile === 'parlay-refinado' ? Math.max(0, expectedEdge) * 0.12 : 0;
+  const diamanteWindowBonus = profile === 'parlay-diamante' && combinedOdds >= 1.8 && combinedOdds <= 3.6 ? 0.06 : 0;
+  const nonPositiveEdgePenalty = expectedEdge <= 0 ? (profile === 'low-variance' ? 0.2 : 0.1) : 0;
+  const anchorBonus = profile === 'parlay-diamante' && anchorPredictionIds
+    ? legs.filter((projection) => anchorPredictionIds.has(projection.predictionId)).length * 0.5
+    : 0;
+  return round(averageLegScore + (aggregateConfidence * 0.16) + refinedEdgeBonus + diamanteWindowBonus + anchorBonus - lowVariancePenalty - nonPositiveEdgePenalty, 6);
 }
 
 function requiredLeagueParlayLegScore(

@@ -1325,7 +1325,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.requiredLeagueAddendum.missingPredictionFixtures, 1);
   });
 
-  it('blocks duplicate required-league parlay approaches instead of publishing identical coupons', () => {
+  it('builds distinct required-league parlay approaches from alternate fixture projections', () => {
     const canadaBosnia = {
       ...fixture('2026-06-12T19:00:00.000Z'),
       id: 'fixture-canada-bosnia',
@@ -1369,19 +1369,47 @@ describe('runDailyE2E', () => {
               fixtureId: 'fixture-canada-bosnia',
               providerFixtureId: '1539000',
               gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
-              predictions: [{
-                ...highConfidencePrediction('codex-run'),
-                id: 'canada-under-25',
-                fixtureId: 'fixture-canada-bosnia',
-                providerFixtureId: '1539000',
-                market: 'goals_over_under',
-                selection: 'under',
-                line: 2.5,
-                odds: 1.67,
-                confidence: 0.63,
-                edge: 0.0261,
-                status: 'review-required',
-              }],
+              predictions: [
+                {
+                  ...highConfidencePrediction('codex-run'),
+                  id: 'canada-under-25',
+                  fixtureId: 'fixture-canada-bosnia',
+                  providerFixtureId: '1539000',
+                  market: 'goals_over_under',
+                  selection: 'under',
+                  line: 2.5,
+                  odds: 1.67,
+                  confidence: 0.63,
+                  edge: 0.0261,
+                  status: 'review-required',
+                },
+                {
+                  ...highConfidencePrediction('codex-run'),
+                  id: 'canada-home',
+                  fixtureId: 'fixture-canada-bosnia',
+                  providerFixtureId: '1539000',
+                  market: 'h2h',
+                  selection: 'home',
+                  line: null,
+                  odds: 1.85,
+                  confidence: 0.57,
+                  edge: 0.034,
+                  status: 'review-required',
+                },
+                {
+                  ...highConfidencePrediction('codex-run'),
+                  id: 'canada-btts-no',
+                  fixtureId: 'fixture-canada-bosnia',
+                  providerFixtureId: '1539000',
+                  market: 'btts',
+                  selection: 'no',
+                  line: null,
+                  odds: 1.8,
+                  confidence: 0.61,
+                  edge: 0.025,
+                  status: 'review-required',
+                },
+              ],
             },
             {
               ok: true,
@@ -1389,18 +1417,47 @@ describe('runDailyE2E', () => {
               fixtureId: 'fixture-usa-paraguay',
               providerFixtureId: '1489370',
               gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
-              predictions: [{
-                ...highConfidencePrediction('codex-run'),
-                id: 'usa-home',
-                fixtureId: 'fixture-usa-paraguay',
-                providerFixtureId: '1489370',
-                market: 'h2h',
-                selection: 'home',
-                odds: 2.09,
-                confidence: 0.58,
-                edge: 0.0255,
-                status: 'review-required',
-              }],
+              predictions: [
+                {
+                  ...highConfidencePrediction('codex-run'),
+                  id: 'usa-home',
+                  fixtureId: 'fixture-usa-paraguay',
+                  providerFixtureId: '1489370',
+                  market: 'h2h',
+                  selection: 'home',
+                  line: null,
+                  odds: 2.09,
+                  confidence: 0.58,
+                  edge: 0.0255,
+                  status: 'review-required',
+                },
+                {
+                  ...highConfidencePrediction('codex-run'),
+                  id: 'usa-under-25',
+                  fixtureId: 'fixture-usa-paraguay',
+                  providerFixtureId: '1489370',
+                  market: 'goals_over_under',
+                  selection: 'under',
+                  line: 2.5,
+                  odds: 1.7,
+                  confidence: 0.62,
+                  edge: 0.03,
+                  status: 'review-required',
+                },
+                {
+                  ...highConfidencePrediction('codex-run'),
+                  id: 'usa-double-chance',
+                  fixtureId: 'fixture-usa-paraguay',
+                  providerFixtureId: '1489370',
+                  market: 'double_chance',
+                  selection: 'home_or_draw',
+                  line: null,
+                  odds: 1.35,
+                  confidence: 0.69,
+                  edge: 0.015,
+                  status: 'review-required',
+                },
+              ],
             },
           ],
         } as any,
@@ -1408,16 +1465,18 @@ describe('runDailyE2E', () => {
     });
 
     const selected = artifact.parlayProjections.filter((projection) => projection.status === 'selected');
-    const blocked = artifact.parlayProjections.filter((projection) => projection.status === 'blocked');
+    const signatures = selected.map((projection) => projection.legs
+      .map((leg) => `${leg.fixtureId}:${leg.predictionId}:${leg.market}:${leg.selection}:${leg.line ?? ''}:${leg.odds ?? ''}`)
+      .sort()
+      .join('|'));
     assert.equal(artifact.parlayProjections.length, 3);
-    assert.equal(selected.length, 1);
-    assert.equal(selected[0].profile, 'parlay-diamante');
-    assert.equal(blocked.length, 2);
-    assert.deepEqual(blocked.map((projection) => projection.profile), ['parlay-refinado', 'low-variance']);
-    assert.equal(blocked.every((projection) => projection.riskFlags.includes('duplicate-required-league-parlay')), true);
-    assert.equal(blocked.every((projection) => projection.legs.length === 0), true);
-    assert.equal(artifact.goalCheck.status, 'review-required');
-    assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'three-parlay-approaches')?.status, 'blocked');
+    assert.equal(selected.length, 3);
+    assert.deepEqual(selected.map((projection) => projection.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.equal(new Set(signatures).size, 3);
+    assert.equal(selected.every((projection) => projection.legs.length === 2), true);
+    assert.equal(selected.every((projection) => new Set(projection.legs.map((leg) => leg.fixtureId)).size === 2), true);
+    assert.equal(artifact.goalCheck.status, 'passed');
+    assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'three-parlay-approaches')?.status, 'passed');
   });
 
   it('rejects non-native daily providers before running', async () => {
