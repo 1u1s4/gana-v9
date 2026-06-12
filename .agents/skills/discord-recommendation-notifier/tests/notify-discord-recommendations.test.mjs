@@ -107,10 +107,19 @@ describe('discord recommendation notifier', () => {
 
     const payload = buildDiscordPayload(artifact, { max: 1 });
     const message = buildGatewayMessage(artifact, { max: 1 });
+    const titles = payload.embeds.map((embed) => embed.title ?? '');
     const requiredEmbed = payload.embeds.find((embed) => /^🌍 Obligatorio/.test(embed.title ?? ''));
     const predictionEmbed = payload.embeds.find((embed) => /^📌 Predicciones obligatorias/.test(embed.title ?? ''));
     const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
 
+    assert.deepEqual(titles, [
+      '🏆 Gana v9 · Recomendaciones',
+      '1️⃣ ⚖️ Team A vs Team B',
+      '🌍 Obligatorio · World Cup',
+      '📌 Predicciones obligatorias · World Cup',
+      '🎛️ Parlays obligatorios · World Cup',
+      '',
+    ]);
     assert.ok(requiredEmbed);
     assert.ok(predictionEmbed);
     assert.ok(parlayEmbed);

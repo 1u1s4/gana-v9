@@ -111,7 +111,6 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
     footer: { text: 'Gana Hermes · Discord native embeds' },
     timestamp: new Date().toISOString(),
   }];
-  embeds.push(...requiredLeagueDiscordEmbeds(artifact));
 
   if (!recommendations.length && !hasRequiredSelections) {
     embeds.push({
@@ -135,6 +134,7 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
     }
   }
 
+  embeds.push(...requiredLeagueDiscordEmbeds(artifact));
   embeds.push({
     description: '🛡️ Revisión manual requerida antes de promoción.',
     color: 0x56ccf2,
@@ -154,6 +154,7 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
   const pageCount = Number.isInteger(options.pageCount) ? options.pageCount : 1;
   const page = Number.isInteger(options.page) ? options.page : 1;
   const includeHeader = page === 1;
+  const includeRequiredLeague = page === pageCount;
   const includeClosing = page === pageCount;
   const embeds = [];
 
@@ -165,7 +166,6 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
       footer: { text: 'Gana Hermes · Discord native embeds' },
       timestamp: new Date().toISOString(),
     });
-    embeds.push(...requiredLeagueDiscordEmbeds(options.artifact));
   }
 
   if (recommendations.length) {
@@ -176,6 +176,10 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
       description: '> El artifact no contiene selecciones para notificar.',
       color: 0x828282,
     });
+  }
+
+  if (includeRequiredLeague) {
+    embeds.push(...requiredLeagueDiscordEmbeds(options.artifact));
   }
 
   if (includeClosing) {
@@ -1127,16 +1131,14 @@ function paginateDiscordSelectionEmbeds(recommendations, artifact) {
   while (index < recommendations.length) {
     const remaining = recommendations.length - index;
     const isFirst = pages.length === 0;
-    const firstPageFixedEmbeds = isFirst ? 1 + requiredLeagueEmbedCount : 0;
-    const lastPageFixedEmbeds = 1;
-    const lastPageCapacity = Math.max(1, DISCORD_EMBED_LIMIT - firstPageFixedEmbeds - lastPageFixedEmbeds);
+    const lastPageFixedEmbeds = (isFirst ? 1 : 0) + requiredLeagueEmbedCount + 1;
+    const lastPageCapacity = Math.max(1, DISCORD_EMBED_LIMIT - lastPageFixedEmbeds);
     let capacity;
     if (remaining <= lastPageCapacity) {
       capacity = lastPageCapacity;
-    } else if (isFirst) {
-      capacity = Math.min(Math.max(1, DISCORD_EMBED_LIMIT - firstPageFixedEmbeds), remaining - 1);
     } else {
-      capacity = Math.min(DISCORD_EMBED_LIMIT, remaining - 1);
+      const nonLastFixedEmbeds = isFirst ? 1 : 0;
+      capacity = Math.min(Math.max(1, DISCORD_EMBED_LIMIT - nonLastFixedEmbeds), remaining - 1);
     }
     pages.push(recommendations.slice(index, index + capacity));
     index += capacity;
