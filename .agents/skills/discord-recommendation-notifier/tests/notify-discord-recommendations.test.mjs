@@ -107,15 +107,59 @@ describe('discord recommendation notifier', () => {
 
     const payload = buildDiscordPayload(artifact, { max: 1 });
     const message = buildGatewayMessage(artifact, { max: 1 });
-    const requiredEmbed = payload.embeds.find((embed) => /Obligatorio/.test(embed.title ?? ''));
+    const requiredEmbed = payload.embeds.find((embed) => /^🌍 Obligatorio/.test(embed.title ?? ''));
+    const predictionEmbed = payload.embeds.find((embed) => /^📌 Predicciones obligatorias/.test(embed.title ?? ''));
+    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
 
     assert.ok(requiredEmbed);
+    assert.ok(predictionEmbed);
+    assert.ok(parlayEmbed);
+    assert.match(payload.embeds[0].description, /📅 Diario: 📦 1 parlay · 📌 0 simples/);
+    assert.match(payload.embeds[0].description, /🌍 Obligatorio World Cup: 🟡 📦 1 parlay · 📌 1 predicción/);
+    assert.match(payload.embeds[0].description, /📊 Total enviado: 📦 2 parlays · 📌 1 predicción/);
     assert.match(requiredEmbed.title, /World Cup/);
-    assert.match(requiredEmbed.description, /✅ Canada vs Bosnia & Herzegovina: 1 promotables \/ 1 preds/);
+    assert.match(requiredEmbed.description, /✅ Canada vs Bosnia & Herzegovina: 1 proyección fuerte \/ 1 predicción/);
     assert.match(requiredEmbed.description, /🚫 USA vs Paraguay: sin predicción válida/);
-    assert.match(requiredEmbed.description, /📌 Canada vs Bosnia & Herzegovina: h2h home @ 1.87/);
-    assert.match(requiredEmbed.description, /🎛️ Parlays obligatorios: ✅ 💎 parlay-diamante @ 1.22 · 🚫 🧠 parlay-refinado · 🚫 🛡️ low-variance/);
+    assert.match(requiredEmbed.description, /📌 1 predicción obligatoria · 🎛️ 1\/3 parlays seleccionados/);
+    assert.match(predictionEmbed.description, /✅ Canada vs Bosnia & Herzegovina/);
+    assert.match(predictionEmbed.description, /Canada gana @ 1.87/);
+    assert.match(parlayEmbed.description, /✅ 💎 parlay-diamante · 1 selección · Cuota 1.22/);
+    assert.match(parlayEmbed.description, /Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
+    assert.match(parlayEmbed.description, /🚫 🧠 parlay-refinado/);
+    assert.doesNotMatch(JSON.stringify(payload), /Sin selecciones/);
     assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
+  });
+
+  it('does not send an empty-selection box when the required addendum has publishable predictions and parlays', () => {
+    const artifact = {
+      date: '2026-06-12',
+      dailyBatchId: 'daily-required-only',
+      recommendations: [],
+      parlayApproaches: [
+        { profile: 'parlay-diamante', status: 'blocked', combinedOdds: null },
+        { profile: 'parlay-refinado', status: 'blocked', combinedOdds: null },
+        { profile: 'low-variance', status: 'blocked', combinedOdds: null },
+      ],
+      requiredLeagueRecommendations: sampleRequiredLeagueRecommendationsPassed(),
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+    const titles = payload.embeds.map((embed) => embed.title ?? '');
+
+    assert.deepEqual(titles, [
+      '🏆 Gana v9 · Recomendaciones',
+      '🌍 Obligatorio · World Cup',
+      '📌 Predicciones obligatorias · World Cup',
+      '🎛️ Parlays obligatorios · World Cup',
+      '',
+    ]);
+    assert.match(payload.embeds[0].description, /📅 Diario: 📦 0 parlays · 📌 0 simples/);
+    assert.match(payload.embeds[0].description, /🌍 Obligatorio World Cup: ✅ 📦 3 parlays · 📌 2 predicciones/);
+    assert.match(payload.embeds[0].description, /📊 Total enviado: 📦 3 parlays · 📌 2 predicciones/);
+    assert.match(payload.embeds[0].description, /🎛️ Enfoques diarios:/);
+    assert.doesNotMatch(JSON.stringify(payload), /Sin selecciones/);
+    assert.doesNotMatch(message, /Sin selecciones/);
   });
 
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
@@ -532,9 +576,131 @@ function sampleRequiredLeagueRecommendations() {
       status: 'promotable',
     }],
     parlayProjections: [
-      { profile: 'parlay-diamante', status: 'selected', combinedOdds: 1.22, legs: [] },
+      {
+        profile: 'parlay-diamante',
+        status: 'selected',
+        combinedOdds: 1.22,
+        aggregateConfidence: 0.63,
+        legs: [{
+          fixture: 'Canada vs Bosnia & Herzegovina',
+          providerFixtureId: '1539000',
+          market: 'h2h',
+          selection: 'home',
+          odds: 1.87,
+          confidence: 0.63,
+          display: {
+            fixtureLabel: 'Canada vs Bosnia & Herzegovina',
+            homeTeamName: 'Canada',
+            awayTeamName: 'Bosnia & Herzegovina',
+            leagueName: 'World Cup',
+          },
+        }],
+      },
       { profile: 'parlay-refinado', status: 'blocked', combinedOdds: null, legs: [] },
       { profile: 'low-variance', status: 'blocked', combinedOdds: null, legs: [] },
     ],
+  };
+}
+
+function sampleRequiredLeagueRecommendationsPassed() {
+  const base = sampleRequiredLeagueRecommendations();
+  return {
+    ...base,
+    coverage: {
+      ...base.coverage,
+      coveredFixtures: 2,
+      missingPredictionFixtures: 0,
+      status: 'passed',
+      fixtures: [
+        {
+          ...base.coverage.fixtures[0],
+          status: 'covered',
+          predictionCount: 10,
+          promotableCount: 1,
+        },
+        {
+          ...base.coverage.fixtures[1],
+          status: 'covered',
+          predictionCount: 10,
+          promotableCount: 3,
+        },
+      ],
+    },
+    goalCheck: {
+      status: 'passed',
+      nextActions: [],
+    },
+    atomicProjections: [
+      {
+        fixture: 'USA vs Paraguay',
+        providerFixtureId: '1489370',
+        market: 'h2h',
+        selection: 'home',
+        odds: 1.96,
+        confidence: 0.655,
+        expectedEdge: 0.040964,
+        status: 'promotable',
+        providers: ['gemini', 'codex'],
+        display: {
+          fixtureLabel: 'USA vs Paraguay',
+          homeTeamName: 'USA',
+          awayTeamName: 'Paraguay',
+          leagueName: 'World Cup',
+        },
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'h2h',
+        selection: 'home',
+        odds: 1.86,
+        confidence: 0.575,
+        expectedEdge: 0.058,
+        status: 'promotable',
+        providers: ['codex', 'gemini'],
+        display: {
+          fixtureLabel: 'Canada vs Bosnia & Herzegovina',
+          homeTeamName: 'Canada',
+          awayTeamName: 'Bosnia & Herzegovina',
+          leagueName: 'World Cup',
+        },
+      },
+    ],
+    parlayProjections: ['parlay-diamante', 'parlay-refinado', 'low-variance'].map((profile) => ({
+      profile,
+      status: 'selected',
+      combinedOdds: 3.6456,
+      aggregateConfidence: 0.376625,
+      legs: [
+        {
+          fixture: 'USA vs Paraguay',
+          providerFixtureId: '1489370',
+          market: 'h2h',
+          selection: 'home',
+          odds: 1.96,
+          confidence: 0.655,
+          display: {
+            fixtureLabel: 'USA vs Paraguay',
+            homeTeamName: 'USA',
+            awayTeamName: 'Paraguay',
+            leagueName: 'World Cup',
+          },
+        },
+        {
+          fixture: 'Canada vs Bosnia & Herzegovina',
+          providerFixtureId: '1539000',
+          market: 'h2h',
+          selection: 'home',
+          odds: 1.86,
+          confidence: 0.575,
+          display: {
+            fixtureLabel: 'Canada vs Bosnia & Herzegovina',
+            homeTeamName: 'Canada',
+            awayTeamName: 'Bosnia & Herzegovina',
+            leagueName: 'World Cup',
+          },
+        },
+      ],
+    })),
   };
 }

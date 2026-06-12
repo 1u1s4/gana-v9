@@ -103,20 +103,17 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const counts = recommendationCounts(recommendations);
+  const hasRequiredSelections = hasRequiredLeagueSelections(artifact);
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones',
-    description: [
-      recommendationCountLine(counts),
-      formatArtifactDate(artifact?.date),
-      ...formatParlayApproachLines(artifact?.parlayApproaches),
-    ].join('\n'),
+    description: formatHeaderDescription(artifact, counts, artifact?.date),
     color: 0x2f80ed,
     footer: { text: 'Gana Hermes · Discord native embeds' },
     timestamp: new Date().toISOString(),
   }];
   embeds.push(...requiredLeagueDiscordEmbeds(artifact));
 
-  if (!recommendations.length) {
+  if (!recommendations.length && !hasRequiredSelections) {
     embeds.push({
       title: 'Sin selecciones',
       description: '> El artifact no contiene selecciones para notificar.',
@@ -163,11 +160,7 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
   if (includeHeader) {
     embeds.push({
       title: '🏆 Gana v9 · Recomendaciones',
-      description: [
-        recommendationCountLine(totalCounts),
-        formatArtifactDate(options.artifactDate),
-        ...formatParlayApproachLines(options.artifact?.parlayApproaches),
-      ].filter(Boolean).join('\n'),
+      description: formatHeaderDescription(options.artifact, totalCounts, options.artifactDate),
       color: 0x2f80ed,
       footer: { text: 'Gana Hermes · Discord native embeds' },
       timestamp: new Date().toISOString(),
@@ -177,7 +170,7 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
 
   if (recommendations.length) {
     embeds.push(...recommendations.map((recommendation, index) => recommendationEmbed(recommendation, index)));
-  } else {
+  } else if (!hasRequiredLeagueSelections(options.artifact)) {
     embeds.push({
       title: 'Sin selecciones',
       description: '> El artifact no contiene selecciones para notificar.',
@@ -200,6 +193,32 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
   };
 }
 
+function formatHeaderDescription(artifact, dailyCounts, artifactDate) {
+  const required = requiredLeagueCounts(artifact);
+  const date = formatArtifactDate(artifactDate);
+  const lines = [];
+  if (required) {
+    lines.push(`📅 Diario: ${recommendationCountLine(dailyCounts)}`);
+    lines.push(`🌍 Obligatorio ${required.title}: ${required.statusIcon} 📦 ${required.selectedParlays} ${required.selectedParlays === 1 ? 'parlay' : 'parlays'} · 📌 ${required.atomic} ${required.atomic === 1 ? 'predicción' : 'predicciones'}`);
+    lines.push(`📊 Total enviado: 📦 ${dailyCounts.parlay + required.selectedParlays} ${(dailyCounts.parlay + required.selectedParlays) === 1 ? 'parlay' : 'parlays'} · 📌 ${dailyCounts.atomic + required.atomic} ${(dailyCounts.atomic + required.atomic) === 1 ? 'predicción' : 'predicciones'}`);
+  } else {
+    lines.push(recommendationCountLine(dailyCounts));
+  }
+  if (date) lines.push(date);
+  lines.push(...formatParlayApproachLines(artifact?.parlayApproaches, required ? '🎛️ Enfoques diarios' : '🎛️ Enfoques'));
+  return lines.filter(Boolean).join('\n');
+}
+
+function formatGatewayHeaderLines(artifact, dailyCounts) {
+  const required = requiredLeagueCounts(artifact);
+  if (!required) return [recommendationCountLine(dailyCounts)];
+  return [
+    `📅 Diario: ${recommendationCountLine(dailyCounts)}`,
+    `🌍 Obligatorio ${required.title}: ${required.statusIcon} 📦 ${required.selectedParlays} ${required.selectedParlays === 1 ? 'parlay' : 'parlays'} · 📌 ${required.atomic} ${required.atomic === 1 ? 'predicción' : 'predicciones'}`,
+    `📊 Total enviado: 📦 ${dailyCounts.parlay + required.selectedParlays} ${(dailyCounts.parlay + required.selectedParlays) === 1 ? 'parlay' : 'parlays'} · 📌 ${dailyCounts.atomic + required.atomic} ${(dailyCounts.atomic + required.atomic) === 1 ? 'predicción' : 'predicciones'}`,
+  ];
+}
+
 function formatArtifactDate(value) {
   if (typeof value !== 'string') return undefined;
   const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/.exec(value.trim());
@@ -218,8 +237,8 @@ export function buildGatewayMessage(artifact, options = {}) {
   const lines = [
     '🏆 Gana v9 · Recomendaciones en revisión',
     '',
-    recommendationCountLine(counts),
-    ...formatParlayApproachLines(artifact?.parlayApproaches),
+    ...formatGatewayHeaderLines(artifact, counts),
+    ...formatParlayApproachLines(artifact?.parlayApproaches, requiredLeagueCounts(artifact) ? '🎛️ Enfoques diarios' : '🎛️ Enfoques'),
     ...formatRequiredLeagueLines(artifact),
     `🟡 ${status} · ${validation} · 💧 ${risk}`,
     '⚠️ Sin ejecución monetaria · Sin garantía',
@@ -228,7 +247,7 @@ export function buildGatewayMessage(artifact, options = {}) {
     '',
   ];
 
-  if (!recommendations.length) {
+  if (!recommendations.length && !hasRequiredLeagueSelections(artifact)) {
     lines.push('> Sin selecciones: el artifact no contiene selecciones para notificar.', '');
   } else {
     for (const [index, recommendation] of recommendations.entries()) {
@@ -454,7 +473,7 @@ function recommendationCountLine(counts) {
   return `📦 ${counts.parlay} ${counts.parlay === 1 ? 'parlay' : 'parlays'} · 📌 ${counts.atomic} ${counts.atomic === 1 ? 'simple' : 'simples'}`;
 }
 
-function formatParlayApproachLines(approaches) {
+function formatParlayApproachLines(approaches, label = '🎛️ Enfoques') {
   if (!Array.isArray(approaches) || !approaches.length) return [];
   const compact = approaches.slice(0, 3).map((approach) => {
     const profile = stringOrFallback(approach?.profile, 'unknown');
@@ -463,7 +482,7 @@ function formatParlayApproachLines(approaches) {
     const odds = Number.isFinite(approach?.combinedOdds) ? ` @ ${formatNumber(approach.combinedOdds, 2)}` : '';
     return `${statusIcon} ${parlayProfileEmoji(profile)} ${profile}${odds}`;
   });
-  return [`🎛️ Enfoques: ${compact.join(' · ')}`];
+  return [`${label}: ${compact.join(' · ')}`];
 }
 
 function requiredLeagueData(artifact) {
@@ -480,16 +499,55 @@ function requiredLeagueData(artifact) {
   return undefined;
 }
 
+function requiredLeagueCounts(artifact) {
+  const data = requiredLeagueData(artifact);
+  if (!data) return undefined;
+  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  const atomicProjections = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
+  const selectedParlays = parlayProjections.filter((projection) => projection?.status === 'selected').length;
+  const status = requiredLeagueStatus(data);
+  return {
+    title: requiredLeagueTitle(data),
+    status,
+    statusIcon: status === 'passed' ? '✅' : status === 'blocked' ? '🚫' : '🟡',
+    atomic: atomicProjections.length,
+    parlays: parlayProjections.length,
+    selectedParlays,
+  };
+}
+
+function hasRequiredLeagueSelections(artifact) {
+  const counts = requiredLeagueCounts(artifact);
+  return Boolean(counts && (counts.atomic > 0 || counts.selectedParlays > 0));
+}
+
 function requiredLeagueDiscordEmbeds(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return [];
-  const lines = formatRequiredLeagueDetailLines(data);
-  if (!lines.length) return [];
-  return [{
+  const summaryLines = formatRequiredLeagueSummaryLines(data);
+  if (!summaryLines.length) return [];
+  const embeds = [{
     title: `🌍 Obligatorio · ${requiredLeagueTitle(data)}`,
-    description: truncate(lines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+    description: truncate(summaryLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
     color: requiredLeagueStatus(data) === 'passed' ? 0x27ae60 : 0xf2994a,
   }];
+  const predictionLines = formatRequiredLeaguePredictionLines(data);
+  if (predictionLines.length) {
+    embeds.push({
+      title: `📌 Predicciones obligatorias · ${requiredLeagueTitle(data)}`,
+      description: truncate(predictionLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+      color: 0x9b51e0,
+    });
+  }
+  const parlayLines = formatRequiredLeagueParlayLines(data);
+  if (parlayLines.length) {
+    embeds.push({
+      title: `🎛️ Parlays obligatorios · ${requiredLeagueTitle(data)}`,
+      description: truncate(parlayLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+      color: 0x27ae60,
+    });
+  }
+  return embeds;
 }
 
 function formatRequiredLeagueLines(artifact) {
@@ -506,7 +564,7 @@ function formatRequiredLeagueLines(artifact) {
   return [`🌍 Obligatorio ${title}: ${statusIcon} ${status}${fixturePart}`];
 }
 
-function formatRequiredLeagueDetailLines(data) {
+function formatRequiredLeagueSummaryLines(data) {
   const lines = [];
   const coverage = data.coverage && typeof data.coverage === 'object' ? data.coverage : {};
   const fixtures = Array.isArray(coverage.fixtures) ? coverage.fixtures : [];
@@ -517,30 +575,102 @@ function formatRequiredLeagueDetailLines(data) {
     const promotableCount = Number.isFinite(fixture?.promotableCount) ? fixture.promotableCount : 0;
     const detail = status === 'missing-predictions'
       ? 'sin predicción válida'
-      : `${promotableCount} promotables / ${predictionCount} preds`;
+      : `${promotableCount} ${promotableCount === 1 ? 'proyección fuerte' : 'proyecciones fuertes'} / ${predictionCount} ${predictionCount === 1 ? 'predicción' : 'predicciones'}`;
     lines.push(`${icon} ${requiredLeagueFixtureLabel(fixture)}: ${detail}`);
   }
 
   const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
-  for (const projection of atomic.slice(0, 4)) {
-    lines.push(`📌 ${requiredLeagueFixtureLabel(projection)}: ${formatCompactSelection(projection)} @ ${formatMetricNumber(projection?.odds, 2)}`);
-  }
-
   const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
-  if (parlayProjections.length) {
-    const compact = parlayProjections.slice(0, 3).map((projection) => {
-      const status = stringOrFallback(projection?.status, 'unknown');
-      const icon = status === 'selected' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
-      const profile = stringOrFallback(projection?.profile, 'profile unknown');
-      const odds = Number.isFinite(projection?.combinedOdds) ? ` @ ${formatNumber(projection.combinedOdds, 2)}` : '';
-      return `${icon} ${parlayProfileEmoji(profile)} ${profile}${odds}`;
-    });
-    lines.push(`🎛️ Parlays obligatorios: ${compact.join(' · ')}`);
+  const selectedParlays = parlayProjections.filter((projection) => projection?.status === 'selected').length;
+  if (atomic.length || parlayProjections.length) {
+    lines.push(`📌 ${atomic.length} ${atomic.length === 1 ? 'predicción obligatoria' : 'predicciones obligatorias'} · 🎛️ ${selectedParlays}/${parlayProjections.length} ${parlayProjections.length === 1 ? 'parlay seleccionado' : 'parlays seleccionados'}`);
   }
-
   const nextActions = Array.isArray(data.goalCheck?.nextActions) ? data.goalCheck.nextActions : [];
   if (nextActions.length) lines.push(`🛠️ Próximo: ${stringOrFallback(nextActions[0], 'revisión requerida')}`);
   return lines;
+}
+
+function formatRequiredLeaguePredictionLines(data) {
+  const lines = [];
+  const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
+  for (const projection of atomic.slice(0, 4)) {
+    const status = stringOrFallback(projection?.status, 'unknown');
+    const icon = status === 'promotable' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
+    const confidence = Number.isFinite(projection?.confidence) ? ` · Conf ${formatPercent(projection.confidence)}` : '';
+    const edge = Number.isFinite(projection?.expectedEdge) ? ` · Edge ${formatPercent(projection.expectedEdge)}` : '';
+    const providers = Array.isArray(projection?.providers) && projection.providers.length ? ` · ${projection.providers.join('+')}` : '';
+    lines.push(`${icon} ${requiredLeagueFixtureLabel(projection)}`);
+    lines.push(`   ${formatRequiredPick(projection)} @ ${formatMetricNumber(projection?.odds, 2)}${confidence}${edge}${providers}`);
+  }
+  return lines;
+}
+
+function formatRequiredLeagueParlayLines(data) {
+  const lines = [];
+  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  for (const projection of parlayProjections.slice(0, 3)) {
+    const status = stringOrFallback(projection?.status, 'unknown');
+    const icon = status === 'selected' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
+    const profile = stringOrFallback(projection?.profile, 'profile unknown');
+    const legs = Array.isArray(projection?.legs) ? projection.legs : [];
+    const odds = Number.isFinite(projection?.combinedOdds) ? ` · Cuota ${formatNumber(projection.combinedOdds, 2)}` : '';
+    const confidence = Number.isFinite(projection?.aggregateConfidence) ? ` · Conf ${formatPercent(projection.aggregateConfidence)}` : '';
+    const legCount = legs.length ? ` · ${legs.length} ${legs.length === 1 ? 'selección' : 'selecciones'}` : '';
+    lines.push(`${icon} ${parlayProfileEmoji(profile)} ${profile}${legCount}${odds}${confidence}`);
+    for (const [index, leg] of legs.slice(0, 3).entries()) {
+      lines.push(`   ${index + 1}. ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg?.odds, 2)}`);
+    }
+    if (!legs.length && Array.isArray(projection?.reasons) && projection.reasons.length) {
+      lines.push(`   ${stringOrFallback(projection.reasons[0], 'sin legs publicados')}`);
+    }
+  }
+  return lines;
+}
+
+function formatRequiredPick(item) {
+  const market = stringOrFallback(item?.market, 'market');
+  const selection = stringOrFallback(item?.selection, 'selection');
+  const line = Number.isFinite(item?.line) ? formatMetricNumber(item.line, 2) : '';
+  const { home, away } = requiredLeagueTeams(item);
+  if (market === 'h2h') {
+    if (selection === 'home') return `${home ?? 'Local'} gana`;
+    if (selection === 'away') return `${away ?? 'Visitante'} gana`;
+    if (selection === 'draw') return 'Empate';
+  }
+  if (market === 'double_chance') {
+    if (selection === 'home_or_draw') return `${home ?? 'Local'} o empate`;
+    if (selection === 'draw_or_away') return `Empate o ${away ?? 'visitante'}`;
+    if (selection === 'home_or_away') return `${home ?? 'Local'} o ${away ?? 'visitante'}`;
+  }
+  if (market === 'goals_over_under') {
+    const direction = selection === 'over' ? 'Más' : selection === 'under' ? 'Menos' : selection;
+    return `${direction} de ${line || 'linea'} goles`;
+  }
+  if (market === 'corners_over_under') {
+    const direction = selection === 'over' ? 'Más' : selection === 'under' ? 'Menos' : selection;
+    return `${direction} de ${line || 'linea'} corners`;
+  }
+  if (market === 'btts') {
+    if (selection === 'yes') return 'Ambos anotan: Sí';
+    if (selection === 'no') return 'Ambos anotan: No';
+  }
+  return formatCompactSelection(item);
+}
+
+function requiredLeagueTeams(item) {
+  const display = item?.display && typeof item.display === 'object' ? item.display : {};
+  const homeFromDisplay = typeof display.homeTeamName === 'string' && display.homeTeamName.trim()
+    ? display.homeTeamName.trim()
+    : undefined;
+  const awayFromDisplay = typeof display.awayTeamName === 'string' && display.awayTeamName.trim()
+    ? display.awayTeamName.trim()
+    : undefined;
+  if (homeFromDisplay || awayFromDisplay) return { home: homeFromDisplay, away: awayFromDisplay };
+  const label = requiredLeagueFixtureLabel(item);
+  const parts = label.split(/\s+vs\s+/i);
+  return parts.length === 2
+    ? { home: parts[0]?.trim(), away: parts[1]?.trim() }
+    : { home: undefined, away: undefined };
 }
 
 function requiredLeagueTitle(data) {
