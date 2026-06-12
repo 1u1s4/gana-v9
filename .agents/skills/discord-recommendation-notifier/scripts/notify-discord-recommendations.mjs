@@ -615,7 +615,8 @@ function formatRequiredLeagueSummaryLines(data) {
     const detail = status === 'missing-predictions'
       ? 'sin predicción válida'
       : `${promotableCount} ${promotableCount === 1 ? 'proyección fuerte' : 'proyecciones fuertes'} / ${predictionCount} ${predictionCount === 1 ? 'predicción' : 'predicciones'}`;
-    lines.push(`${icon} ${requiredLeagueFixtureLabelWithKickoff(fixture)}: ${detail}`);
+    lines.push(`${icon} ${requiredLeagueFixtureLabelWithKickoff(fixture)}:`);
+    lines.push(detail);
   }
 
   const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];

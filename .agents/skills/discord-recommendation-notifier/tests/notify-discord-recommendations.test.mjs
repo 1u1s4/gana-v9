@@ -127,8 +127,8 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[0].description, /🌍 Obligatorio World Cup: 🟡 📦 1 parlay · 📌 1 predicción/);
     assert.match(payload.embeds[0].description, /📊 Total enviado: 📦 2 parlays · 📌 1 predicción/);
     assert.match(requiredEmbed.title, /World Cup/);
-    assert.match(requiredEmbed.description, /✅ Canada vs Bosnia & Herzegovina: 1 proyección fuerte \/ 1 predicción/);
-    assert.match(requiredEmbed.description, /🚫 USA vs Paraguay: sin predicción válida/);
+    assert.match(requiredEmbed.description, /✅ Canada vs Bosnia & Herzegovina:\n> 1 proyección fuerte \/ 1 predicción/);
+    assert.match(requiredEmbed.description, /🚫 USA vs Paraguay:\n> sin predicción válida/);
     assert.match(requiredEmbed.description, /📌 1 predicción obligatoria · 🎛️ 1\/3 parlays seleccionados/);
     assert.match(predictionEmbed.description, /✅ Canada vs Bosnia & Herzegovina/);
     assert.match(predictionEmbed.description, /Canada gana @ 1.87/);
@@ -176,17 +176,17 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30 GT/);
     assert.match(payload.embeds[1].description, /Team A vs Team B: h2h home @ 1.4/);
     assert.doesNotMatch(payload.embeds[1].description, /Team A vs Team B · 14:30 GT: h2h home @ 1.4/);
-    assert.match(requiredEmbed.description, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
+    assert.match(requiredEmbed.description, /Canada vs Bosnia & Herzegovina · 13:00 GT:\n> 1 proyección fuerte/);
     assert.match(predictionEmbed.description, /Canada vs Bosnia & Herzegovina\n/);
     assert.doesNotMatch(predictionEmbed.description, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
     assert.match(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
     assert.doesNotMatch(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
     assert.match(message, /Team A vs Team B · 14:30 GT/);
     assert.match(message, /Team A vs Team B: h2h home @ 1.4/);
-    assert.match(message, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
+    assert.match(message, /Canada vs Bosnia & Herzegovina · 13:00 GT:\n> 1 proyección fuerte/);
     assert.match(message, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
     assert.doesNotMatch(message, /⚽ Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
-    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
+    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT:\\n> 1 proyección fuerte/);
   });
 
   it('does not send an empty-selection box when the required addendum has publishable predictions and parlays', () => {
