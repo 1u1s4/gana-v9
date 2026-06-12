@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import type { AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
-import type { FilterCombineMode, LowOddsScanView } from './filters/types.js';
+import type { LowOddsScanView } from './filters/types.js';
 import { discoverFixtures } from './filters/engine.js';
 import { scanLowOdds } from './filters/low-odds.js';
 import {
@@ -44,21 +44,50 @@ import {
 } from './runtime/run-service.js';
 import { getPrismaClient } from './storage/db.js';
 import { getDbStatus } from './storage/db-status.js';
-import { startDashboardServer, type DashboardOptions } from './dashboard/server.js';
+import { startDashboardServer } from './dashboard/server.js';
 import type { Fixture } from './domain/fixtures.js';
-import { isMarketKey, MARKET_KEYS, type MarketKey } from './domain/markets.js';
+import type { MarketKey } from './domain/markets.js';
 import type { OddsQuote } from './domain/odds.js';
 import { runFixtureResearch, type FixtureResearchResult } from './evidence/research.js';
 import { runFixtureScoring, type FixtureScoringResult } from './prediction/service.js';
 import { runParlayAnalysis, type ParlayAnalysisRunResult } from './parlay/analysis.js';
 import { runParlayBuild, type ParlayBuildRunResult } from './parlay/service.js';
-import type { ParlayConfig } from './parlay/types.js';
-import { runValidation, type RunValidationInput, type ValidationRunResult } from './validation/service.js';
+import { runValidation, type ValidationRunResult } from './validation/service.js';
 import type { ResearchWebMode } from './prediction/prompts.js';
 import { runCertification } from './evals/runner.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from './metrics/daily.js';
-import { runDailyE2E, type DailyE2ERunResult, type DailyE2EProvider, type DailyParlayProfile, type DailyRequiredLeagueInput } from './daily/e2e.js';
+import { runDailyE2E, type DailyE2ERunResult } from './daily/e2e.js';
 import { runStrategyReview, type StrategyReviewResult } from './strategy-review/daily.js';
+import {
+  formatLocalDate,
+  optionalCombineModeFlag,
+  optionalDailyParlayProfileFlag,
+  optionalDailyProviderModelsFlag,
+  optionalDailyProvidersFlag,
+  optionalDailyRequiredLeaguesFlag,
+  optionalDashboardOptions,
+  optionalFloatFlag,
+  optionalMarketsFlag,
+  optionalNumberFlag,
+  optionalParlayAnalysisProfileScope,
+  optionalParlayConfig,
+  optionalPositiveFloatFlag,
+  optionalPositiveIntegerFlag,
+  optionalResearchWebMode,
+  optionalResearchWebModeFlag,
+  optionalRunIdsFlag,
+  optionalRunValidationMode,
+  optionalStringFlag,
+  parseFlags,
+  parseLowOddsSlashFlags,
+  requireDateFlag,
+  requiredRunId,
+  requiredRunInput,
+  requiredValidationTarget,
+  requireStringFlag,
+  wantsDefault,
+  type CommandFlags,
+} from './commands/flags.js';
 
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
@@ -323,292 +352,14 @@ function printFiltersStatus(status: FiltersStatus): void {
   printKeyValue('maxFixturesPerRun', status.filters.maxFixturesPerRun);
 }
 
-function parseFlags(args: string[]): Record<string, string | true> {
-  const flags: Record<string, string | true> = {};
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (!arg?.startsWith('--')) continue;
-    const key = arg.slice(2);
-    const next = args[i + 1];
-    if (next && !next.startsWith('--')) {
-      flags[key] = next;
-      i++;
-    } else {
-      flags[key] = true;
-    }
-  }
-  return flags;
-}
-
-const LOW_ODDS_SLASH_KEYS = new Set(['date', 'threshold', 'markets', 'leagues', 'teams', 'combine']);
-
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function expandLowOddsSlashTokens(tokens: string[]): string[] {
-  const expanded: string[] = [];
-  let hasDate = false;
-
-  for (const token of tokens) {
-    if (token.startsWith('--')) {
-      if (token === '--date') hasDate = true;
-      expanded.push(token);
-      continue;
-    }
-
-    const colonIndex = token.indexOf(':');
-    if (colonIndex > 0) {
-      const key = token.slice(0, colonIndex);
-      const value = token.slice(colonIndex + 1);
-      if (LOW_ODDS_SLASH_KEYS.has(key) && value) {
-        if (key === 'date') hasDate = true;
-        expanded.push(`--${key}`, value);
-        continue;
-      }
-    }
-
-    if (!hasDate && token === 'today') {
-      expanded.push('--date', formatLocalDate(new Date()));
-      hasDate = true;
-      continue;
-    }
-
-    if (!hasDate && /^\d{4}-\d{2}-\d{2}$/.test(token)) {
-      expanded.push('--date', token);
-      hasDate = true;
-      continue;
-    }
-
-    expanded.push(token);
-  }
-
-  return expanded;
-}
-
-function parseLowOddsSlashFlags(args: string): Record<string, string | true> {
-  return parseFlags(expandLowOddsSlashTokens(args.split(' ').filter(Boolean)));
-}
-
-function requireDateFlag(flags: Record<string, string | true>): string {
-  const date = flags.date;
-  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new Error('--date YYYY-MM-DD is required.');
-  }
-  return date;
-}
-
-function optionalNumberFlag(flags: Record<string, string | true>, key: string): number | undefined {
-  const value = flags[key];
-  if (typeof value !== 'string') return undefined;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) throw new Error(`--${key} must be an integer.`);
-  return parsed;
-}
-
-function requireStringFlag(flags: Record<string, string | true>, key: string): string {
-  const value = flags[key];
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`--${key} is required.`);
-  return value.trim();
-}
-
-function optionalStringFlag(flags: Record<string, string | true>, key: string): string | undefined {
-  const value = flags[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function optionalResearchWebMode(flags: Record<string, string | true>): ResearchWebMode {
-  const value = optionalResearchWebModeFlag(flags) ?? 'off';
-  return value;
-}
-
-function optionalResearchWebModeFlag(flags: Record<string, string | true>): ResearchWebMode | undefined {
-  const value = optionalStringFlag(flags, 'web');
-  if (value === undefined) return undefined;
-  if (value === 'off' || value === 'cached' || value === 'live') return value;
-  throw new Error('--web must be off, cached, or live.');
-}
-
-function optionalFloatFlag(flags: Record<string, string | true>, key: string): number | undefined {
-  const value = flags[key];
-  if (typeof value !== 'string') return undefined;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) throw new Error(`--${key} must be a number.`);
-  return parsed;
-}
-
-function optionalMarketsFlag(flags: Record<string, string | true>): MarketKey[] | undefined {
-  const value = flags.markets;
-  if (value === undefined) return undefined;
-  if (typeof value !== 'string') {
-    throw new Error(`--markets must be a comma-separated list of: ${MARKET_KEYS.join(', ')}.`);
-  }
-
-  const marketNames = value.split(',').map((market) => market.trim()).filter(Boolean);
-  const invalid = marketNames.filter((market) => !isMarketKey(market));
-  if (!marketNames.length || invalid.length) {
-    throw new Error(`--markets contains unsupported market(s): ${invalid.join(', ') || value}. Use: ${MARKET_KEYS.join(', ')}.`);
-  }
-
-  return [...new Set(marketNames)] as MarketKey[];
-}
-
-function optionalRunIdsFlag(flags: Record<string, string | true>): string[] | undefined {
-  const value = flags['run-ids'];
-  if (value === undefined) return undefined;
-  if (typeof value !== 'string') throw new Error('--run-ids must be a comma-separated list of run ids.');
-  const runIds = value.split(',').map((runId) => runId.trim()).filter(Boolean);
-  if (!runIds.length) throw new Error('--run-ids must include at least one run id.');
-  return [...new Set(runIds)];
-}
-
-function optionalParlayAnalysisProfileScope(flags: Record<string, string | true>): 'core' | 'all' | undefined {
-  const value = optionalStringFlag(flags, 'profile-scope');
-  if (value === undefined) return undefined;
-  if (value === 'core' || value === 'all') return value;
-  throw new Error('--profile-scope must be core or all.');
-}
-
-function optionalPositiveIntegerFlag(flags: Record<string, string | true>, key: string): number | undefined {
-  const value = flags[key];
-  if (typeof value !== 'string') return undefined;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`--${key} must be a positive integer.`);
-  return parsed;
-}
-
-function optionalPositiveFloatFlag(flags: Record<string, string | true>, key: string): number | undefined {
-  const value = optionalFloatFlag(flags, key);
-  if (value === undefined) return undefined;
-  if (value <= 0) throw new Error(`--${key} must be greater than 0.`);
-  return value;
-}
-
-function optionalProbabilityFlag(flags: Record<string, string | true>, key: string): number | undefined {
-  const value = optionalFloatFlag(flags, key);
-  if (value === undefined) return undefined;
-  if (value < 0 || value > 1) throw new Error(`--${key} must be between 0 and 1.`);
-  return value;
-}
-
-function optionalParlayConfig(flags: Record<string, string | true>): ParlayConfig {
-  const config: ParlayConfig = {};
-  const minLegs = optionalPositiveIntegerFlag(flags, 'min-legs');
-  const maxLegs = optionalPositiveIntegerFlag(flags, 'max-legs');
-  const minPredictionConfidence = optionalProbabilityFlag(flags, 'min-confidence');
-  const maxCombinedOdds = optionalFloatFlag(flags, 'max-combined-odds');
-  if (minLegs !== undefined) config.minLegs = minLegs;
-  if (maxLegs !== undefined) config.maxLegs = maxLegs;
-  if (flags['allow-multiple-legs-per-fixture'] === true) config.allowMultipleLegsPerFixture = true;
-  if (minPredictionConfidence !== undefined) config.minPredictionConfidence = minPredictionConfidence;
-  if (maxCombinedOdds !== undefined) config.maxCombinedOdds = maxCombinedOdds;
-  return config;
-}
-
-function requiredValidationTarget(flags: Record<string, string | true>): RunValidationInput {
-  const date = typeof flags.date === 'string' ? requireDateFlag(flags) : undefined;
-  const predictionId = optionalStringFlag(flags, 'prediction-id');
-  const parlayId = optionalStringFlag(flags, 'parlay-id');
-  const count = [date, predictionId, parlayId].filter(Boolean).length;
-  if (count !== 1) throw new Error('validate requires exactly one of --date, --prediction-id, or --parlay-id.');
-  return {
-    ...(date && { date }),
-    ...(predictionId && { predictionId }),
-    ...(parlayId && { parlayId }),
-    ...(optionalStringFlag(flags, 'recommendation-artifact') && { recommendationArtifact: optionalStringFlag(flags, 'recommendation-artifact') }),
-  };
-}
-
-function optionalRunValidationMode(flags: Record<string, string | true>): 'auto' | 'force' | false | undefined {
-  const value = flags.validate;
-  if (value === undefined) return undefined;
-  if (value === true) return 'force';
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'auto' || normalized === 'force') return normalized;
-  if (normalized === 'off' || normalized === 'false' || normalized === 'disabled' || normalized === 'none') return false;
-  throw new Error('--validate must be auto, force, or off.');
-}
-
-function optionalDailyProvidersFlag(flags: Record<string, string | true>): DailyE2EProvider[] | undefined {
-  const value = optionalStringFlag(flags, 'providers');
-  if (value === undefined) return undefined;
-  const providers = value.split(',').map((provider) => provider.trim()).filter(Boolean);
-  const invalid = providers.filter((provider) => provider !== 'codex' && provider !== 'gemini');
-  if (!providers.length || invalid.length) {
-    throw new Error(`--providers must be a comma-separated list using codex,gemini. Invalid: ${invalid.join(',') || value}.`);
-  }
-  return [...new Set(providers)] as DailyE2EProvider[];
-}
-
-function optionalDailyParlayProfileFlag(flags: Record<string, string | true>): DailyParlayProfile | undefined {
-  const value = optionalStringFlag(flags, 'parlay-profile');
-  if (value === undefined) return undefined;
-  if (
-    value === 'safe-consensus'
-    || value === 'balanced'
-    || value === 'aggressive-analytical'
-    || value === 'low-variance'
-    || value === 'high-conviction'
-    || value === 'market-diverse'
-    || value === 'parlay-oro'
-    || value === 'parlay-diamante'
-    || value === 'parlay-all-in'
-    || value === 'parlay-refinado'
-    || value === 'portfolio-v2'
-  ) {
-    return value;
-  }
-  throw new Error('--parlay-profile must be safe-consensus, balanced, aggressive-analytical, low-variance, high-conviction, market-diverse, parlay-oro, parlay-diamante, parlay-all-in, parlay-refinado, or portfolio-v2.');
-}
-
-function optionalDailyRequiredLeaguesFlag(flags: Record<string, string | true>): DailyRequiredLeagueInput[] | undefined {
-  const value = optionalStringFlag(flags, 'required-leagues');
-  if (value === undefined) return undefined;
-  if (/^(off|false|none|disabled|0)$/i.test(value)) return [];
-  return value.split(',')
-    .map((token) => token.trim())
-    .filter(Boolean)
-    .map((token) => {
-      const [providerCompetitionId, name, country, seasonText] = token.split(':').map((part) => part.trim());
-      if (!providerCompetitionId) throw new Error('--required-leagues entries must include a provider league id.');
-      const season = seasonText ? Number(seasonText) : null;
-      if (season !== null && (!Number.isInteger(season) || season < 1900)) {
-        throw new Error('--required-leagues season must be a four-digit year.');
-      }
-      return {
-        providerCompetitionId,
-        ...(name ? { name } : {}),
-        ...(country ? { country } : {}),
-        ...(season !== null ? { season } : {}),
-      };
-    });
-}
-
-function requiredRunInput(flags: Record<string, string | true>): { date: string; runId?: string; validate?: 'auto' | 'force' | false; web?: ResearchWebMode; markets?: MarketKey[] } {
-  return {
-    date: requireDateFlag(flags),
-    runId: optionalStringFlag(flags, 'run-id'),
-    validate: optionalRunValidationMode(flags),
-    web: optionalResearchWebModeFlag(flags),
-    markets: optionalMarketsFlag(flags),
-  };
-}
-
-function requiredRunId(flags: Record<string, string | true>): string {
-  return requireStringFlag(flags, 'run-id');
-}
-
-async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<FixtureScoringResult> {
+async function scoreFixture(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<FixtureScoringResult> {
   const fixtureId = requireStringFlag(flags, 'fixture-id');
   const service = await loadOptionalRunService();
   const runner = service.runFixtureScoring ?? runFixtureScoring;
   return runner(ctx.config, { fixtureId, web: optionalResearchWebMode(flags), markets: optionalMarketsFlag(flags) }, ctx.runtime);
 }
 
-async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayBuildRunResult> {
+async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<ParlayBuildRunResult> {
   const portfolio = optionalStringFlag(flags, 'portfolio');
   const deterministicPortfolios = new Set(['low-variance', 'balanced', 'totals', 'high-conviction', 'market-diverse', 'parlay-oro', 'parlay-diamante', 'parlay-all-in', 'parlay-refinado']);
   if (portfolio !== undefined && portfolio !== 'llm' && portfolio !== 'low-odds-top' && !deterministicPortfolios.has(portfolio)) {
@@ -642,7 +393,7 @@ async function buildParlay(ctx: HeadlessCommandContext | CommandContext, flags: 
   return runner(ctx.config, input, ctx.runtime);
 }
 
-async function analyzeParlays(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ParlayAnalysisRunResult> {
+async function analyzeParlays(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<ParlayAnalysisRunResult> {
   return runParlayAnalysis(ctx.config, {
     date: optionalStringFlag(flags, 'date'),
     runId: optionalStringFlag(flags, 'run-id'),
@@ -655,14 +406,14 @@ async function analyzeParlays(ctx: HeadlessCommandContext | CommandContext, flag
   }, ctx.runtime);
 }
 
-async function validateResults(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<ValidationRunResult> {
+async function validateResults(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<ValidationRunResult> {
   const input = requiredValidationTarget(flags);
   const service = await loadOptionalRunService();
   const runner = service.runValidation ?? runValidation;
   return runner(ctx.config, input, ctx.runtime);
 }
 
-async function buildDailyMetrics(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<DailyMetricsRunResult> {
+async function buildDailyMetrics(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<DailyMetricsRunResult> {
   const persistFlag = optionalStringFlag(flags, 'persist');
   const persist = flags.persist === true || persistFlag === undefined
     ? true
@@ -676,7 +427,7 @@ async function buildDailyMetrics(ctx: HeadlessCommandContext | CommandContext, f
   }, ctx.runtime);
 }
 
-async function buildStrategyReview(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<StrategyReviewResult> {
+async function buildStrategyReview(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<StrategyReviewResult> {
   const agentFlag = optionalStringFlag(flags, 'agent');
   const agent = flags.agent === true || agentFlag === undefined
     ? true
@@ -692,7 +443,7 @@ async function buildStrategyReview(ctx: HeadlessCommandContext | CommandContext,
   }, ctx.runtime);
 }
 
-async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunPipelineResult> {
+async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<RunPipelineResult> {
   const input = requiredRunInput(flags);
   const service = await loadOptionalRunService();
   if (!service.runPipeline) {
@@ -701,7 +452,7 @@ async function runPipeline(ctx: HeadlessCommandContext | CommandContext, flags: 
   return service.runPipeline(ctx.config, input, ctx.runtime);
 }
 
-async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<DailyE2ERunResult> {
+async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<DailyE2ERunResult> {
   const persistMetricsFlag = optionalStringFlag(flags, 'persist-metrics');
   const persistMetrics = flags['persist-metrics'] === true || persistMetricsFlag === undefined
     ? true
@@ -723,16 +474,7 @@ async function runDailyE2ECommand(ctx: HeadlessCommandContext | CommandContext, 
   }, ctx.runtime);
 }
 
-function optionalDailyProviderModelsFlag(flags: Record<string, string | true>): Partial<Record<DailyE2EProvider, string>> | undefined {
-  const models: Partial<Record<DailyE2EProvider, string>> = {};
-  const codexModel = optionalStringFlag(flags, 'codex-model')?.trim();
-  const geminiModel = optionalStringFlag(flags, 'gemini-model')?.trim();
-  if (codexModel) models.codex = codexModel;
-  if (geminiModel) models.gemini = geminiModel;
-  return Object.keys(models).length ? models : undefined;
-}
-
-async function exportRun(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<RunExportResult> {
+async function exportRun(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<RunExportResult> {
   const input = { runId: requiredRunId(flags) };
   const service = await loadOptionalRunService();
   if (!service.exportRunArtifacts) {
@@ -741,24 +483,12 @@ async function exportRun(ctx: HeadlessCommandContext | CommandContext, flags: Re
   return service.exportRunArtifacts(ctx.config, input, ctx.runtime);
 }
 
-function listArtifacts(config: AgentConfig, flags: Record<string, string | true>): ArtifactListResult {
+function listArtifacts(config: AgentConfig, flags: CommandFlags): ArtifactListResult {
   const artifactRoot = ensureArtifactRoot(config);
   const runId = optionalStringFlag(flags, 'run-id');
   const path = runId ? join(artifactRoot, 'runs', runId) : artifactRoot;
   const files = existsSync(path) ? readdirSync(path).sort() : [];
   return { artifactRoot, runId, path, files };
-}
-
-function optionalCombineModeFlag(flags: Record<string, string | true>): FilterCombineMode | undefined {
-  const value = flags.combine;
-  if (value === undefined) return undefined;
-  const normalized = String(value).toUpperCase();
-  if (normalized === 'OR' || normalized === 'AND') return normalized;
-  throw new Error('--combine must be OR or AND.');
-}
-
-function wantsDefault(flags: Record<string, string | true>, key: string): boolean {
-  return flags[key] === true || flags[key] === 'default';
 }
 
 function configWithMarketOverride(config: AgentConfig, markets: MarketKey[] | undefined): AgentConfig {
@@ -772,21 +502,14 @@ function configWithMarketOverride(config: AgentConfig, markets: MarketKey[] | un
   };
 }
 
-function optionalDashboardOptions(flags: Record<string, string | true>): DashboardOptions {
-  return {
-    port: optionalPositiveIntegerFlag(flags, 'port'),
-    host: optionalStringFlag(flags, 'host'),
-  };
-}
-
-async function serveDashboard(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<void> {
+async function serveDashboard(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<void> {
   const dashboard = await startDashboardServer(ctx.config, optionalDashboardOptions(flags));
   console.log(`  ${GREEN}✓${RESET} ${DIM}dashboard${RESET} ${CYAN}${dashboard.url}${RESET}`);
   console.log(`  ${DIM}Press Ctrl+C to stop.${RESET}`);
   await new Promise<void>((resolve) => dashboard.server.once('close', resolve));
 }
 
-async function runLowOddsScan(ctx: HeadlessCommandContext | CommandContext, flags: Record<string, string | true>): Promise<LowOddsScanView> {
+async function runLowOddsScan(ctx: HeadlessCommandContext | CommandContext, flags: CommandFlags): Promise<LowOddsScanView> {
   const input = {
     date: requireDateFlag(flags),
     threshold: optionalFloatFlag(flags, 'threshold'),
