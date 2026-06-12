@@ -113,12 +113,14 @@ function successfulPipelineDeps(input: {
   analyzeParlays?: RunPipelineDependencies['analyzeParlays'];
   discoverLowOddsFixtures?: RunPipelineDependencies['discoverLowOddsFixtures'];
   fetchLowOddsSnapshot?: RunPipelineDependencies['fetchLowOddsSnapshot'];
+  primaryDiscoveryQueries?: unknown[];
 }): RunPipelineDependencies {
   const evaluatedAt = input.now ?? '2026-04-29T12:00:00.000Z';
   return {
     createRunId: () => input.runId,
     now: () => new Date(evaluatedAt),
-    discoverFixtures: async () => {
+    discoverFixtures: async (_config, query) => {
+      input.primaryDiscoveryQueries?.push(query);
       input.calls.push('fixtures');
       return {
         fixtures: [input.target],
@@ -739,6 +741,7 @@ describe('executeRunPipeline', () => {
       competitionId: '359',
     });
     const discoveryQueries: Array<{ leaguesDefault?: boolean; teamsDefault?: boolean }> = [];
+    const primaryDiscoveryQueries: unknown[] = [];
 
     const result = await executeRunPipeline(config, {
       date: '2026-04-29',
@@ -748,6 +751,7 @@ describe('executeRunPipeline', () => {
       calls,
       runId: 'run-global-low-odds-slate',
       date: '2026-04-29',
+      primaryDiscoveryQueries,
       discoverLowOddsFixtures: async (_config, query) => {
         discoveryQueries.push(query);
         calls.push('low-odds-fixtures');
@@ -815,6 +819,13 @@ describe('executeRunPipeline', () => {
     }));
 
     assert.equal(result.verdict, 'review-required');
+    assert.deepEqual(primaryDiscoveryQueries, [{
+      date: '2026-04-29',
+      leaguesDefault: true,
+      teamsDefault: true,
+      combineMode: 'OR',
+      fullDay: true,
+    }]);
     assert.deepEqual(discoveryQueries, [{ date: '2026-04-29', fullDay: true }]);
     assert.equal(result.lowOddsScan.fixtureCount, 2);
     assert.equal(result.lowOddsScan.hitCount, 2);

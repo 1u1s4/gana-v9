@@ -33,23 +33,25 @@ describe('league preset file', () => {
     const byLeagueId = new Map((await listLeaguePresets(config)).map((preset) => [preset.providerCompetitionId, preset]));
 
     assert.deepEqual(
-      ['39', '135', '140', '78', '128', '339', '262'].map((leagueId) => {
+      ['1', '39', '135', '140', '78', '128', '339', '262'].map((leagueId) => {
         const preset = byLeagueId.get(leagueId);
         return preset && {
           id: preset.providerCompetitionId,
           name: preset.name,
           country: preset.country,
+          season: preset.season,
           seasonless: preset.season === null,
         };
       }),
       [
-        { id: '39', name: 'Premier League', country: 'England', seasonless: true },
-        { id: '135', name: 'Serie A', country: 'Italy', seasonless: true },
-        { id: '140', name: 'La Liga', country: 'Spain', seasonless: true },
-        { id: '78', name: 'Bundesliga', country: 'Germany', seasonless: true },
-        { id: '128', name: 'Liga Profesional Argentina', country: 'Argentina', seasonless: true },
-        { id: '339', name: 'Liga Nacional', country: 'Guatemala', seasonless: true },
-        { id: '262', name: 'Liga MX', country: 'Mexico', seasonless: true },
+        { id: '1', name: 'World Cup', country: 'World', season: 2026, seasonless: false },
+        { id: '39', name: 'Premier League', country: 'England', season: null, seasonless: true },
+        { id: '135', name: 'Serie A', country: 'Italy', season: null, seasonless: true },
+        { id: '140', name: 'La Liga', country: 'Spain', season: null, seasonless: true },
+        { id: '78', name: 'Bundesliga', country: 'Germany', season: null, seasonless: true },
+        { id: '128', name: 'Liga Profesional Argentina', country: 'Argentina', season: null, seasonless: true },
+        { id: '339', name: 'Liga Nacional', country: 'Guatemala', season: null, seasonless: true },
+        { id: '262', name: 'Liga MX', country: 'Mexico', season: null, seasonless: true },
       ],
     );
   });

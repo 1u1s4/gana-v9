@@ -5,7 +5,7 @@ Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Gu
 ## Horarios
 
 - `07:00` Guatemala: validar el dia anterior contra el artifact de recomendaciones publicado, recalcular daily metrics solo de picks publicados y notificar estadisticas a Discord.
-- `10:15` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con parlay-diamante, council gate, y notificar recomendaciones/parlays a Discord.
+- `10:15` Guatemala: correr Daily E2E del dia siguiente con Codex + Gemini, low-odds elegibles, portfolio-v2 con los 3 enfoques diarios (`parlay-diamante`, `parlay-refinado`, `low-variance`), council gate, y notificar recomendaciones/parlays a Discord.
 - `10:00-22:30` Guatemala, cada 30 minutos: catch-up idempotente del Daily E2E. Si el equipo estuvo dormido a las `10:15`, el wrapper vuelve a intentar al despertar; si el daily ya corrio, el lock diario evita duplicados.
 - `13:00` Guatemala: correr strategy review del dia anterior cerrado, usando Codex GPT-5.5 con reasoning X-High, y actualizar el log central de mejoras del Harness.
 
@@ -38,7 +38,7 @@ Este script:
 2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --web live --parlay-profile portfolio-v2`.
 3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`, `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES=10000`) para cubrir el universo diario disponible y low-odds elegibles.
 4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto; low-odds cubre `h2h` casa/visitante y `double_chance` `home_or_draw`/`draw_or_away` dentro del umbral.
-5. Genera `portfolio-v2`, que incluye `parlay-diamante` como perfil conservador diario objetivo 1.10-1.20.
+5. Genera `portfolio-v2`, que publica como enfoques diarios `parlay-diamante`, `parlay-refinado` y `low-variance` cuando sobreviven las compuertas.
 6. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
 7. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
 8. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
@@ -86,10 +86,10 @@ Variables utiles:
 - `GANA_DAILY_GEMINI_MODEL`: default `gemini-3.1-pro`.
 - `GANA_DAILY_PROVIDER_CONCURRENCY`: default `2`.
 - `GANA_WEB_MODE`: default `live`.
-- `GANA_PARLAY_PROFILE`: default `portfolio-v2`; incluye `parlay-diamante`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`.
+- `GANA_PARLAY_PROFILE`: default `portfolio-v2`; genera `parlay-diamante`, `parlay-refinado`, `parlay-all-in`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`; la publicacion diaria prioriza `parlay-diamante`, `parlay-refinado` y `low-variance`.
 - `AGENT_CODEX_FALLBACK_MODELS`: default cron `gpt-5.4-mini`.
 - `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
-- `GANA_DISCORD_MAX_SELECTIONS`: default `14`.
+- `GANA_DISCORD_MAX_SELECTIONS`: default `3` para publicar los 3 enfoques diarios de parlays.
 - `GANA_METRICS_PERSIST`: default `true`.
 - `GANA_STRATEGY_REVIEW_DATE`: fuerza fecha para strategy review diario.
 - `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-5.5`.

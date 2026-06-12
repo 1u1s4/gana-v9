@@ -1,53 +1,44 @@
 {
   "sources": [
     {
-      "id": "provider_snapshot_fixture",
-      "type": "provider-snapshot",
+      "id": "source_api_fixture",
+      "type": "api-football",
       "url": null,
-      "title": "Provider Fixture Snapshot",
-      "capturedAt": "2026-06-08T00:38:26.642Z",
-      "hash": "0f74f404-faf1-43c8-8750-e453d01674d9",
+      "title": "API Football Fixture Snapshot",
+      "capturedAt": "2026-06-11T16:44:17.478Z",
+      "hash": "01ca7361-9746-47fc-aaba-80dec3d9a7a7",
       "metadata": {
-        "provider": "api-football"
+        "provider": "api-football",
+        "fixtureId": "49769adc-7d77-4339-adab-246d1597c99e"
       }
     },
     {
-      "id": "provider_snapshot_statistics",
-      "type": "provider-snapshot",
-      "url": null,
-      "title": "Provider Statistics Snapshot",
-      "capturedAt": "2026-06-08T00:38:27.216Z",
-      "hash": "e08e1047-cc59-45cb-b79d-c70a5c2c4d13",
-      "metadata": {
-        "provider": "api-football"
-      }
-    },
-    {
-      "id": "provider_snapshot_odds",
+      "id": "source_api_odds",
       "type": "provider-snapshot",
       "url": null,
       "title": "Provider Odds Snapshot",
-      "capturedAt": "2026-06-08T00:38:28.264Z",
-      "hash": "946763c7-6f7f-43d5-8a64-dbf18ef5d098",
+      "capturedAt": "2026-06-11T16:44:19.327Z",
+      "hash": "ac230c5d-b6e8-476f-aa25-bb2b9e9470d7",
       "metadata": {
-        "provider": "api-football"
+        "providerFixtureId": "1527081",
+        "bookmakers": ["Bet365", "Pinnacle"]
       }
     },
     {
-      "id": "web_search_1",
+      "id": "source_web_1",
       "type": "web-search",
-      "url": "https://footystats.org/sweden/angelholms-ff-vs-bk-olympic-h2h-stats",
-      "title": "Ängelholms FF vs BK Olympic H2H Stats, Predictions & Head to Head",
-      "capturedAt": "2026-06-08T00:40:00.000Z",
+      "url": "https://livescores.biz/h2h/para-hills-knights-vs-fk-beograd",
+      "title": "Para Hills Knights vs FK Beograd H2H stats - livescores.biz",
+      "capturedAt": "2026-06-11T16:50:00.000Z",
       "hash": null,
       "metadata": {}
     },
     {
-      "id": "web_search_2",
+      "id": "source_web_2",
       "type": "web-search",
-      "url": "https://www.soccervital.com/match-prediction/angelholms-ff-vs-bk-olympic-1504451",
-      "title": "Ängelholms FF vs BK Olympic Prediction, 08 June 2026",
-      "capturedAt": "2026-06-08T00:40:00.000Z",
+      "url": "https://www.flashscore.com/match/some-id",
+      "title": "Match Preview and Team Form Analysis",
+      "capturedAt": "2026-06-11T16:50:00.000Z",
       "hash": null,
       "metadata": {}
     }
@@ -55,194 +46,147 @@
   "evidenceItems": [
     {
       "id": "evidence_h2h_odds",
-      "sourceId": "provider_snapshot_odds",
-      "claimIds": ["claim_h2h_home_win"],
-      "snippet": "Bet365 H2H Home: 2.20, Pinnacle H2H Home: 2.15",
-      "summary": "Bookmakers favor Angelholms FF to win, with odds around 2.15-2.20.",
-      "confidence": 0.8,
+      "sourceId": "source_api_odds",
+      "claimIds": ["claim_h2h_away", "claim_double_chance_da", "claim_double_chance_ha"],
+      "snippet": "H2H Away Price: 1.14 (Bet365), 1.14 (Pinnacle)",
+      "summary": "FK Beograd are strong favorites to win, with an implied probability of approximately 87.7%.",
+      "confidence": 0.95,
       "metadata": {}
     },
     {
-      "id": "evidence_h2h_web",
-      "sourceId": "web_search_1",
-      "claimIds": ["claim_h2h_balanced", "claim_h2h_away_recent"],
-      "snippet": "Last 11 Meetings: 4 wins for Ängelholm, 4 wins for Olympic, 3 draws. Last League Meeting (August 2025): Ängelholm 0-3 BK Olympic.",
-      "summary": "The head-to-head record is balanced, but BK Olympic has won the last two encounters.",
+      "id": "evidence_form_home",
+      "sourceId": "source_web_2",
+      "claimIds": ["claim_h2h_away"],
+      "snippet": "Para Hills Knights: 12th Place | 2 Points (0W, 2D, 11L) | GD: -45 (8 Scored, 53 Conceded)",
+      "summary": "Para Hills Knights are winless in the 2026 season and are at the bottom of the league table, having conceded 53 goals in 13 matches.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-        "id": "evidence_form_home_away",
-        "sourceId": "web_search_1",
-        "claimIds": ["claim_form"],
-        "snippet": "Ängelholms FF are yet to record a home victory (0W, 3D, 2L). BK Olympic is on a 4-match losing streak away from home.",
-        "summary": "Both teams exhibit poor form in their respective home/away roles. Angelholms FF has not won a home game this season, while BK Olympic has lost their last four away matches.",
-        "confidence": 0.95,
-        "metadata": {}
-    },
-    {
-      "id": "evidence_double_chance_web",
-      "sourceId": "web_search_1",
-      "claimIds": ["claim_double_chance"],
-      "snippet": "Main Prediction: Double Chance 1X (Ängelholm win or draw). Ängelholm's recent win against Rosengård provides momentum to finally secure points at home.",
-      "summary": "A web source predicts a double chance for Angelholms FF to win or draw, citing their recent win as a momentum builder.",
-      "confidence": 0.7,
+      "id": "evidence_form_away",
+      "sourceId": "source_web_2",
+      "claimIds": ["claim_h2h_away", "claim_btts_no"],
+      "snippet": "FK Beograd: 6th Place | 18 Points (5W, 3D, 5L) | GD: +4 (22 Scored, 18 Conceded)",
+      "summary": "FK Beograd are in 6th place with a positive goal difference and have been in strong form, recently on a three-match winning streak.",
+      "confidence": 0.9,
       "metadata": {}
     },
-     {
-      "id": "evidence_double_chance_odds",
-      "sourceId": "provider_snapshot_odds",
-      "claimIds": ["claim_double_chance"],
-      "snippet": "Bet365 Double Chance Home/Draw: 1.33",
-      "summary": "The odds for Angelholms FF to win or draw are short (1.33), indicating a high probability.",
+    {
+      "id": "evidence_h2h_previous",
+      "sourceId": "source_web_1",
+      "claimIds": ["claim_h2h_away", "claim_goals_over_3_5"],
+      "snippet": "Last Meeting (March 13, 2026): FK Beograd 5–0 Para Hills Knights",
+      "summary": "The most recent head-to-head match resulted in a dominant 5-0 victory for FK Beograd.",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_goals_odds",
+      "sourceId": "source_api_odds",
+      "claimIds": ["claim_goals_over_3_5"],
+      "snippet": "Goals Over/Under 3.5: Over Price 1.62 (Bet365), 1.57 (Pinnacle)",
+      "summary": "The odds for 'Over 3.5 goals' suggest a high probability of a high-scoring match, with an implied probability of over 60%.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_btts_home_scoring_rate",
+      "sourceId": "source_web_2",
+      "claimIds": ["claim_btts_no"],
+      "snippet": "Para Hills Knights... (8 Scored, 53 Conceded)",
+      "summary": "Para Hills Knights have a very low scoring record, with only 8 goals scored in 13 league matches this season.",
       "confidence": 0.85,
       "metadata": {}
     },
     {
-      "id": "evidence_over_under_web",
-      "sourceId": "web_search_1",
-      "claimIds": ["claim_over_under"],
-      "snippet": "Goals Prediction: Over 2.5 Goals. Both teams have shown they can score but struggle to keep clean sheets.",
-      "summary": "A web source predicts over 2.5 goals, noting both teams' ability to score and their defensive weaknesses.",
-      "confidence": 0.75,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_over_under_odds",
-      "sourceId": "provider_snapshot_odds",
-      "claimIds": ["claim_over_under"],
-      "snippet": "Bet365 Over 2.5: 1.62, Pinnacle Over 2.5: 1.62",
-      "summary": "Bookmakers offer odds of 1.62 for over 2.5 goals, implying a probability of around 61.7%.",
-      "confidence": 0.8,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_btts_web",
-      "sourceId": "web_search_1",
-      "claimIds": ["claim_btts"],
-      "snippet": "BTTS (Both Teams to Score): There is a high probability (approx. 65%) of both teams finding the net given their recent defensive records.",
-      "summary": "A web source gives a high probability for both teams to score, based on their defensive records.",
-      "confidence": 0.7,
-      "metadata": {}
-    },
-    {
-      "id": "evidence_btts_odds",
-      "sourceId": "provider_snapshot_odds",
-      "claimIds": ["claim_btts"],
-      "snippet": "Bet365 BTTS Yes: 1.53",
-      "summary": "The odds for both teams to score are 1.53, suggesting it is a likely outcome.",
-      "confidence": 0.8,
-      "metadata": {}
+        "id": "evidence_dc_odds",
+        "sourceId": "source_api_odds",
+        "claimIds": ["claim_double_chance_da", "claim_double_chance_ha"],
+        "snippet": "Double Chance Draw/Away: 1.02 (Bet365)",
+        "summary": "The 'Draw or Away' double chance market has a price of 1.02, indicating an extremely high probability (approx 98%) for this outcome.",
+        "confidence": 0.98,
+        "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "claim_h2h_home_win",
-      "statement": "Angelholms FF are the favorites to win the match.",
+      "id": "claim_h2h_away",
+      "statement": "FK Beograd is heavily favored to win against Para Hills Knights.",
       "subject": {
         "type": "market",
-        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "id": "49769adc-7d77-4339-adab-246d1597c99e",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_odds"],
+      "evidenceIds": ["evidence_h2h_odds", "evidence_form_home", "evidence_form_away", "evidence_h2h_previous"],
       "conflictStatus": "none",
       "metadata": {}
     },
     {
-      "id": "claim_h2h_balanced",
-      "statement": "The historical head-to-head record between the two teams is evenly balanced.",
+      "id": "claim_double_chance_da",
+      "statement": "The 'Draw or Away' outcome for the double chance market is highly probable.",
       "subject": {
         "type": "market",
-        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_web"],
-      "conflictStatus": "none",
-      "metadata": {}
-    },
-     {
-      "id": "claim_h2h_away_recent",
-      "statement": "BK Olympic won the last two matches against Angelholms FF.",
-      "subject": {
-        "type": "market",
-        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
-        "market": "h2h"
-      },
-      "supportLevel": "supported",
-      "evidenceIds": ["evidence_h2h_web"],
-      "conflictStatus": "conflict",
-      "metadata": {
-        "comment": "Conflicts with the claim that Angelholms FF are favorites."
-      }
-    },
-    {
-        "id": "claim_form",
-        "statement": "Both teams are in poor form, with Angelholms FF struggling at home and BK Olympic struggling away.",
-        "subject": {
-            "type": "team",
-            "id": "7ba8b784-6104-4006-9cf6-33ab65020975",
-            "teamName": "Angelholms FF"
-        },
-        "supportLevel": "supported",
-        "evidenceIds": ["evidence_form_home_away"],
-        "conflictStatus": "none",
-        "metadata": {}
-    },
-    {
-      "id": "claim_double_chance",
-      "statement": "A win for Angelholms FF or a draw is a likely outcome.",
-      "subject": {
-        "type": "market",
-        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "id": "49769adc-7d77-4339-adab-246d1597c99e",
         "market": "double_chance"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_double_chance_web", "evidence_double_chance_odds"],
+      "evidenceIds": ["evidence_h2h_odds", "evidence_dc_odds"],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": { "selection": "draw_or_away" }
     },
     {
-      "id": "claim_over_under",
-      "statement": "The match is likely to have over 2.5 goals.",
+        "id": "claim_double_chance_ha",
+        "statement": "The 'Home or Away' outcome for the double chance market is probable.",
+        "subject": {
+          "type": "market",
+          "id": "49769adc-7d77-4339-adab-246d1597c99e",
+          "market": "double_chance"
+        },
+        "supportLevel": "supported",
+        "evidenceIds": ["evidence_h2h_odds", "evidence_dc_odds"],
+        "conflictStatus": "none",
+        "metadata": { "selection": "home_or_away" }
+      },
+    {
+      "id": "claim_goals_over_3_5",
+      "statement": "The match is likely to feature over 3.5 goals.",
       "subject": {
         "type": "market",
-        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "id": "49769adc-7d77-4339-adab-246d1597c99e",
         "market": "goals_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_over_under_web", "evidence_over_under_odds"],
+      "evidenceIds": ["evidence_goals_odds", "evidence_h2h_previous", "evidence_form_home"],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {"line": 3.5, "selection": "over"}
     },
     {
-      "id": "claim_btts",
-      "statement": "Both teams are likely to score.",
+      "id": "claim_btts_no",
+      "statement": "It is unlikely that both teams will score.",
       "subject": {
         "type": "market",
-        "id": "1b1e0ac5-ec73-4cf5-9a59-4c12fd980a10",
+        "id": "49769adc-7d77-4339-adab-246d1597c99e",
         "market": "btts"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["evidence_btts_web", "evidence_btts_odds"],
+      "evidenceIds": ["evidence_btts_home_scoring_rate", "evidence_form_away"],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {"selection": "no"}
     }
   ],
   "gateResult": {
     "verdict": "review-required",
     "reasons": [
-      "Research generated with sufficient evidence for most markets, but some required markets were skipped due to lack of data."
+      "Research generated for most required markets, but coverage is incomplete."
     ],
     "warnings": [
-       "No evidence was found for the corners_over_under market."
+        "Could not find sufficient evidence to make a claim for the 'corners_over_under' market."
     ]
   },
   "warnings": [],
   "metadata": {
       "marketCoverage": {
-          "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
           "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
           "skippedMarkets": ["corners_over_under"]
       }

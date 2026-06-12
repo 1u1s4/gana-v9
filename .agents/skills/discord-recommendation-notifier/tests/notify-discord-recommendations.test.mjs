@@ -85,6 +85,23 @@ describe('discord recommendation notifier', () => {
     assert.match(message, /3️⃣ 🛡️ Team A vs Team B/);
   });
 
+  it('prints preferred parlay approach status lines in native and gateway output', () => {
+    const artifact = {
+      ...sampleArtifact(),
+      parlayApproaches: [
+        { profile: 'parlay-diamante', status: 'blocked', combinedOdds: null },
+        { profile: 'parlay-refinado', status: 'selected', combinedOdds: 1.43 },
+        { profile: 'low-variance', status: 'blocked', combinedOdds: null },
+      ],
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+
+    assert.match(payload.embeds[0].description, /🎛️ Enfoques: 🚫 💎 parlay-diamante · ✅ 🧠 parlay-refinado @ 1.43 · 🚫 🛡️ low-variance/);
+    assert.match(message, /🎛️ Enfoques: 🚫 💎 parlay-diamante · ✅ 🧠 parlay-refinado @ 1.43 · 🚫 🛡️ low-variance/);
+  });
+
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
     const artifact = sampleArtifactWithAtomic();
     const uuidA = 'a28f3e87-bc59-4e9e-b1fd-062759061d86';

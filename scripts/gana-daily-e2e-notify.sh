@@ -63,4 +63,4 @@ exec node scripts/gana-daily-e2e-and-notify.mjs \
   --provider-concurrency "$GANA_DAILY_PROVIDER_CONCURRENCY" \
   --web "${GANA_WEB_MODE:-live}" \
   --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}" \
-  --max "${GANA_DISCORD_MAX_SELECTIONS:-14}"
+  --max "${GANA_DISCORD_MAX_SELECTIONS:-3}"

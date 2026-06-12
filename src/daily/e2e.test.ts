@@ -409,7 +409,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendations.some((item: any) => item.kind === 'parlay'), true);
   });
 
-  it('limits final parlays to four, prefers the diamante safety window, and excludes used legs from simples', async () => {
+  it('limits final parlays to the three published approaches and excludes used legs from simples', async () => {
     const ctx = context();
     const duplicateLowVarianceLegs = parlayRecommendation({ predictionId: 'prediction-low-variance' }).legs.map((leg: any, index: number) => ({
       ...leg,
@@ -419,11 +419,12 @@ describe('runDailyE2E', () => {
       parlayRecommendation({ rank: 1, parlayId: 'balanced-1', profile: 'balanced', combinedOdds: 1.8, predictionId: 'prediction-balanced-1' }),
       parlayRecommendation({ rank: 2, parlayId: 'balanced-2', profile: 'balanced', combinedOdds: 1.9, predictionId: 'prediction-extra-balanced' }),
       parlayRecommendation({ rank: 3, parlayId: 'diamante-1', profile: 'parlay-diamante', combinedOdds: 1.12, predictionId: 'prediction-atomic-1' }),
-      parlayRecommendation({ rank: 4, parlayId: 'low-variance-1', profile: 'low-variance', combinedOdds: 1.4, predictionId: 'prediction-low-variance' }),
-      parlayRecommendation({ rank: 5, parlayId: 'high-odds-1', profile: 'high-conviction', combinedOdds: 2.6, aggregateConfidence: 0.95, expectedEdge: 0.2, predictionId: 'prediction-high-odds' }),
-      parlayRecommendation({ rank: 6, parlayId: 'market-diverse-duplicate', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse', legs: duplicateLowVarianceLegs }),
-      parlayRecommendation({ rank: 7, parlayId: 'high-conviction-1', profile: 'high-conviction', combinedOdds: 1.7, predictionId: 'prediction-high-conviction' }),
-      parlayRecommendation({ rank: 8, parlayId: 'low-odds-top-1', profile: 'low-odds-top', combinedOdds: 1.35, aggregateConfidence: 0.82, expectedEdge: 0.08, predictionId: 'prediction-low-odds-top' }),
+      parlayRecommendation({ rank: 4, parlayId: 'refinado-1', profile: 'parlay-refinado', combinedOdds: 1.43, aggregateConfidence: 0.82, expectedEdge: 0.06, predictionId: 'prediction-refinado' }),
+      parlayRecommendation({ rank: 5, parlayId: 'low-variance-1', profile: 'low-variance', combinedOdds: 1.4, predictionId: 'prediction-low-variance' }),
+      parlayRecommendation({ rank: 6, parlayId: 'high-odds-1', profile: 'high-conviction', combinedOdds: 2.6, aggregateConfidence: 0.95, expectedEdge: 0.2, predictionId: 'prediction-high-odds' }),
+      parlayRecommendation({ rank: 7, parlayId: 'market-diverse-duplicate', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse', legs: duplicateLowVarianceLegs }),
+      parlayRecommendation({ rank: 8, parlayId: 'high-conviction-1', profile: 'high-conviction', combinedOdds: 1.7, predictionId: 'prediction-high-conviction' }),
+      parlayRecommendation({ rank: 9, parlayId: 'low-odds-top-1', profile: 'low-odds-top', combinedOdds: 1.35, aggregateConfidence: 0.82, expectedEdge: 0.08, predictionId: 'prediction-low-odds-top' }),
     ];
 
     const result = await runDailyE2E(ctx.config, {
@@ -518,13 +519,18 @@ describe('runDailyE2E', () => {
     assert.equal(result.recommendations.atomic >= 1, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.parlayRecommendations.length, 3);
-    assert.equal(recommendations.parlayRecommendations[0].profile, 'parlay-diamante');
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.deepEqual(recommendations.parlayApproaches.map((item: any) => [item.profile, item.status]), [
+      ['parlay-diamante', 'selected'],
+      ['parlay-refinado', 'selected'],
+      ['low-variance', 'selected'],
+    ]);
     assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.rank), [1, 2, 3]);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'balanced-2'), false);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-odds-1'), false);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'market-diverse-duplicate'), false);
     assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'high-conviction-1'), false);
-    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'low-odds-top-1'), true);
+    assert.equal(recommendations.parlayRecommendations.some((item: any) => item.parlayId === 'low-odds-top-1'), false);
     assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), ['prediction-atomic-2']);
     assert.equal(recommendations.atomicRecommendations[0].legs[0].fixture, 'Team C vs Team D');
     assert.deepEqual(recommendations.atomicRecommendations[0].legs[0].display, {
@@ -534,11 +540,12 @@ describe('runDailyE2E', () => {
       kickoffLocal: '2026-05-19T18:00:00.000Z',
     });
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayLegs, true);
-    assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 4);
+    assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 3);
     assert.equal(recommendations.recommendationPolicy.parlayAnalysisTop, 12);
     assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.maxCombinedOdds, 2.2);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.semanticDuplicateSignature, 'fixtureId:market:selection:line');
+    assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.preferredProfileOrder, ['parlay-diamante', 'parlay-refinado', 'low-variance']);
     assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.allowedProfiles, ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance']);
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayFixtures, true);
     assert.deepEqual(recommendations.recommendationPolicy.demotedModels, ['gpt-5.4-mini']);

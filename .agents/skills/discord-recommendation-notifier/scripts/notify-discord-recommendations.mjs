@@ -79,18 +79,19 @@ export function buildDiscordPayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const selectionLimit = Math.min(max, DISCORD_SELECTION_EMBEDS_PER_MESSAGE);
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, selectionLimit));
-  return buildDiscordPayloadPage(recommendations, { ...options, artifactDate: artifact?.date });
+  return buildDiscordPayloadPage(recommendations, { ...options, artifact, artifactDate: artifact?.date });
 }
 
 export function buildDiscordPayloads(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
-  if (!recommendations.length) return [buildDiscordPayloadPage([], options)];
+  if (!recommendations.length) return [buildDiscordPayloadPage([], { ...options, artifact, artifactDate: artifact?.date })];
   const pages = recommendations.length > DISCORD_SELECTION_EMBEDS_PER_MESSAGE
     ? paginateDiscordSelectionEmbeds(recommendations)
     : [recommendations];
   return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
     ...options,
+    artifact,
     artifactDate: artifact?.date,
     page: index + 1,
     pageCount: pages.length,
@@ -107,6 +108,7 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
     description: [
       recommendationCountLine(counts),
       formatArtifactDate(artifact?.date),
+      ...formatParlayApproachLines(artifact?.parlayApproaches),
     ].join('\n'),
     color: 0x2f80ed,
     footer: { text: 'Gana Hermes · Discord native embeds' },
@@ -163,6 +165,7 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
       description: [
         recommendationCountLine(totalCounts),
         formatArtifactDate(options.artifactDate),
+        ...formatParlayApproachLines(options.artifact?.parlayApproaches),
       ].filter(Boolean).join('\n'),
       color: 0x2f80ed,
       footer: { text: 'Gana Hermes · Discord native embeds' },
@@ -214,6 +217,7 @@ export function buildGatewayMessage(artifact, options = {}) {
     '🏆 Gana v9 · Recomendaciones en revisión',
     '',
     recommendationCountLine(counts),
+    ...formatParlayApproachLines(artifact?.parlayApproaches),
     `🟡 ${status} · ${validation} · 💧 ${risk}`,
     '⚠️ Sin ejecución monetaria · Sin garantía',
     '',
@@ -425,6 +429,18 @@ export function recommendationCounts(recommendations) {
 
 function recommendationCountLine(counts) {
   return `📦 ${counts.parlay} ${counts.parlay === 1 ? 'parlay' : 'parlays'} · 📌 ${counts.atomic} ${counts.atomic === 1 ? 'simple' : 'simples'}`;
+}
+
+function formatParlayApproachLines(approaches) {
+  if (!Array.isArray(approaches) || !approaches.length) return [];
+  const compact = approaches.slice(0, 3).map((approach) => {
+    const profile = stringOrFallback(approach?.profile, 'unknown');
+    const status = stringOrFallback(approach?.status, 'unknown');
+    const statusIcon = status === 'selected' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
+    const odds = Number.isFinite(approach?.combinedOdds) ? ` @ ${formatNumber(approach.combinedOdds, 2)}` : '';
+    return `${statusIcon} ${parlayProfileEmoji(profile)} ${profile}${odds}`;
+  });
+  return [`🎛️ Enfoques: ${compact.join(' · ')}`];
 }
 
 export function recommendationKind(recommendation) {

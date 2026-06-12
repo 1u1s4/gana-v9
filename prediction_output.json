@@ -1,129 +1,262 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "dc48efda-c58c-44a6-883d-a16947da671f",
+      "oddsQuoteId": "dc33e3be-b51b-4706-9fca-1e5f578526e4",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 1.13,
-      "probability": 0.89,
-      "modelProbability": 0.89,
-      "marketFairProbability": 0.814596,
-      "edge": 0.075404,
-      "confidence": 0.9,
+      "odds": 1.55,
+      "probability": 0.645161,
+      "modelProbability": 0.645161,
+      "marketFairProbability": 0.58013,
+      "edge": 0.065031,
+      "confidence": 0.85,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_odds",
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_form",
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_past_meetings"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2"
       ],
       "claimIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_h2h_home_win"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_2",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_3",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_7",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_9"
       ],
-      "rationale": "Brann W is strongly favored to win the match against Lyn W. Bookmakers heavily favor Brann W to win, with odds as low as 1.12, implying an ~89% probability. Brann W is undefeated in the season (7W, 1D, 0L) and has won their last 5 matches, positioning them at the top of the Toppserien. Brann has dominated recent head-to-head encounters, including a significant 9-0 victory in the last season.",
+      "rationale": "Canberra FC is 1st in the league with a strong win record, averaging over 3 goals, and has a dominant H2H record against Queanbeyan City. Canberra FC is currently in 1st place in the Capital Territory NPL.; Canberra FC has won 8 out of their 9 matches this season.; Canberra FC averages over 3 goals per match.; Canberra FC has won 6 of the last 7 head-to-head meetings against Queanbeyan City.; Canberra FC has a 64.52% implied probability of winning (odds 1.55).",
       "warnings": []
     },
     {
-      "oddsQuoteId": "392378a6-56ab-442d-b8cc-80a455575212",
+      "oddsQuoteId": "3a8510b6-47d8-4f2c-86ec-744d456fad56",
+      "market": "h2h",
+      "selection": "draw",
+      "line": null,
+      "odds": 4.75,
+      "probability": 0.210526,
+      "modelProbability": 0.210526,
+      "marketFairProbability": 0.189306,
+      "edge": 0.02122,
+      "confidence": 0.4,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2"
+      ],
+      "claimIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_10"
+      ],
+      "rationale": "A draw has a 21.05% implied probability (odds 4.75).",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "cb4ee88d-1533-44d0-b8f7-42505d0e5975",
+      "market": "h2h",
+      "selection": "away",
+      "line": null,
+      "odds": 3.9,
+      "probability": 0.25641,
+      "modelProbability": 0.25641,
+      "marketFairProbability": 0.230564,
+      "edge": 0.025846,
+      "confidence": 0.65,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2"
+      ],
+      "claimIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_4",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_5",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_6",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_8",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_11"
+      ],
+      "rationale": "Queanbeyan City is in good form with 5 consecutive wins, including a recent 4-0, and won the most recent H2H against Canberra FC. Queanbeyan City is currently in 4th place in the Capital Territory NPL.; Queanbeyan City has won their last five consecutive league matches.; Queanbeyan City recently secured a 4-0 victory over O'Connor Knights.; Queanbeyan City won their most recent head-to-head match against Canberra FC by 3-0 on March 31, 2026.; Queanbeyan City has a 25.64% implied probability of winning (odds 3.9).",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "0e70001d-3fa4-4632-a78a-b34a7bb8e86a",
       "market": "double_chance",
       "selection": "home_or_draw",
       "line": null,
-      "odds": 1.01,
-      "probability": 0.99,
-      "modelProbability": 0.99,
-      "marketFairProbability": 0.470022,
-      "edge": 0.519978,
-      "confidence": 0.94,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_double_chance_odds",
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_h2h_form"
-      ],
-      "claimIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_dc_home_draw"
-      ],
-      "rationale": "Brann W is highly likely to avoid defeat (win or draw). The odds for Brann W to win or draw are extremely low at 1.01, indicating this outcome is seen as a near certainty. Brann W is undefeated in the season (7W, 1D, 0L) and has won their last 5 matches, positioning them at the top of the Toppserien.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "5d620893-79b5-474c-8497-944b963802d2",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 1.36,
-      "probability": 0.74,
-      "modelProbability": 0.74,
-      "marketFairProbability": 0.685158,
-      "edge": 0.054842,
+      "odds": 1.12,
+      "probability": 0.892857,
+      "modelProbability": 0.892857,
+      "marketFairProbability": 0.409873,
+      "edge": 0.482984,
       "confidence": 0.9,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_goals_over_under_odds",
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_goals_form"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2"
       ],
       "claimIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_goals_over_2_5"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_2",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_13"
       ],
-      "rationale": "The match is expected to have more than 2.5 goals. Odds for Over 2.5 goals are short at 1.36, suggesting bookmakers expect a high-scoring game. Brann W has a powerful offense, averaging 4.4 goals in their last five games.",
+      "rationale": "Canberra FC's strong form and league position make Home or Draw a very safe outcome. Canberra FC is currently in 1st place in the Capital Territory NPL.; Canberra FC has won 8 out of their 9 matches this season.; The 'Home or Draw' selection in the double chance market has an 89.29% implied probability (odds 1.12).",
       "warnings": []
     },
     {
-      "oddsQuoteId": "705a44d6-91d6-4c86-89fc-ddf908bb2ac1",
-      "market": "corners_over_under",
-      "selection": "over",
-      "line": 9.5,
-      "odds": 1.67,
-      "probability": 0.6,
-      "modelProbability": 0.6,
-      "marketFairProbability": 0.557029,
-      "edge": 0.042971,
+      "oddsQuoteId": "f8570d7e-cbe1-448e-a80b-5273d0d78c53",
+      "market": "double_chance",
+      "selection": "home_or_away",
+      "line": null,
+      "odds": 1.11,
+      "probability": 0.900901,
+      "modelProbability": 0.900901,
+      "marketFairProbability": 0.413566,
+      "edge": 0.487335,
+      "confidence": 0.8,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2"
+      ],
+      "claimIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_5",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_14"
+      ],
+      "rationale": "Both Canberra FC and Queanbeyan City are in good form; a draw is less likely given their recent scoring. Canberra FC is currently in 1st place in the Capital Territory NPL.; Queanbeyan City has won their last five consecutive league matches.; The 'Home or Away' selection in the double chance market has a 90.09% implied probability (odds 1.11).",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "f0eab15b-661a-4d8b-884d-aa3ec600588a",
+      "market": "double_chance",
+      "selection": "draw_or_away",
+      "line": null,
+      "odds": 2.6,
+      "probability": 0.384615,
+      "modelProbability": 0.384615,
+      "marketFairProbability": 0.176561,
+      "edge": 0.208054,
       "confidence": 0.6,
       "confidenceBand": "medium",
       "blockers": [],
-      "promotable": false,
+      "promotable": true,
       "evidenceIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_corners_odds"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2"
       ],
       "claimIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_corners_over_9_5"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_5",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_8",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_15"
       ],
-      "rationale": "The match is likely to feature more than 9.5 corners. The odds for Over 9.5 corners are 1.67, suggesting it is more likely than under, but with less certainty than other markets. The 'corners_over_under' claim is based only on odds data, lacking statistical team performance metrics for confirmation.",
+      "rationale": "Queanbeyan City's recent strong form and win in the last H2H suggest they can avoid a loss. Queanbeyan City has won their last five consecutive league matches.; Queanbeyan City won their most recent head-to-head match against Canberra FC by 3-0 on March 31, 2026.; The 'Draw or Away' selection in the double chance market has a 38.46% implied probability (odds 2.6).",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "9dac1434-e20d-47bf-87c3-4d57f6b654c9",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.5,
+      "odds": 1.3,
+      "probability": 0.769231,
+      "modelProbability": 0.769231,
+      "marketFairProbability": 0.723404,
+      "edge": 0.045827,
+      "confidence": 0.9,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_1",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_2",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_3"
+      ],
+      "claimIds": [
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_3",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_12",
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_16"
+      ],
+      "rationale": "Canberra FC averages over 3 goals, and H2H statistics show a very high probability of over 2.5 goals. High-scoring game expected. Canberra FC averages over 3 goals per match.; The Over 2.5 goals market has a 76.92% implied probability (odds 1.3).; 100% of head-to-head matches between Canberra FC and Queanbeyan City have had over 1.5 goals, with a high probability (around 75%) of over 2.5 goals.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "f5e0b95e-56e1-4125-b9b5-043c4c0d1665",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 2.5,
+      "odds": 3.4,
+      "probability": 0.294118,
+      "modelProbability": 0.294118,
+      "marketFairProbability": 0.276596,
+      "edge": 0.017522,
+      "confidence": 0.3,
+      "confidenceBand": "low",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [],
+      "claimIds": [],
+      "rationale": "No strong evidence for under 2.5 goals; strong evidence for over 2.5 goals makes this unlikely.",
       "warnings": [
-        "The 'corners_over_under' claim is based only on odds data, lacking statistical team performance metrics for confirmation."
+        "Insufficient market-specific evidence to promote pick for goals_over_under under 2.5"
       ]
     },
     {
       "oddsQuoteId": null,
       "market": "btts",
-      "selection": "no",
+      "selection": "yes",
       "line": null,
       "odds": null,
-      "probability": 0.8,
-      "modelProbability": 0.8,
+      "probability": 0.7,
+      "modelProbability": 0.7,
       "marketFairProbability": null,
-      "edge": null,
+      "edge": 0.0,
       "confidence": 0.8,
-      "confidenceBand": "medium",
+      "confidenceBand": "high",
       "blockers": [],
-      "promotable": false,
+      "promotable": true,
       "evidenceIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:evidence_btts_no"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:evidence_4"
       ],
       "claimIds": [
-        "e1b87a2e-3631-43c6-969d-a7ee60d8141e:claim_btts_no"
+        "777b6748-1e8c-4134-af50-cecde3e56b8c:claim_17"
       ],
-      "rationale": "It is unlikely that both teams will score. Brann W's defense is very strong, conceding only 0.2 goals on average in their last five matches, making it unlikely both teams will score.",
+      "rationale": "Both teams are in good scoring form, and it's expected to be a high-scoring game. Both Teams to Score (BTTS) is a strong consideration due to the expected high-scoring nature of the game and Queanbeyan City's current momentum.",
       "warnings": [
-        "No odds quotes available for BTTS market. Prediction is based on analytical evidence only."
+        "market btts skipped/review-required: missing odds quotes for requested market",
+        "explicit fallback warning explaining why fixture-level evidence is the best available support"
+      ]
+    },
+    {
+      "oddsQuoteId": null,
+      "market": "corners_over_under",
+      "selection": "over",
+      "line": 9.5,
+      "odds": null,
+      "probability": 0.5,
+      "modelProbability": 0.5,
+      "marketFairProbability": null,
+      "edge": 0.0,
+      "confidence": 0.2,
+      "confidenceBand": "low",
+      "blockers": [],
+      "promotable": false,
+      "evidenceIds": [],
+      "claimIds": [],
+      "rationale": "No strong specific evidence for corners over/under, relying on general fixture context.",
+      "warnings": [
+        "market corners_over_under skipped/review-required: missing odds quotes for requested market",
+        "Insufficient market-specific evidence to promote pick for corners_over_under over 9.5"
       ]
     }
   ],
-  "warnings": [],
+  "warnings": [
+    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
+    "market btts skipped/review-required: missing odds quotes for requested market"
+  ],
   "metadata": {}
 }

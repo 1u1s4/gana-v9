@@ -1,86 +1,143 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "cd799049-4132-429d-b8c7-11a01e92cafc",
+      "oddsQuoteId": "ec170c4d-96dd-4bf4-b858-2397c894bdd4",
       "market": "h2h",
-      "selection": "draw",
+      "selection": "away",
       "line": null,
-      "odds": 3.21,
-      "probability": 0.31,
-      "modelProbability": 0.31,
-      "marketFairProbability": 0.28847,
-      "edge": 0.02153,
-      "confidence": 0.65,
-      "confidenceBand": "medium",
+      "odds": 1.85,
+      "probability": 0.60,
+      "modelProbability": 0.60,
+      "marketFairProbability": 0.501237,
+      "edge": 0.098763,
+      "confidence": 0.90,
+      "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_2",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_3",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_4"
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_2",
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_h2h_away",
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_h2h_home"
       ],
       "claimIds": [
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_2",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_3",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_5"
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_h2h_away_win"
       ],
-      "rationale": "First leg ended in a draw (1-1), and Livyi Bereh (home team) has strong recent form, making a draw a plausible outcome with a slight edge.",
+      "rationale": "Bray Wanderers are in strong form and are favored to win, as supported by web search predictions and favorable odds from bookmakers.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "9a1a8930-7c46-4e21-878b-10e76875ca2e",
+      "oddsQuoteId": "fee991b1-19d6-44d1-a3cd-a50050ee08a7",
       "market": "double_chance",
-      "selection": "home_or_draw",
+      "selection": "draw_or_away",
       "line": null,
-      "odds": 1.28,
-      "probability": 0.70,
-      "modelProbability": 0.70,
-      "marketFairProbability": 0.357143,
-      "edge": 0.342857,
-      "confidence": 0.70,
+      "odds": 1.22,
+      "probability": 0.85,
+      "modelProbability": 0.85,
+      "marketFairProbability": 0.375,
+      "edge": 0.475,
+      "confidence": 0.90,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_2",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_3",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_6"
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_double_chance_draw_or_away"
       ],
       "claimIds": [
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_2",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_3",
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_8"
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_double_chance_draw_or_away"
       ],
-      "rationale": "Livyi Bereh is in strong form (3 wins, 2 draws in last 5), and the first leg ended in a draw, making 'Home or Draw' a very likely outcome. Note: Market fair probability for this selection is unusually low.",
-      "warnings": ["Unusually low marketFairProbability detected for this selection, potentially impacting edge calculation validity."]
+      "rationale": "Bray Wanderers' strong form and favorite status make a draw or away win highly probable.",
+      "warnings": [
+        "Market fair probability for double chance draw_or_away seems unusually low compared to implied probability."
+      ]
     },
     {
-      "oddsQuoteId": "d275f879-7153-4b62-b62a-6a4b9ccda54c",
+      "oddsQuoteId": "2cff94ea-3672-4aa4-8ccc-f9583dfcc28e",
       "market": "goals_over_under",
-      "selection": "under",
+      "selection": "over",
       "line": 2.5,
-      "odds": 1.67,
-      "probability": 0.62,
-      "modelProbability": 0.62,
-      "marketFairProbability": 0.567128,
-      "edge": 0.052872,
-      "confidence": 0.75,
+      "odds": 1.71,
+      "probability": 0.65,
+      "modelProbability": 0.65,
+      "marketFairProbability": 0.551316,
+      "edge": 0.098684,
+      "confidence": 0.85,
       "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:evidence_5"
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_goals_over_2_5"
       ],
       "claimIds": [
-        "a4ce4123-6c2f-4943-85f2-4e199b2462a7:claim_6"
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_goals_over_2_5"
       ],
-      "rationale": "Odds and evidence strongly indicate 'Under 2.5 Goals' is the more probable outcome.",
+      "rationale": "Web search predicts a 1-2 score, implying 3 goals, and Bray Wanderers average 2.0 goals per match, supporting over 2.5 goals.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "82bcc589-67ae-427c-a94f-4c9673ed68ca",
+      "market": "btts",
+      "selection": "yes",
+      "line": null,
+      "odds": 1.62,
+      "probability": 0.68,
+      "modelProbability": 0.68,
+      "marketFairProbability": 0.575916,
+      "edge": 0.104084,
+      "confidence": 0.90,
+      "confidenceBand": "high",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_web_1",
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:evidence_api_odds_btts_yes"
+      ],
+      "claimIds": [
+        "c42e77c4-65de-4fde-93d6-6cf01e624a04:claim_btts_yes"
+      ],
+      "rationale": "Web search analysis indicates Both Teams To Score is a strong possibility, despite Treaty's struggles, as they often score at home.",
       "warnings": []
     }
   ],
   "warnings": [
-    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
-    "market btts skipped/review-required: missing odds quotes for requested market"
+    "market corners_over_under skipped/review-required: missing odds quotes for requested market"
   ],
-  "metadata": {}
+  "metadata": {
+    "promptVersion": "score-prediction-v2",
+    "runId": "71a88125-2c4b-4a45-ad32-0053eb70db06",
+    "createdAt": "2026-06-11T14:13:19.025Z",
+    "webMode": "live",
+    "marketCoverage": {
+      "warnings": [
+        "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+      ],
+      "quotedMarkets": [
+        "btts",
+        "double_chance",
+        "goals_over_under",
+        "h2h"
+      ],
+      "skippedMarkets": [
+        {
+          "market": "corners_over_under",
+          "reason": "missing odds quotes for requested market"
+        }
+      ],
+      "evidenceMarkets": [
+        "btts",
+        "double_chance",
+        "goals_over_under",
+        "h2h"
+      ],
+      "requiredMarkets": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "corners_over_under",
+        "btts"
+      ]
+    }
+  }
 }

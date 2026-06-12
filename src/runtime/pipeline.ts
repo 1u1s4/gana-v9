@@ -322,6 +322,7 @@ export async function executeRunPipeline(
         leaguesDefault: true,
         teamsDefault: true,
         combineMode: 'OR',
+        fullDay: true,
       }, runtime);
       writeJsonArtifact(config, runId, 'fixtures.json', result);
       return result;

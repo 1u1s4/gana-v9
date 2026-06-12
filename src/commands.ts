@@ -1023,6 +1023,11 @@ function printDailyE2EResult(result: DailyE2ERunResult): void {
   printKeyValue('recommendations', result.recommendations.total);
   printKeyValue('parlayRecommendations', result.recommendations.parlays);
   printKeyValue('atomicRecommendations', result.recommendations.atomic);
+  if (result.requiredLeagueRecommendations) {
+    printKeyValue('requiredLeagueGoal', result.requiredLeagueRecommendations.status);
+    printKeyValue('requiredLeagueMissingFixtures', result.requiredLeagueRecommendations.missingPredictionFixtures);
+    printKeyValue('requiredLeagueArtifact', result.requiredLeagueRecommendations.artifactPath);
+  }
   if (result.metrics) printKeyValue('metricsPersisted', result.metrics.persisted);
   printKeyValue('artifactType', 'analytical only; not executable');
   if (result.error) console.log(`  ${YELLOW}!${RESET} ${DIM}${result.error}${RESET}`);

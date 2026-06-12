@@ -113,7 +113,7 @@ try {
       '--artifact', recommendationsPath,
       '--transport', 'discord-native',
       '--gateway-target', discordTargets.recommendations,
-      '--max', String(args.max ?? 14),
+      '--max', String(args.max ?? 3),
     ], {
       cwd: REPO_ROOT,
       env,

@@ -72,6 +72,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
 - Parlay titles include a profile emoji before the fixture name: `💎` parlay-diamante, `🧠` parlay-refinado, `🛡️` low-variance, `📉` low-odds-top, `🚀` parlay-all-in, `🥇` parlay-oro, `⚖️` balanced, `🔥` high-conviction, `🧩` market-diverse, `🥅` totals, `🔒` conservative, `🔎` review, and `🎟️` fallback/unknown.
+- When the artifact includes `parlayApproaches`, the header must show the three approach statuses with profile emojis; blocked approaches are status context, not published parlay picks.
 - Do not publish raw fixture UUIDs or `Fixture ...` placeholders when persisted fixture metadata is available; the daily artifact should already carry hydrated display labels from source-run `fixtures.json`.
 - Selection icons identify the market family: `🎯` corners, `🥅` goals/BTTS, `⚽` result-style soccer markets.
 - Native Discord recommendation blocks are color-coded: yellow for the principal/rank-1 parlay, green for secondary parlays, and purple for simple recommendations.

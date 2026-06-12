@@ -1,10 +1,271 @@
-
 import json
+import math
+
+def calculate_implied_probability(odds):
+    if odds == 0:
+        return 0
+    return 1 / odds
+
+def calculate_edge(model_probability, market_fair_probability):
+    return round(model_probability - market_fair_probability, 6)
+
+def determine_confidence_band(confidence):
+    if confidence is None:
+        return "low"
+    if confidence < 0.6:
+        return "low"
+    elif 0.6 <= confidence <= 0.75:
+        return "medium"
+    else:
+        return "high"
+
+def get_claims_and_evidence_for_quote(market, selection, line, claims):
+    relevant_claim_ids = set()
+    rationale_parts = []
+    
+    # Add claims directly related to the quote's market and selection
+    for claim in claims:
+        # Check for marketKey first
+        if claim.get('marketKey') == market:
+            if market == 'h2h':
+                if ((selection == 'home' and 'h2h_home_odds' in claim['id']) or 
+                    (selection == 'draw' and 'h2h_draw_odds' in claim['id']) or 
+                    (selection == 'away' and 'h2h_away_odds' in claim['id'])):
+                    relevant_claim_ids.add(claim['id'])
+                    rationale_parts.append(claim['statement'])
+            elif market == 'double_chance':
+                if ((selection == 'home_or_draw' and 'home_draw_odds' in claim['id']) or 
+                    (selection == 'home_or_away' and 'home_away_odds' in claim['id']) or 
+                    (selection == 'draw_or_away' and 'draw_away_odds' in claim['id'])):
+                    relevant_claim_ids.add(claim['id'])
+                    rationale_parts.append(claim['statement'])
+            elif market == 'goals_over_under':
+                # For goals_over_under, also check line
+                if (((selection == 'over' and 'goals_over_odds' in claim['id']) or 
+                     (selection == 'under' and 'goals_under_odds' in claim['id'])) and 
+                    (claim.get('line') == line)):
+                    relevant_claim_ids.add(claim['id'])
+                    rationale_parts.append(claim['statement'])
+        
+        # Add claims providing model probability for the market and selection (these often have marketKey=None)
+        if market == 'h2h' and claim.get('marketKey') is None:
+             if ((selection == 'home' and 'h2h_home_prob' in claim['id']) or 
+                 (selection == 'draw' and 'h2h_draw_prob' in claim['id']) or 
+                 (selection == 'away' and 'h2h_away_prob' in claim['id'])):
+                relevant_claim_ids.add(claim['id'])
+                rationale_parts.append(claim['statement'])
+        
+        if market == 'goals_over_under' and claim.get('marketKey') is None:
+            if selection == 'over' and 'goals_over_prob' in claim['id']:
+                relevant_claim_ids.add(claim['id'])
+                rationale_parts.append(claim['statement'])
+                
+    # Add general fixture-level claims for rationale
+    for claim in claims:
+        if claim['id'] not in relevant_claim_ids: # Avoid adding duplicates
+            if ((claim.get('marketKey') is None and market == 'h2h' and 
+                (('h2h_historical' in claim['id']) or 
+                 ('h2h_last_meeting' in claim['id']))) or 
+                (claim.get('marketKey') is None and market == 'goals_over_under' and 
+                (('goals_tr_high_scoring' in claim['id']) or 
+                 ('goals_scu_pct' in claim['id']) or 
+                 ('goals_tr_pct' in claim['id'])))):
+                relevant_claim_ids.add(claim['id'])
+                rationale_parts.append(claim['statement'])
+
+    # Gather all unique evidence IDs from the relevant claims
+    relevant_evidence_ids = set()
+    for claim_id in relevant_claim_ids:
+        for claim in claims:
+            if claim['id'] == claim_id:
+                for eid in claim.get('evidenceIds', []):
+                    relevant_evidence_ids.add(eid)
+                break # Found the claim, no need to search further
+
+    # Use a more concise rationale
+    rationale = ". ".join(sorted(list(set(rationale_parts))))
+    if len(rationale) > 250: # Truncate if too long
+        rationale = rationale[:247] + "..."
+    
+    return list(relevant_claim_ids), list(relevant_evidence_ids), rationale
+
+def process_fixture_predictions(input_data):
+    predictions = []
+    all_warnings = list(input_data.get('researchBundle', {}).get('warnings', []))
+
+    claims = input_data['claims']
+    allowed_quotes = input_data['allowedQuotes']
+    evidence_items = input_data['evidenceItems']
+
+    # Extract model probabilities from claims for h2h
+    h2h_model_probs = {}
+    for claim in claims:
+        if 'h2h_home_prob' in claim['id']:
+            h2h_model_probs['home'] = float(claim['statement'].split(' ')[5].replace('%', '')) / 100
+        elif 'h2h_draw_prob' in claim['id']:
+            h2h_model_probs['draw'] = float(claim['statement'].split(' ')[4].replace('%', '')) / 100
+        elif 'h2h_away_prob' in claim['id']:
+            h2h_model_probs['away'] = float(claim['statement'].split(' ')[5].replace('%', '')) / 100
+    
+    # Extract model probabilities for goals_over_under
+    goals_over_under_model_probs = {}
+    for claim in claims:
+        if 'goals_over_prob' in claim['id']:
+            goals_over_under_model_probs['over'] = float(claim['statement'].split(' ')[5].replace('%', '')) / 100
+            goals_over_under_model_probs['under'] = 1 - goals_over_under_model_probs['over']
+    
+    # Process each allowed quote
+    for quote in allowed_quotes:
+        market = quote['market']
+        selection = quote['selection']
+        line = quote['line']
+        odds = quote['odds']
+        odds_quote_id = quote['oddsQuoteId']
+        market_fair_probability = quote['marketFairProbability']
+        
+        model_probability = None
+        confidence = None
+        
+        relevant_claim_ids, relevant_evidence_ids, rationale = get_claims_and_evidence_for_quote(market, selection, line, claims)
+        
+        # Determine modelProbability and confidence based on market
+        if market == 'h2h':
+            model_probability = h2h_model_probs.get(selection)
+            # Find confidence for the model_probability claim
+            for claim in claims:
+                if ((selection == 'home' and 'h2h_home_prob' in claim['id']) or 
+                    (selection == 'draw' and 'h2h_draw_prob' in claim['id']) or 
+                    (selection == 'away' and 'h2h_away_prob' in claim['id'])):
+                    for eid in claim.get('evidenceIds', []):
+                        for ev_item in evidence_items:
+                            if ev_item['id'] == eid:
+                                confidence = ev_item['confidence']
+                                break
+                        if confidence is not None:
+                            break
+                    break
+        elif market == 'double_chance':
+            # Derive model probability from h2h model probabilities
+            if selection == 'home_or_draw':
+                model_probability = h2h_model_probs.get('home', 0) + h2h_model_probs.get('draw', 0)
+            elif selection == 'home_or_away':
+                model_probability = h2h_model_probs.get('home', 0) + h2h_model_probs.get('away', 0)
+            elif selection == 'draw_or_away':
+                model_probability = h2h_model_probs.get('draw', 0) + h2h_model_probs.get('away', 0)
+            
+            # Use minimum confidence of the component H2H probabilities
+            component_confidences = []
+            if 'home' in selection and h2h_model_probs.get('home') is not None:
+                for claim in claims:
+                    if 'h2h_home_prob' in claim['id']:
+                        for eid in claim.get('evidenceIds', []):
+                            for ev_item in evidence_items:
+                                if ev_item['id'] == eid:
+                                    component_confidences.append(ev_item['confidence'])
+            if 'draw' in selection and h2h_model_probs.get('draw') is not None:
+                for claim in claims:
+                    if 'h2h_draw_prob' in claim['id']:
+                        for eid in claim.get('evidenceIds', []):
+                            for ev_item in evidence_items:
+                                if ev_item['id'] == eid:
+                                    component_confidences.append(ev_item['confidence'])
+            if 'away' in selection and h2h_model_probs.get('away') is not None:
+                for claim in claims:
+                    if 'h2h_away_prob' in claim['id']:
+                        for eid in claim.get('evidenceIds', []):
+                            for ev_item in evidence_items:
+                                if ev_item['id'] == eid:
+                                    component_confidences.append(ev_item['confidence'])
+            
+            if component_confidences:
+                confidence = min(component_confidences) # Use min for a conservative approach
+            else:
+                confidence = 0.5 # Default if no specific confidence found
+            
+        elif market == 'goals_over_under':
+            model_probability = goals_over_under_model_probs.get(selection)
+            # Find confidence for the model_probability claim
+            for claim in claims:
+                if (selection == 'over' and 'goals_over_prob' in claim['id']):
+                    for eid in claim.get('evidenceIds', []):
+                        for ev_item in evidence_items:
+                            if ev_item['id'] == eid:
+                                confidence = ev_item['confidence']
+                                break
+                        if confidence is not None:
+                            break
+                    break
+
+        # Fallback if model_probability is still None
+        if model_probability is None:
+            model_probability = calculate_implied_probability(odds)
+            if not rationale:
+                rationale = f"Model probability not explicitly found for {market} - {selection}. Using implied probability from odds as fallback."
+            else:
+                rationale += f" Model probability not explicitly found for {market} - {selection}. Using implied probability from odds as fallback."
+            all_warnings.append(f"Model probability for {market} - {selection} not explicitly found. Using implied probability as fallback.")
+            if confidence is None:
+                confidence = 0.5 # Lower confidence for fallback
+
+        # Round model_probability to 6 decimal places for consistency
+        model_probability = round(model_probability, 6)
+
+        edge = calculate_edge(model_probability, market_fair_probability)
+        confidence_band = determine_confidence_band(confidence)
+
+        # Determine promotable status
+        promotable = bool(relevant_claim_ids and relevant_evidence_ids)
+
+        predictions.append({
+            "oddsQuoteId": odds_quote_id,
+            "market": market,
+            "selection": selection,
+            "line": line,
+            "odds": odds,
+            "probability": model_probability, 
+            "modelProbability": model_probability,
+            "marketFairProbability": round(market_fair_probability, 6),
+            "edge": edge,
+            "confidence": round(confidence, 6) if confidence is not None else 0.5,
+            "confidenceBand": confidence_band,
+            "blockers": [],
+            "promotable": promotable,
+            "evidenceIds": relevant_evidence_ids,
+            "claimIds": relevant_claim_ids,
+            "rationale": rationale,
+            "warnings": []
+        })
+
+    # Add warnings for skipped markets from researchBundle
+    for skipped_market in input_data.get('researchBundle', {}).get('metadata', {}).get('marketCoverage', {}).get('skippedMarkets', []):
+        warning_msg = f"market {skipped_market['market']} skipped: {skipped_market['reason']}"
+        if warning_msg not in all_warnings:
+            all_warnings.append(warning_msg)
+
+    output = {
+        "predictions": predictions,
+        "warnings": sorted(list(set(all_warnings))), # Remove duplicates and sort for consistency
+        "metadata": {}
+    }
+    
+    return json.dumps(output, indent=2)
+
+# Assuming input_data is read from stdin or a file
+# For demonstration, I'll use the provided input JSON directly.
+# This part would typically be:
+# input_json_string = sys.stdin.read()
+# input_data = json.loads(input_json_string)
+
+# Main execution
+# print(process_fixture_predictions(input_data))
+
+# For direct use within the agent, the input_data comes from the user prompt.
+# I will process the provided input_data here.
 
 input_data = {
   "promptVersion": "score-prediction-v2",
-  "runId": "e39f2330-ada0-4514-82f8-8a09d6f71648",
-  "createdAt": "2026-05-26T16:30:47.691Z",
+  "runId": "6a56ceac-cc57-4f23-a07f-ade2cb5d7d8d",
+  "createdAt": "2026-06-09T17:19:55.313Z",
   "webMode": "live",
   "requiredMarkets": [
     "h2h",
@@ -21,77 +282,81 @@ input_data = {
     "btts"
   ],
   "fixture": {
-    "id": "6469748d-cd2b-4128-80c4-f9150e4f3291",
-    "providerFixtureId": "1546010",
-    "competitionId": "2f85377a-bf57-4ae6-94aa-6ee386b3fe91",
+    "id": "edda21e2-d12f-4a11-bf03-987a079f903e",
+    "providerFixtureId": "1524858",
+    "competitionId": "fa7fdb18-ce8c-44a1-abb9-0ac3a8a3cf67",
     "season": 2026,
-    "homeTeamId": "1ad1ec91-b333-48a8-a4f8-37fcbca8becc",
-    "awayTeamId": "900a405d-9efb-4147-b119-78fc89eb62ea",
-    "scheduledAt": "2026-05-26T15:00:00.000Z",
-    "status": "live",
-    "scoreHome": 1,
-    "scoreAway": 0,
+    "homeTeamId": "0e7f4505-94e6-4cb6-a3ea-a621365b9a75",
+    "awayTeamId": "ae31a910-363e-4b47-a7fc-a3a822c39dfa",
+    "scheduledAt": "2026-06-10T23:00:00.000Z",
+    "status": "scheduled",
+    "scoreHome": None,
+    "scoreAway": None,
     "includedByFilters": [],
     "metadata": {
       "league": {
-        "id": 1229,
-        "name": "Liga Women",
-        "country": "Peru",
+        "id": 256,
+        "name": "USL League Two",
+        "country": "USA",
         "season": 2026,
-        "round": "Regular Season - 4"
+        "round": "Group Stage"
       },
       "teams": {
         "home": {
-          "id": 27781,
-          "name": "Yanapuma W"
+          "id": 4076,
+          "name": "SC United Bantams"
         },
         "away": {
-          "id": 20518,
-          "name": "Alianza Lima W"
+          "id": 4089,
+          "name": "Tobacco Road"
         }
       },
-      "round": "Regular Season - 4",
+      "round": "Group Stage",
       "timezone": "UTC",
-      "apiFootballStatusShort": "2H",
-      "apiFootballStatusLong": "Second Half"
+      "apiFootballStatusShort": "NS",
+      "apiFootballStatusLong": "Not Started"
     }
   },
   "fixtureStatistics": {
-    "providerFixtureId": "1546010",
-    "capturedAt": "2026-05-26T16:30:49.874Z",
-    "providerSnapshotId": "d25548c4-c120-42bf-8aa2-0236615e7705"
+    "providerFixtureId": "1524858",
+    "capturedAt": "2026-06-09T17:19:57.085Z",
+    "providerSnapshotId": "124feb7d-9d53-460e-afa2-02400a765496"
   },
   "oddsSnapshot": {
-    "id": "abdb8926-1f0d-46cf-8350-11d75b8564c1",
-    "fixtureId": "6469748d-cd2b-4128-80c4-f9150e4f3291",
-    "providerFixtureId": "1546010",
-    "providerSnapshotId": "0e6a26af-ead0-416f-93fa-aa3d1ee6a029",
-    "bookmakerCount": 2,
-    "capturedAt": "2026-05-26T16:05:38.587Z",
-    "payloadHash": "d2e622390b6df7bf7fa339afae5101f8c789930a050959171ae778f4ebc250a4"
+    "id": "b1e46655-5708-4e6e-b861-9025683b24ca",
+    "fixtureId": "edda21e2-d12f-4a11-bf03-987a079f903e",
+    "providerFixtureId": "1524858",
+    "providerSnapshotId": "531a9f51-419c-46a1-985a-4fe44223e9ae",
+    "bookmakerCount": 1,
+    "capturedAt": "2026-06-09T17:07:30.956Z",
+    "payloadHash": "0cde93799dfbab55c240e0387aca813894948c211bfae447a43265a56db54c38"
   },
   "researchBundle": {
-    "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4",
-    "runId": "e39f2330-ada0-4514-82f8-8a09d6f71648",
+    "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a",
+    "runId": "6a56ceac-cc57-4f23-a07f-ade2cb5d7d8d",
     "status": "promotable",
     "gateResult": {
       "reasons": [
-        "Research downgraded due to missing odds and reliable statistics for some required markets.",
-        "The provided 'fixtureStatistics' snapshot from the provider was empty, requiring full reliance on web search for statistical claims.",
+        "structured research generated with sufficient evidence",
+        "web-search evidence included",
         "objective research gate passed with current web evidence"
       ],
       "verdict": "promotable",
       "warnings": [
-        "mapped invalid supportLevel 'uncertain' to 'weak' on claim 'claim-btts'",
+        "mapped invalid subject type \"event\" to market \"h2h\" on claim \"claim_h2h_draw_prob\"",
+        "mapped invalid subject type \"event\" to fixture on claim \"claim_h2h_historical\"",
+        "mapped invalid subject type \"event\" to fixture on claim \"claim_h2h_last_meeting\"",
         "market corners_over_under skipped/review-required: missing odds quotes for requested market",
         "market btts skipped/review-required: missing odds quotes for requested market"
       ]
     },
     "providerAgentic": "gemini",
-    "model": "gemini-2.5-pro",
+    "model": "gemini-2.5-flash",
     "promptVersion": "research-fixture-v2",
     "warnings": [
-      "mapped invalid supportLevel 'uncertain' to 'weak' on claim 'claim-btts'",
+      "mapped invalid subject type \"event\" to market \"h2h\" on claim \"claim_h2h_draw_prob\"",
+      "mapped invalid subject type \"event\" to fixture on claim \"claim_h2h_historical\"",
+      "mapped invalid subject type \"event\" to fixture on claim \"claim_h2h_last_meeting\"",
       "market corners_over_under skipped/review-required: missing odds quotes for requested market",
       "market btts skipped/review-required: missing odds quotes for requested market"
     ],
@@ -138,7 +403,9 @@ input_data = {
         ]
       },
       "referenceRepairs": [
-        "mapped invalid supportLevel 'uncertain' to 'weak' on claim 'claim-btts'",
+        "mapped invalid subject type \"event\" to market \"h2h\" on claim \"claim_h2h_draw_prob\"",
+        "mapped invalid subject type \"event\" to fixture on claim \"claim_h2h_historical\"",
+        "mapped invalid subject type \"event\" to fixture on claim \"claim_h2h_last_meeting\"",
         "market corners_over_under skipped/review-required: missing odds quotes for requested market",
         "market btts skipped/review-required: missing odds quotes for requested market"
       ],
@@ -149,7 +416,7 @@ input_data = {
         "nativeToolUsed": True,
         "nativeSupported": True,
         "browserFallbackUsed": False,
-        "realWebSearchSourceCount": 1,
+        "realWebSearchSourceCount": 3,
         "syntheticWebSearchSourceCount": 0
       },
       "providerContextWarnings": []
@@ -157,788 +424,570 @@ input_data = {
   },
   "sources": [
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:web-search-1",
-      "type": "web-search",
-      "url": "https://livescores.biz/pre-match/yanapuma-sport-vs-alianza-lima-w",
-      "title": "Yanapuma Sport vs Alianza Lima W H2H, Standings, Predictions",
-      "externalId": None,
-      "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:06:00.000Z",
-      "metadata": {}
-    },
-    {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:source_api_football_odds_snapshot",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:source_api_football_odds_snapshot",
       "type": "provider-snapshot",
       "url": None,
       "title": "API-Football odds snapshot",
-      "externalId": "1546010",
+      "externalId": "1524858",
       "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:05:38.587Z",
+      "capturedAt": "2026-06-09T17:07:30.956Z",
       "metadata": {
-        "fixtureId": "6469748d-cd2b-4128-80c4-f9150e4f3291",
-        "quoteCount": 25,
-        "snapshotId": "0e6a26af-ead0-416f-93fa-aa3d1ee6a029",
-        "bookmakerCount": 2,
-        "oddsSnapshotId": "abdb8926-1f0d-46cf-8350-11d75b8564c1",
-        "providerFixtureId": "1546010"
+        "fixtureId": "edda21e2-d12f-4a11-bf03-987a079f903e",
+        "quoteCount": 8,
+        "snapshotId": "531a9f51-419c-46a1-985a-4fe44223e9ae",
+        "bookmakerCount": 1,
+        "oddsSnapshotId": "b1e46655-5708-4e6e-b861-9025683b24ca",
+        "providerFixtureId": "1524858"
       }
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:provider-odds-0e6a26af",
-      "type": "provider-snapshot",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:api_football_odds",
+      "type": "api-football",
       "url": None,
-      "title": "Odds Snapshot",
-      "externalId": "api-football://provider-odds-0e6a26af/1546010",
+      "title": "API-Football Odds Snapshot",
+      "externalId": "api-football://api_football_odds",
       "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:05:38.587Z",
+      "capturedAt": "2026-06-09T17:07:30.956Z",
       "metadata": {
-        "bookmakerCount": 2,
-        "providerFixtureId": "1546010"
+        "oddsSnapshotId": "b1e46655-5708-4e6e-b861-9025683b24ca",
+        "providerSnapshotId": "531a9f51-419c-46a1-985a-4fe44223e9ae"
       }
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:source_api_football_fixture_statistics",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_3",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHhS0gcoM-EMiMzybFpo_yPSALMgq9T0tqbckLgsoXcAXW-m9uNlu5m5XKT1YlNM96iH3gyPUTOQsUUKUzAF6c90kUHL2vBZtbi78A3rcfMQFTmb1krrYQ_4FsNV3OHMVcPxD5InfHc6zu6LcKzwlc3eW9GFva21LLl_NgqWbmCDotVlCc2eQ==",
+      "title": "AiScore Betting Odds and Prediction",
+      "externalId": None,
+      "providerSnapshotId": None,
+      "capturedAt": "2026-06-09T17:07:30.000Z",
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_2",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHB621WZJ6NVuiIVpf8OM6d4WJYLaTz3_smE6uz-qXHr2-TfdV2CNc_C9EmYHQmiiLkOGUAPDcOi25C4ds6V74utKFgCIzTH8qkyxkzycBDE9ov04eOGHHSvuWGnDbOknFn1ScCm42zPMn1dpql00I9r3OnNij9Vg==",
+      "title": "FC Tables Head-to-Head Stats",
+      "externalId": None,
+      "providerSnapshotId": None,
+      "capturedAt": "2026-06-09T17:07:30.000Z",
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_1",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHx3lqhte6K2bqgtAcLeQG2-30KSVIk48fAciJ-OO_JQ-GbJjoxPktIbSik5biOwHu5u3T2Aj_uKeurSvv46pdpMmhurjw0rpq3izYUTtMmgRLu7s7kPZVtBY6sVWHS1HKC4tfBDfYzanbCTf7ilkRz6yef8nM09ourHO_3h_i4ni00ktaMsDQA_IwP",
+      "title": "Betmines Match Preview and Statistics",
+      "externalId": None,
+      "providerSnapshotId": None,
+      "capturedAt": "2026-06-09T17:07:30.000Z",
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:source_api_football_fixture_statistics",
       "type": "api-football",
       "url": None,
       "title": "API-Football fixture statistics",
-      "externalId": "1546010",
+      "externalId": "1524858",
       "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:05:36.976Z",
+      "capturedAt": "2026-06-09T17:07:29.844Z",
       "metadata": {
         "fields": [
           "cornersHome",
           "cornersAway",
           "totalCorners"
         ],
-        "snapshotId": "952819f6-e02f-4d95-8686-53ff648b1b75",
-        "providerFixtureId": "1546010"
+        "snapshotId": "040fd1b2-f2ff-42d5-b465-55a76a69df6f",
+        "providerFixtureId": "1524858"
       }
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:provider-stats-952819f6",
-      "type": "api-football",
-      "url": None,
-      "title": "API-Football Statistics Snapshot",
-      "externalId": "api-football://provider-stats-952819f6/1546010",
-      "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:05:36.976Z",
-      "metadata": {
-        "provider": "api-football",
-        "providerFixtureId": "1546010"
-      }
-    },
-    {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:source_api_football_fixture",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:source_api_football_fixture",
       "type": "api-football",
       "url": None,
       "title": "API-Football fixture",
-      "externalId": "1546010",
+      "externalId": "1524858",
       "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:05:30.741Z",
+      "capturedAt": "2026-06-09T17:07:26.769Z",
       "metadata": {
-        "fixtureId": "6469748d-cd2b-4128-80c4-f9150e4f3291",
-        "providerFixtureId": "1546010"
-      }
-    },
-    {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:provider-fixture-18c80997",
-      "type": "api-football",
-      "url": None,
-      "title": "API-Football Fixture Snapshot",
-      "externalId": "api-football://provider-fixture-18c80997/1546010",
-      "providerSnapshotId": None,
-      "capturedAt": "2026-05-26T16:02:55.883Z",
-      "metadata": {
-        "provider": "api-football",
-        "providerFixtureId": "1546010"
+        "fixtureId": "edda21e2-d12f-4a11-bf03-987a079f903e",
+        "providerFixtureId": "1524858"
       }
     }
   ],
   "evidenceItems": [
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-h2h-odds",
-      "sourceId": "fa56e894-4591-4fcf-9064-05db8f59f1f4:provider-odds-0e6a26af",
-      "summary": "The odds across multiple bookmakers heavily favor Alianza Lima W, with an average price around 1.12, implying a probability of ~89% for an away win.",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_1",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:api_football_odds",
+      "summary": "Betting odds for h2h market from API-Football snapshot.",
       "confidence": 0.95,
       "claimIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-h2h-away-win"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_home_odds",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_draw_odds",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_away_odds"
       ],
       "metadata": {}
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-web-form",
-      "sourceId": "fa56e894-4591-4fcf-9064-05db8f59f1f4:web-search-1",
-      "summary": "Web search results indicate Yanapuma W had a recent 10-0 loss against a top team (Universitario), suggesting a significant defensive vulnerability against strong opponents like Alianza Lima W.",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_2",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_3",
+      "summary": "Probabilities for h2h market from web search.",
       "confidence": 0.85,
       "claimIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-h2h-away-win",
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-goals-over"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_home_prob",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_draw_prob",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_away_prob"
       ],
       "metadata": {}
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-dc-odds",
-      "sourceId": "fa56e894-4591-4fcf-9064-05db8f59f1f4:provider-odds-0e6a26af",
-      "summary": "The 'Draw or Away' double chance market has a price of 1.01, indicating it is considered almost a certainty by the bookmaker.",
-      "confidence": 0.98,
-      "claimIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-dc-draw-away"
-      ],
-      "metadata": {}
-    },
-    {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-goals-over-odds",
-      "sourceId": "fa56e894-4591-4fcf-9064-05db8f59f1f4:provider-odds-0e6a26af",
-      "summary": "Pinnacle's odds for Over 3.5 goals are 1.43, implying a high probability (~70%) of a high-scoring match.",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_3",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_2",
+      "summary": "Historical head-to-head statistics.",
       "confidence": 0.9,
       "claimIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-goals-over"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_historical",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_last_meeting"
       ],
       "metadata": {}
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-btts-web",
-      "sourceId": "fa56e894-4591-4fcf-9064-05db8f59f1f4:web-search-1",
-      "summary": "Web search provides conflicting evidence for BTTS. Yanapuma was shut out in a recent heavy loss but has scored in other matches. Alianza Lima's record is also mixed. There is no clear trend.",
-      "confidence": 0.6,
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_1",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:api_football_odds",
+      "summary": "Betting odds for over 2.5 goals market from API-Football snapshot.",
+      "confidence": 0.95,
       "claimIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-btts"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_over_odds"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_2",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_1",
+      "summary": "Probability and statistics for over 2.5 goals.",
+      "confidence": 0.8,
+      "claimIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_over_prob",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_tr_high_scoring",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_tr_pct"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_3",
+      "sourceId": "90a322732-9e4b-473a-bfdc-5b57bed55e8a:web_search_1", # This evidence has a typo, will use the correct sourceId from the claim.
+      "summary": "SC United Bantams over 2.5 goals percentage.",
+      "confidence": 0.8,
+      "claimIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_scu_pct"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_double_chance_1",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:api_football_odds",
+      "summary": "Betting odds for double chance market from API-Football snapshot.",
+      "confidence": 0.95,
+      "claimIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_double_chance_home_draw_odds",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_double_chance_home_away_odds",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_double_chance_draw_away_odds"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_btts_1",
+      "sourceId": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:web_search_1",
+      "summary": "Probability and statistics for both teams to score.",
+      "confidence": 0.8,
+      "claimIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_btts_prob",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_btts_scu_pct",
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_btts_tr_pct"
       ],
       "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-h2h-away-win",
-      "statement": "Alianza Lima W is the overwhelming favorite to win the match.",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_home_odds",
+      "statement": "SC United Bantams to win at odds of 1.42 (implied probability 70.42%).",
       "marketKey": "h2h",
       "selectionKey": None,
       "line": None,
       "supportLevel": "supported",
       "confidence": None,
       "evidenceIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-h2h-odds",
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-web-form"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_1"
       ],
       "conflictStatus": "none"
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-dc-draw-away",
-      "statement": "Alianza Lima W is extremely likely to secure at least a draw.",
-      "marketKey": "double_chance",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_draw_odds",
+      "statement": "A draw at odds of 4.75 (implied probability 21.05%).",
+      "marketKey": "h2h",
       "selectionKey": None,
       "line": None,
       "supportLevel": "supported",
       "confidence": None,
       "evidenceIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-dc-odds"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_1"
       ],
       "conflictStatus": "none"
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-goals-over",
-      "statement": "The match is likely to have over 3.5 goals.",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_away_odds",
+      "statement": "Tobacco Road to win at odds of 5.00 (implied probability 20.00%).",
+      "marketKey": "h2h",
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_1"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_home_prob",
+      "statement": "SC United Bantams have a 49% chance of winning based on betting market projections.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_2"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_draw_prob",
+      "statement": "There is a 21% chance of a draw based on betting market projections.",
+      "marketKey": "h2h",
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_2"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_away_prob",
+      "statement": "Tobacco Road FC has a 30% chance of winning based on betting market projections.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_2"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_historical",
+      "statement": "The historical head-to-head record between SC United Bantams and Tobacco Road FC is balanced with 1 win each and 2 draws in 4 matches.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_3"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_h2h_last_meeting",
+      "statement": "In their last meeting on May 31, 2025, SC United Bantams won 2-1 at home.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_h2h_3"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_over_odds",
+      "statement": "Over 2.5 goals at odds of 1.25 (implied probability 80%).",
       "marketKey": "goals_over_under",
       "selectionKey": None,
       "line": None,
       "supportLevel": "supported",
       "confidence": None,
       "evidenceIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-goals-over-odds",
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-web-form"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_1"
       ],
       "conflictStatus": "none"
     },
     {
-      "id": "fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-btts",
-      "statement": "It is uncertain whether both teams will score.",
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_over_prob",
+      "statement": "There is a 67% probability of over 2.5 goals, expected due to both teams' defensive records.",
+      "marketKey": "goals_over_under",
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_2"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_tr_high_scoring",
+      "statement": "Tobacco Road FC is known for high-scoring games, with 9 of their last 10 matches seeing over 2.5 goals.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_2"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_scu_pct",
+      "statement": "SC United Bantams' Over 2.5 Goals percentage for the 2026 season is 60%.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_3"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_goals_tr_pct",
+      "statement": "Tobacco Road FC's Over 2.5 Goals percentage for the 2026 season is 80%.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_goals_2"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_double_chance_home_draw_odds",
+      "statement": "Home or Draw (SC United Bantams or Draw) at odds of 1.11 (implied probability 90.09%).",
+      "marketKey": "double_chance",
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_double_chance_1"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_double_chance_home_away_odds",
+      "statement": "Home or Away (SC United Bantams or Tobacco Road) at odds of 1.12 (implied probability 89.29%).",
+      "marketKey": "double_chance",
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_double_chance_1"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_double_chance_draw_away_odds",
+      "statement": "Draw or Away (Draw or Tobacco Road) at odds of 2.60 (implied probability 38.46%).",
+      "marketKey": "double_chance",
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_double_chance_1"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_btts_prob",
+      "statement": "There is a 67% probability for Both Teams to Score (BTTS).",
       "marketKey": "btts",
       "selectionKey": None,
       "line": None,
-      "supportLevel": "weak",
+      "supportLevel": "supported",
       "confidence": None,
       "evidenceIds": [
-        "fa56e894-4591-4fcf-9064-05db8f59f1f4:evidence-btts-web"
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_btts_1"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_btts_scu_pct",
+      "statement": "SC United Bantams' Both Teams to Score percentage for the 2026 season is 40%.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_btts_1"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "90a32732-9e4b-473a-bfdc-5b57bed55e8a:claim_btts_tr_pct",
+      "statement": "Tobacco Road FC's Both Teams to Score percentage for the 2026 season is 80%.",
+      "marketKey": None,
+      "selectionKey": None,
+      "line": None,
+      "supportLevel": "supported",
+      "confidence": None,
+      "evidenceIds": [
+        "90a32732-9e4b-473a-bfdc-5b57bed55e8a:evidence_btts_1"
       ],
       "conflictStatus": "none"
     }
   ],
   "allowedQuotes": [
     {
-      "oddsQuoteId": "4e0609a6-c068-4ead-a506-c13cdf7d549e",
+      "oddsQuoteId": "c27ce881-d743-4ef6-b20f-6fd0dff65948",
       "market": "h2h",
       "selection": "away",
-      "line": None,
-      "odds": 1.14,
-      "impliedProbability": 0.877193,
-      "marketImpliedProbability": 0.893142,
-      "marketFairProbability": 0.818187,
-      "consensusFairOdds": 1.222214,
-      "overround": 0.092003,
-      "marketEfficiencyScore": 0.6772,
-      "lowLiquidity": True,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "72e832eb-73cc-4a2b-86c4-7d07f0e8b2eb",
-      "market": "h2h",
-      "selection": "draw",
-      "line": None,
-      "odds": 9.5,
-      "impliedProbability": 0.105263,
-      "marketImpliedProbability": 0.114821,
-      "marketFairProbability": 0.104979,
-      "consensusFairOdds": 9.525711,
-      "overround": 0.092003,
-      "marketEfficiencyScore": 0.6772,
-      "lowLiquidity": True,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "df396015-fc09-41db-a294-9ef44d513c58",
-      "market": "h2h",
-      "selection": "home",
-      "line": None,
-      "odds": 13,
-      "impliedProbability": 0.076923,
-      "marketImpliedProbability": 0.08404,
-      "marketFairProbability": 0.076834,
-      "consensusFairOdds": 13.01512,
-      "overround": 0.092003,
-      "marketEfficiencyScore": 0.6772,
-      "lowLiquidity": True,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "0e620873-2729-450b-be63-c6da71740daf",
-      "market": "double_chance",
-      "selection": "draw_or_away",
-      "line": None,
-      "odds": 1.01,
-      "impliedProbability": 0.990099,
-      "marketImpliedProbability": 0.990099,
-      "marketFairProbability": 0.460161,
-      "consensusFairOdds": 2.173154,
-      "overround": 1.151637,
-      "marketEfficiencyScore": 0.5167,
-      "lowLiquidity": True,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "823147ba-1dcc-4271-a294-b3093bd66459",
-      "market": "double_chance",
-      "selection": "home_or_away",
-      "line": None,
-      "odds": 1.04,
-      "impliedProbability": 0.961538,
-      "marketImpliedProbability": 0.961538,
-      "marketFairProbability": 0.446887,
-      "consensusFairOdds": 2.237703,
-      "overround": 1.151637,
-      "marketEfficiencyScore": 0.5167,
-      "lowLiquidity": True,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "7e254c97-2ac2-4832-a8ad-fb9f21f68dde",
-      "market": "double_chance",
-      "selection": "home_or_draw",
       "line": None,
       "odds": 5,
       "impliedProbability": 0.2,
       "marketImpliedProbability": 0.2,
-      "marketFairProbability": 0.092952,
-      "consensusFairOdds": 10.758187,
-      "overround": 1.151637,
+      "marketFairProbability": 0.179412,
+      "consensusFairOdds": 5.573758,
+      "overround": 0.114752,
+      "marketEfficiencyScore": 0.5276,
+      "lowLiquidity": True,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-09T17:07:30.956Z"
+    },
+    {
+      "oddsQuoteId": "b58b40db-5f6f-4383-8805-d8a335e0b05d",
+      "market": "h2h",
+      "selection": "draw",
+      "line": None,
+      "odds": 4.75,
+      "impliedProbability": 0.210526,
+      "marketImpliedProbability": 0.210526,
+      "marketFairProbability": 0.188855,
+      "consensusFairOdds": 5.29507,
+      "overround": 0.114752,
+      "marketEfficiencyScore": 0.5276,
+      "lowLiquidity": True,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-09T17:07:30.956Z"
+    },
+    {
+      "oddsQuoteId": "948d57d1-80df-4991-b6d8-17c4f3c8cc7b",
+      "market": "h2h",
+      "selection": "home",
+      "line": None,
+      "odds": 1.42,
+      "impliedProbability": 0.704225,
+      "marketImpliedProbability": 0.704225,
+      "marketFairProbability": 0.631733,
+      "consensusFairOdds": 1.582947,
+      "overround": 0.114752,
+      "marketEfficiencyScore": 0.5276,
+      "lowLiquidity": True,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-09T17:07:30.956Z"
+    },
+    {
+      "oddsQuoteId": "93e8d911-705b-4983-af5d-65ddf911beb6",
+      "market": "double_chance",
+      "selection": "draw_or_away",
+      "line": None,
+      "odds": 2.6,
+      "impliedProbability": 0.384615,
+      "marketImpliedProbability": 0.384615,
+      "marketFairProbability": 0.176561,
+      "consensusFairOdds": 5.663771,
+      "overround": 1.178373,
       "marketEfficiencyScore": 0.5167,
       "lowLiquidity": True,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
+      "capturedAt": "2026-06-09T17:07:30.956Z"
     },
     {
-      "oddsQuoteId": "3ae24a6a-8603-46ff-9233-49cc26398162",
+      "oddsQuoteId": "a272f9b1-c433-44c6-a9be-3722dca1e3b8",
+      "market": "double_chance",
+      "selection": "home_or_away",
+      "line": None,
+      "odds": 1.12,
+      "impliedProbability": 0.892857,
+      "marketImpliedProbability": 0.892857,
+      "marketFairProbability": 0.409873,
+      "consensusFairOdds": 2.439778,
+      "overround": 1.178373,
+      "marketEfficiencyScore": 0.5167,
+      "lowLiquidity": True,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-09T17:07:30.956Z"
+    },
+    {
+      "oddsQuoteId": "b2934c2e-26bf-47d1-8d28-51b676771f23",
+      "market": "double_chance",
+      "selection": "home_or_draw",
+      "line": None,
+      "odds": 1.11,
+      "impliedProbability": 0.900901,
+      "marketImpliedProbability": 0.900901,
+      "marketFairProbability": 0.413566,
+      "consensusFairOdds": 2.417995,
+      "overround": 1.178373,
+      "marketEfficiencyScore": 0.5167,
+      "lowLiquidity": True,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-09T17:07:30.956Z"
+    },
+    {
+      "oddsQuoteId": "b3099681-f41e-4a6e-99bf-fb428b1caaf9",
       "market": "goals_over_under",
       "selection": "over",
       "line": 2.5,
-      "odds": 1.17,
-      "impliedProbability": 0.854701,
-      "marketImpliedProbability": 0.854701,
-      "marketFairProbability": 0.793651,
-      "consensusFairOdds": 1.26,
-      "overround": 0.076923,
-      "marketEfficiencyScore": 0.6064,
+      "odds": 1.25,
+      "impliedProbability": 0.8,
+      "marketImpliedProbability": 0.8,
+      "marketFairProbability": 0.75,
+      "consensusFairOdds": 1.333333,
+      "overround": 0.066667,
+      "marketEfficiencyScore": 0.6278,
       "lowLiquidity": True,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
+      "capturedAt": "2026-06-09T17:07:30.956Z"
     },
     {
-      "oddsQuoteId": "b926206b-4e5b-406b-8a93-4e2bc6f4f6d1",
+      "oddsQuoteId": "8f5a56ec-a686-410e-8246-a0319670371b",
       "market": "goals_over_under",
       "selection": "under",
       "line": 2.5,
-      "odds": 4.5,
-      "impliedProbability": 0.222222,
-      "marketImpliedProbability": 0.222222,
-      "marketFairProbability": 0.206349,
-      "consensusFairOdds": 4.846154,
-      "overround": 0.076923,
-      "marketEfficiencyScore": 0.6064,
+      "odds": 3.75,
+      "impliedProbability": 0.266667,
+      "marketImpliedProbability": 0.266667,
+      "marketFairProbability": 0.25,
+      "consensusFairOdds": 4,
+      "overround": 0.066667,
+      "marketEfficiencyScore": 0.6278,
       "lowLiquidity": True,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "15b7dcbe-24cc-43a0-b00d-616b36fe40cd",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 3.5,
-      "odds": 1.43,
-      "impliedProbability": 0.699301,
-      "marketImpliedProbability": 0.699301,
-      "marketFairProbability": 0.635204,
-      "consensusFairOdds": 1.574297,
-      "overround": 0.100907,
-      "marketEfficiencyScore": 0.5564,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "4b9e0118-aae8-48dd-b35b-6de268475a9c",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 3.5,
-      "odds": 2.49,
-      "impliedProbability": 0.401606,
-      "marketImpliedProbability": 0.401606,
-      "marketFairProbability": 0.364796,
-      "consensusFairOdds": 2.741259,
-      "overround": 0.100907,
-      "marketEfficiencyScore": 0.5564,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "13783a41-b355-4dd7-b186-c7d1cb28644f",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 4.5,
-      "odds": 2.03,
-      "impliedProbability": 0.492611,
-      "marketImpliedProbability": 0.492611,
-      "marketFairProbability": 0.451351,
-      "consensusFairOdds": 2.215569,
-      "overround": 0.091413,
-      "marketEfficiencyScore": 0.5762,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "f0e4ce38-56c6-4f9b-92be-f4034096e10a",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 4.5,
-      "odds": 1.67,
-      "impliedProbability": 0.598802,
-      "marketImpliedProbability": 0.598802,
-      "marketFairProbability": 0.548649,
-      "consensusFairOdds": 1.82266,
-      "overround": 0.091413,
-      "marketEfficiencyScore": 0.5762,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "52ae43b2-6761-4f36-94c7-8943f883ca43",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 3.75,
-      "odds": 1.52,
-      "impliedProbability": 0.657895,
-      "marketImpliedProbability": 0.657895,
-      "marketFairProbability": 0.598945,
-      "consensusFairOdds": 1.669604,
-      "overround": 0.098423,
-      "marketEfficiencyScore": 0.5616,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "505dd113-bb06-43ba-b16b-220d1da7ac94",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 3.75,
-      "odds": 2.27,
-      "impliedProbability": 0.440529,
-      "marketImpliedProbability": 0.440529,
-      "marketFairProbability": 0.401055,
-      "consensusFairOdds": 2.493421,
-      "overround": 0.098423,
-      "marketEfficiencyScore": 0.5616,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "653116cd-b100-4375-b4a6-4bc2ea939f5a",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 4.75,
-      "odds": 2.25,
-      "impliedProbability": 0.444444,
-      "marketImpliedProbability": 0.444444,
-      "marketFairProbability": 0.404762,
-      "consensusFairOdds": 2.470588,
-      "overround": 0.098039,
-      "marketEfficiencyScore": 0.5624,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "8402c30f-9d7d-43eb-af39-49c66968da8d",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 4.25,
-      "odds": 1.85,
-      "impliedProbability": 0.540541,
-      "marketImpliedProbability": 0.540541,
-      "marketFairProbability": 0.498645,
-      "consensusFairOdds": 2.005435,
-      "overround": 0.084019,
-      "marketEfficiencyScore": 0.5916,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "26bcd6ad-23c3-404d-8e3a-42439dec3cc2",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 4,
-      "odds": 1.65,
-      "impliedProbability": 0.606061,
-      "marketImpliedProbability": 0.606061,
-      "marketFairProbability": 0.555256,
-      "consensusFairOdds": 1.800971,
-      "overround": 0.091497,
-      "marketEfficiencyScore": 0.576,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "fb2312cc-9898-433d-b2e2-e81d1d4d394c",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 4,
-      "odds": 2.06,
-      "impliedProbability": 0.485437,
-      "marketImpliedProbability": 0.485437,
-      "marketFairProbability": 0.444744,
-      "consensusFairOdds": 2.248485,
-      "overround": 0.091497,
-      "marketEfficiencyScore": 0.576,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "f30fea5e-d110-462e-a7f7-143607ed1ffc",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 4.25,
-      "odds": 1.84,
-      "impliedProbability": 0.543478,
-      "marketImpliedProbability": 0.543478,
-      "marketFairProbability": 0.501355,
-      "consensusFairOdds": 1.994595,
-      "overround": 0.084019,
-      "marketEfficiencyScore": 0.5916,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "8611ceef-06b4-403d-8108-8f0e5e10ad5e",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 4.75,
-      "odds": 1.53,
-      "impliedProbability": 0.653595,
-      "marketImpliedProbability": 0.653595,
-      "marketFairProbability": 0.595238,
-      "consensusFairOdds": 1.68,
-      "overround": 0.098039,
-      "marketEfficiencyScore": 0.5624,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "b83d240a-25cf-4bf2-9a5a-c82026ba8764",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 5,
-      "odds": 2.62,
-      "impliedProbability": 0.381679,
-      "marketImpliedProbability": 0.381679,
-      "marketFairProbability": 0.346633,
-      "consensusFairOdds": 2.884892,
-      "overround": 0.101104,
-      "marketEfficiencyScore": 0.556,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
-    },
-    {
-      "oddsQuoteId": "09b2ff46-7917-4f72-a008-6d282c79ab72",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 5,
-      "odds": 1.39,
-      "impliedProbability": 0.719424,
-      "marketImpliedProbability": 0.719424,
-      "marketFairProbability": 0.653367,
-      "consensusFairOdds": 1.530534,
-      "overround": 0.101104,
-      "marketEfficiencyScore": 0.556,
-      "lowLiquidity": True,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-05-26T16:05:38.587Z"
+      "capturedAt": "2026-06-09T17:07:30.956Z"
     }
   ],
-  "providerContextWarnings": [
-    "scoring prompt allowedQuotes trimmed from 25 to 22 representative quotes"
-  ]
+  "providerContextWarnings": []
 }
 
-def get_claim_by_id(claim_id, claims_data):
-    for claim in claims_data:
-        if claim["id"] == claim_id:
-            return claim
-    return None
-
-def get_evidence_by_id(evidence_id, evidence_data):
-    for evidence in evidence_data:
-        if evidence["id"] == evidence_id:
-            return evidence
-    return None
-
-def calculate_model_probability_and_confidence(claim_obj, evidence_data):
-    if not claim_obj or not claim_obj["evidenceIds"]:
-        return 0.5, 0.5, "very low" # Default if claim not found or no evidence
-
-    total_confidence = 0
-    count = 0
-    for evidence_id in claim_obj["evidenceIds"]:
-        evidence = get_evidence_by_id(evidence_id, evidence_data)
-        if evidence and evidence["confidence"] is not None:
-            total_confidence += evidence["confidence"]
-            count += 1
-    
-    model_probability = total_confidence / count if count > 0 else 0.5 # Default if no evidence
-    
-    confidence = model_probability # Using model_probability as confidence for now
-    
-    if confidence > 0.85:
-        confidence_band = "high"
-    elif confidence > 0.70:
-        confidence_band = "medium"
-    elif confidence > 0.50:
-        confidence_band = "low"
-    else:
-        confidence_band = "very low"
-            
-    return model_probability, confidence, confidence_band
-
-# Extract relevant data
-claims_data = input_data["claims"]
-evidence_items_data = input_data["evidenceItems"]
-allowed_quotes_data = input_data["allowedQuotes"]
-required_markets = input_data["requiredMarkets"]
-research_bundle_warnings = input_data["researchBundle"].get("warnings", [])
-
-predictions = []
-output_warnings = list(research_bundle_warnings) # Start with existing research bundle warnings
-
-# Helper to find an allowed quote
-def find_quote(market, selection, line=None):
-    for quote in allowed_quotes_data:
-        if quote["market"] == market and quote["selection"] == selection:
-            if line is None or (quote.get("line") is not None and abs(quote["line"] - line) < 0.001):
-                return quote
-    return None
-
-# Process H2H market
-if "h2h" in required_markets:
-    h2h_claim = get_claim_by_id("fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-h2h-away-win", claims_data)
-    if h2h_claim:
-        h2h_quote = find_quote("h2h", "away")
-        if h2h_quote:
-            model_prob, confidence, confidence_band = calculate_model_probability_and_confidence(h2h_claim, evidence_items_data)
-            edge = model_prob - h2h_quote["marketFairProbability"]
-            
-            predictions.append({
-                "oddsQuoteId": h2h_quote["oddsQuoteId"],
-                "market": "h2h",
-                "selection": "away",
-                "line": None,
-                "odds": h2h_quote["odds"],
-                "probability": round(model_prob, 2), # Round to 2 decimal places as in example
-                "modelProbability": round(model_prob, 2),
-                "marketFairProbability": h2h_quote["marketFairProbability"],
-                "edge": round(edge, 5), # Round to 5 decimal places
-                "confidence": round(confidence, 2),
-                "confidenceBand": confidence_band,
-                "blockers": [],
-                "promotable": True if edge > 0 else False,
-                "evidenceIds": h2h_claim["evidenceIds"],
-                "claimIds": [h2h_claim["id"]],
-                "rationale": "Alianza Lima W is heavily favored according to bookmaker odds (1.14) and recent web search results indicating Yanapuma W's significant defensive vulnerabilities, including a 10-0 loss to a top team.",
-                "warnings": []
-            })
-
-# Process Double Chance market
-if "double_chance" in required_markets:
-    dc_claim = get_claim_by_id("fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-dc-draw-away", claims_data)
-    if dc_claim:
-        dc_quote = find_quote("double_chance", "draw_or_away")
-        if dc_quote:
-            model_prob, confidence, confidence_band = calculate_model_probability_and_confidence(dc_claim, evidence_items_data)
-            edge = model_prob - dc_quote["marketFairProbability"]
-            
-            predictions.append({
-                "oddsQuoteId": dc_quote["oddsQuoteId"],
-                "market": "double_chance",
-                "selection": "draw_or_away",
-                "line": None,
-                "odds": dc_quote["odds"],
-                "probability": round(model_prob, 2),
-                "modelProbability": round(model_prob, 2),
-                "marketFairProbability": dc_quote["marketFairProbability"],
-                "edge": round(edge, 5),
-                "confidence": round(confidence, 2),
-                "confidenceBand": confidence_band,
-                "blockers": [],
-                "promotable": True if edge > 0 else False,
-                "evidenceIds": dc_claim["evidenceIds"],
-                "claimIds": [dc_claim["id"]],
-                "rationale": "The 'Draw or Away' double chance market is considered almost a certainty by bookmakers (odds 1.01), with strong evidence supporting Alianza Lima W securing at least a draw.",
-                "warnings": []
-            })
-
-# Process Goals Over/Under market (specifically Over 3.5 based on claim and evidence)
-if "goals_over_under" in required_markets:
-    goals_over_claim = get_claim_by_id("fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-goals-over", claims_data)
-    if goals_over_claim:
-        # Find the quote for Over 3.5 goals
-        goals_over_quote = find_quote("goals_over_under", "over", 3.5)
-        if goals_over_quote:
-            model_prob, confidence, confidence_band = calculate_model_probability_and_confidence(goals_over_claim, evidence_items_data)
-            edge = model_prob - goals_over_quote["marketFairProbability"]
-            
-            predictions.append({
-                "oddsQuoteId": goals_over_quote["oddsQuoteId"],
-                "market": "goals_over_under",
-                "selection": "over",
-                "line": 3.5,
-                "odds": goals_over_quote["odds"],
-                "probability": round(model_prob, 2),
-                "modelProbability": round(model_prob, 2),
-                "marketFairProbability": goals_over_quote["marketFairProbability"],
-                "edge": round(edge, 5),
-                "confidence": round(confidence, 2),
-                "confidenceBand": confidence_band,
-                "blockers": [],
-                "promotable": True if edge > 0 else False,
-                "evidenceIds": goals_over_claim["evidenceIds"],
-                "claimIds": [goals_over_claim["id"]],
-                "rationale": "Pinnacle's odds for Over 3.5 goals (1.43) imply a high probability, reinforced by Yanapuma W's recent heavy loss (10-0), suggesting a high-scoring match is likely.",
-                "warnings": []
-            })
-
-# Process Corners Over/Under market (missing quotes)
-if "corners_over_under" in required_markets:
-    corners_warnings = ["Market skipped/review-required: missing odds quotes for requested market"]
-    # Add to overall warnings if not already present
-    if corners_warnings[0] not in output_warnings:
-        output_warnings.extend(corners_warnings)
-    
-    # Emit a prediction with warnings, even without quotes
-    predictions.append({
-        "oddsQuoteId": None,
-        "market": "corners_over_under",
-        "selection": None,
-        "line": None,
-        "odds": None,
-        "probability": None,
-        "modelProbability": None,
-        "marketFairProbability": None,
-        "edge": None,
-        "confidence": None,
-        "confidenceBand": None,
-        "blockers": [],
-        "promotable": False,
-        "evidenceIds": [],
-        "claimIds": [],
-        "rationale": "No odds available for corners over/under, therefore no analytical pick can be made.",
-        "warnings": corners_warnings
-    })
-
-# Process BTTS market (missing quotes)
-if "btts" in required_markets:
-    btts_claim = get_claim_by_id("fa56e894-4591-4fcf-9064-05db8f59f1f4:claim-btts", claims_data)
-    btts_warnings = ["Market skipped/review-required: missing odds quotes for requested market"]
-    if btts_warnings[0] not in output_warnings:
-        output_warnings.extend(btts_warnings)
-
-    btts_evidence_ids = []
-    btts_claim_ids = []
-    btts_rationale = "No odds available for Both Teams to Score (BTTS). Web search provides conflicting evidence for BTTS, with Yanapuma's recent shutout vs. other scoring matches and Alianza Lima's mixed record. No clear trend."
-    model_prob = None
-    confidence = None
-    confidence_band = None
-
-    if btts_claim:
-        model_prob, confidence, confidence_band = calculate_model_probability_and_confidence(btts_claim, evidence_items_data)
-        btts_evidence_ids = btts_claim["evidenceIds"]
-        btts_claim_ids = [btts_claim["id"]]
-        btts_warnings.append("Conflicting web search evidence for BTTS, no clear trend.")
-        
-    predictions.append({
-        "oddsQuoteId": None,
-        "market": "btts",
-        "selection": None,
-        "line": None,
-        "odds": None,
-        "probability": round(model_prob, 2) if model_prob is not None else None,
-        "modelProbability": round(model_prob, 2) if model_prob is not None else None,
-        "marketFairProbability": None,
-        "edge": None,
-        "confidence": round(confidence, 2) if confidence is not None else None,
-        "confidenceBand": confidence_band,
-        "blockers": [],
-        "promotable": False,
-        "evidenceIds": btts_evidence_ids,
-        "claimIds": btts_claim_ids,
-        "rationale": btts_rationale,
-        "warnings": btts_warnings
-    })
-
-final_output = {
-    "predictions": predictions,
-    "warnings": sorted(list(set(output_warnings))), # Remove duplicates and sort
-    "metadata": {}
-}
-
-print(json.dumps(final_output, indent=2))
+print(process_fixture_predictions(input_data))
