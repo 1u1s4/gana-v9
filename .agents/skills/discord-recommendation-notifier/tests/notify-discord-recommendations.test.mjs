@@ -212,6 +212,32 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(message, /Sin selecciones/);
   });
 
+  it('explains blocked duplicate required parlays in user-facing Spanish', () => {
+    const requiredLeagueRecommendations = sampleRequiredLeagueRecommendationsPassed();
+    for (const projection of requiredLeagueRecommendations.parlayProjections.slice(1)) {
+      projection.status = 'blocked';
+      projection.legs = [];
+      projection.combinedOdds = null;
+      projection.aggregateConfidence = null;
+      projection.reasons = ['duplicate of parlay-diamante; identical required-league parlay is not published twice'];
+      projection.riskFlags = ['duplicate-required-league-parlay', 'blocked'];
+    }
+    const artifact = {
+      date: '2026-06-12',
+      dailyBatchId: 'daily-required-deduped',
+      recommendations: [],
+      requiredLeagueRecommendations,
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
+
+    assert.match(parlayEmbed.description, /✅ 💎 parlay-diamante · 2 selecciones/);
+    assert.match(parlayEmbed.description, /🚫 🧠 parlay-refinado/);
+    assert.match(parlayEmbed.description, /Duplicado de parlay-diamante; no se publica cupón idéntico\./);
+    assert.doesNotMatch(parlayEmbed.description, /identical required-league parlay/);
+  });
+
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
     const artifact = sampleArtifactWithAtomic();
     const uuidA = 'a28f3e87-bc59-4e9e-b1fd-062759061d86';

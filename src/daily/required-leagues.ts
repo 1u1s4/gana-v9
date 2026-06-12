@@ -513,7 +513,7 @@ function buildRequiredLeagueParlayProjections(
   atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
   fixtureCount: number,
 ): DailyRequiredLeagueParlayProjection[] {
-  return DAILY_PREFERRED_PARLAY_PROFILE_ORDER.map((profile) => {
+  const projections = DAILY_PREFERRED_PARLAY_PROFILE_ORDER.map((profile) => {
     const legs = selectRequiredLeagueParlayLegs(profile, atomicProjections);
     if (fixtureCount < 2 || legs.length < 2) {
       return {
@@ -570,6 +570,57 @@ function buildRequiredLeagueParlayProjections(
       ]),
     } satisfies DailyRequiredLeagueParlayProjection;
   });
+  return dedupeRequiredLeagueParlayProjections(projections);
+}
+
+function dedupeRequiredLeagueParlayProjections(
+  projections: readonly DailyRequiredLeagueParlayProjection[],
+): DailyRequiredLeagueParlayProjection[] {
+  const selectedBySignature = new Map<string, DailyRequiredLeagueParlayProjection>();
+  return projections.map((projection) => {
+    if (projection.status !== 'selected') return projection;
+    const signature = requiredLeagueParlaySignature(projection);
+    const duplicateOf = selectedBySignature.get(signature);
+    if (!duplicateOf) {
+      selectedBySignature.set(signature, projection);
+      return projection;
+    }
+    return {
+      ...projection,
+      status: 'blocked',
+      parlayId: null,
+      combinedOdds: null,
+      aggregateConfidence: null,
+      adjustedProbability: null,
+      expectedEdge: null,
+      sourceRunIds: [],
+      providers: [],
+      legs: [],
+      reasons: uniqueStrings([
+        `duplicate of ${duplicateOf.profile}; identical required-league parlay is not published twice`,
+        ...projection.reasons,
+      ]),
+      riskFlags: uniqueStrings([
+        ...projection.riskFlags,
+        'duplicate-required-league-parlay',
+        'blocked',
+      ]),
+    };
+  });
+}
+
+function requiredLeagueParlaySignature(projection: DailyRequiredLeagueParlayProjection): string {
+  return projection.legs
+    .map((leg) => [
+      leg.fixtureId,
+      leg.predictionId,
+      leg.market,
+      leg.selection,
+      leg.line ?? '',
+      leg.odds ?? '',
+    ].join(':'))
+    .sort()
+    .join('|');
 }
 
 function selectRequiredLeagueParlayLegs(

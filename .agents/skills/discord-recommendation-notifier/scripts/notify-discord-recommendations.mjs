@@ -665,7 +665,7 @@ function formatRequiredLeagueParlayLines(data) {
       lines.push(`   ${metrics.join(' · ')}`);
     }
     if (!legs.length && Array.isArray(projection?.reasons) && projection.reasons.length) {
-      lines.push(`   ${stringOrFallback(projection.reasons[0], 'sin legs publicados')}`);
+      lines.push(`   ${formatRequiredLeagueBlockedParlayReason(projection)}`);
     }
   }
   return lines;
@@ -673,6 +673,16 @@ function formatRequiredLeagueParlayLines(data) {
 
 function formatRequiredLeagueParlayLeg(leg) {
   return `${formatMarketIcon(leg)} ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg?.odds, 2)}`;
+}
+
+function formatRequiredLeagueBlockedParlayReason(projection) {
+  if (Array.isArray(projection?.riskFlags) && projection.riskFlags.includes('duplicate-required-league-parlay')) {
+    const duplicateReason = (projection.reasons ?? []).find((reason) => /^duplicate of /i.test(String(reason)));
+    const match = /^duplicate of ([^;]+)/i.exec(String(duplicateReason ?? ''));
+    const profile = match?.[1] ? match[1].trim() : 'otro enfoque';
+    return `Duplicado de ${profile}; no se publica cupón idéntico.`;
+  }
+  return stringOrFallback(projection?.reasons?.[0], 'sin legs publicados');
 }
 
 function formatRequiredPick(item) {

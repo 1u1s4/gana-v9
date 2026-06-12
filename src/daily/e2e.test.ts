@@ -6,6 +6,7 @@ import { join } from 'path';
 import { loadConfig } from '../config.js';
 import { createRuntimeContext } from '../runtime/context.js';
 import { runDailyE2E } from './e2e.js';
+import { buildRequiredLeagueRecommendations } from './required-leagues.js';
 
 function context() {
   const root = mkdtempSync(join(tmpdir(), 'gana-daily-e2e-test-'));
@@ -1322,6 +1323,101 @@ describe('runDailyE2E', () => {
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.requiredLeagueGoalCheck.status, 'review-required');
     assert.equal(recommendations.recommendationPolicy.requiredLeagueAddendum.missingPredictionFixtures, 1);
+  });
+
+  it('blocks duplicate required-league parlay approaches instead of publishing identical coupons', () => {
+    const canadaBosnia = {
+      ...fixture('2026-06-12T19:00:00.000Z'),
+      id: 'fixture-canada-bosnia',
+      providerFixtureId: '1539000',
+      leagueId: 1,
+      season: 2026,
+      competitionName: 'World Cup',
+      homeTeamName: 'Canada',
+      awayTeamName: 'Bosnia & Herzegovina',
+    };
+    const usaParaguay = {
+      ...fixture('2026-06-13T01:00:00.000Z'),
+      id: 'fixture-usa-paraguay',
+      providerFixtureId: '1489370',
+      leagueId: 1,
+      season: 2026,
+      competitionName: 'World Cup',
+      homeTeamName: 'USA',
+      awayTeamName: 'Paraguay',
+    };
+    const artifact = buildRequiredLeagueRecommendations({
+      dailyBatchId: 'daily-world-cup-required-dedupe',
+      date: '2026-06-12',
+      generatedAt: '2026-06-12T13:30:00.000Z',
+      providers: ['codex'],
+      timezone: 'America/Guatemala',
+      resolveModel: () => 'gpt-5.5',
+      requiredLeagues: [{ providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 }],
+      providerPipelineResults: {
+        codex: {
+          ok: true,
+          runId: 'codex-run',
+          date: '2026-06-12',
+          status: 'succeeded',
+          verdict: 'review-required',
+          fixtures: [canadaBosnia, usaParaguay],
+          scoring: [
+            {
+              ok: true,
+              runId: 'codex-run',
+              fixtureId: 'fixture-canada-bosnia',
+              providerFixtureId: '1539000',
+              gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+              predictions: [{
+                ...highConfidencePrediction('codex-run'),
+                id: 'canada-under-25',
+                fixtureId: 'fixture-canada-bosnia',
+                providerFixtureId: '1539000',
+                market: 'goals_over_under',
+                selection: 'under',
+                line: 2.5,
+                odds: 1.67,
+                confidence: 0.63,
+                edge: 0.0261,
+                status: 'review-required',
+              }],
+            },
+            {
+              ok: true,
+              runId: 'codex-run',
+              fixtureId: 'fixture-usa-paraguay',
+              providerFixtureId: '1489370',
+              gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+              predictions: [{
+                ...highConfidencePrediction('codex-run'),
+                id: 'usa-home',
+                fixtureId: 'fixture-usa-paraguay',
+                providerFixtureId: '1489370',
+                market: 'h2h',
+                selection: 'home',
+                odds: 2.09,
+                confidence: 0.58,
+                edge: 0.0255,
+                status: 'review-required',
+              }],
+            },
+          ],
+        } as any,
+      },
+    });
+
+    const selected = artifact.parlayProjections.filter((projection) => projection.status === 'selected');
+    const blocked = artifact.parlayProjections.filter((projection) => projection.status === 'blocked');
+    assert.equal(artifact.parlayProjections.length, 3);
+    assert.equal(selected.length, 1);
+    assert.equal(selected[0].profile, 'parlay-diamante');
+    assert.equal(blocked.length, 2);
+    assert.deepEqual(blocked.map((projection) => projection.profile), ['parlay-refinado', 'low-variance']);
+    assert.equal(blocked.every((projection) => projection.riskFlags.includes('duplicate-required-league-parlay')), true);
+    assert.equal(blocked.every((projection) => projection.legs.length === 0), true);
+    assert.equal(artifact.goalCheck.status, 'review-required');
+    assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'three-parlay-approaches')?.status, 'blocked');
   });
 
   it('rejects non-native daily providers before running', async () => {
