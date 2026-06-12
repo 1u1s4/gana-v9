@@ -72,6 +72,8 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
 - Fixture labels should include kickoff time in Guatemala when artifact metadata provides it, formatted as `HH:MM GT` next to the match name.
+- Avoid repeating the same kickoff time twice inside a single simple recommendation embed; keep the time in the title and omit it from the inner selection line.
+- Required parlay legs should use the same compact selection style with a market icon, fixture, optional kickoff, pick, and odds; put parlay-level cuota/confidence on a separate compact metrics line.
 - Parlay titles include a profile emoji before the fixture name: `💎` parlay-diamante, `🧠` parlay-refinado, `🛡️` low-variance, `📉` low-odds-top, `🚀` parlay-all-in, `🥇` parlay-oro, `⚖️` balanced, `🔥` high-conviction, `🧩` market-diverse, `🥅` totals, `🔒` conservative, `🔎` review, and `🎟️` fallback/unknown.
 - When the artifact includes `parlayApproaches`, the header must show the three approach statuses with profile emojis; blocked approaches are status context, not published parlay picks.
 - Do not publish raw fixture UUIDs or `Fixture ...` placeholders when persisted fixture metadata is available; the daily artifact should already carry hydrated display labels from source-run `fixtures.json`.

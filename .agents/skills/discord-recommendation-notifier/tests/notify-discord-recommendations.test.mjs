@@ -132,8 +132,9 @@ describe('discord recommendation notifier', () => {
     assert.match(requiredEmbed.description, /📌 1 predicción obligatoria · 🎛️ 1\/3 parlays seleccionados/);
     assert.match(predictionEmbed.description, /✅ Canada vs Bosnia & Herzegovina/);
     assert.match(predictionEmbed.description, /Canada gana @ 1.87/);
-    assert.match(parlayEmbed.description, /✅ 💎 parlay-diamante · 1 selección · Cuota 1.22/);
-    assert.match(parlayEmbed.description, /Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
+    assert.match(parlayEmbed.description, /✅ 💎 parlay-diamante · 1 selección/);
+    assert.match(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
+    assert.match(parlayEmbed.description, /📊 Cuota 1.22 · 🧠 Conf 63%/);
     assert.match(parlayEmbed.description, /🚫 🧠 parlay-refinado/);
     assert.doesNotMatch(JSON.stringify(payload), /Sin selecciones/);
     assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
@@ -141,6 +142,7 @@ describe('discord recommendation notifier', () => {
 
   it('prints kickoff times in Guatemala time for daily and required fixtures', () => {
     const artifact = sampleArtifactWithRequiredLeague();
+    artifact.recommendations[0].kind = 'atomic-prediction';
     artifact.recommendations[0].legs[0].display = {
       fixtureLabel: 'Team A vs Team B',
       homeTeamName: 'Team A',
@@ -168,11 +170,13 @@ describe('discord recommendation notifier', () => {
     const joined = JSON.stringify(payload);
 
     assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30 GT/);
-    assert.match(payload.embeds[1].description, /Team A vs Team B · 14:30 GT: h2h home @ 1.4/);
+    assert.match(payload.embeds[1].description, /Team A vs Team B: h2h home @ 1.4/);
+    assert.doesNotMatch(payload.embeds[1].description, /Team A vs Team B · 14:30 GT: h2h home @ 1.4/);
     assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
     assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
-    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
+    assert.match(joined, /⚽ Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
     assert.match(message, /Team A vs Team B · 14:30 GT/);
+    assert.match(message, /Team A vs Team B: h2h home @ 1.4/);
     assert.match(message, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
   });
 

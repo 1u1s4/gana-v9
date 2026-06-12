@@ -652,18 +652,27 @@ function formatRequiredLeagueParlayLines(data) {
     const icon = status === 'selected' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
     const profile = stringOrFallback(projection?.profile, 'profile unknown');
     const legs = Array.isArray(projection?.legs) ? projection.legs : [];
-    const odds = Number.isFinite(projection?.combinedOdds) ? ` · Cuota ${formatNumber(projection.combinedOdds, 2)}` : '';
-    const confidence = Number.isFinite(projection?.aggregateConfidence) ? ` · Conf ${formatPercent(projection.aggregateConfidence)}` : '';
     const legCount = legs.length ? ` · ${legs.length} ${legs.length === 1 ? 'selección' : 'selecciones'}` : '';
-    lines.push(`${icon} ${parlayProfileEmoji(profile)} ${profile}${legCount}${odds}${confidence}`);
-    for (const [index, leg] of legs.slice(0, 3).entries()) {
-      lines.push(`   ${index + 1}. ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg?.odds, 2)}`);
+    lines.push(`${icon} ${parlayProfileEmoji(profile)} ${profile}${legCount}`);
+    for (const leg of legs.slice(0, 3)) {
+      lines.push(`   ${formatRequiredLeagueParlayLeg(leg)}`);
+    }
+    const metrics = [
+      Number.isFinite(projection?.combinedOdds) ? `📊 Cuota ${formatNumber(projection.combinedOdds, 2)}` : undefined,
+      Number.isFinite(projection?.aggregateConfidence) ? `🧠 Conf ${formatPercent(projection.aggregateConfidence)}` : undefined,
+    ].filter(Boolean);
+    if (metrics.length) {
+      lines.push(`   ${metrics.join(' · ')}`);
     }
     if (!legs.length && Array.isArray(projection?.reasons) && projection.reasons.length) {
       lines.push(`   ${stringOrFallback(projection.reasons[0], 'sin legs publicados')}`);
     }
   }
   return lines;
+}
+
+function formatRequiredLeagueParlayLeg(leg) {
+  return `${formatMarketIcon(leg)} ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg?.odds, 2)}`;
 }
 
 function formatRequiredPick(item) {
@@ -788,8 +797,9 @@ function recommendationEmbed(recommendation, index) {
   const rank = numberOrFallback(recommendation.rank, index + 1);
   const kind = recommendationKind(recommendation);
   const typePrefix = recommendationTypePrefix(recommendation);
+  const includeLegKickoff = kind !== 'atomic-prediction';
   const legLines = Array.isArray(recommendation.legs) && recommendation.legs.length
-    ? recommendation.legs.slice(0, 8).map((leg) => `> ${formatCompactLeg(leg)}`)
+    ? recommendation.legs.slice(0, 8).map((leg) => `> ${formatCompactLeg(leg, { includeKickoff: includeLegKickoff })}`)
     : ['> Sin detalle de selecciones.'];
   if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
     legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
@@ -827,11 +837,12 @@ function formatRecommendationLines(recommendation, index) {
 
 function formatCompactRecommendationLines(recommendation, index) {
   const rank = numberOrFallback(recommendation.rank, index + 1);
+  const includeLegKickoff = recommendationKind(recommendation) !== 'atomic-prediction';
   const lines = [`${rankEmoji(rank)} ${recommendationTypePrefix(recommendation)}${recommendationTitle(recommendation)}`];
 
   if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
     for (const leg of recommendation.legs.slice(0, 8)) {
-      lines.push(`> ${formatCompactLeg(leg)}`);
+      lines.push(`> ${formatCompactLeg(leg, { includeKickoff: includeLegKickoff })}`);
     }
     if (recommendation.legs.length > 8) lines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
   } else {
@@ -943,20 +954,30 @@ function displayFromLeg(leg) {
 }
 
 function displayFixtureName(leg) {
+  return displayFixtureNameWithOptions(leg, { includeKickoff: true });
+}
+
+function displayFixtureNameWithOptions(leg, options = {}) {
+  const includeKickoff = options.includeKickoff !== false;
   const display = leg?.display && typeof leg.display === 'object' ? leg.display : {};
   const fromDisplay = display.fixtureLabel
     || buildLabelFromTeams(display.homeTeamName, display.awayTeamName)
     || buildLabelFromTeams(leg?.homeTeamName, leg?.awayTeamName)
     || leg?.fixtureLabel;
   if (typeof fromDisplay === 'string' && fromDisplay.trim() && !isUuidFixtureLabel(fromDisplay)) {
-    return fixtureLabelWithKickoff(compactFixtureName(fromDisplay), leg);
+    const compact = compactFixtureName(fromDisplay);
+    return includeKickoff ? fixtureLabelWithKickoff(compact, leg) : compact;
   }
 
   const fixture = typeof leg?.fixture === 'string' ? leg.fixture.trim() : '';
-  if (fixture && !isUuidFixtureLabel(fixture)) return fixtureLabelWithKickoff(compactFixtureName(fixture), leg);
+  if (fixture && !isUuidFixtureLabel(fixture)) {
+    const compact = compactFixtureName(fixture);
+    return includeKickoff ? fixtureLabelWithKickoff(compact, leg) : compact;
+  }
 
   const fixtureId = typeof leg?.fixtureId === 'string' ? leg.fixtureId.trim() : '';
-  return fixtureLabelWithKickoff(fixtureId ? `Fixture ${shortId(fixtureId)}` : 'fixture unknown', leg);
+  const fallback = fixtureId ? `Fixture ${shortId(fixtureId)}` : 'fixture unknown';
+  return includeKickoff ? fixtureLabelWithKickoff(fallback, leg) : fallback;
 }
 
 function buildLabelFromTeams(homeTeamName, awayTeamName) {
@@ -996,8 +1017,8 @@ function formatKickoffGuatemala(item) {
   return `${GUATEMALA_TIME_FORMATTER.format(date)} GT`;
 }
 
-export function formatCompactLeg(leg) {
-  return `${formatMarketIcon(leg)} ${displayFixtureName(leg)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
+export function formatCompactLeg(leg, options = {}) {
+  return `${formatMarketIcon(leg)} ${displayFixtureNameWithOptions(leg, options)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
 }
 
 function formatMarketIcon(leg) {
