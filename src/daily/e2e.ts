@@ -524,6 +524,9 @@ export async function runDailyE2E(
   });
   finalRecommendations = applyCouncilDecisions(finalRecommendations, council);
   if (!finalRecommendations.some((recommendation) => recommendation.kind === 'parlay')) {
+    const councilKeptRecommendations = finalRecommendations;
+    const councilCandidatesBeforeComposition = councilCandidateRecommendations;
+    const councilBeforeComposition = council;
     const composedParlays = buildCouncilComposedParlayRecommendations(finalRecommendations);
     if (composedParlays.length) {
       const parlayPredictionIds = recommendationLegPredictionIds(composedParlays);
@@ -542,7 +545,14 @@ export async function runDailyE2E(
         providerComparison: providerComparison.summary,
         validationFreshness,
       });
-      finalRecommendations = applyCouncilDecisions(councilCandidateRecommendations, council);
+      const composedFinalRecommendations = applyCouncilDecisions(councilCandidateRecommendations, council);
+      if (composedFinalRecommendations.some((recommendation) => recommendation.kind === 'parlay')) {
+        finalRecommendations = composedFinalRecommendations;
+      } else {
+        finalRecommendations = councilKeptRecommendations;
+        councilCandidateRecommendations = councilCandidatesBeforeComposition;
+        council = councilBeforeComposition;
+      }
     }
   }
   parlayRecommendations = finalRecommendations.filter((recommendation) => recommendation.kind === 'parlay');

@@ -409,6 +409,130 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendations.some((item: any) => item.kind === 'parlay'), true);
   });
 
+  it('keeps council-kept simples when a composed parlay is rejected', async () => {
+    const ctx = context();
+    const fixtures = [
+      fixture('2026-05-22T16:00:00.000Z'),
+      { ...fixture('2026-05-22T17:00:00.000Z'), id: 'fixture-2', homeTeamName: 'Team C', awayTeamName: 'Team D' },
+      { ...fixture('2026-05-22T18:00:00.000Z'), id: 'fixture-3', homeTeamName: 'Team E', awayTeamName: 'Team F' },
+      { ...fixture('2026-05-22T19:00:00.000Z'), id: 'fixture-4', homeTeamName: 'Team G', awayTeamName: 'Team H' },
+    ];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-05-22',
+      providers: ['codex'],
+      parlayProfile: 'portfolio-v2',
+      persistMetrics: false,
+      dailyBatchId: 'daily-rejected-composed-parlay-keeps-simples',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        const runId = `${config.provider}-run`;
+        return {
+          ok: true,
+          runId,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'review-required',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures,
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: fixtures.length, hitCount: 0, hits: [], candidateFixtures: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [{
+            ok: true,
+            runId,
+            fixtureId: 'fixture-1',
+            providerFixtureId: 'provider-fixture-1',
+            gateResult: { verdict: 'review-required', reasons: ['manual review required'], warnings: [] },
+            predictions: [
+              fallbackPrediction(runId, 'fallback-overinflated-1', 'fixture-1', {
+                odds: 1.5,
+                confidence: 0.91,
+                edge: 0.78,
+                status: 'promotable',
+                warnings: ['low-liquidity'],
+              }),
+              fallbackPrediction(runId, 'fallback-overinflated-2', 'fixture-2', {
+                odds: 1.45,
+                confidence: 0.82,
+                edge: 0.42,
+                status: 'promotable',
+                warnings: ['low-liquidity'],
+              }),
+              fallbackPrediction(runId, 'fallback-simple-review-1', 'fixture-3', {
+                odds: 1.5,
+                confidence: 0.69,
+                edge: 0.038,
+                market: 'h2h',
+                selection: 'away',
+                warnings: ['low-liquidity'],
+              }),
+              fallbackPrediction(runId, 'fallback-simple-review-2', 'fixture-4', {
+                odds: 1.42,
+                confidence: 0.66,
+                edge: 0.029,
+                market: 'h2h',
+                selection: 'home',
+                warnings: ['low-liquidity'],
+              }),
+            ],
+          }],
+          parlay: {
+            ok: false,
+            runId,
+            gateResult: { verdict: 'blocked', reasons: ['strict parlay gate found no promotion-safe build'], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: [],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => ({
+        ok: false,
+        runId: runtime.runId ?? 'parlay-run',
+        date: input.date,
+        gateResult: { verdict: 'blocked', reasons: ['no valid analytical parlays generated'], warnings: [] },
+        build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 0, aggregateConfidence: 0, aggregateQuality: 0 } },
+        persistedParlayIds: [],
+      }) as any,
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: input.runIds?.length ?? 0,
+        top: [],
+        diagnostics: { generatedAt: '2026-05-22T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 0, profileScopedAnalyzed: 0, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    assert.equal(recommendations.parlayRecommendations.length, 0);
+    assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), [
+      'fallback-simple-review-1',
+      'fallback-simple-review-2',
+    ]);
+    assert.equal(recommendations.atomicRecommendations.every((item: any) => item.councilDecision.decision === 'review'), true);
+    assert.equal(recommendations.council.reviewCount, 2);
+    assert.equal(recommendations.council.rejectedCount >= 1, true);
+    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
+    assert.equal(summary.counts.atomicRecommendations, 2);
+  });
+
   it('limits final parlays to the three published approaches and excludes used legs from simples', async () => {
     const ctx = context();
     const duplicateLowVarianceLegs = parlayRecommendation({ predictionId: 'prediction-low-variance' }).legs.map((leg: any, index: number) => ({
