@@ -139,6 +139,43 @@ describe('discord recommendation notifier', () => {
     assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
   });
 
+  it('prints kickoff times in Guatemala time for daily and required fixtures', () => {
+    const artifact = sampleArtifactWithRequiredLeague();
+    artifact.recommendations[0].legs[0].display = {
+      fixtureLabel: 'Team A vs Team B',
+      homeTeamName: 'Team A',
+      awayTeamName: 'Team B',
+      kickoffLocal: '2026-05-15T20:30:00.000Z',
+    };
+    artifact.requiredLeagueRecommendations.coverage.fixtures[0].display = {
+      ...artifact.requiredLeagueRecommendations.coverage.fixtures[0].display,
+      kickoffLocal: '2026-06-12T19:00:00.000Z',
+    };
+    artifact.requiredLeagueRecommendations.atomicProjections[0].display = {
+      fixtureLabel: 'Canada vs Bosnia & Herzegovina',
+      homeTeamName: 'Canada',
+      awayTeamName: 'Bosnia & Herzegovina',
+      leagueName: 'World Cup',
+      kickoffLocal: '2026-06-12T19:00:00.000Z',
+    };
+    artifact.requiredLeagueRecommendations.parlayProjections[0].legs[0].display = {
+      ...artifact.requiredLeagueRecommendations.parlayProjections[0].legs[0].display,
+      kickoffLocal: '2026-06-12T19:00:00.000Z',
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+    const joined = JSON.stringify(payload);
+
+    assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30 GT/);
+    assert.match(payload.embeds[1].description, /Team A vs Team B · 14:30 GT: h2h home @ 1.4/);
+    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
+    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
+    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
+    assert.match(message, /Team A vs Team B · 14:30 GT/);
+    assert.match(message, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
+  });
+
   it('does not send an empty-selection box when the required addendum has publishable predictions and parlays', () => {
     const artifact = {
       date: '2026-06-12',

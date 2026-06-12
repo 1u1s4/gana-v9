@@ -15,6 +15,13 @@ const DISCORD_EMBED_LIMIT = 10;
 const DISCORD_NON_SELECTION_EMBEDS = 2;
 const DISCORD_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
 const DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - 1;
+const GUATEMALA_TIMEZONE = 'America/Guatemala';
+const GUATEMALA_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: GUATEMALA_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
 
 export function parseArgs(argv) {
   const args = {
@@ -257,6 +264,8 @@ export function buildGatewayMessage(artifact, options = {}) {
     for (const [index, recommendation] of recommendations.entries()) {
       lines.push(...formatCompactRecommendationLines(recommendation, index));
     }
+    const requiredDetails = formatRequiredLeagueGatewayDetailLines(artifact);
+    if (requiredDetails.length) lines.push(...requiredDetails);
   }
 
   lines.push('━━━━━━━━━━━━━━━━━━', '', '🛡️ Revisión manual requerida antes de promoción.');
@@ -568,6 +577,32 @@ function formatRequiredLeagueLines(artifact) {
   return [`🌍 Obligatorio ${title}: ${statusIcon} ${status}${fixturePart}`];
 }
 
+function formatRequiredLeagueGatewayDetailLines(artifact) {
+  const data = requiredLeagueData(artifact);
+  if (!data) return [];
+  const title = requiredLeagueTitle(data);
+  const lines = [];
+  const summaryLines = formatRequiredLeagueSummaryLines(data);
+  if (summaryLines.length) {
+    lines.push(`🌍 Obligatorio · ${title}`);
+    lines.push(...summaryLines.map((line) => `> ${line}`));
+    lines.push('');
+  }
+  const predictionLines = formatRequiredLeaguePredictionLines(data);
+  if (predictionLines.length) {
+    lines.push(`📌 Predicciones obligatorias · ${title}`);
+    lines.push(...predictionLines.map((line) => `> ${line}`));
+    lines.push('');
+  }
+  const parlayLines = formatRequiredLeagueParlayLines(data);
+  if (parlayLines.length) {
+    lines.push(`🎛️ Parlays obligatorios · ${title}`);
+    lines.push(...parlayLines.map((line) => `> ${line}`));
+    lines.push('');
+  }
+  return lines;
+}
+
 function formatRequiredLeagueSummaryLines(data) {
   const lines = [];
   const coverage = data.coverage && typeof data.coverage === 'object' ? data.coverage : {};
@@ -670,7 +705,7 @@ function requiredLeagueTeams(item) {
     ? display.awayTeamName.trim()
     : undefined;
   if (homeFromDisplay || awayFromDisplay) return { home: homeFromDisplay, away: awayFromDisplay };
-  const label = requiredLeagueFixtureLabel(item);
+  const label = rawRequiredLeagueFixtureLabel(item);
   const parts = label.split(/\s+vs\s+/i);
   return parts.length === 2
     ? { home: parts[0]?.trim(), away: parts[1]?.trim() }
@@ -698,6 +733,10 @@ function requiredLeagueStatus(data) {
 }
 
 function requiredLeagueFixtureLabel(item) {
+  return fixtureLabelWithKickoff(rawRequiredLeagueFixtureLabel(item), item);
+}
+
+function rawRequiredLeagueFixtureLabel(item) {
   return compactFixtureName(
     item?.fixture
     || item?.display?.fixtureLabel
@@ -910,14 +949,14 @@ function displayFixtureName(leg) {
     || buildLabelFromTeams(leg?.homeTeamName, leg?.awayTeamName)
     || leg?.fixtureLabel;
   if (typeof fromDisplay === 'string' && fromDisplay.trim() && !isUuidFixtureLabel(fromDisplay)) {
-    return compactFixtureName(fromDisplay);
+    return fixtureLabelWithKickoff(compactFixtureName(fromDisplay), leg);
   }
 
   const fixture = typeof leg?.fixture === 'string' ? leg.fixture.trim() : '';
-  if (fixture && !isUuidFixtureLabel(fixture)) return compactFixtureName(fixture);
+  if (fixture && !isUuidFixtureLabel(fixture)) return fixtureLabelWithKickoff(compactFixtureName(fixture), leg);
 
   const fixtureId = typeof leg?.fixtureId === 'string' ? leg.fixtureId.trim() : '';
-  return fixtureId ? `Fixture ${shortId(fixtureId)}` : 'fixture unknown';
+  return fixtureLabelWithKickoff(fixtureId ? `Fixture ${shortId(fixtureId)}` : 'fixture unknown', leg);
 }
 
 function buildLabelFromTeams(homeTeamName, awayTeamName) {
@@ -934,6 +973,27 @@ function compactFixtureName(value) {
     .replace(/\s+vs\.?\s+/i, ' vs ')
     .replace(/\s+United\s+II\b/i, ' Utd II')
     .trim();
+}
+
+function fixtureLabelWithKickoff(label, item) {
+  const compact = compactFixtureName(label);
+  if (/\s·\s\d{2}:\d{2}\sGT\b/.test(compact)) return compact;
+  const kickoff = formatKickoffGuatemala(item);
+  return kickoff ? `${compact} · ${kickoff}` : compact;
+}
+
+function formatKickoffGuatemala(item) {
+  const display = item?.display && typeof item.display === 'object' ? item.display : {};
+  const value = [
+    display.kickoffLocal,
+    display.scheduledAt,
+    item?.kickoffLocal,
+    item?.scheduledAt,
+  ].find((candidate) => typeof candidate === 'string' && candidate.trim());
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return `${GUATEMALA_TIME_FORMATTER.format(date)} GT`;
 }
 
 export function formatCompactLeg(leg) {
