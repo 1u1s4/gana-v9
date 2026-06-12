@@ -1,34 +1,72 @@
 # Gana Agent TUI
 
-Interfaz de terminal personalizada para agentes. Por defecto usa tu autenticacion local de Codex (`~/.codex/auth.json`) mediante `codex exec`, y conserva Gemini CLI y OpenRouter como backends opcionales.
+[Español](README.es.md)
 
-## Uso
+Gana v9 is an analytical terminal agent and operations harness for football/soccer research, odds review, prediction scoring, parlay construction, validation, dashboards, and Discord reporting. It is designed for human review workflows and explicitly does not execute monetary actions.
 
-1. Instala dependencias:
+The default agent backend is local Codex authentication through `codex exec`. Gemini CLI and OpenRouter are available as optional providers.
 
-   ```bash
-   npm install
-   ```
+## What It Does
 
-2. Configura credenciales:
+- Runs a terminal UI for agent-assisted research and operations.
+- Discovers fixtures and odds through API-Football.
+- Scores predictions and builds analytical parlay candidates.
+- Persists operational data in MySQL through Prisma.
+- Exports artifacts, evidence packs, validation results, and daily metrics.
+- Serves a local read-only dashboard for persisted results.
+- Publishes daily Discord recommendation and validation summaries with native embeds.
+- Redacts secrets in artifacts, logs, sessions, and error payloads.
 
-   ```bash
-   cp .env.example .env
-   ```
+## Safety Boundary
 
-   Para el backend Codex no necesitas agregar una API key si ya hiciste `codex login`.
-   Para el backend Gemini no necesitas agregar una API key si ya iniciaste sesion con `gemini`.
-   Si cambias `AGENT_PROVIDER=openrouter`, agrega `OPENROUTER_API_KEY`.
+Gana v9 is analytical software. It does not place bets, move money, trade assets, or automate monetary execution. Any recommendations are review artifacts only and require manual human judgment.
 
-3. Ejecuta la TUI:
+Keep real credentials only in `.env` or your local provider authentication stores. The repository is configured to ignore `.env`, `.artifacts/`, `.sessions/`, `node_modules/`, `dist/`, and `tmp/`.
 
-   ```bash
-   npm start
-   ```
+## Requirements
 
-## Acceptance live productivo
+- Node.js with npm or pnpm.
+- Codex CLI login for the default provider, or Gemini CLI / OpenRouter credentials for alternate providers.
+- `DATABASE_URL` for persisted operations.
+- `API_FOOTBALL_KEY` for live football data.
+- Prisma migrations applied to the target database.
 
-La aceptacion productiva es manual y usa la CLI real con DB, API-Football y auth local del provider configurado. Usa siempre una fecha absoluta:
+The current production-candidate database target is DigitalOcean MySQL through Prisma. PostgreSQL is documented as a future migration path, not the current runtime requirement.
+
+## Quick Start
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create local configuration:
+
+```bash
+cp .env.example .env
+```
+
+For the default Codex backend, no API key is needed if you have already run `codex login`. For Gemini, authenticate with the Gemini CLI. If you use OpenRouter, set `AGENT_PROVIDER=openrouter` and provide `OPENROUTER_API_KEY`.
+
+Build and start the TUI:
+
+```bash
+npm run build
+npm start
+```
+
+For development:
+
+```bash
+pnpm gana --help
+pnpm test
+pnpm typecheck
+```
+
+## Productive Live Acceptance
+
+The live acceptance flow is manual and uses the real CLI with database access, API-Football, and local provider authentication. Always use an absolute date.
 
 ```bash
 pnpm gana db status
@@ -44,11 +82,11 @@ pnpm gana validate --date YYYY-MM-DD
 pnpm gana dashboard --port 4317
 ```
 
-Requiere `DATABASE_URL`, `API_FOOTBALL_KEY` y auth de `AGENT_PROVIDER` (`codex`, `gemini` u `openrouter`). La DB canonica del RC actual es DigitalOcean MySQL via Prisma; PostgreSQL queda como migracion futura documentada, no como requisito operativo actual. El run debe producir `runId`, artifacts, evidence pack, predictions, candidato de parlay, verdict y logs/artifacts sin secretos.
+A successful run should produce a `runId`, artifacts, an evidence pack, predictions, parlay candidates, a verdict, and logs/artifacts with secrets redacted.
 
-## Operacion diaria Discord
+## Daily Discord Operations
 
-La operacion diaria usa hora Guatemala (`America/Guatemala`) y notifica por Discord con embeds nativos:
+Daily operations use Guatemala time (`America/Guatemala`) and publish native Discord embeds.
 
 ```bash
 node scripts/gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD
@@ -56,12 +94,12 @@ node scripts/gana-daily-e2e-and-notify.mjs --date YYYY-MM-DD
 node scripts/install-gana-cron.mjs
 ```
 
-Cron operativo:
+Operational cron schedule:
 
-- 7:00: valida el dia anterior, calcula `daily-metrics`, y envia estadisticas.
-- 10:00: corre E2E diario full para el dia siguiente y envia parlays/recomendaciones.
+- 07:00: validate the previous day, compute `daily-metrics`, and send stats.
+- 10:00: run the full daily E2E flow for the next day and send parlays/recommendations.
 
-Los envios pueden dividirse por flujo con variables opcionales:
+Optional per-flow Discord targets:
 
 - `GANA_DISCORD_RECOMMENDATIONS_TARGET`
 - `GANA_DISCORD_COUNCIL_TARGET`
@@ -70,99 +108,97 @@ Los envios pueden dividirse por flujo con variables opcionales:
 - `GANA_DISCORD_STRATEGY_TARGET`
 - `GANA_DISCORD_ALERTS_TARGET`
 
-Cada una cae a `--gateway-target`, luego `GANA_DISCORD_TARGET`, y finalmente al canal operativo actual.
+Each target falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, and finally the configured operational channel.
 
-Documentacion: `docs/discord-recommendation-notifications.md`.
+See [Discord recommendation notifications](docs/discord-recommendation-notifications.md).
 
-## Configuracion
+## Configuration
 
-Puedes ajustar el provider, modelo, estilo visual, presupuesto y carpeta de sesiones en `agent.config.json`.
+Most runtime settings can be adjusted in `agent.config.json` and `.env`.
+
+Core provider options:
+
+- `codex`: default provider, using models such as `gpt-5.5`.
+- `gemini`: Gemini CLI provider, using models such as `gemini-2.5-flash`.
+- `openrouter`: OpenRouter provider, requiring `OPENROUTER_API_KEY`.
 
 Browser Use fallback:
 
-- `AGENT_BROWSER_FALLBACK=true` habilita la herramienta local `browser` para agentes OpenRouter cuando el web search nativo no sea suficiente.
-- `BROWSER_USE_API_KEY` configura Browser Use Cloud.
-- Los limites por defecto respetan la capa free: `BROWSER_USE_MAX_TASKS_PER_MONTH=10`, `BROWSER_USE_MAX_CONCURRENT_SESSIONS=3`, `BROWSER_USE_TIMEOUT_MS=180000`.
-- Esta herramienta es solo para research de lectura; queda cubierta por policy, auditoria, redaccion y bloqueo de automatizacion monetaria.
+- `AGENT_BROWSER_FALLBACK=true` enables the local `browser` tool for OpenRouter agents when native web search is insufficient.
+- `BROWSER_USE_API_KEY` configures Browser Use Cloud.
+- Default limits match the free tier: `BROWSER_USE_MAX_TASKS_PER_MONTH=10`, `BROWSER_USE_MAX_CONCURRENT_SESSIONS=3`, `BROWSER_USE_TIMEOUT_MS=180000`.
+- The tool is read-only for research and remains covered by policy checks, auditing, redaction, and monetary-action blocking.
 
-Limites operativos por run:
+Operational run limits:
 
-- `GANA_MAX_FIXTURES_PER_RUN` limita fixtures seleccionados para el pipeline.
-- `GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN` limita fixtures enviados a research/scoring agentic.
-- `GANA_MAX_PROVIDER_REQUESTS_PER_RUN` limita requests reales a API-Football y bloquea con error accionable si el canary excede el techo.
+- `GANA_MAX_FIXTURES_PER_RUN` limits selected fixtures for the pipeline.
+- `GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN` limits fixtures sent to agentic research/scoring.
+- `GANA_MAX_PROVIDER_REQUESTS_PER_RUN` limits real API-Football requests and fails with an actionable error when exceeded.
 
-Providers validos:
+## TUI Commands
 
-- `codex` con modelos como `gpt-5.5`.
-- `gemini` con modelos como `gemini-2.5-flash`.
-- `openrouter` con IDs de OpenRouter.
+- `/help`: list commands.
+- `/dashboard`: serve the local web dashboard.
+- `/provider`: list or switch between `codex`, `gemini`, and `openrouter`.
+- `/model`: list, search, and switch models for the active provider.
+- `/fast`: toggle fast mode when supported.
+- `/think low|medium|high|xhigh`: adjust Codex reasoning effort when supported.
+- `/web`: show or change native web search mode: `on`, `off`, `cached`, `live`.
+- `/new`: start a new conversation.
+- `exit`: close the TUI.
 
-Comandos disponibles dentro de la TUI:
+## Provider Backends
 
-- `/help`: lista comandos.
-- `/dashboard`: sirve una interfaz web local para ver partidos/resultados, predicciones, parlays, validaciones y runs.
-- `/provider`: lista providers disponibles y cambia entre `codex`, `gemini` y `openrouter`.
-- `/model`: lista, busca y cambia modelos del provider activo.
-- `/fast`: alterna modo rapido cuando el provider/modelo lo soporta.
-- `/think low|medium|high|xhigh`: ajusta nivel de razonamiento en Codex cuando el modelo lo soporta.
-- `/web`: muestra o cambia el uso obligatorio de web search nativo: `on`, `off`, `cached`, `live`.
-- `/new`: inicia una conversacion nueva.
-- `exit`: cierra la TUI.
+### Codex
 
-Backend Codex:
+- Runs `codex exec --json` as a subprocess.
+- Reads authentication from `CODEX_HOME` or `codexHome`.
+- Forces native web search with `web_search="live"` when enabled.
+- Resumes the Codex thread across turns until `/new`.
+- Renders shell commands executed by Codex inside the tool renderer.
+- Reads model metadata from `config/codex-models.json`.
 
-- Usa `codex exec --json` como subprocess.
-- Lee la autenticacion desde `CODEX_HOME` o `codexHome`.
-- Fuerza web search nativo con `web_search="live"` cuando `nativeWebSearch` esta activo.
-- Reanuda el thread de Codex entre turnos hasta usar `/new`.
-- Muestra comandos de shell ejecutados por Codex dentro del renderer de herramientas.
-- `/model` lee `config/codex-models.json`.
-
-Actualizar el listado de modelos Codex:
+Update the Codex model list:
 
 ```bash
 npm run update:codex-models
 ```
 
-Backend Gemini CLI:
+### Gemini CLI
 
-- Disponible configurando `provider: "gemini"` y un modelo como `gemini-2.5-flash`.
-- Usa `gemini --prompt --output-format stream-json` como subprocess.
-- Lee la autenticacion local desde `~/.gemini/oauth_creds.json`.
-- Fuerza el uso del tool nativo `google_web_search` cuando `nativeWebSearch` esta activo.
-- Reanuda la sesion de Gemini entre turnos hasta usar `/new`.
-- `/model` primero lee `config/gemini-models.json` desde este repo y luego agrega modelos conocidos del CLI de Gemini como fallback.
+- Runs `gemini --prompt --output-format stream-json` as a subprocess.
+- Reads local authentication from `~/.gemini/oauth_creds.json`.
+- Forces native `google_web_search` when enabled.
+- Resumes the Gemini session across turns until `/new`.
+- Reads model metadata from `config/gemini-models.json`, then falls back to known Gemini CLI models.
 
-Actualizar el listado de modelos Gemini:
+Update the Gemini model list:
 
 ```bash
 npm run update:gemini-models
 ```
 
-El script lee modelos desde el Gemini CLI instalado. Si defines `GEMINI_API_KEY` o `GOOGLE_API_KEY`, tambien intenta consultar la API de Gemini y fusionar esos resultados.
+If `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set, the update script also attempts to query the Gemini API and merge those results.
 
-Backend OpenRouter:
+### OpenRouter
 
-- Disponible configurando `provider: "openrouter"` y `OPENROUTER_API_KEY`.
-- Incluye lectura, escritura y edicion de archivos.
-- Incluye busqueda por glob y grep, listado de directorios y ejecucion de shell con timeout.
-- Incluye el fallback local `browser` via Browser Use Cloud, gobernado por policy y cuotas configuradas.
+- Requires `OPENROUTER_API_KEY`.
+- Provides file read/write/edit, glob/grep search, directory listing, and shell execution with timeout.
+- Can use the Browser Use Cloud fallback through the local `browser` tool.
 
-## Dashboard local
+## Local Dashboard
 
-Para revisar los resultados guardados en la DB:
+To inspect persisted results:
 
 ```bash
 pnpm gana dashboard --port 4317
 ```
 
-Abre `http://127.0.0.1:4317`. La interfaz permite filtrar por fecha, run id, estado y limite; muestra partidos/resultados, predicciones, parlays, validaciones y runs con detalle lateral. Requiere `DATABASE_URL` y usa solo lectura sobre los datos persistidos.
+Open `http://127.0.0.1:4317`. The dashboard is read-only and supports filtering by date, run id, status, and limit. It shows fixtures/results, predictions, parlays, validations, daily runs, and detail panels. It requires `DATABASE_URL`.
 
-## Notificaciones Discord
+## Discord Notifications
 
-El envio de parlays/recomendaciones a Discord desde Hermes esta documentado en `docs/discord-recommendation-notifications.md`. La skill vive en `.agents/skills/discord-recommendation-notifier/`, no en `skills/` del harness.
-
-El formato canonico persiste en el script de la skill y usa cajas nativas de Discord (`embeds`) con emojis, estado/riesgo, selecciones en blockquote, metricas compactas y cierre de revision manual.
+Parlay/recommendation delivery through Hermes is documented in [docs/discord-recommendation-notifications.md](docs/discord-recommendation-notifications.md). The notifier skill lives in `.agents/skills/discord-recommendation-notifier/`.
 
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
@@ -171,8 +207,30 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
   --max 3
 ```
 
-Las validaciones/estadisticas del dia anterior y los cron jobs de 7am/10am Guatemala estan documentados en `docs/daily-operations-cron.md`.
+Previous-day validation/statistics and the Guatemala 07:00/10:00 cron jobs are documented in [docs/daily-operations-cron.md](docs/daily-operations-cron.md).
 
 ```bash
 scripts/install-gana-hermes-cron.sh
 ```
+
+## Development
+
+Useful commands:
+
+```bash
+pnpm test
+pnpm typecheck
+pnpm gana db status
+pnpm gana football status
+pnpm gana dashboard --port 4317
+```
+
+Before publishing or pushing public branches, run:
+
+```bash
+gitleaks detect --source . --redact=100 --no-banner
+```
+
+## License
+
+No license file is currently included. Add a license before publishing the repository as open source.
