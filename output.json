@@ -1,14 +1,24 @@
 {
   "sources": [
     {
+      "id": "source_web_1",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHxFoFNl9tWBEV7INdmXhZhdNKn064UFdEo0JRNAnj8eP8gmci7MkmV_XH2IGrKPrxlF7IKrAKA1S95uU-tzFvkMk2KDlQmaBYT7VOyAMRXSZTWXsL0UAhZfuzfnHybUThx4LHoMgJrC-kV3Qh7yUoYbglpNJvqJ39dkhvo6ce4GlXPW3YVu6jLE90f7dCATd1axTk6A==",
+      "title": "USA and Paraguay 2026 World Cup Preparation and Qualification",
+      "capturedAt": "2026-06-12T09:16:32.627Z",
+      "hash": "foxsports_com_hash",
+      "metadata": {}
+    },
+    {
       "id": "source_api_football_fixture",
       "type": "api-football",
       "url": "N/A",
       "title": "API-Football Fixture Data",
-      "capturedAt": "2026-06-12T08:50:39.805Z",
-      "hash": "1547252",
+      "capturedAt": "2026-06-12T09:16:32.627Z",
+      "hash": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
       "metadata": {
-        "fixtureId": "00d44060-b558-4380-87f2-0d90ed6ebb40"
+        "providerFixtureId": "1489370",
+        "competitionName": "World Cup"
       }
     },
     {
@@ -16,303 +26,439 @@
       "type": "api-football",
       "url": "N/A",
       "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-06-12T08:50:41.766Z",
-      "hash": "76130bfc-feff-4e28-89ae-14f6a9e0e5a7",
+      "capturedAt": "2026-06-12T09:16:37.506Z",
+      "hash": "1785e4ca-7696-4b2f-b977-b6b478ceb59f",
       "metadata": {
-        "oddsSnapshotId": "f20b9765-8641-414c-91fe-a5c4a0f93fb5"
+        "bookmakerCount": 2
       }
-    },
-    {
-      "id": "source_web_playmakerstats",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFVgpjP__lmacfOszWCR6Mi2INAF9cWh0Kgfq0U4qMlr9VQ8fXh9mq5C0fuQQi5w00LT0a6V_EXrmvxG25BRY9vhb8TMvKZri8de7xHHr-9ZPHREw-ike2CqjgopZ_QLFbXTWkitsYEj8yx31ufxSEBJJDL",
-      "title": "playmakerstats.com",
-      "capturedAt": "2026-06-12T08:50:35.979Z",
-      "hash": "web_search_1",
-      "metadata": {}
     }
   ],
   "evidenceItems": [
     {
-      "id": "evidence_h2h_dominance",
-      "sourceId": "source_web_playmakerstats",
+      "id": "evidence_web_usa_qualification",
+      "sourceId": "source_web_1",
       "claimIds": [],
-      "snippet": "Grêmio Prudente holds the upper hand in recent meetings. Last Meeting: Grêmio Prudente defeated Tanabi 2–0 on May 30, 2025. Overall: Tanabi has struggled to secure a victory against Grêmio Prudente in their most recent recorded youth matchups.",
-      "summary": "Grêmio Prudente U20 has a historical advantage over Tanabi SP U20, winning their last encounter 2-0 in May 2025.",
+      "snippet": "As a co-host of the 2026 World Cup alongside Canada and Mexico, the United States automatically qualified and did not participate in the CONCACAF qualification rounds.",
+      "summary": "USA automatically qualified for the 2026 World Cup as a co-host.",
       "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_win_probability",
-      "sourceId": "source_web_playmakerstats",
+      "id": "evidence_web_paraguay_qualification",
+      "sourceId": "source_web_1",
       "claimIds": [],
-      "snippet": "Statistical models favor Grêmio Prudente with approximately a 70% win probability, largely due to their home-field advantage and historical H2H dominance.",
-      "summary": "Statistical models predict a 70% win probability for Grêmio Prudente U20, supported by home advantage and H2H records.",
-      "confidence": 0.85,
+      "snippet": "Paraguay successfully qualified for the 2026 World Cup, marking their return to the tournament for the first time since 2010. Paraguay finished 6th in the CONMEBOL standings, securing the final automatic qualification spot for South America with 28 points.",
+      "summary": "Paraguay qualified for the 2026 World Cup by finishing 6th in CONMEBOL qualifiers.",
+      "confidence": 0.9,
       "metadata": {}
     },
     {
-      "id": "evidence_h2h_odds_home",
+      "id": "evidence_web_usa_recent_form",
+      "sourceId": "source_web_1",
+      "claimIds": [],
+      "snippet": "Under head coach Mauricio Pochettino, the U.S. has focused on high-level friendlies to prepare for the tournament. Recent results leading into June 2026 include: May 2026: A 3–2 victory over Senegal. June 2026: A competitive 2–1 loss to Germany. March 2026: Disappointing friendly losses to Belgium and Portugal (combined score of 7–2).",
+      "summary": "USA's recent friendly results include a win against Senegal and losses to Germany, Belgium, and Portugal.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_web_paraguay_recent_form",
+      "sourceId": "source_web_1",
+      "claimIds": [],
+      "snippet": "One of their most significant results was a 2–1 win against Argentina in November 2024, with goals from Antonio Sanabria and Omar Alderete. They maintained a disciplined defensive structure, not conceding more than one goal in any of their final 10 matches leading up to the tournament.",
+      "summary": "Paraguay secured a 2-1 win against Argentina in November 2024 and maintained a strong defensive record in their final 10 qualification matches.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_h2h_bet365_home",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "h2h, selection: home, price: 1.53",
-      "summary": "Odds for Gremio Prudente U20 to win (H2H home) are 1.53.",
+      "snippet": "h2h, selection: home, price: 1.95, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 1.95 for USA to win (H2H).",
       "confidence": 0.95,
       "metadata": {
         "market": "h2h",
         "selection": "home",
-        "price": 1.53
+        "price": 1.95
       }
     },
     {
-      "id": "evidence_h2h_odds_draw",
+      "id": "evidence_h2h_pinnacle_home",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "h2h, selection: draw, price: 3.75",
-      "summary": "Odds for a draw (H2H draw) are 3.75.",
+      "snippet": "h2h, selection: home, price: 1.96, bookmaker: Pinnacle",
+      "summary": "Pinnacle offers odds of 1.96 for USA to win (H2H).",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "h2h",
+        "selection": "home",
+        "price": 1.96
+      }
+    },
+    {
+      "id": "evidence_h2h_bet365_draw",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "h2h, selection: draw, price: 3.4, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 3.4 for a draw (H2H).",
       "confidence": 0.95,
       "metadata": {
         "market": "h2h",
         "selection": "draw",
-        "price": 3.75
+        "price": 3.4
       }
     },
     {
-      "id": "evidence_h2h_odds_away",
+      "id": "evidence_h2h_pinnacle_draw",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "h2h, selection: away, price: 5",
-      "summary": "Odds for Tanabi SP U20 to win (H2H away) are 5.",
+      "snippet": "h2h, selection: draw, price: 3.5, bookmaker: Pinnacle",
+      "summary": "Pinnacle offers odds of 3.5 for a draw (H2H).",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "h2h",
+        "selection": "draw",
+        "price": 3.5
+      }
+    },
+    {
+      "id": "evidence_h2h_bet365_away",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "h2h, selection: away, price: 4, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 4 for Paraguay to win (H2H).",
       "confidence": 0.95,
       "metadata": {
         "market": "h2h",
         "selection": "away",
-        "price": 5
+        "price": 4
       }
     },
     {
-      "id": "evidence_goals_over_2_5_odds",
+      "id": "evidence_h2h_pinnacle_away",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "goals_over_under, selection: over, line: 2.5, price: 1.8",
-      "summary": "Odds for over 2.5 goals are 1.8.",
+      "snippet": "h2h, selection: away, price: 4.18, bookmaker: Pinnacle",
+      "summary": "Pinnacle offers odds of 4.18 for Paraguay to win (H2H).",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "h2h",
+        "selection": "away",
+        "price": 4.18
+      }
+    },
+    {
+      "id": "evidence_double_chance_home_or_draw",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "double_chance, selection: home_or_draw, price: 1.22, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 1.22 for USA or Draw (Double Chance).",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "home_or_draw",
+        "price": 1.22
+      }
+    },
+    {
+      "id": "evidence_double_chance_draw_or_away",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "double_chance, selection: draw_or_away, price: 1.83, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 1.83 for Draw or Paraguay (Double Chance).",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "draw_or_away",
+        "price": 1.83
+      }
+    },
+    {
+      "id": "evidence_goals_over_2_5",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "goals_over_under, selection: over, line: 2.5, price: 2.3, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 2.3 for Over 2.5 Goals.",
       "confidence": 0.95,
       "metadata": {
         "market": "goals_over_under",
         "selection": "over",
         "line": 2.5,
-        "price": 1.8
+        "price": 2.3
       }
     },
     {
-      "id": "evidence_goals_under_2_5_odds",
+      "id": "evidence_goals_under_2_5",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "goals_over_under, selection: under, line: 2.5, price: 2",
-      "summary": "Odds for under 2.5 goals are 2.",
+      "snippet": "goals_over_under, selection: under, line: 2.5, price: 1.62, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 1.62 for Under 2.5 Goals.",
       "confidence": 0.95,
       "metadata": {
         "market": "goals_over_under",
         "selection": "under",
         "line": 2.5,
+        "price": 1.62
+      }
+    },
+    {
+      "id": "evidence_btts_yes",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "btts, selection: yes, price: 2, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 2 for Both Teams To Score Yes.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "btts",
+        "selection": "yes",
         "price": 2
       }
     },
     {
-      "id": "evidence_double_chance_home_draw_odds",
+      "id": "evidence_btts_no",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "double_chance, selection: home_or_draw, price: 1.17",
-      "summary": "Odds for Gremio Prudente U20 to win or draw (Double Chance home_or_draw) are 1.17.",
+      "snippet": "btts, selection: no, price: 1.75, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 1.75 for Both Teams To Score No.",
       "confidence": 0.95,
       "metadata": {
-        "market": "double_chance",
-        "selection": "home_or_draw",
-        "price": 1.17
+        "market": "btts",
+        "selection": "no",
+        "price": 1.75
       }
     },
     {
-      "id": "evidence_double_chance_home_away_odds",
+      "id": "evidence_corners_over_9_5",
       "sourceId": "source_api_football_odds",
       "claimIds": [],
-      "snippet": "double_chance, selection: home_or_away, price: 1.22",
-      "summary": "Odds for either team to win (Double Chance home_or_away) are 1.22.",
+      "snippet": "corners_over_under, selection: over, line: 9.5, price: 2.1, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 2.1 for Over 9.5 Corners.",
       "confidence": 0.95,
       "metadata": {
-        "market": "double_chance",
-        "selection": "home_or_away",
-        "price": 1.22
-      }
-    },
-    {
-      "id": "evidence_double_chance_draw_away_odds",
-      "sourceId": "source_api_football_odds",
-      "claimIds": [],
-      "snippet": "double_chance, selection: draw_or_away, price: 2.1",
-      "summary": "Odds for Tanabi SP U20 to win or draw (Double Chance draw_or_away) are 2.1.",
-      "confidence": 0.95,
-      "metadata": {
-        "market": "double_chance",
-        "selection": "draw_or_away",
+        "market": "corners_over_under",
+        "selection": "over",
+        "line": 9.5,
         "price": 2.1
+      }
+    },
+    {
+      "id": "evidence_corners_under_9_5",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "corners_over_under, selection: under, line: 9.5, price: 1.67, bookmaker: Bet365",
+      "summary": "Bet365 offers odds of 1.67 for Under 9.5 Corners.",
+      "confidence": 0.95,
+      "metadata": {
+        "market": "corners_over_under",
+        "selection": "under",
+        "line": 9.5,
+        "price": 1.67
       }
     }
   ],
   "claims": [
     {
-      "id": "claim_h2h_home_win",
-      "statement": "Gremio Prudente U20 is favored to win against Tanabi SP U20.",
+      "id": "claim_h2h_usa_win_odds",
+      "statement": "USA is favored to win the match with average odds around 1.95-1.96.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_h2h_dominance",
-        "evidence_win_probability",
-        "evidence_h2h_odds_home",
-        "evidence_h2h_odds_away"
-      ],
+      "evidenceIds": ["evidence_h2h_bet365_home", "evidence_h2h_pinnacle_home"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "home",
-        "price": 1.53
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_h2h_draw",
-      "statement": "A draw between Gremio Prudente U20 and Tanabi SP U20 has odds of 3.75.",
+      "id": "claim_h2h_draw_odds",
+      "statement": "A draw in the match has average odds around 3.4-3.5.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_h2h_odds_draw"
-      ],
+      "evidenceIds": ["evidence_h2h_bet365_draw", "evidence_h2h_pinnacle_draw"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "draw",
-        "price": 3.75
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_h2h_away_win",
-      "statement": "Tanabi SP U20 to win against Gremio Prudente U20 has odds of 5.",
+      "id": "claim_h2h_paraguay_win_odds",
+      "statement": "Paraguay is less favored to win the match with average odds around 4.0-4.18.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_h2h_odds_away"
-      ],
+      "evidenceIds": ["evidence_h2h_bet365_away", "evidence_h2h_pinnacle_away"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "away",
-        "price": 5
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_goals_over_2_5",
-      "statement": "The odds for over 2.5 goals in the match are 1.8.",
+      "id": "claim_double_chance_home_draw_odds",
+      "statement": "USA to win or draw (Double Chance) has odds of 1.22.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_double_chance_home_or_draw"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_double_chance_draw_away_odds",
+      "statement": "Draw or Paraguay to win (Double Chance) has odds of 1.83.",
+      "subject": {
+        "type": "market",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_double_chance_draw_or_away"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_goals_over_2_5_odds",
+      "statement": "Odds for Over 2.5 Goals are 2.3, indicating it's less likely than Under 2.5 Goals.",
+      "subject": {
+        "type": "market",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
         "market": "goals_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_goals_over_2_5_odds"
-      ],
+      "evidenceIds": ["evidence_goals_over_2_5"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "over",
-        "line": 2.5,
-        "price": 1.8
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_goals_under_2_5",
-      "statement": "The odds for under 2.5 goals in the match are 2.",
+      "id": "claim_goals_under_2_5_odds",
+      "statement": "Odds for Under 2.5 Goals are 1.62, suggesting it is more likely than Over 2.5 Goals.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
         "market": "goals_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_goals_under_2_5_odds"
-      ],
+      "evidenceIds": ["evidence_goals_under_2_5"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "under",
-        "line": 2.5,
-        "price": 2
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_double_chance_home_draw",
-      "statement": "Gremio Prudente U20 to win or draw has odds of 1.17.",
+      "id": "claim_btts_yes_odds",
+      "statement": "Odds for Both Teams To Score Yes are 2.0.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
-        "market": "double_chance"
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
+        "market": "btts"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_double_chance_home_draw_odds"
-      ],
+      "evidenceIds": ["evidence_btts_yes"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "home_or_draw",
-        "price": 1.17
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_double_chance_home_away",
-      "statement": "Either Gremio Prudente U20 or Tanabi SP U20 to win has odds of 1.22.",
+      "id": "claim_btts_no_odds",
+      "statement": "Odds for Both Teams To Score No are 1.75.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
-        "market": "double_chance"
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
+        "market": "btts"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_double_chance_home_away_odds"
-      ],
+      "evidenceIds": ["evidence_btts_no"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "home_or_away",
-        "price": 1.22
-      }
+      "metadata": {}
     },
     {
-      "id": "claim_double_chance_draw_away",
-      "statement": "Tanabi SP U20 to win or draw has odds of 2.1.",
+      "id": "claim_corners_over_9_5_odds",
+      "statement": "Odds for Over 9.5 Corners are 2.1.",
       "subject": {
         "type": "market",
-        "id": "00d44060-b558-4380-87f2-0d90ed6ebb40",
-        "market": "double_chance"
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
+        "market": "corners_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": [
-        "evidence_double_chance_draw_away_odds"
-      ],
+      "evidenceIds": ["evidence_corners_over_9_5"],
       "conflictStatus": "none",
-      "metadata": {
-        "selection": "draw_or_away",
-        "price": 2.1
-      }
+      "metadata": {}
+    },
+    {
+      "id": "claim_corners_under_9_5_odds",
+      "statement": "Odds for Under 9.5 Corners are 1.67.",
+      "subject": {
+        "type": "market",
+        "id": "4df28e9e-089d-4b44-ad54-3de67e7f9c37",
+        "market": "corners_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_corners_under_9_5"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_usa_auto_qualified",
+      "statement": "The USA team automatically qualified for the 2026 World Cup as a co-host.",
+      "subject": {
+        "type": "team",
+        "id": "42ad2038-498d-4669-aa60-cb2892c627b8",
+        "name": "USA"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_usa_qualification"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_paraguay_qualified_conmebol",
+      "statement": "Paraguay qualified for the 2026 World Cup by finishing 6th in CONMEBOL qualifiers.",
+      "subject": {
+        "type": "team",
+        "id": "934cb2b6-02ec-4a3b-b87f-2d197926c413",
+        "name": "Paraguay"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_paraguay_qualification"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_usa_friendly_performance",
+      "statement": "USA's recent friendly matches include a 3-2 victory over Senegal and losses to Germany (2-1), Belgium, and Portugal (combined 7-2).",
+      "subject": {
+        "type": "team",
+        "id": "42ad2038-498d-4669-aa60-cb2892c627b8",
+        "name": "USA"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_usa_recent_form"],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_paraguay_qualification_performance",
+      "statement": "Paraguay achieved a significant 2-1 win against Argentina in November 2024 and demonstrated strong defensive discipline in their final 10 qualification matches.",
+      "subject": {
+        "type": "team",
+        "id": "934cb2b6-02ec-4a3b-b87f-2d197926c413",
+        "name": "Paraguay"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_web_paraguay_recent_form"],
+      "conflictStatus": "none",
+      "metadata": {}
     }
   ],
   "gateResult": {
     "verdict": "promotable",
     "reasons": [
-      "Structured research generated with sufficient evidence including web-search and API-Football data for all required markets."
+      "structured research generated with sufficient evidence",
+      "web-search evidence included as webMode is live"
     ],
     "warnings": []
   },

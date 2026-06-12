@@ -609,18 +609,21 @@ function validateEvidencePackV2(manifest: any): Record<string, unknown> & { ok: 
 }
 
 function secretLeakCheck(): CertificationCheck {
+  const providerKey = `sk-${'test-secret1234567890'}`;
+  const githubToken = `ghp_${'secretsecretsecret'}`;
+  const queryKey = `abc${'123'}`;
   const leaked = {
-    authorization: 'Bearer sk-test-secret1234567890',
-    url: 'mysql://user:pass@example.test/db?api_key=abc123',
-    nested: 'GITHUB_TOKEN=ghp_secretsecretsecret',
+    authorization: `Bearer ${providerKey}`,
+    url: `mysql://user:pass@example.test/db?api_key=${queryKey}`,
+    nested: `GITHUB_TOKEN=${githubToken}`,
   };
   const redacted = stableStringify(redactSecrets(leaked));
   return {
     name: 'secret-leak-redaction-breaks-certify-fixture',
     ok: redacted.includes('[REDACTED]')
-      && !redacted.includes('sk-test-secret')
-      && !redacted.includes('ghp_secret')
-      && !redacted.includes('api_key=abc123'),
+      && !redacted.includes(providerKey)
+      && !redacted.includes(githubToken)
+      && !redacted.includes(`api_key=${queryKey}`),
     details: redacted,
   };
 }

@@ -1,0 +1,7 @@
+# Historical false positives from redaction/security test fixtures.
+dd4945c50619a0384a7a61bd6283edf52dfd73d6:src/permissions/policy.test.ts:curl-auth-header:77
+dd4945c50619a0384a7a61bd6283edf52dfd73d6:src/permissions/policy.test.ts:jwt:81
+dd4945c50619a0384a7a61bd6283edf52dfd73d6:src/storage/repositories/transactions.test.ts:generic-api-key:137
+b29982250c9d24c2b407f48d4683cacbbf8209b0:src/permissions/policy.test.ts:generic-api-key:84
+b29982250c9d24c2b407f48d4683cacbbf8209b0:src/permissions/policy.test.ts:generic-api-key:85
+b29982250c9d24c2b407f48d4683cacbbf8209b0:src/permissions/policy.test.ts:jwt:87

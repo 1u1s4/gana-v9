@@ -152,12 +152,14 @@ describe('compound storage writes', () => {
       metadata: { authorization: 'Bearer secret-token' },
     });
 
+    const validationOpenAiKey = `sk-${'123...cdef'}`;
+
     await createValidationArtifactRepository({ validationArtifact: redactingDelegate as any }).create({
       settlementRuleVersion: 'settlement-v1',
       status: 'blocked',
       reason: 'x-apisports-key secret-key',
       resultInput: { cookie: 'session=secret-cookie' },
-      outcome: { reason: 'OPENAI_API_KEY=sk-123...cdef' },
+      outcome: { reason: `OPENAI_API_KEY=${validationOpenAiKey}` },
       metadata: { databaseUrl: 'mysql://user:***@example.test/db' },
     });
 
@@ -187,6 +189,7 @@ describe('compound storage writes', () => {
 
     const body = JSON.stringify(persisted);
     assert.match(body, /\[REDACTED\]/);
-    assert.doesNotMatch(body, /secret-pass|secret-token|secret-key|secret-cookie|sk-123...cdef|secret-parlay-token|secret-parlay-key|secret-parlay-pass|secret-parlay-batch-token/);
+    assert.doesNotMatch(body, /secret-pass|secret-token|secret-key|secret-cookie|secret-parlay-token|secret-parlay-key|secret-parlay-pass|secret-parlay-batch-token/);
+    assert.equal(body.includes(validationOpenAiKey), false);
   });
 });
