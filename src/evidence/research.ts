@@ -12,16 +12,7 @@ import { getPrismaClient } from '../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
 import { deriveNativeWebSearchRequirement, displayNativeWebToolName } from '../providers/agentic/helpers.js';
 import type { AgentEvent } from '../providers/agentic/types.js';
-import {
-  createApiFootballPersistence,
-  createApiFootballProvider,
-} from '../providers/sports/api-football.js';
-import type {
-  CanonicalOddsSnapshot,
-  FixtureStatistics,
-  OddsQuery,
-  SportsDataProvider,
-} from '../providers/sports/types.js';
+import type { CanonicalOddsSnapshot } from '../providers/sports/types.js';
 import {
   RESEARCH_FIXTURE_PROMPT_VERSION,
   type ResearchWebMode,
@@ -33,6 +24,20 @@ import {
   type SourceRecord,
 } from './types.js';
 import { mergeGateWarnings, validateResearchBundle } from './claims.js';
+import {
+  apiFootballOddsSnapshotSource,
+  apiFootballSource,
+  apiFootballSources,
+  apiFootballStatisticsSource,
+  buildResearchProviderContext,
+  createDefaultSportsProvider,
+  fixtureMetadataClaim,
+  fixtureMetadataSummary,
+  fixtureStatisticsClaim,
+  fixtureStatisticsSummary,
+  type ResearchProviderContext,
+  type ResearchSportsProvider,
+} from './provider-context.js';
 
 export interface RunFixtureResearchInput {
   fixtureId: string;
@@ -56,17 +61,6 @@ export interface FixtureResearchDependencies {
   now?: () => Date;
   persistBundle?: (bundle: ResearchBundle, artifactPath: string) => Promise<void>;
   createRun?: (input: { runId: string; artifactDir?: string }) => Promise<string>;
-}
-
-type ResearchSportsProvider = Pick<SportsDataProvider, 'getFixture'> &
-  Partial<Pick<SportsDataProvider, 'getFixtureStatistics'>> & {
-    getCanonicalOddsSnapshot?(input: OddsQuery): Promise<CanonicalOddsSnapshot>;
-  };
-
-interface ResearchProviderContext {
-  fixtureStatistics?: FixtureStatistics;
-  oddsSnapshot?: CanonicalOddsSnapshot;
-  warnings: string[];
 }
 
 interface NativeWebSearchTrace {
@@ -988,174 +982,6 @@ function isHardResearchWarning(message: string): boolean {
   const normalized = message.toLowerCase();
   if (/\b(without|no)\s+(material\s+)?conflicts?\b/.test(normalized)) return false;
   return /fallback research|agentic research failed|research agent timed out|no web[-_ ]search source|no real .*web[-_ ]search|no native web[-_ ]search|browser fallback.*(?:missing|required|unavailable)|not included in the structured output|missing web[-_ ]search|web[-_ ]search evidence was required but not included|interrupted|insufficient evidence|contradict|mismatch|stale|\bconflict(?:ing|ed|s)?\b/i.test(message);
-}
-
-async function createDefaultSportsProvider(
-  config: AgentConfig,
-  runtime: RuntimeContext,
-): Promise<ResearchSportsProvider> {
-  const persistence = await createApiFootballPersistence(config, runtime);
-  return createApiFootballProvider(config, persistence);
-}
-
-async function buildResearchProviderContext(
-  provider: ResearchSportsProvider,
-  fixture: Fixture,
-  inputOddsSnapshot?: CanonicalOddsSnapshot,
-  markets?: MarketKey[],
-): Promise<ResearchProviderContext> {
-  const warnings: string[] = [];
-  const fixtureStatistics = await fetchFixtureStatistics(provider, fixture.providerFixtureId, warnings);
-  const oddsSnapshot = inputOddsSnapshot
-    ?? await fetchCanonicalOddsSnapshot(provider, fixture.providerFixtureId, warnings, markets);
-
-  return {
-    ...(fixtureStatistics && { fixtureStatistics }),
-    ...(oddsSnapshot && { oddsSnapshot }),
-    warnings: uniqueStrings(warnings),
-  };
-}
-
-async function fetchFixtureStatistics(
-  provider: ResearchSportsProvider,
-  providerFixtureId: string,
-  warnings: string[],
-): Promise<FixtureStatistics | undefined> {
-  if (!provider.getFixtureStatistics) return undefined;
-  try {
-    return await provider.getFixtureStatistics({ providerFixtureId });
-  } catch (err: any) {
-    warnings.push(`API-Football fixture statistics unavailable: ${err?.message ?? String(err)}`);
-    return undefined;
-  }
-}
-
-async function fetchCanonicalOddsSnapshot(
-  provider: ResearchSportsProvider,
-  providerFixtureId: string,
-  warnings: string[],
-  markets?: MarketKey[],
-): Promise<CanonicalOddsSnapshot | undefined> {
-  if (!provider.getCanonicalOddsSnapshot) return undefined;
-  try {
-    return await provider.getCanonicalOddsSnapshot({ fixtureId: providerFixtureId, markets });
-  } catch (err: any) {
-    warnings.push(`API-Football odds snapshot unavailable: ${err?.message ?? String(err)}`);
-    return undefined;
-  }
-}
-
-function apiFootballSource(fixture: Fixture, capturedAt: string): SourceRecord {
-  return {
-    id: 'source_api_football_fixture',
-    type: 'api-football',
-    externalId: fixture.providerFixtureId,
-    title: 'API-Football fixture',
-    capturedAt,
-    hash: hashPayload(fixture),
-    metadata: {
-      fixtureId: fixture.id,
-      providerFixtureId: fixture.providerFixtureId,
-    },
-  };
-}
-
-function apiFootballStatisticsSource(statistics: FixtureStatistics, capturedAt: string): SourceRecord {
-  return {
-    id: 'source_api_football_fixture_statistics',
-    type: 'api-football',
-    externalId: statistics.providerFixtureId,
-    snapshotId: statistics.providerSnapshotId,
-    title: 'API-Football fixture statistics',
-    capturedAt: statistics.capturedAt ?? capturedAt,
-    hash: hashPayload(statistics),
-    metadata: {
-      providerFixtureId: statistics.providerFixtureId,
-      fields: ['cornersHome', 'cornersAway', 'totalCorners'],
-    },
-  };
-}
-
-function apiFootballOddsSnapshotSource(snapshot: CanonicalOddsSnapshot, capturedAt: string): SourceRecord {
-  return {
-    id: 'source_api_football_odds_snapshot',
-    type: 'provider-snapshot',
-    externalId: snapshot.providerFixtureId,
-    snapshotId: snapshot.providerSnapshotId,
-    title: 'API-Football odds snapshot',
-    capturedAt: snapshot.capturedAt ?? capturedAt,
-    hash: snapshot.payloadHash,
-    metadata: {
-      fixtureId: snapshot.fixtureId,
-      providerFixtureId: snapshot.providerFixtureId,
-      oddsSnapshotId: snapshot.oddsSnapshotId ?? null,
-      quoteCount: snapshot.quotes.length,
-      bookmakerCount: snapshot.bookmakerCount,
-    },
-  };
-}
-
-function apiFootballSources(
-  fixture: Fixture,
-  capturedAt: string,
-  providerContext: ResearchProviderContext,
-): SourceRecord[] {
-  return [
-    apiFootballSource(fixture, capturedAt),
-    providerContext.fixtureStatistics
-      ? apiFootballStatisticsSource(providerContext.fixtureStatistics, capturedAt)
-      : undefined,
-    providerContext.oddsSnapshot
-      ? apiFootballOddsSnapshotSource(providerContext.oddsSnapshot, capturedAt)
-      : undefined,
-  ].filter((source): source is SourceRecord => Boolean(source));
-}
-
-function fixtureMetadataSummary(fixture: Fixture): string {
-  const score = Number.isFinite(fixture.scoreHome) && Number.isFinite(fixture.scoreAway)
-    ? `, score ${fixture.scoreHome}-${fixture.scoreAway}`
-    : '';
-  const homeTeam = fixture.homeTeamName
-    ? `${fixture.homeTeamName} (${fixture.homeTeamId})`
-    : fixture.homeTeamId;
-  const awayTeam = fixture.awayTeamName
-    ? `${fixture.awayTeamName} (${fixture.awayTeamId})`
-    : fixture.awayTeamId;
-  return [
-    `API-Football fixture ${fixture.providerFixtureId}`,
-    `home team ${homeTeam}`,
-    `away team ${awayTeam}`,
-    `status ${fixture.status}`,
-    `scheduledAt ${fixture.scheduledAt}${score}`,
-  ].join(', ');
-}
-
-function fixtureStatisticsSummary(statistics: FixtureStatistics): string {
-  const cornerParts = [
-    Number.isFinite(statistics.cornersHome) ? `home corners ${statistics.cornersHome}` : undefined,
-    Number.isFinite(statistics.cornersAway) ? `away corners ${statistics.cornersAway}` : undefined,
-    Number.isFinite(statistics.totalCorners) ? `total corners ${statistics.totalCorners}` : undefined,
-  ].filter(Boolean);
-  const corners = cornerParts.length ? cornerParts.join(', ') : 'no mapped corner statistics returned';
-  return [
-    `API-Football fixture statistics ${statistics.providerFixtureId}`,
-    corners,
-    `capturedAt ${statistics.capturedAt}`,
-  ].join(', ');
-}
-
-function fixtureStatisticsClaim(statistics: FixtureStatistics): string {
-  if (Number.isFinite(statistics.totalCorners)) {
-    return `API-Football statistics list ${statistics.totalCorners} total corners for fixture ${statistics.providerFixtureId}.`;
-  }
-  return `API-Football statistics were captured for fixture ${statistics.providerFixtureId}.`;
-}
-
-function fixtureMetadataClaim(fixture: Fixture): string {
-  const matchup = fixture.homeTeamName && fixture.awayTeamName
-    ? `${fixture.homeTeamName} vs ${fixture.awayTeamName}`
-    : `fixture ${fixture.providerFixtureId}`;
-  return `API-Football lists ${matchup} (${fixture.providerFixtureId}) as ${fixture.status} with scheduled kickoff ${fixture.scheduledAt}.`;
 }
 
 function redactErrorMessage(error: string): string {
