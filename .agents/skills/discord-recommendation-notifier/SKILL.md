@@ -72,7 +72,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
 - Confidence metrics use the `🍀` icon everywhere; keep `🧠` only when it is a profile emoji such as `parlay-refinado`.
-- Fixture labels should include kickoff time in Guatemala when artifact metadata provides it, formatted as `HH:MM GT` next to the match name. In required-league addendum output, show the kickoff only in the `🌍 Obligatorio` fixture summary lines, not again in required prediction lines or required parlay legs.
+- Fixture labels should include kickoff time in Guatemala when artifact metadata provides it, formatted as `HH:MM` next to the match name. In required-league addendum output, show the kickoff only in the `🌍 Obligatorio` fixture summary lines, not again in required prediction lines or required parlay legs.
 - Required-league fixture summary lines should put the fixture/time header on one line ending in `:`, then the projection/prediction count on the next line.
 - Avoid repeating the same kickoff time twice inside a single simple recommendation embed; keep the time in the title and omit it from the inner selection line.
 - Required parlay legs should use the same compact selection style with a market icon, fixture, pick, and odds; put parlay-level cuota/confidence on a separate compact metrics line.

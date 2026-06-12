@@ -1014,8 +1014,8 @@ function compactFixtureName(value) {
 }
 
 function fixtureLabelWithKickoff(label, item) {
-  const compact = compactFixtureName(label);
-  if (/\s·\s\d{2}:\d{2}\sGT\b/.test(compact)) return compact;
+  const compact = compactFixtureName(label).replace(/\s·\s(\d{2}:\d{2})\sGT\b/g, ' · $1');
+  if (/\s·\s\d{2}:\d{2}\b/.test(compact)) return compact;
   const kickoff = formatKickoffGuatemala(item);
   return kickoff ? `${compact} · ${kickoff}` : compact;
 }
@@ -1031,7 +1031,7 @@ function formatKickoffGuatemala(item) {
   if (!value) return '';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
-  return `${GUATEMALA_TIME_FORMATTER.format(date)} GT`;
+  return GUATEMALA_TIME_FORMATTER.format(date);
 }
 
 export function formatCompactLeg(leg, options = {}) {
