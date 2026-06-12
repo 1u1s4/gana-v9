@@ -1,6 +1,6 @@
 import type { RunPipelineResult } from '../runtime/run-service.js';
 import type { PredictionRecordView } from '../prediction/types.js';
-import type { DailyE2EProvider } from './e2e.js';
+import type { DailyE2EProvider } from './types.js';
 
 export interface DailyProviderPredictionInput {
   provider: DailyE2EProvider;

@@ -41,6 +41,8 @@ import {
   DAILY_PARLAY_RECOMMENDATION_LIMIT,
   DAILY_PREFERRED_PARLAY_PROFILE_ORDER,
   DAILY_STAKE_BUCKETS,
+  VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE,
+  VALIDATION_FRESHNESS_MIN_COVERAGE,
   applyDailyStakeRecommendations,
   atomicPredictionEdge,
   atomicPredictionKey,
@@ -333,39 +335,6 @@ interface DailyRunDiagnostics {
   analyzedParlays: number;
   recommendations: number;
   providerPredictionCounts: Record<string, { predictions: number; promotable: number }>;
-}
-
-export interface AtomicPredictionRecommendation {
-  kind: 'atomic-prediction';
-  rank: number;
-  parlayId: string;
-  predictionId: string;
-  predictionIds: string[];
-  sourceRunId: string | null;
-  sourceRunIds: string[];
-  provider: DailyE2EProvider;
-  providers: DailyE2EProvider[];
-  model: string;
-  profile: typeof ATOMIC_RECOMMENDATION_PROFILE;
-  validationStatus: 'unvalidated';
-  harnessStatus: string;
-  combinedOdds: number;
-  aggregateConfidence: number;
-  adjustedProbability: number;
-  expectedEdge: number;
-  score: number;
-  exposure: {
-    units: number;
-    percentOfAnalyticalBankroll: number;
-    policy: 'single-selection-analytical-watchlist';
-  };
-  stakeRecommendation?: DailyStakeRecommendation;
-  bankerLegs: ParlayAnalysisRecommendation['bankerLegs'];
-  reasons: string[];
-  riskFlags: string[];
-  legs: ParlayAnalysisRecommendation['legs'];
-  selectionMode?: DailyRecommendationSelectionMode;
-  fallbackReasons?: string[];
 }
 
 export async function runDailyE2E(
@@ -666,8 +635,8 @@ export async function runDailyE2E(
     atomicRecommendations = buildFallbackAtomicPredictionRecommendations(
       providerPipelineResults,
       providers,
-    (provider) => modelForProvider(effectiveConfig, provider, input.models),
-    parlayRecommendations.length,
+      (provider) => modelForProvider(effectiveConfig, provider, input.models),
+      parlayRecommendations.length,
       parlayLegPredictionIds,
       parlayLegSelectionKeys,
       parlayLegFixtureIds,

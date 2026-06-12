@@ -37,6 +37,39 @@ export interface DailyStakeRecommendation {
   policy: 'bucketed-bankroll-percentage-confidence-edge-recommendation';
 }
 
+export interface AtomicPredictionRecommendation {
+  kind: 'atomic-prediction';
+  rank: number;
+  parlayId: string;
+  predictionId: string;
+  predictionIds: string[];
+  sourceRunId: string | null;
+  sourceRunIds: string[];
+  provider: DailyE2EProvider;
+  providers: DailyE2EProvider[];
+  model: string;
+  profile: 'atomic-high-confidence';
+  validationStatus: 'unvalidated';
+  harnessStatus: string;
+  combinedOdds: number;
+  aggregateConfidence: number;
+  adjustedProbability: number;
+  expectedEdge: number;
+  score: number;
+  exposure: {
+    units: number;
+    percentOfAnalyticalBankroll: number;
+    policy: 'single-selection-analytical-watchlist';
+  };
+  stakeRecommendation?: DailyStakeRecommendation;
+  bankerLegs: ParlayAnalysisRecommendation['bankerLegs'];
+  reasons: string[];
+  riskFlags: string[];
+  legs: ParlayAnalysisRecommendation['legs'];
+  selectionMode?: DailyRecommendationSelectionMode;
+  fallbackReasons?: string[];
+}
+
 export interface AtomicPredictionCandidate {
   provider: DailyE2EProvider;
   model: string;
