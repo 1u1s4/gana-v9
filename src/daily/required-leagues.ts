@@ -29,7 +29,9 @@ export interface DailyRequiredLeagueInput {
 export const DAILY_REQUIRED_LEAGUE_DEFAULTS: DailyRequiredLeagueInput[] = [
   { providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 },
 ];
-export const DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER = ['principal', 'resultados', 'totales'] as const;
+export const DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER = ['principal', 'resultados', 'mixto-seguro'] as const;
+const REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE = 0.62;
+const REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE = 0.45;
 export type DailyRequiredLeagueParlayApproach = typeof DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER[number];
 export type DailyRequiredLeagueGoalStatus = 'passed' | 'review-required';
 
@@ -302,7 +304,7 @@ export function buildRequiredLeagueRecommendations(input: {
       defaultRequiredLeagues: DAILY_REQUIRED_LEAGUE_DEFAULTS,
       parlayProfiles: DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER,
       atomicSelection: 'best non-blocked prediction per required fixture, promotable preferred over review-required',
-      parlaySelection: 'LLM-style atomic portfolio planner: build three distinct required-league coupons from non-blocked projections, balancing confidence, positive atomic edge, market diversity, and realistic odds',
+      parlaySelection: 'LLM-style atomic portfolio planner: build up to three distinct required-league coupons from non-blocked projections, rejecting non-positive portfolio edge or low aggregate confidence and balancing confidence, positive atomic edge, market diversity, leg reuse, and realistic odds',
     },
     analyticalArtifactOnly: true,
     executionCapability: 'none',
@@ -548,12 +550,13 @@ const REQUIRED_LEAGUE_PARLAY_APPROACH_SPECS: readonly RequiredLeagueParlayApproa
     preferredFamilies: ['result'],
   },
   {
-    profile: 'totales',
-    intent: 'cupón temático de goles para no repetir solo tesis de resultado cuando hay pocas opciones',
-    targetOddsMin: 2.2,
-    targetOddsMax: 3.9,
+    profile: 'mixto-seguro',
+    intent: 'cupón alterno no rígido: prioriza la mejor mezcla positiva antes que forzar un tema de mercado débil',
+    targetOddsMin: 2,
+    targetOddsMax: 4,
     targetOddsIdeal: 3,
-    preferredFamilies: ['totals'],
+    preferredFamilies: ['result', 'totals'],
+    preferMixedFamilies: true,
   },
 ];
 
@@ -581,6 +584,14 @@ function buildRequiredLeagueParlayProjections(
     const legs = selected?.legs ?? [];
     const availableFixtureCount = new Set(parlayCandidates.map((projection) => projection.fixtureId)).size;
     if (!selected || fixtureCount < 2 || availableFixtureCount < 2 || legs.length < 2) {
+      const diagnostic = fixtureCount >= 2 && availableFixtureCount >= 2
+        ? bestRequiredLeagueParlayDiagnostic(spec, parlayCandidates, {
+          usedSignatures,
+          usedPredictionCounts,
+          usedFixturePairCounts,
+          anchorPredictionIds,
+        })
+        : undefined;
       return {
         kind: 'required-league-parlay-projection',
         profile: spec.profile,
@@ -598,12 +609,14 @@ function buildRequiredLeagueParlayProjections(
           fixtureCount < 2 ? 'fewer than two required-league fixtures were scheduled or discovered' : '',
           availableFixtureCount < 2 ? 'fewer than two required-league fixtures have non-blocked projections' : '',
           fixtureCount >= 2 && availableFixtureCount >= 2 && legs.length < 2
-            ? `fewer than ${usedSignatures.size + 1} unique required-league parlay signatures are available for ${spec.profile}`
+            ? `no unique required-league parlay meets positive-edge and confidence floors for ${spec.profile}`
             : '',
+          diagnostic ? formatRequiredLeagueParlayDiagnostic(diagnostic) : '',
         ]),
         riskFlags: uniqueStrings([
           'required-league-addendum',
           'blocked',
+          'required-league-confidence-floor',
           ...(fixtureCount >= 2 && availableFixtureCount >= 2 ? ['duplicate-required-league-parlay', 'insufficient-required-league-parlay-diversity'] : []),
         ]),
       } satisfies DailyRequiredLeagueParlayProjection;
@@ -658,6 +671,10 @@ interface RequiredLeagueParlayLegSelection {
   legs: DailyRequiredLeagueAtomicProjection[];
   signature: string;
   fixturePairSignature: string;
+  combinedOdds: number;
+  aggregateConfidence: number;
+  expectedEdge: number;
+  minConfidence: number;
   score: number;
 }
 
@@ -701,16 +718,21 @@ function selectRequiredLeagueParlayLegs(
     for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
       const right = ordered[rightIndex] as DailyRequiredLeagueAtomicProjection;
       if (left.fixtureId === right.fixtureId) continue;
+      if (!requiredLeagueProjectionParlayEligible(left) || !requiredLeagueProjectionParlayEligible(right)) continue;
       const legs = [left, right].sort(compareRequiredLeagueParlayLegOrder);
       const signature = requiredLeagueParlayLegsSignature(legs);
       if (context.usedSignatures.has(signature)) continue;
       if (seenSignatures.has(signature)) continue;
       seenSignatures.add(signature);
       const fixturePairSignature = requiredLeagueFixturePairSignature(legs);
+      const metrics = requiredLeagueParlayPortfolioMetrics(legs);
+      if (metrics.expectedEdge <= 0) continue;
+      if (metrics.aggregateConfidence < REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE) continue;
       combinations.push({
         legs,
         signature,
         fixturePairSignature,
+        ...metrics,
         score: requiredLeagueParlaySelectionScore(spec, legs, context, fixturePairSignature),
       });
     }
@@ -718,10 +740,109 @@ function selectRequiredLeagueParlayLegs(
   return combinations
     .sort((a, b) =>
       b.score - a.score
+      || b.expectedEdge - a.expectedEdge
+      || b.minConfidence - a.minConfidence
       || b.legs.reduce((sum, leg) => sum + leg.confidence, 0) - a.legs.reduce((sum, leg) => sum + leg.confidence, 0)
       || a.signature.localeCompare(b.signature)
     )
     .find((combination) => !context.usedSignatures.has(combination.signature));
+}
+
+function bestRequiredLeagueParlayDiagnostic(
+  spec: RequiredLeagueParlayApproachSpec,
+  atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
+  context: {
+    usedSignatures: ReadonlySet<string>;
+    usedPredictionCounts: ReadonlyMap<string, number>;
+    usedFixturePairCounts: ReadonlyMap<string, number>;
+    anchorPredictionIds: ReadonlySet<string>;
+  },
+): RequiredLeagueParlayLegSelection | undefined {
+  const ordered = [...atomicProjections]
+    .sort((a, b) =>
+      requiredLeagueAtomicPortfolioProjectionScore(b) - requiredLeagueAtomicPortfolioProjectionScore(a)
+      || requiredAtomicProjectionScore(b) - requiredAtomicProjectionScore(a)
+      || a.odds - b.odds
+      || a.predictionId.localeCompare(b.predictionId)
+    );
+  const combinations: RequiredLeagueParlayLegSelection[] = [];
+  const seenSignatures = new Set<string>();
+  for (let leftIndex = 0; leftIndex < ordered.length; leftIndex += 1) {
+    const left = ordered[leftIndex] as DailyRequiredLeagueAtomicProjection;
+    for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
+      const right = ordered[rightIndex] as DailyRequiredLeagueAtomicProjection;
+      if (left.fixtureId === right.fixtureId) continue;
+      const legs = [left, right].sort(compareRequiredLeagueParlayLegOrder);
+      const signature = requiredLeagueParlayLegsSignature(legs);
+      if (context.usedSignatures.has(signature)) continue;
+      if (seenSignatures.has(signature)) continue;
+      seenSignatures.add(signature);
+      const fixturePairSignature = requiredLeagueFixturePairSignature(legs);
+      const metrics = requiredLeagueParlayPortfolioMetrics(legs);
+      combinations.push({
+        legs,
+        signature,
+        fixturePairSignature,
+        ...metrics,
+        score: requiredLeagueParlaySelectionScore(spec, legs, context, fixturePairSignature),
+      });
+    }
+  }
+  return combinations.sort((a, b) =>
+    b.aggregateConfidence - a.aggregateConfidence
+    || b.expectedEdge - a.expectedEdge
+    || b.score - a.score
+    || a.signature.localeCompare(b.signature)
+  )[0];
+}
+
+function formatRequiredLeagueParlayDiagnostic(diagnostic: RequiredLeagueParlayLegSelection): string {
+  const missedGates = [
+    diagnostic.minConfidence < REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE
+      ? `confianza mínima por leg ${formatRequiredLeaguePercent(diagnostic.minConfidence)} < ${formatRequiredLeaguePercent(REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE)}`
+      : '',
+    diagnostic.aggregateConfidence < REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE
+      ? `confianza agregada ${formatRequiredLeaguePercent(diagnostic.aggregateConfidence)} < ${formatRequiredLeaguePercent(REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE)}`
+      : '',
+    diagnostic.expectedEdge <= 0
+      ? `edge esperado ${formatRequiredLeaguePercent(diagnostic.expectedEdge)} <= 0.00%`
+      : '',
+  ].filter(Boolean);
+  const legs = diagnostic.legs.map((leg) =>
+    `${leg.fixture} ${leg.market} ${leg.selection}${leg.line === null ? '' : ` ${leg.line}`} @ ${round(leg.odds, 2)} (${formatRequiredLeaguePercent(leg.confidence)})`
+  ).join(' + ');
+  return [
+    `mejor combo rechazado: ${legs}`,
+    `cuota ${round(diagnostic.combinedOdds, 2)}`,
+    `confianza agregada ${formatRequiredLeaguePercent(diagnostic.aggregateConfidence)}`,
+    `edge esperado ${formatRequiredLeaguePercent(diagnostic.expectedEdge)}`,
+    missedGates.length ? `no supera: ${missedGates.join('; ')}` : '',
+  ].filter(Boolean).join('; ');
+}
+
+function formatRequiredLeaguePercent(value: number): string {
+  return `${round(value * 100, 2).toFixed(2)}%`;
+}
+
+function requiredLeagueProjectionParlayEligible(projection: DailyRequiredLeagueAtomicProjection): boolean {
+  return projection.confidence >= REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE && projection.expectedEdge > 0;
+}
+
+function requiredLeagueParlayPortfolioMetrics(legs: readonly DailyRequiredLeagueAtomicProjection[]): {
+  combinedOdds: number;
+  aggregateConfidence: number;
+  expectedEdge: number;
+  minConfidence: number;
+} {
+  const combinedOdds = legs.reduce((product, projection) => product * projection.odds, 1);
+  const aggregateConfidence = legs.reduce((product, projection) => product * clamp(projection.confidence, 0.01, 0.99), 1);
+  const adjustedProbability = clamp(aggregateConfidence, 0.01, 0.99);
+  return {
+    combinedOdds,
+    aggregateConfidence,
+    expectedEdge: (combinedOdds * adjustedProbability) - 1,
+    minConfidence: Math.min(...legs.map((projection) => projection.confidence)),
+  };
 }
 
 function requiredLeagueFixturePairSignature(
@@ -753,10 +874,7 @@ function requiredLeagueParlaySelectionScore(
   },
   fixturePairSignature: string,
 ): number {
-  const combinedOdds = legs.reduce((product, projection) => product * projection.odds, 1);
-  const aggregateConfidence = legs.reduce((product, projection) => product * clamp(projection.confidence, 0.01, 0.99), 1);
-  const expectedEdge = (combinedOdds * clamp(aggregateConfidence, 0.01, 0.99)) - 1;
-  const minConfidence = Math.min(...legs.map((projection) => projection.confidence));
+  const { combinedOdds, aggregateConfidence, expectedEdge, minConfidence } = requiredLeagueParlayPortfolioMetrics(legs);
   const averageLegScore = average(legs.map(requiredLeagueAtomicPortfolioProjectionScore));
   const targetOddsScore = requiredLeagueTargetOddsScore(spec, combinedOdds);
   const marketFamilyScore = requiredLeagueMarketFamilyScore(spec, legs);
@@ -769,9 +887,6 @@ function requiredLeagueParlaySelectionScore(
   const fixturePairPenalty = (context.usedFixturePairCounts.get(fixturePairSignature) ?? 0) * 0.06;
   const weakLegPenalty = legs.reduce((sum, projection) => sum + requiredLeagueProjectionWeakPenalty(projection), 0);
   const lowConfidencePenalty = minConfidence < 0.55 ? (0.55 - minConfidence) * 0.9 : 0;
-  const nonPositiveEdgePenalty = expectedEdge <= 0
-    ? spec.profile === 'totales' && legs.every((projection) => projection.expectedEdge > 0) ? 0.06 : 0.18
-    : 0;
 
   return round(
     averageLegScore
@@ -784,8 +899,7 @@ function requiredLeagueParlaySelectionScore(
       - reusePenalty
       - fixturePairPenalty
       - weakLegPenalty
-      - lowConfidencePenalty
-      - nonPositiveEdgePenalty,
+      - lowConfidencePenalty,
     6,
   );
 }
@@ -830,9 +944,10 @@ function requiredLeagueMarketFamilyScore(
     if (legs.every((projection) => projection.market === 'h2h')) score += 0.08;
   }
 
-  if (spec.profile === 'totales') {
-    const totalsCount = families.filter((family) => family === 'totals').length;
-    score += totalsCount === legs.length ? 0.34 : -(legs.length - totalsCount) * 0.2;
+  if (spec.profile === 'mixto-seguro') {
+    const hasResult = families.includes('result');
+    const hasTotals = families.includes('totals');
+    score += hasResult && hasTotals ? 0.2 : 0.02;
   }
 
   return round(score, 6);

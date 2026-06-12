@@ -13,6 +13,8 @@ Inputs:
 Rules:
 - Return JSON only, matching `output.schema.json`.
 - Emit one prediction for each requested market with usable quotes and evidence. If a requested market cannot be scored, return a blocked or review-required prediction with clear blockers.
+- For priority or required fixtures, emit conservative high-probability alternatives in addition to the primary market pick when `allowedQuotes` contains realistic lower-variance lines. Prefer supported goals bands such as under 3.0/3.25/3.5 or over 1.0/1.25/1.5, and protected result-style markets only when their fair probability is not anomalous.
+- Do not force a conservative alternative when it has non-positive edge, distorted fair probability, stale/low-liquidity-only support, or weaker evidence than the primary pick; explain the blocker instead.
 - Use `modelProbability`, `marketFairProbability`, `edge`, `confidenceBand`, `blockers`, `promotable`, `evidenceIds` and `claimIds`.
 - Edge must be based on market fair probability or consensus/devig when available. Do not base edge only on raw implied probability.
 - Apply calibration when sufficient history exists. When sample size is below the configured floor, degrade confidence and warn.

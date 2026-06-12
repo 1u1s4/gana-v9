@@ -869,6 +869,7 @@ function scoringPromptForAttempt(prompt: string, attempt: number): string {
     '- do not include status/progress prose such as "Estoy verificando"',
     '- include at least one persisted evidenceId from Input.evidenceItems for every prediction',
     '- cover every market represented in Input.allowedQuotes; if a market is available, include one grounded pick for it',
+    '- include conservative high-probability alternatives when they are available, positive-edge, and evidence-supported',
     '- keep rationales concise and ground every pick in persisted oddsQuoteId plus persisted evidenceIds',
   ].join('\n');
 }

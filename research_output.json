@@ -1,0 +1,217 @@
+{
+  "sources": [
+    {
+      "id": "web_source_1",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHdi6zkJAX7yrU32fTEln9cZZd5ZTYw64dty48ZYtQS2U2CnBhbc0x6I6JVP87zDUZzywOu__pSL9owvqZDUcUrMwMdV9_8QKLscV_Godt4HbHpj6qPp6jeIsH-Q-lLGVyOZ2H3ZCYOgRuJgDNEttzyYpi0r3jhT0zgayotwTSP3IPqt6-AW8LQ4rZCbD90ZYthnHoxlXpd0PaTawr6t5nSRb6W7rJ1Gkd3-p4KqTIqHyqKpzrNYpVSI5X-ycZDjivFhrkxhWcr5q7xkIee_BvgfqcURVOM21tzKQ==",
+      "title": "Brazil vs Morocco: World Cup 2026 Group C opener preview",
+      "capturedAt": "2026-06-12T16:21:14.779Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_2",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEyKcF-SBMqE2fIG0L9E6C0tfh9xKortIBo0XYLxqzCqy3CJCTSvaCUh5FpkNPY1gc8NcpeHUcG3NBQ4ieYPNRrvJ051P8YqMZjc6UKjfhbDrPXgIp2gI-5w5wXHi9PyhFBiiHnE3Czvlz1_pVusT9cG2dxexHLG9DNMZSMxJQLpBE-m5ws9b3NcQIxA9uqFrsScOeLb3XvUDGjit0RI69gENpGCxy3RhVE1g0rR7EcrPxPht51iVbX",
+      "title": "Brazil vs Morocco: Head-to-Head, Team News, Prediction",
+      "capturedAt": "2026-06-12T16:21:14.779Z",
+      "metadata": {}
+    },
+    {
+      "id": "odds_source",
+      "type": "db",
+      "url": "internal-snapshot",
+      "title": "Odds Snapshot from API-Football",
+      "capturedAt": "2026-06-12T16:21:20.707Z",
+      "hash": "3461306f-deb0-4b35-b9c1-3d894bddfc31",
+      "metadata": {}
+    },
+    {
+      "id": "fixture_source",
+      "type": "db",
+      "url": "internal-snapshot",
+      "title": "Fixture Details from API-Football",
+      "capturedAt": "2026-06-12T16:21:19.126Z",
+      "hash": "08026089-6714-47cf-a55e-8c69539c0485",
+      "metadata": {}
+    },
+    {
+      "id": "stats_source",
+      "type": "db",
+      "url": "internal-snapshot",
+      "title": "Fixture Statistics from API-Football",
+      "capturedAt": "2026-06-12T16:21:19.677Z",
+      "hash": "c4ea47ff-3103-4afa-aca3-0e635f4ec9ba",
+      "metadata": {}
+    }
+  ],
+  "evidenceItems": [
+    {
+      "id": "evid_h2h_1",
+      "sourceId": "web_source_2",
+      "claimIds": [
+        "claim_h2h_fav"
+      ],
+      "snippet": "All-Time H2H: Brazil leads 2–1–0 (W-L-D). Last Meeting: Morocco 2–1 Brazil (Friendly, March 2023). World Cup History: Brazil 3–0 Morocco (1998 Group Stage).",
+      "summary": "Brazil has a superior head-to-head record against Morocco, winning 2 out of 3 matches, including a 3-0 victory in the 1998 World Cup.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evid_h2h_2",
+      "sourceId": "web_source_1",
+      "claimIds": [
+        "claim_h2h_fav"
+      ],
+      "snippet": "Brazil enters as the clear favorite, though Morocco's defensive reputation makes the 'Under' a popular play.",
+      "summary": "Market consensus shows Brazil as clear favorites for the match.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evid_h2h_3",
+      "sourceId": "odds_source",
+      "claimIds": [
+        "claim_h2h_fav"
+      ],
+      "snippet": "Brazil (home) price: 1.62 (Bet365), 1.64 (Pinnacle)",
+      "summary": "Odds for Brazil to win are 1.62-1.64, indicating high implied probability.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evid_ou_1",
+      "sourceId": "web_source_1",
+      "claimIds": [
+        "claim_ou_fav"
+      ],
+      "snippet": "Under/Over 2.5 Goals: Under is favored at -123",
+      "summary": "The 'Under 2.5 Goals' market is favored according to web search.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evid_ou_2",
+      "sourceId": "odds_source",
+      "claimIds": [
+        "claim_ou_fav"
+      ],
+      "snippet": "goals_over_under, selection: 'under', line: 2.5, price: 1.73 (Bet365), 1.79 (Pinnacle)",
+      "summary": "Odds for Under 2.5 goals are 1.73-1.79, implying a higher probability.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evid_btts_1",
+      "sourceId": "web_source_1",
+      "claimIds": [
+        "claim_btts_no"
+      ],
+      "snippet": "Brazil Form: Under new manager Carlo Ancelotti, Brazil has tightened its defense, conceding only one goal in his first five matches.",
+      "summary": "Brazil has a strong defensive record under Ancelotti, conceding only one goal in five matches.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evid_btts_2",
+      "sourceId": "odds_source",
+      "claimIds": [
+        "claim_btts_no"
+      ],
+      "snippet": "btts, selection: 'no', price: 1.7 (Bet365)",
+      "summary": "Odds for Both Teams To Score (No) are 1.7, indicating it is favored.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evid_dc_1",
+      "sourceId": "odds_source",
+      "claimIds": [
+        "claim_dc_fav"
+      ],
+      "snippet": "double_chance, selection: 'home_or_draw', price: 1.14 (Bet365)",
+      "summary": "Odds for Brazil to win or draw are 1.14, indicating a very high implied probability.",
+      "confidence": 0.9,
+      "metadata": {}
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_h2h_fav",
+      "statement": "Brazil is favored to win against Morocco.",
+      "subject": {
+        "type": "market",
+        "id": "08026089-6714-47cf-a55e-8c69539c0485",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evid_h2h_1",
+        "evid_h2h_2",
+        "evid_h2h_3"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_ou_fav",
+      "statement": "Under 2.5 goals is the favored outcome for total goals in the match.",
+      "subject": {
+        "type": "market",
+        "id": "08026089-6714-47cf-a55e-8c69539c0485",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evid_ou_1",
+        "evid_ou_2"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_btts_no",
+      "statement": "Both Teams To Score (No) is the favored outcome.",
+      "subject": {
+        "type": "market",
+        "id": "08026089-6714-47cf-a55e-8c69539c0485",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evid_btts_1",
+        "evid_btts_2"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_dc_fav",
+      "statement": "Brazil to win or draw is the highly favored outcome in the double chance market.",
+      "subject": {
+        "type": "market",
+        "id": "08026089-6714-47cf-a55e-8c69539c0485",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evid_dc_1"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    }
+  ],
+  "gateResult": {
+    "verdict": "promotable",
+    "reasons": [
+      "structured research generated with sufficient evidence",
+      "web-search evidence included as webMode is live"
+    ],
+    "warnings": []
+  },
+  "warnings": [],
+  "metadata": {
+    "marketCoverage": {
+      "skippedMarkets": []
+    }
+  }
+}

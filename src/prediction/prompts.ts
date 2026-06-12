@@ -166,6 +166,8 @@ export function buildScorePredictionPrompt(input?: BuildScorePredictionPromptInp
     `Prompt version: ${SCORE_PREDICTION_PROMPT_VERSION}.`,
     'Select analytical picks across every requested market that has an available allowedQuote for this fixture.',
     'Emit at least one prediction per requested available market when evidence is sufficient; if a market is thin or uncertain, still emit the best analytical candidate with explicit warnings instead of silently omitting it.',
+    'For priority or required fixtures, include conservative high-probability alternatives in addition to the primary market pick when allowedQuotes contain realistic lower-variance lines. Examples: safer goals totals such as under 3.0/3.25/3.5 or over 1.0/1.25/1.5, and protected result-style markets when their fair probability is not anomalous.',
+    'Do not force a conservative alternative when it has non-positive edge, distorted fair probability, stale/low-liquidity-only support, or weaker evidence than the primary pick; explain the blocker instead.',
     'Every prediction must reference persisted oddsQuoteId values and evidenceIds from the supplied research bundle.',
     'Use canonical markets only: h2h, double_chance, goals_over_under, corners_over_under, btts.',
     'Do not invent odds, fixtures, evidence, providers, models, prompt versions, or scoring rule versions.',

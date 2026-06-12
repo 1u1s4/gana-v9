@@ -54,6 +54,8 @@ describe('research prompts', () => {
     assert.match(prompt, /Monetary safety/);
     assert.match(prompt, /analytical artifacts only/);
     assert.match(prompt, /starting with "\{" as the first character/);
+    assert.match(prompt, /conservative high-probability alternatives/);
+    assert.match(prompt, /under 3\.0\/3\.25\/3\.5/);
   });
 
   it('sanitizes negated monetary warnings before scoring guard checks', () => {

@@ -648,6 +648,7 @@ function formatRequiredLeaguePredictionLines(data) {
 function formatRequiredLeagueParlayLines(data) {
   const lines = [];
   const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  const blockedDiagnostics = [];
   for (const projection of parlayProjections.slice(0, 3)) {
     const status = stringOrFallback(projection?.status, 'unknown');
     const icon = status === 'selected' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
@@ -668,8 +669,24 @@ function formatRequiredLeagueParlayLines(data) {
       lines.push(`   ${metrics.join(' · ')}`);
     }
     if (!legs.length && Array.isArray(projection?.reasons) && projection.reasons.length) {
-      lines.push(`   ${formatRequiredLeagueBlockedParlayReason(projection)}`);
+      const diagnostic = parseRequiredLeagueBlockedParlayDiagnostic(projection);
+      if (diagnostic) blockedDiagnostics.push(diagnostic);
+      lines.push(`   ${formatRequiredLeagueBlockedParlayReason(projection, diagnostic)}`);
     }
+  }
+  const uniqueDiagnostics = uniqueRequiredLeagueBlockedDiagnostics(blockedDiagnostics);
+  for (const diagnostic of uniqueDiagnostics.slice(0, 2)) {
+    lines.push('🔎 Mejor combo evaluado');
+    for (const leg of diagnostic.legs.slice(0, 3)) {
+      lines.push(`   ${formatMarketIcon(leg)} ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg.odds, 2)} · Conf ${formatPercent(diagnosticLegConfidence(leg))}`);
+    }
+    const metrics = [
+      Number.isFinite(diagnostic.combinedOdds) ? `📊 Cuota ${formatMetricNumber(diagnostic.combinedOdds, 2)}` : undefined,
+      Number.isFinite(diagnostic.aggregateConfidence) ? `🍀 Conf ${formatPercent(diagnostic.aggregateConfidence)}` : undefined,
+      Number.isFinite(diagnostic.expectedEdge) ? `📈 Edge ${formatPercent(diagnostic.expectedEdge)}` : undefined,
+    ].filter(Boolean);
+    if (metrics.length) lines.push(`   ${metrics.join(' · ')}`);
+    if (diagnostic.missedGate) lines.push(`   🚧 No supera piso: ${diagnostic.missedGate}`);
   }
   return lines;
 }
@@ -678,14 +695,113 @@ function formatRequiredLeagueParlayLeg(leg) {
   return `${formatMarketIcon(leg)} ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg?.odds, 2)}`;
 }
 
-function formatRequiredLeagueBlockedParlayReason(projection) {
+function formatRequiredLeagueBlockedParlayReason(projection, diagnostic = undefined) {
+  const reasons = Array.isArray(projection?.reasons) ? projection.reasons : [];
+  const riskFlags = Array.isArray(projection?.riskFlags) ? projection.riskFlags : [];
+  if (riskFlags.includes('required-league-confidence-floor')) {
+    if (diagnostic) return 'No publicado: confianza agregada insuficiente.';
+    const diagnosticReason = reasons.find((reason) => /^(best rejected combo|mejor combo rechazado):/i.test(String(reason)));
+    if (diagnosticReason) return 'No publicado: confianza agregada insuficiente.';
+    const confidenceReason = reasons.find((reason) => /confidence floor|confidence floors/i.test(String(reason)));
+    const profile = stringOrFallback(projection?.profile, 'este enfoque');
+    if (confidenceReason) return `No se publica ${profile}: no hay cupón único con edge positivo y pisos de confianza.`;
+    return 'No se publica: no supera pisos de confianza y edge positivo.';
+  }
   if (Array.isArray(projection?.riskFlags) && projection.riskFlags.includes('duplicate-required-league-parlay')) {
-    const duplicateReason = (projection.reasons ?? []).find((reason) => /^duplicate of /i.test(String(reason)));
+    const duplicateReason = reasons.find((reason) => /^duplicate of /i.test(String(reason)));
     const match = /^duplicate of ([^;]+)/i.exec(String(duplicateReason ?? ''));
     const profile = match?.[1] ? match[1].trim() : 'otro enfoque';
     return `Duplicado de ${profile}; no se publica cupón idéntico.`;
   }
-  return stringOrFallback(projection?.reasons?.[0], 'sin legs publicados');
+  return stringOrFallback(reasons[0], 'sin legs publicados');
+}
+
+function parseRequiredLeagueBlockedParlayDiagnostic(projection) {
+  const reasons = Array.isArray(projection?.reasons) ? projection.reasons : [];
+  const raw = reasons.find((reason) => /^(best rejected combo|mejor combo rechazado):/i.test(String(reason)));
+  if (!raw) return null;
+  const text = String(raw);
+  const body = text.replace(/^(best rejected combo|mejor combo rechazado):\s*/i, '');
+  const [legsText = '', ...detailParts] = body.split(/\s*;\s*/);
+  const details = detailParts.join('; ');
+  const legs = legsText.split(/\s+\+\s+/)
+    .map(parseRequiredLeagueBlockedDiagnosticLeg)
+    .filter(Boolean);
+  if (!legs.length) return null;
+  const combinedOdds = numberFromMatch(details, /(?:cuota|combined odds)\s+([0-9.]+)/i);
+  const aggregateConfidence = percentFromMatch(details, /(?:confianza agregada|aggregate confidence)\s+([0-9.]+)%/i);
+  const expectedEdge = percentFromMatch(details, /(?:edge esperado|expected edge)\s+([+-]?[0-9.]+)%/i);
+  const missedGate = missedRequiredLeagueParlayGate(details);
+  return {
+    legs,
+    combinedOdds,
+    aggregateConfidence,
+    expectedEdge,
+    missedGate,
+    signature: JSON.stringify({
+      legs: legs.map((leg) => [requiredLeagueFixtureLabel(leg), leg.market, leg.selection, leg.line, leg.odds]),
+      combinedOdds,
+      aggregateConfidence,
+      expectedEdge,
+      missedGate,
+    }),
+  };
+}
+
+function parseRequiredLeagueBlockedDiagnosticLeg(value) {
+  const text = String(value).trim();
+  const match = /^(.*)\s+(h2h|double_chance|goals_over_under|corners_over_under|btts)\s+([a-z_]+)(?:\s+([0-9.]+))?\s+@\s+([0-9.]+)\s+\(([0-9.]+)%\)$/i.exec(text);
+  if (!match) return null;
+  const [, fixture, market, selection, lineText, oddsText, confidenceText] = match;
+  const line = lineText === undefined ? null : Number(lineText);
+  const odds = Number(oddsText);
+  const confidence = Number(confidenceText) / 100;
+  return {
+    fixture: fixture.trim(),
+    display: { fixtureLabel: fixture.trim() },
+    market: market.toLowerCase(),
+    selection: selection.toLowerCase(),
+    line: Number.isFinite(line) ? line : null,
+    odds: Number.isFinite(odds) ? odds : null,
+    confidence: Number.isFinite(confidence) ? confidence : null,
+  };
+}
+
+function uniqueRequiredLeagueBlockedDiagnostics(diagnostics) {
+  const seen = new Set();
+  const unique = [];
+  for (const diagnostic of diagnostics) {
+    if (!diagnostic?.signature || seen.has(diagnostic.signature)) continue;
+    seen.add(diagnostic.signature);
+    unique.push(diagnostic);
+  }
+  return unique;
+}
+
+function missedRequiredLeagueParlayGate(details) {
+  const spanish = /no supera:\s*(.+)$/i.exec(details);
+  const english = /missed gates:\s*(.+)$/i.exec(details);
+  const raw = (spanish?.[1] ?? english?.[1] ?? '').trim();
+  if (!raw) return '';
+  return raw
+    .replace(/\baggregate confidence\b/gi, 'confianza agregada')
+    .replace(/\bmin leg confidence\b/gi, 'confianza mínima por leg')
+    .replace(/\bexpected edge\b/gi, 'edge esperado');
+}
+
+function diagnosticLegConfidence(leg) {
+  return Number.isFinite(leg?.confidence) ? leg.confidence : 0;
+}
+
+function numberFromMatch(value, pattern) {
+  const match = pattern.exec(String(value));
+  const parsed = Number(match?.[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function percentFromMatch(value, pattern) {
+  const parsed = numberFromMatch(value, pattern);
+  return Number.isFinite(parsed) ? parsed / 100 : null;
 }
 
 function formatRequiredPick(item) {
