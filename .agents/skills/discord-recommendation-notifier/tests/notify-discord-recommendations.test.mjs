@@ -71,18 +71,27 @@ describe('discord recommendation notifier', () => {
         { ...base, rank: 1, profile: 'parlay-diamante', parlayId: 'diamante-1' },
         { ...base, rank: 2, profile: 'parlay-refinado', parlayId: 'refinado-1' },
         { ...base, rank: 3, profile: 'low-variance', parlayId: 'low-variance-1' },
+        { ...base, rank: 4, profile: 'principal', parlayId: 'principal-1' },
+        { ...base, rank: 5, profile: 'resultados', parlayId: 'resultados-1' },
+        { ...base, rank: 6, profile: 'totales', parlayId: 'totales-1' },
       ],
     };
 
-    const payload = buildDiscordPayload(artifact, { max: 3 });
-    const message = buildGatewayMessage(artifact, { max: 3 });
+    const payload = buildDiscordPayload(artifact, { max: 6 });
+    const message = buildGatewayMessage(artifact, { max: 6 });
 
     assert.match(payload.embeds[1].title, /1️⃣ 💎 Team A vs Team B/);
     assert.match(payload.embeds[2].title, /2️⃣ 🧠 Team A vs Team B/);
     assert.match(payload.embeds[3].title, /3️⃣ 🛡️ Team A vs Team B/);
+    assert.match(payload.embeds[4].title, /4️⃣ 💎 Team A vs Team B/);
+    assert.match(payload.embeds[5].title, /5️⃣ ⚽ Team A vs Team B/);
+    assert.match(payload.embeds[6].title, /6️⃣ 🥅 Team A vs Team B/);
     assert.match(message, /1️⃣ 💎 Team A vs Team B/);
     assert.match(message, /2️⃣ 🧠 Team A vs Team B/);
     assert.match(message, /3️⃣ 🛡️ Team A vs Team B/);
+    assert.match(message, /4️⃣ 💎 Team A vs Team B/);
+    assert.match(message, /5️⃣ ⚽ Team A vs Team B/);
+    assert.match(message, /6️⃣ 🥅 Team A vs Team B/);
   });
 
   it('prints preferred parlay approach status lines in native and gateway output', () => {

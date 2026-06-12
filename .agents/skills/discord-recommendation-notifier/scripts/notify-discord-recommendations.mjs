@@ -878,6 +878,10 @@ export function recommendationTypePrefix(recommendation) {
 
 export function parlayProfileEmoji(profile) {
   const key = stringOrFallback(profile, '').toLowerCase();
+  if (key === 'principal') return '💎';
+  if (key === 'resultados') return '⚽';
+  if (key === 'totales') return '🥅';
+  if (key === 'mixto-seguro') return '🧩';
   if (key === 'parlay-diamante') return '💎';
   if (key === 'parlay-refinado') return '🧠';
   if (key === 'low-variance') return '🛡️';

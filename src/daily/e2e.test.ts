@@ -1325,7 +1325,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.requiredLeagueAddendum.missingPredictionFixtures, 1);
   });
 
-  it('builds distinct required-league parlay approaches from alternate fixture projections', () => {
+  it('builds distinct required-league atomic portfolio approaches from alternate fixture projections', () => {
     const canadaBosnia = {
       ...fixture('2026-06-12T19:00:00.000Z'),
       id: 'fixture-canada-bosnia',
@@ -1471,10 +1471,13 @@ describe('runDailyE2E', () => {
       .join('|'));
     assert.equal(artifact.parlayProjections.length, 3);
     assert.equal(selected.length, 3);
-    assert.deepEqual(selected.map((projection) => projection.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.deepEqual(selected.map((projection) => projection.profile), ['principal', 'resultados', 'totales']);
     assert.equal(new Set(signatures).size, 3);
     assert.equal(selected.every((projection) => projection.legs.length === 2), true);
     assert.equal(selected.every((projection) => new Set(projection.legs.map((leg) => leg.fixtureId)).size === 2), true);
+    assert.equal(selected.find((projection) => projection.profile === 'resultados')?.legs.every((leg) => leg.market === 'h2h'), true);
+    assert.equal(selected.find((projection) => projection.profile === 'totales')?.legs.every((leg) => leg.market === 'goals_over_under' || leg.market === 'btts'), true);
+    assert.deepEqual(artifact.recommendationPolicy.parlayProfiles, ['principal', 'resultados', 'totales']);
     assert.equal(artifact.goalCheck.status, 'passed');
     assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'three-parlay-approaches')?.status, 'passed');
   });

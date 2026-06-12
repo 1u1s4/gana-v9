@@ -19,7 +19,7 @@ import type { PipelineValidationMode, RunPipelineDependencies, RunPipelineInput 
 import { buildDailyProviderComparison, type DailyProviderComparison, type DailyProviderConsensus } from './comparison.js';
 import { applyCouncilDecisions, runRecommendationCouncil } from '../council/recommendation-council.js';
 import { recommendationArtifactTargets } from '../recommendations/artifact.js';
-import { buildRequiredLeagueRecommendations, normalizeRequiredLeagues } from './required-leagues.js';
+import { DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER, buildRequiredLeagueRecommendations, normalizeRequiredLeagues } from './required-leagues.js';
 import type { DailyRequiredLeagueGoalStatus, DailyRequiredLeagueInput } from './required-leagues.js';
 import {
   ATOMIC_BLOCKED_RISK_FLAGS,
@@ -783,7 +783,7 @@ export async function runDailyE2E(
         leagues: requiredLeagues,
         goalStatus: requiredLeagueArtifact.goalCheck.status,
         missingPredictionFixtures: requiredLeagueArtifact.coverage.missingPredictionFixtures,
-        parlayProfiles: DAILY_PREFERRED_PARLAY_PROFILE_ORDER,
+        parlayProfiles: DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER,
       },
       atomicExcludesSelectedParlayLegs: true,
       atomicExcludesSelectedParlayFixtures: true,
