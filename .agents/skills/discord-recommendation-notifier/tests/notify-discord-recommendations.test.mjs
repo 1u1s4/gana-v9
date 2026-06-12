@@ -168,16 +168,24 @@ describe('discord recommendation notifier', () => {
     const payload = buildDiscordPayload(artifact, { max: 1 });
     const message = buildGatewayMessage(artifact, { max: 1 });
     const joined = JSON.stringify(payload);
+    const requiredEmbed = payload.embeds.find((embed) => /^🌍 Obligatorio/.test(embed.title ?? ''));
+    const predictionEmbed = payload.embeds.find((embed) => /^📌 Predicciones obligatorias/.test(embed.title ?? ''));
+    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
 
     assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30 GT/);
     assert.match(payload.embeds[1].description, /Team A vs Team B: h2h home @ 1.4/);
     assert.doesNotMatch(payload.embeds[1].description, /Team A vs Team B · 14:30 GT: h2h home @ 1.4/);
-    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
-    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
-    assert.match(joined, /⚽ Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
+    assert.match(requiredEmbed.description, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
+    assert.match(predictionEmbed.description, /Canada vs Bosnia & Herzegovina\n/);
+    assert.doesNotMatch(predictionEmbed.description, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
+    assert.match(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
+    assert.doesNotMatch(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
     assert.match(message, /Team A vs Team B · 14:30 GT/);
     assert.match(message, /Team A vs Team B: h2h home @ 1.4/);
-    assert.match(message, /Canada vs Bosnia & Herzegovina · 13:00 GT/);
+    assert.match(message, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
+    assert.match(message, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
+    assert.doesNotMatch(message, /⚽ Canada vs Bosnia & Herzegovina · 13:00 GT: Canada gana @ 1.87/);
+    assert.match(joined, /Canada vs Bosnia & Herzegovina · 13:00 GT: 1 proyección fuerte/);
   });
 
   it('does not send an empty-selection box when the required addendum has publishable predictions and parlays', () => {

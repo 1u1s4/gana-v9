@@ -71,9 +71,9 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Header embed format: `🏆 Gana v9 · Recomendaciones`, parlay/simple counts, and artifact date as `DD/MM/YYYY`.
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
 - Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
-- Fixture labels should include kickoff time in Guatemala when artifact metadata provides it, formatted as `HH:MM GT` next to the match name.
+- Fixture labels should include kickoff time in Guatemala when artifact metadata provides it, formatted as `HH:MM GT` next to the match name. In required-league addendum output, show the kickoff only in the `🌍 Obligatorio` fixture summary lines, not again in required prediction lines or required parlay legs.
 - Avoid repeating the same kickoff time twice inside a single simple recommendation embed; keep the time in the title and omit it from the inner selection line.
-- Required parlay legs should use the same compact selection style with a market icon, fixture, optional kickoff, pick, and odds; put parlay-level cuota/confidence on a separate compact metrics line.
+- Required parlay legs should use the same compact selection style with a market icon, fixture, pick, and odds; put parlay-level cuota/confidence on a separate compact metrics line.
 - Required parlay approaches must use alternate non-blocked fixture projections so the three required coupons are distinct whenever enough candidates exist; block only approaches that cannot be made unique, with a concise Spanish reason.
 - Parlay titles include a profile emoji before the fixture name: `💎` parlay-diamante, `🧠` parlay-refinado, `🛡️` low-variance, `📉` low-odds-top, `🚀` parlay-all-in, `🥇` parlay-oro, `⚖️` balanced, `🔥` high-conviction, `🧩` market-diverse, `🥅` totals, `🔒` conservative, `🔎` review, and `🎟️` fallback/unknown.
 - When the artifact includes `parlayApproaches`, the header must show the three approach statuses with profile emojis; blocked approaches are status context, not published parlay picks.
