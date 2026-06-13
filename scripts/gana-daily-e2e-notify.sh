@@ -39,6 +39,8 @@ require_command node
 require_command pnpm
 
 DATE="${GANA_DAILY_DATE:-$(gt_date 1)}"
+DAILY_BATCH_ID="${GANA_DAILY_BATCH_ID:-daily-${DATE}-full}"
+LOCK_PATH="$REPO_ROOT/.artifacts/gana-v9/cron/locks/daily-e2e-${DATE}.lock"
 # Flow-specific GANA_DISCORD_*_TARGET values are resolved inside the Node wrapper.
 
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
@@ -55,14 +57,53 @@ export GANA_DAILY_REQUIRED_LEAGUES="${GANA_DAILY_REQUIRED_LEAGUES:-1:World Cup:W
 export AGENT_CODEX_FALLBACK_MODELS="${AGENT_CODEX_FALLBACK_MODELS:-gpt-5.4-mini}"
 export AGENT_CODEX_SANDBOX="${AGENT_CODEX_SANDBOX:-danger-full-access}"
 
-exec node scripts/gana-daily-e2e-and-notify.mjs \
+mark_retryable_lock() {
+  local signal="$1"
+  node - "$LOCK_PATH" "$DATE" "$DAILY_BATCH_ID" "$signal" <<'NODE' || true
+const fs = require('node:fs');
+const path = process.argv[2];
+const date = process.argv[3];
+const dailyBatchId = process.argv[4];
+const signal = process.argv[5];
+const retryAfter = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+fs.mkdirSync(require('node:path').dirname(path), { recursive: true });
+fs.writeFileSync(path, `${JSON.stringify({
+  date,
+  dailyBatchId,
+  status: 'retryable',
+  retryAfter,
+  updatedAt: new Date().toISOString(),
+  reason: `daily-e2e wrapper received ${signal}`,
+}, null, 2)}\n`);
+NODE
+}
+
+child_pid=""
+handle_signal() {
+  local signal="$1"
+  mark_retryable_lock "$signal"
+  if [[ -n "$child_pid" ]] && kill -0 "$child_pid" >/dev/null 2>&1; then
+    kill -TERM "$child_pid" >/dev/null 2>&1 || true
+    wait "$child_pid" >/dev/null 2>&1 || true
+  fi
+  echo "daily-e2e wrapper received $signal; lock marked retryable at $LOCK_PATH" >&2
+  exit 143
+}
+trap 'handle_signal SIGTERM' TERM
+trap 'handle_signal SIGINT' INT
+
+node scripts/gana-daily-e2e-and-notify.mjs \
   --date "$DATE" \
+  --daily-batch-id "$DAILY_BATCH_ID" \
   --providers "${GANA_DAILY_PROVIDERS:-codex,gemini}" \
   --codex-model "$GANA_DAILY_CODEX_MODEL" \
   --gemini-model "$GANA_DAILY_GEMINI_MODEL" \
   --threshold "$GANA_LOW_ODDS_THRESHOLD" \
   --provider-concurrency "$GANA_DAILY_PROVIDER_CONCURRENCY" \
+  --max-fixtures "${GANA_DAILY_MAX_FIXTURES:-${GANA_CRON_MAX_FIXTURES_PER_RUN:-100}}" \
   --web "${GANA_WEB_MODE:-live}" \
   --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}" \
   --required-leagues "$GANA_DAILY_REQUIRED_LEAGUES" \
-  --max "${GANA_DISCORD_MAX_SELECTIONS:-3}"
+  --max "${GANA_DISCORD_MAX_SELECTIONS:-3}" &
+child_pid=$!
+wait "$child_pid"

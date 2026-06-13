@@ -1,104 +1,81 @@
 {
   "predictions": [
     {
-      "oddsQuoteId": "aca2ec36-571c-41b9-b8b3-24704bdf0ea5",
+      "oddsQuoteId": "c3215705-bd4c-4d8e-a4ec-64a7cea840bc",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 1.12,
-      "probability": 0.85,
-      "modelProbability": 0.85,
-      "marketFairProbability": 0.815558,
-      "edge": 0.034442,
-      "confidence": 0.90,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_h2h_odds",
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_forebet_trends"
-      ],
-      "claimIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_h2h_home_favored"
-      ],
-      "rationale": "Santos U20 are clear pre-match favorites based on Bet365 pricing and corroborating web trends, showing recent wins over Jabaquara U20.",
-      "warnings": []
-    },
-    {
-      "oddsQuoteId": "5ed7b9d7-c240-4e36-96bc-10a5fd74262d",
-      "market": "double_chance",
-      "selection": "home_or_draw",
-      "line": null,
-      "odds": 1.01,
-      "probability": 0.98,
-      "modelProbability": 0.98,
-      "marketFairProbability": 0.468063,
-      "edge": 0.511937,
-      "confidence": 0.90,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_double_chance_odds"
-      ],
-      "claimIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_double_chance_home_or_draw_short"
-      ],
-      "rationale": "The market strongly expects Santos U20 to avoid defeat, with home_or_draw priced extremely short at 1.01.",
-      "warnings": [
-        "High overround in double chance market suggests potential inefficiency or low liquidity exaggeration."
-      ]
-    },
-    {
-      "oddsQuoteId": "6da69677-446c-44ab-9778-324923931141",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 1.4,
-      "probability": 0.70,
-      "modelProbability": 0.70,
-      "marketFairProbability": 0.662651,
-      "edge": 0.037349,
-      "confidence": 0.80,
+      "odds": 1.5,
+      "probability": 0.68,
+      "modelProbability": 0.68,
+      "marketFairProbability": 0.594656,
+      "edge": 0.02,
+      "confidence": 0.75,
       "confidenceBand": "medium",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_goals_odds",
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_forebet_trends"
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-h2h-odds",
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-form-standing",
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-h2h-history"
       ],
       "claimIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_goals_over_2_5_favored"
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:claim-h2h-home-win"
       ],
-      "rationale": "Over 2.5 goals is favored by the odds and consistent with Santos U20's recent scoring trends reported online.",
+      "rationale": "Bulls Academy is favored due to better league standing and positive historical odds. Rydalmere is on a 5-game winless streak, further supporting a home win.",
       "warnings": []
     },
     {
-      "oddsQuoteId": "27918b15-05de-4162-98ef-ad542949083d",
-      "market": "corners_over_under",
-      "selection": "over",
-      "line": 10.5,
-      "odds": 1.73,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.536193,
-      "edge": 0.013807,
-      "confidence": 0.60,
-      "confidenceBand": "low",
+      "oddsQuoteId": "91242bcd-c958-4e86-9976-d09babccbbdc",
+      "market": "double_chance",
+      "selection": "home_or_away",
+      "line": null,
+      "odds": 1.22,
+      "probability": 0.85,
+      "modelProbability": 0.85,
+      "marketFairProbability": 0.374424,
+      "edge": 0.037,
+      "confidence": 0.8,
+      "confidenceBand": "high",
       "blockers": [],
       "promotable": true,
       "evidenceIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_corners_odds",
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:evidence_forebet_trends"
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-double-chance-odds",
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-h2h-history"
       ],
       "claimIds": [
-        "0f44ee9c-f5d9-4157-aa5e-46e03673485a:claim_corners_over_10_5_slight_favored"
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:claim-double-chance-no-draw"
       ],
-      "rationale": "Over 10.5 corners is slightly favored by the odds, with limited supporting web-reported corner averages.",
+      "rationale": "Historical head-to-head matches show no draws. Odds also suggest a low probability of a draw, indicating a decisive result.",
+      "warnings": []
+    },
+    {
+      "oddsQuoteId": "a476a189-b6d3-46a2-9d7f-9f4dc9dacf47",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 2.5,
+      "odds": 1.6,
+      "probability": 0.65,
+      "modelProbability": 0.65,
+      "marketFairProbability": 0.589744,
+      "edge": 0.04,
+      "confidence": 0.78,
+      "confidenceBand": "medium",
+      "blockers": [],
+      "promotable": true,
+      "evidenceIds": [
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-goals-over-under-odds",
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-team-avg-goals"
+      ],
+      "claimIds": [
+        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:claim-goals-over-2.5"
+      ],
+      "rationale": "Bet365 odds favor over 2.5 goals. Both teams have a history of high-scoring games, especially Rydalmere with 3.17 average goals per game.",
       "warnings": []
     }
   ],
   "warnings": [
+    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
     "market btts skipped/review-required: missing odds quotes for requested market"
   ],
   "metadata": {}

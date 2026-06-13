@@ -68,6 +68,7 @@ const command = [
   '--date', date,
   '--providers', providers,
   '--provider-concurrency', String(providerConcurrency),
+  ...(args.maxFixtures ? ['--max-fixtures', String(args.maxFixtures)] : []),
   '--threshold', String(args.threshold ?? 1.2),
   '--web', webMode,
   '--parlay-profile', parlayProfile,
@@ -197,6 +198,7 @@ function parseArgs(argv) {
     else if (arg === '--gemini-model') parsed.geminiModel = requireValue(argv, ++index, arg);
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
+    else if (arg === '--max-fixtures') parsed.maxFixtures = Number(requireValue(argv, ++index, arg));
     else if (arg === '--parlay-profile') parsed.parlayProfile = requireValue(argv, ++index, arg);
     else if (arg === '--required-leagues') parsed.requiredLeagues = requireValue(argv, ++index, arg);
     else if (arg === '--web') parsed.web = requireValue(argv, ++index, arg);

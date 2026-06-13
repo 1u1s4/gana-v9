@@ -1,5 +1,6 @@
 import json
 import sys
+import re # Import re for regex parsing
 from collections import defaultdict
 
 def calculate_probability_metrics(odds, model_probability, market_fair_probability):
@@ -15,7 +16,7 @@ def get_confidence_band(confidence):
     else:
         return "low"
 
-def map_claim_to_selection(claim):
+def map_claim_to_selection(claim, home_team_name, away_team_name):
     market_key = claim["marketKey"]
     statement = claim["statement"]
     selection_key = claim["selectionKey"]
@@ -25,24 +26,32 @@ def map_claim_to_selection(claim):
         return selection_key, line
 
     if market_key == "h2h":
-        if "favored to win" in statement or "home win" in statement:
+        if home_team_name and (home_team_name in statement or "home win" in statement or "favored to win" in statement.lower().replace(home_team_name.lower(), "")):
             return "home", None
-        elif "away win" in statement:
+        elif away_team_name and (away_team_name in statement or "away win" in statement):
             return "away", None
         elif "draw" in statement:
             return "draw", None
     elif market_key == "double_chance":
-        if "win or draw" in statement and "Dainava" in statement: # Assuming Dainava is home team
+        if home_team_name and ("win or draw" in statement and home_team_name in statement) or ("home or draw" in statement):
             return "home_or_draw", None
-        elif "win or draw" in statement and "Ekranas" in statement: # Assuming Ekranas is away team
+        elif away_team_name and ("win or draw" in statement and away_team_name in statement) or ("draw or away" in statement):
             return "draw_or_away", None
         elif "home or away" in statement:
             return "home_or_away", None
     elif market_key == "goals_over_under":
-        if "over" in statement and "goals" in statement:
-            return "over", line if line else 2.5 # Default line to 2.5 if not specified in claim
-        elif "under" in statement and "goals" in statement:
-            return "under", line if line else 2.5
+        # Try to extract line from statement
+        line_match = re.search(r'(over|under)\s+([\d.]+)\s+goals', statement, re.IGNORECASE)
+        if line_match:
+            extracted_selection = line_match.group(1).lower()
+            extracted_line = float(line_match.group(2))
+            return extracted_selection, extracted_line
+        else:
+            # Fallback to claim's line or default if not found
+            if "over" in statement and "goals" in statement:
+                return "over", line if line else 2.5
+            elif "under" in statement and "goals" in statement:
+                return "under", line if line else 2.5
     elif market_key == "btts":
         if "both teams to score" in statement or "both teams are likely to score" in statement:
             return "yes", None
@@ -63,6 +72,9 @@ def score_predictions():
     claims = input_data["claims"]
     evidence_items = input_data["evidenceItems"]
     research_bundle_warnings = input_data["researchBundle"]["warnings"]
+    fixture = input_data["fixture"] # Extract fixture
+    home_team_name = fixture["metadata"]["teams"]["home"]["name"] # Extract home team name
+    away_team_name = fixture["metadata"]["teams"]["away"]["name"] # Extract away team name
 
     # Helper dictionaries
     evidence_by_id = {item["id"]: item for item in evidence_items}
@@ -76,9 +88,11 @@ def score_predictions():
     # Group claims by market and inferred selection for easier lookup
     claims_by_market_selection_line = defaultdict(lambda: defaultdict(list))
     for claim in claims:
-        inferred_selection, inferred_line = map_claim_to_selection(claim)
+        # Pass team names to map_claim_to_selection
+        inferred_selection, inferred_line = map_claim_to_selection(claim, home_team_name, away_team_name)
         if inferred_selection:
-            claims_by_market_selection_line[claim["marketKey"]][f"{inferred_selection}_{inferred_line}"].append(claim)
+            key_line = str(inferred_line) if inferred_line is not None else "None"
+            claims_by_market_selection_line[claim["marketKey"]][f"{inferred_selection}_{key_line}"].append(claim)
         else:
             # If selection cannot be inferred, store by market only
             claims_by_market_selection_line[claim["marketKey"]]["general"].append(claim)
@@ -103,14 +117,17 @@ def score_predictions():
 
             # Try to find specific claims first
             matched_claims = []
-            key = f"{quote_selection}_{quote_line}" if quote_line else f"{quote_selection}_None"
+            key_line = str(quote_line) if quote_line is not None else "None"
+            key = f"{quote_selection}_{key_line}"
             if key in claims_by_market_selection_line[market]:
                 matched_claims.extend(claims_by_market_selection_line[market][key])
 
             # If no specific claims, try to find general claims that match the statement
+            # This part needs to be updated to use the new map_claim_to_selection with team names
             if not matched_claims and "general" in claims_by_market_selection_line[market]:
                 for claim in claims_by_market_selection_line[market]["general"]:
-                    inferred_selection, inferred_line = map_claim_to_selection(claim)
+                    # Ensure general claims are also checked with team names if they fit
+                    inferred_selection, inferred_line = map_claim_to_selection(claim, home_team_name, away_team_name)
                     if inferred_selection == quote_selection and inferred_line == quote_line:
                         matched_claims.append(claim)
 
@@ -146,12 +163,14 @@ def score_predictions():
                 model_probability,
                 quote["marketFairProbability"]
             )
+            # Ensure the prediction line is correctly set from the quote, not inferred from claim (if claim had null line)
+            final_line = quote_line if quote_line is not None else (inferred_line if inferred_line is not None else None)
 
             predictions.append({
                 "oddsQuoteId": quote["oddsQuoteId"],
                 "market": market,
                 "selection": quote_selection,
-                "line": quote_line,
+                "line": final_line,
                 "odds": quote["odds"],
                 "probability": implied_probability,
                 "modelProbability": model_probability,
