@@ -35,6 +35,8 @@ const REQUIRED_SKILLS = [
   'ensemble-disagreement-v1',
   'correlation-model-v1',
   'parlay-candidate-generator-v1',
+  'llm-parlay-all-in-v1',
+  'llm-parlay-refinado-v1',
   'parlay-portfolio-v1',
   'parlay-ranker-v1',
   'validation-clv-v1',

@@ -59,16 +59,17 @@ try {
     status: ok && (!notify || notifyResult?.status === 0) ? 'ok' : 'warning',
     date,
     timezone: TIMEZONE,
-    rows: [
-      ['Validate exit', validation.status ?? 'unknown'],
-      ['Metrics exit', metrics.status ?? 'unknown'],
-      ['Review exit', review.status ?? 'unknown'],
-      ['Notify exit', notifyResult?.status ?? (notify ? 'not-run' : 'disabled')],
-      ['Modelo', env.AGENT_MODEL],
-      ['Reasoning', env.AGENT_REASONING_EFFORT],
-      ['Target', gatewayTarget],
-    ],
-    artifacts: [reviewArtifact, logPath].filter(Boolean).map(compactPath),
+    bullets: [
+      `Validate exit: ${validation.status ?? 'unknown'}`,
+      `Metrics exit: ${metrics.status ?? 'unknown'}`,
+      `Review exit: ${review.status ?? 'unknown'}`,
+      `Notify exit: ${notifyResult?.status ?? (notify ? 'not-run' : 'disabled')}`,
+      `Modelo: ${env.AGENT_MODEL}`,
+      `Reasoning: ${env.AGENT_REASONING_EFFORT}`,
+      `Target: ${gatewayTarget}`,
+      reviewArtifact ? `Review: ${compactPath(reviewArtifact)}` : undefined,
+      `Log: ${compactPath(logPath)}`,
+    ].filter(Boolean),
     footer: ok ? '🧠 Revisión estratégica lista para lectura humana.' : '⚠️ Revisar logs antes de actuar.',
   }));
   process.exitCode = ok && (!notify || notifyResult?.status === 0) ? 0 : notifyResult?.status ?? review.status ?? 1;

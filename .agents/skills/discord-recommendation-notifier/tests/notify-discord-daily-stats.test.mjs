@@ -77,7 +77,7 @@ describe('discord daily stats notifier', () => {
     assert.match(payload.embeds[1].description, /💵 Stake 10/);
     assert.doesNotMatch(payload.embeds[1].description, /Expo/);
     assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
-    assert.match(payload.embeds[2].description, /> ✅ 🎯 Team C vs Team D: corners under 9.5 @ 1.82/);
+    assert.match(payload.embeds[2].description, /> ✅ ⛳ Team C vs Team D: corners under 9.5 @ 1.82/);
     assert.match(payload.embeds[2].description, /💵 Stake 5/);
     assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
     assert.doesNotMatch(message, /\bbet\b/i);

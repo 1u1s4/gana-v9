@@ -1,9 +1,25 @@
+import { spawnSync } from 'node:child_process';
+
 export const GANA_TELEGRAM_RICH_FOOTER = '🛡️ Review humano antes de promocionar · sin ejecución monetaria';
 
 export function renderCronRichSummary(input = {}) {
   const format = input.format || process.env.GANA_TELEGRAM_SUMMARY_FORMAT || 'markdown-console';
   if (format === 'telegram-html') return renderCronTelegramHtml(input);
   return renderCronMarkdownSummary(input);
+}
+
+export function emitCronRichSummary(input = {}) {
+  const message = renderCronRichSummary(input);
+  if (!isDirectTelegramEnabled()) {
+    console.log(message);
+    return { delivered: false, target: undefined };
+  }
+  const target = process.env.GANA_CRON_TELEGRAM_TARGET || 'telegram';
+  const result = sendViaHermesGateway(target, message);
+  if (result.success) return { delivered: true, target, result };
+  console.error(`direct telegram delivery failed: ${result.error || JSON.stringify(result)}`);
+  console.log(message);
+  return { delivered: false, target, result };
 }
 
 export function renderCronMarkdownSummary({
@@ -242,4 +258,37 @@ export function redactSensitiveText(value) {
     .replace(/\b\d{6,}:[A-Za-z0-9_-]{20,}\b/g, '[redacted-token]')
     .replace(/\b(?:ghp|gho|ghu|ghs|ghr|github_pat|sk|xoxb|xoxp|glpat)-[A-Za-z0-9_=-]{16,}\b/g, '[redacted-token]')
     .replace(/([?&](?:token|key|secret|api_key|apikey|access_token)=)[^&\s]+/gi, '$1[redacted]');
+}
+
+function isDirectTelegramEnabled() {
+  return /^(1|true|yes)$/i.test(process.env.GANA_CRON_DIRECT_TELEGRAM || '');
+}
+
+function sendViaHermesGateway(target, message) {
+  const hermesHome = process.env.HERMES_HOME || `${process.env.HOME}/.hermes`;
+  const python = process.env.HERMES_GATEWAY_PYTHON || `${hermesHome}/hermes-agent/venv/bin/python3`;
+  const agentRoot = process.env.HERMES_AGENT_ROOT || `${hermesHome}/hermes-agent`;
+  const payload = JSON.stringify({ action: 'send', target, message });
+  const script = [
+    'import json, sys',
+    'from tools.send_message_tool import send_message_tool',
+    'payload=json.loads(sys.stdin.read())',
+    'print(send_message_tool(payload))',
+  ].join('\n');
+  const result = spawnSync(python, ['-c', script], {
+    input: payload,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PYTHONPATH: `${agentRoot}${process.env.PYTHONPATH ? `:${process.env.PYTHONPATH}` : ''}`,
+    },
+    maxBuffer: 1024 * 1024,
+  });
+  if (result.error) return { success: false, error: result.error.message };
+  if (result.status !== 0) return { success: false, error: result.stderr || `exit ${result.status}` };
+  try {
+    return JSON.parse(result.stdout || '{}');
+  } catch {
+    return { success: false, error: `invalid gateway response: ${result.stdout}` };
+  }
 }

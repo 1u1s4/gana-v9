@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
-import { buildCronOutcome, compactPath, durationBetween, parseJsonObject, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
+import { buildCronOutcome, compactPath, durationBetween, emitCronRichSummary, parseJsonObject } from './gana-telegram-rich-output.mjs';
 import { countPublishableSelections, readCurrentRecommendationArtifact } from './lib/daily-e2e-wrapper-state.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
@@ -43,19 +43,19 @@ if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
     reason: 'not-before guard',
     artifacts: [outcomePath],
   }));
-  console.log(renderCronRichSummary({
+  emitCronRichSummary({
     title: 'Gana v9 · Daily E2E omitido',
     status: 'skipped',
     date,
     timezone: TIMEZONE,
-    rows: [
-      ['Motivo', 'not-before guard'],
-      ['Batch', dailyBatchId],
-      ['No antes de', notBefore],
-      ['Hora GT', guatemalaTimeParts()],
+    bullets: [
+      'Motivo: not-before guard',
+      `Batch: ${dailyBatchId}`,
+      `No antes de: ${notBefore}`,
+      `Hora GT: ${formatGuatemalaTime(guatemalaTimeParts())}`,
     ],
     footer: '⏭️ No se corrió nada todavía; el catch-up lo intenta de nuevo en ventana válida.',
-  }));
+  });
   process.exit(0);
 }
 let acquiredRunLock = false;
@@ -65,29 +65,31 @@ if (!args.force) {
 }
 if (!args.force && !acquiredRunLock) {
   const retryAfter = typeof existingRunLock?.retryAfter === 'string' ? existingRunLock.retryAfter : undefined;
+  const skip = describeExistingRunLock(existingRunLock, retryAfter);
   writeOutcome(buildCronOutcome({
     flow: 'daily-e2e',
     status: 'skipped',
     date,
     timezone: TIMEZONE,
     batchId: dailyBatchId,
-    reason: retryAfter ? 'retry pending' : 'lock active',
+    reason: skip.reason,
     artifacts: [lockPath, outcomePath],
     retryAfter,
   }));
-  console.log(renderCronRichSummary({
+  emitCronRichSummary({
     title: 'Gana v9 · Daily E2E omitido',
     status: 'skipped',
     date,
     timezone: TIMEZONE,
-    rows: [
-      ['Motivo', retryAfter ? 'retry pendiente tras run vacío/fallido' : 'ya corrió o sigue en curso'],
-      ['Batch', dailyBatchId],
-      ['Retry after', retryAfter],
-      ['Lock', compactPath(lockPath)],
-    ],
-    footer: '⏭️ Sin duplicar publicaciones; lock activo.',
-  }));
+    bullets: buildSkipBullets({
+      message: skip.message,
+      batchId: dailyBatchId,
+      lock: existingRunLock,
+      lockPath,
+      retryAfter,
+    }),
+    footer: skip.footer,
+  });
   process.exit(0);
 }
 const startedAt = new Date();
@@ -180,24 +182,28 @@ try {
     if (councilNotify.stderr.trim()) writeLogLine(logFd, councilNotify.stderr.trim());
     if (councilNotify.status !== 0) throw new Error(`council notification failed with exit ${councilNotify.status}`);
     const councilNotifyResult = parseJsonObject(councilNotify.stdout);
-    console.log(renderCronRichSummary({
+    emitCronRichSummary({
       title: 'Gana v9 · Daily E2E publicado',
       status: 'ok',
       date,
       timezone: TIMEZONE,
-      rows: [
-        ['Batch', dailyBatchId],
-        ['Publicables', selectionCount],
-        ['Daily recs', publishableCounts.recommendations],
-        ['Obligatorias', publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays],
-        ['Run exit', result.status ?? 'unknown'],
-        ['Duración', durationBetween(startedAt, completedAt)],
-        ['Discord recomendaciones', recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')],
-        ['Discord council', councilNotifyResult?.discordResult?.message_id],
-      ],
-      artifacts: [recommendationsPath, logPath, outcomePath].map(compactPath),
+      bullets: [
+        `Batch: ${dailyBatchId}`,
+        `Publicación: ${selectionCount} selections · ${publishableCounts.recommendations} recommendations`,
+        `Obligatorias: ${publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays}`,
+        `Run: exit ${result.status ?? 'unknown'} · ${durationBetween(startedAt, completedAt)}`,
+        recommendationNotify?.discordResult?.message_id || recommendationNotify?.discordResults?.length
+          ? `Discord recomendaciones: ${recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')}`
+          : undefined,
+        councilNotifyResult?.discordResult?.message_id
+          ? `Discord council: ${councilNotifyResult.discordResult.message_id}`
+          : undefined,
+        `Recommendations: ${compactPath(recommendationsPath)}`,
+        `Log: ${compactPath(logPath)}`,
+        `Outcome: ${compactPath(outcomePath)}`,
+      ].filter(Boolean),
       footer: '🛡️ Revisión manual requerida antes de promoción · sin ejecución monetaria',
-    }));
+    });
     if (acquiredRunLock) {
       writeLock(lockPath, {
         date,
@@ -231,7 +237,7 @@ try {
         { label: 'log', path: logPath },
         { label: 'outcome', path: outcomePath },
       ],
-    }));
+    });
     if (result.status !== 0) {
       writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
     }
@@ -258,23 +264,23 @@ try {
       ].join('\n'),
       color: 0xf2994a,
     });
-    console.log(renderCronRichSummary({
+    emitCronRichSummary({
       title: 'Gana v9 · Daily E2E requiere revisión',
       status: 'warning',
       date,
       timezone: TIMEZONE,
-      rows: [
-        ['Batch', dailyBatchId],
-        ['Exit', result.status ?? 'unknown'],
-        ['Signal', result.signal ?? 'none'],
-        ['Duración', durationBetween(startedAt, completedAt)],
-        ['Artifact gate', artifactState.reason],
-        ['Publicables', selectionCount],
-        ['Discord alertas', discordTargets.alerts],
-      ],
-      artifacts: [latest, logPath, outcomePath].filter(Boolean).map(compactPath),
+      bullets: [
+        `Batch: ${dailyBatchId}`,
+        `Run: exit ${result.status ?? 'unknown'} · signal ${result.signal ?? 'none'} · ${durationBetween(startedAt, completedAt)}`,
+        `Artifact gate: ${artifactState.reason}`,
+        `Publicables: ${selectionCount}`,
+        `Discord alertas: ${discordTargets.alerts}`,
+        latest ? `Latest: ${compactPath(latest)}` : undefined,
+        `Log: ${compactPath(logPath)}`,
+        `Outcome: ${compactPath(outcomePath)}`,
+      ].filter(Boolean),
       footer: '⚠️ Revisar logs antes de promoción; no se enviaron recomendaciones vacías.',
-    }));
+    });
     writeOutcome(buildCronOutcome({
       flow: 'daily-e2e',
       status: 'review-required',
@@ -294,7 +300,7 @@ try {
         { label: 'log', path: logPath },
         { label: 'outcome', path: outcomePath },
       ],
-    }));
+    });
     process.exitCode = result.status === 0 ? 1 : result.status ?? 1;
   }
 } finally {
@@ -374,6 +380,67 @@ function writeLock(path, payload) {
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
+function describeExistingRunLock(lock, retryAfter) {
+  const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
+  if (retryAfter || status === 'retryable') {
+    return {
+      reason: 'retry pending',
+      message: 'retry pendiente tras run vacío/fallido',
+      footer: '⏭️ Sin duplicar publicaciones; esperando ventana de retry.',
+    };
+  }
+  if (status === 'published') {
+    return {
+      reason: 'already published',
+      message: 'ya corrió y publicó recomendaciones',
+      footer: '⏭️ Sin duplicar publicaciones; batch ya publicado.',
+    };
+  }
+  if (status === 'running') {
+    return {
+      reason: 'run in progress',
+      message: 'sigue en curso',
+      footer: '⏭️ Sin duplicar publicaciones; ejecución activa.',
+    };
+  }
+  if (status === 'completed' || status === 'succeeded') {
+    return {
+      reason: 'already completed',
+      message: 'ya corrió y completó',
+      footer: '⏭️ Sin duplicar publicaciones; batch ya completado.',
+    };
+  }
+  if (status === 'failed' || status === 'blocked') {
+    return {
+      reason: `previous ${status}`,
+      message: `corrida previa quedó ${status}`,
+      footer: '⏭️ Sin duplicar publicaciones; revisar lock antes de rerun forzado.',
+    };
+  }
+  return {
+    reason: 'lock active unknown status',
+    message: `lock activo con estado no reconocido: ${status}`,
+    footer: '⏭️ Sin duplicar publicaciones; lock activo.',
+  };
+}
+
+function buildSkipBullets({ message, batchId, lock, lockPath, retryAfter }) {
+  const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
+  const completedAt = typeof lock?.completedAt === 'string' ? lock.completedAt : undefined;
+  const selectionCount = Number.isFinite(lock?.selectionCount) ? lock.selectionCount : undefined;
+  const recommendationCount = Number.isFinite(lock?.recommendationCount) ? lock.recommendationCount : undefined;
+  return [
+    `Motivo: ${message}`,
+    `Batch: ${batchId}`,
+    `Lock: ${status}${completedAt ? ` · completed ${completedAt}` : ''}`,
+    selectionCount !== undefined || recommendationCount !== undefined
+      ? `Publicación: ${selectionCount ?? 0} selections · ${recommendationCount ?? 0} recommendations`
+      : undefined,
+    retryAfter ? `Retry after: ${retryAfter}` : undefined,
+    `Path: ${compactPath(lockPath)}`,
+  ].filter(Boolean);
+}
+
 function writeOutcome(payload) {
   mkdirSync(dirname(outcomePath), { recursive: true });
   writeFileSync(outcomePath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -425,6 +492,13 @@ function guatemalaTimeParts() {
     minute: Number(parts.minute),
     second: Number(parts.second),
   };
+}
+
+function formatGuatemalaTime(parts) {
+  const hh = String(parts.hour).padStart(2, '0');
+  const mm = String(parts.minute).padStart(2, '0');
+  const ss = String(parts.second).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
 }
 
 function requireValue(argv, index, flag) {

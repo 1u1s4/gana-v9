@@ -849,3 +849,24 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Add sample-size guarded model-market cooldowns (proposed) — src/daily/recommendation-policy.ts, src/scoring/edge-gate.ts, src/prediction/gates.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
 - [high] Promote only buckets with fresh validation coverage (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/strategy-review/daily.ts, src/validation/service.ts
 - [medium] Rebalance low-odds coverage away from weak h2h exposure (proposed) — src/filters/low-odds-selector.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-06-15 · strategy-2026-06-14
+
+- Run: strategy-review-2026-06-14-c5fa83f8
+- Dates: 2026-06-14
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-14-c5fa83f8/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-14-c5fa83f8/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 40-29 hit 58.0% (113 total)
+- Parlays: 0-5 hit 0.0% (6 total)
+
+### Proposed Modifications
+
+- [high] Suppress duplicate parlay leg sets before persistence and validation (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts
+- [high] Quarantine weak parlay profiles from daily portfolio-v2 generation (ready-for-implementation) — src/daily/e2e.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts
+- [high] Add market-specific h2h promotion and parlay eligibility gates (ready-for-implementation) — src/prediction/service.ts, src/prediction/gates.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+- [high] Cap effective confidence for brittle BTTS and mid-price totals legs (ready-for-implementation) — src/prediction/service.ts, src/parlay/rules.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, skills/score-prediction-v2/prompt.md
+- [high] Make validation freshness bucket-aware by market, profile, provider, and model (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts
+- [medium] Add rolling model calibration demotion instead of static model lists only (proposed) — src/metrics/daily.ts, src/daily/recommendation-policy.ts, src/prediction/service.ts

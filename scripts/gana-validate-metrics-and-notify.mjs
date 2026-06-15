@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
@@ -18,17 +18,20 @@ const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${runSlug}.log`);
 const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `${runSlug}.lock`);
 
 mkdirSync(dirname(logPath), { recursive: true });
-if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, startedAt: new Date().toISOString() })) {
+const existingRunLock = !args.force && existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
+if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, status: 'running', startedAt: new Date().toISOString() })) {
+  const skip = describeValidationLock(existingRunLock);
   console.log(renderCronRichSummary({
     title: 'Gana v9 · Validación omitida',
     status: 'skipped',
     date,
     timezone: TIMEZONE,
-    rows: [
-      ['Motivo', 'ya corrió o sigue en curso'],
-      ['Lock', compactPath(lockPath)],
-    ],
-    footer: '⏭️ Sin duplicar validaciones.',
+    bullets: buildValidationSkipBullets({
+      message: skip.message,
+      lock: existingRunLock,
+      lockPath,
+    }),
+    footer: skip.footer,
   }));
   process.exit(0);
 }
@@ -102,17 +105,38 @@ try {
       status: validation.status === 0 ? 'ok' : 'review',
       date,
       timezone: TIMEZONE,
-      rows: [
-        ['Validate exit', validation.status ?? 'unknown'],
-        ['Metrics exit', metrics.status ?? 'unknown'],
-        ['Discord stats', notifyResult?.discordResult?.message_id ?? notifyResult?.message_id],
-        ['Discord feedback', feedbackResult?.discordResult?.message_id],
-      ],
-      artifacts: [recommendationArtifact, validationsArtifact, metricsArtifact, logPath].filter(Boolean).map(compactPath),
+      bullets: [
+        `Validate exit: ${validation.status ?? 'unknown'}`,
+        `Metrics exit: ${metrics.status ?? 'unknown'}`,
+        notifyResult?.discordResult?.message_id || notifyResult?.message_id
+          ? `Discord stats: ${notifyResult?.discordResult?.message_id ?? notifyResult?.message_id}`
+          : undefined,
+        feedbackResult?.discordResult?.message_id
+          ? `Discord feedback: ${feedbackResult.discordResult.message_id}`
+          : undefined,
+        recommendationArtifact ? `Recommendations: ${compactPath(recommendationArtifact)}` : undefined,
+        validationsArtifact ? `Validations: ${compactPath(validationsArtifact)}` : undefined,
+        metricsArtifact ? `Metrics: ${compactPath(metricsArtifact)}` : undefined,
+        `Log: ${compactPath(logPath)}`,
+      ].filter(Boolean),
       footer: validation.status === 0
         ? '✅ Validación/métricas publicadas · revisar antes de ajustar promoción'
         : '⚠️ Validación con revisión pendiente · no maquillar resultados',
     }));
+    writeLock(lockPath, {
+      date,
+      runSlug,
+      status: 'published',
+      validationExit: validation.status ?? null,
+      metricsExit: metrics.status ?? null,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      artifacts: [recommendationArtifact, validationsArtifact, metricsArtifact, logPath].filter(Boolean),
+      notifications: {
+        stats: notifyResult?.discordResult?.message_id ?? notifyResult?.message_id,
+        feedback: feedbackResult?.discordResult?.message_id,
+      },
+    });
     process.exitCode = validation.status === 0 ? 0 : validation.status ?? 1;
     handled = true;
   }
@@ -139,14 +163,27 @@ try {
       status: 'warning',
       date,
       timezone: TIMEZONE,
-      rows: [
-        ['Validate exit', validation.status ?? 'unknown'],
-        ['Metrics exit', metrics.status ?? 'unknown'],
-        ['Discord alertas', discordTargets.alerts],
-      ],
-      artifacts: [validationsArtifact, metricsArtifact, logPath].filter(Boolean).map(compactPath),
+      bullets: [
+        `Validate exit: ${validation.status ?? 'unknown'}`,
+        `Metrics exit: ${metrics.status ?? 'unknown'}`,
+        `Discord alertas: ${discordTargets.alerts}`,
+        validationsArtifact ? `Validations: ${compactPath(validationsArtifact)}` : undefined,
+        metricsArtifact ? `Metrics: ${compactPath(metricsArtifact)}` : undefined,
+        `Log: ${compactPath(logPath)}`,
+      ].filter(Boolean),
       footer: '⚠️ Revisar logs antes de ajustar promoción.',
     }));
+    writeLock(lockPath, {
+      date,
+      runSlug,
+      status: 'review-required',
+      validationExit: validation.status ?? null,
+      metricsExit: metrics.status ?? null,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      artifacts: [validationsArtifact, metricsArtifact, logPath].filter(Boolean),
+      notifications: { alerts: discordTargets.alerts },
+    });
     process.exitCode = metrics.status ?? validation.status ?? 1;
   }
 } finally {
@@ -200,6 +237,59 @@ function acquireOnce(path, ttlMs, payload) {
     closeSync(fd);
   }
   return true;
+}
+
+function readJsonFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return undefined;
+  }
+}
+
+function writeLock(path, payload) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function describeValidationLock(lock) {
+  const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
+  if (status === 'published') {
+    return {
+      message: 'ya corrió y publicó validación/métricas',
+      footer: '⏭️ Sin duplicar validaciones; batch ya publicado.',
+    };
+  }
+  if (status === 'running') {
+    return {
+      message: 'sigue en curso',
+      footer: '⏭️ Sin duplicar validaciones; ejecución activa.',
+    };
+  }
+  if (status === 'review-required') {
+    return {
+      message: 'corrida previa requiere revisión',
+      footer: '⏭️ Sin duplicar validaciones; revisar resultado previo.',
+    };
+  }
+  return {
+    message: `lock activo con estado no reconocido: ${status}`,
+    footer: '⏭️ Sin duplicar validaciones; lock activo.',
+  };
+}
+
+function buildValidationSkipBullets({ message, lock, lockPath }) {
+  const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
+  const completedAt = typeof lock?.completedAt === 'string' ? lock.completedAt : undefined;
+  return [
+    `Motivo: ${message}`,
+    `Lock: ${status}${completedAt ? ` · completed ${completedAt}` : ''}`,
+    Number.isFinite(lock?.validationExit) ? `Validate exit: ${lock.validationExit}` : undefined,
+    Number.isFinite(lock?.metricsExit) ? `Metrics exit: ${lock.metricsExit}` : undefined,
+    lock?.notifications?.stats ? `Discord stats: ${lock.notifications.stats}` : undefined,
+    lock?.notifications?.feedback ? `Discord feedback: ${lock.notifications.feedback}` : undefined,
+    `Path: ${compactPath(lockPath)}`,
+  ].filter(Boolean);
 }
 
 function guatemalaDate(offsetDays) {
