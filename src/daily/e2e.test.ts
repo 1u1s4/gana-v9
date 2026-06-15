@@ -1475,11 +1475,199 @@ describe('runDailyE2E', () => {
     assert.equal(new Set(signatures).size, 3);
     assert.equal(selected.every((projection) => projection.legs.length === 2), true);
     assert.equal(selected.every((projection) => new Set(projection.legs.map((leg) => leg.fixtureId)).size === 2), true);
-    assert.equal(selected.find((projection) => projection.profile === 'resultados')?.legs.every((leg) => leg.market === 'h2h'), true);
+    assert.equal(selected.find((projection) => projection.profile === 'resultados')?.legs.every((leg) => leg.market !== 'corners_over_under'), true);
     assert.equal(selected.every((projection) => (projection.expectedEdge ?? 0) > 0), true);
     assert.deepEqual(artifact.recommendationPolicy.parlayProfiles, ['principal', 'resultados', 'mixto-seguro']);
     assert.equal(artifact.goalCheck.status, 'passed');
     assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'three-parlay-approaches')?.status, 'passed');
+  });
+
+  it('prefers safety-first required-league parlays from double chance and conservative totals', () => {
+    const fixtures = [
+      {
+        ...fixture('2026-06-13T19:00:00.000Z'),
+        id: 'fixture-qatar-switzerland',
+        providerFixtureId: '1489373',
+        leagueId: 1,
+        season: 2026,
+        competitionName: 'World Cup',
+        homeTeamName: 'Qatar',
+        awayTeamName: 'Switzerland',
+      },
+      {
+        ...fixture('2026-06-13T22:00:00.000Z'),
+        id: 'fixture-brazil-morocco',
+        providerFixtureId: '1489371',
+        leagueId: 1,
+        season: 2026,
+        competitionName: 'World Cup',
+        homeTeamName: 'Brazil',
+        awayTeamName: 'Morocco',
+      },
+      {
+        ...fixture('2026-06-14T01:00:00.000Z'),
+        id: 'fixture-haiti-scotland',
+        providerFixtureId: '1489372',
+        leagueId: 1,
+        season: 2026,
+        competitionName: 'World Cup',
+        homeTeamName: 'Haiti',
+        awayTeamName: 'Scotland',
+      },
+      {
+        ...fixture('2026-06-14T04:00:00.000Z'),
+        id: 'fixture-australia-turkiye',
+        providerFixtureId: '1539001',
+        leagueId: 1,
+        season: 2026,
+        competitionName: 'World Cup',
+        homeTeamName: 'Australia',
+        awayTeamName: 'Türkiye',
+      },
+    ];
+    const dc = (
+      fixtureId: string,
+      providerFixtureId: string,
+      id: string,
+      selection: string,
+      odds: number,
+      confidence: number,
+    ) => ({
+      ...highConfidencePrediction('codex-run-safety'),
+      id,
+      fixtureId,
+      providerFixtureId,
+      market: 'double_chance',
+      selection,
+      line: null,
+      odds,
+      impliedProbability: 1 / odds,
+      confidence,
+      edge: -0.02,
+      status: 'blocked',
+      warnings: ['double_chance fair probability was inconsistent with low-price implied probability', 'edge below configured minimum 0'],
+    });
+    const total = (
+      fixtureId: string,
+      providerFixtureId: string,
+      id: string,
+      selection: string,
+      line: number,
+      odds: number,
+      confidence: number,
+    ) => ({
+      ...highConfidencePrediction('codex-run-safety'),
+      id,
+      fixtureId,
+      providerFixtureId,
+      market: 'goals_over_under',
+      selection,
+      line,
+      odds,
+      impliedProbability: 1 / odds,
+      confidence,
+      edge: 0.01,
+      status: 'review-required',
+      warnings: ['manual review required before promotion'],
+    });
+    const cover = (
+      fixtureId: string,
+      providerFixtureId: string,
+      id: string,
+      selection: string,
+    ) => ({
+      ...highConfidencePrediction('codex-run-safety'),
+      id,
+      fixtureId,
+      providerFixtureId,
+      market: 'h2h',
+      selection,
+      line: null,
+      odds: 1.8,
+      impliedProbability: 1 / 1.8,
+      confidence: 0.62,
+      edge: 0.01,
+      status: 'review-required',
+      warnings: ['coverage prediction for required-league atomic projection'],
+    });
+    const artifact = buildRequiredLeagueRecommendations({
+      dailyBatchId: 'daily-world-cup-required-safety',
+      date: '2026-06-13',
+      generatedAt: '2026-06-13T13:30:00.000Z',
+      providers: ['codex'],
+      timezone: 'America/Guatemala',
+      resolveModel: () => 'gpt-5.5',
+      requiredLeagues: [{ providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 }],
+      providerPipelineResults: {
+        codex: {
+          ok: true,
+          runId: 'codex-run-safety',
+          date: '2026-06-13',
+          status: 'succeeded',
+          verdict: 'review-required',
+          fixtures,
+          scoring: fixtures.map((item) => ({
+            ok: true,
+            runId: 'codex-run-safety',
+            fixtureId: item.id,
+            providerFixtureId: item.providerFixtureId,
+            gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+            predictions: [
+              item.id === 'fixture-qatar-switzerland'
+                ? cover(item.id, item.providerFixtureId, 'qatar-switzerland-cover', 'away')
+                : item.id === 'fixture-brazil-morocco'
+                  ? cover(item.id, item.providerFixtureId, 'brazil-morocco-cover', 'home')
+                  : item.id === 'fixture-haiti-scotland'
+                    ? cover(item.id, item.providerFixtureId, 'haiti-scotland-cover', 'away')
+                    : cover(item.id, item.providerFixtureId, 'australia-turkiye-cover', 'away'),
+              item.id === 'fixture-qatar-switzerland'
+                ? dc(item.id, item.providerFixtureId, 'qatar-switzerland-dc', 'draw_or_away', 1.05, 0.54)
+                : item.id === 'fixture-brazil-morocco'
+                  ? dc(item.id, item.providerFixtureId, 'brazil-morocco-dc', 'home_or_draw', 1.14, 0.51)
+                  : item.id === 'fixture-haiti-scotland'
+                    ? dc(item.id, item.providerFixtureId, 'haiti-scotland-dc', 'draw_or_away', 1.17, 0.56)
+                    : dc(item.id, item.providerFixtureId, 'australia-turkiye-dc', 'draw_or_away', 1.17, 0.58),
+              ...(item.id === 'fixture-qatar-switzerland'
+                ? [total(item.id, item.providerFixtureId, 'qatar-over-15', 'over', 1.5, 1.3, 0.6)]
+                : []),
+              ...(item.id === 'fixture-haiti-scotland'
+                ? [total(item.id, item.providerFixtureId, 'haiti-under-35', 'under', 3.5, 1.36, 0.61)]
+                : []),
+            ],
+          })),
+        } as any,
+      },
+    });
+
+    const principal = artifact.parlayProjections.find((projection) => projection.profile === 'principal');
+    const resultados = artifact.parlayProjections.find((projection) => projection.profile === 'resultados');
+    const mixto = artifact.parlayProjections.find((projection) => projection.profile === 'mixto-seguro');
+
+    assert.equal(artifact.goalCheck.status, 'passed');
+    assert.equal(principal?.status, 'selected');
+    assert.equal(principal?.legs.length, 4);
+    assert.equal(principal?.legs.every((leg) => leg.market === 'double_chance'), true);
+    assert.deepEqual(principal?.legs.map((leg) => `${leg.fixture}:${leg.selection}`), [
+      'Qatar vs Switzerland:draw_or_away',
+      'Brazil vs Morocco:home_or_draw',
+      'Haiti vs Scotland:draw_or_away',
+      'Australia vs Türkiye:draw_or_away',
+    ]);
+    assert.equal(resultados?.status, 'selected');
+    assert.deepEqual(resultados?.legs.map((leg) => `${leg.fixture}:${leg.market}:${leg.selection}:${leg.line}`), [
+      'Qatar vs Switzerland:goals_over_under:over:1.5',
+      'Haiti vs Scotland:goals_over_under:under:3.5',
+    ]);
+    assert.equal(mixto?.status, 'selected');
+    assert.deepEqual(mixto?.legs.map((leg) => `${leg.fixture}:${leg.selection}`), [
+      'Qatar vs Switzerland:draw_or_away',
+      'Brazil vs Morocco:home_or_draw',
+    ]);
+    assert.ok((principal?.aggregateConfidence ?? 0) > 0.6);
+    assert.ok((resultados?.aggregateConfidence ?? 0) > 0.5);
+    assert.ok((mixto?.aggregateConfidence ?? 0) > 0.8);
+    assert.equal(principal?.riskFlags.includes('market-implied-safety-confidence'), true);
+    assert.equal(principal?.riskFlags.includes('blocked-leg-safety-override'), true);
   });
 
   it('blocks required-league parlays when aggregate confidence remains weak after atomic reruns', () => {

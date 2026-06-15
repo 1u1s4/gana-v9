@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "parlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The title of the parlay."
+          },
+          "predictionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "The IDs of the predictions included in the parlay."
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "description": "The rationale for selecting these legs and omitting others."
+          },
+          "riskNotes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "Notes on the potential risks of the parlay."
+            }
+          }
+        },
+        "required": ["title", "predictionIds", "rationale", "riskNotes"]
+      }
+    },
+    "noParlayReason": {
+      "type": "string",
+      "description": "The reason why no parlay was generated."
+    }
+  },
+  "required": []
+}

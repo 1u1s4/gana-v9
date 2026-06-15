@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
+import { compactPath, parseJsonObject, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -31,16 +32,19 @@ const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `daily-e2e-$
 
 mkdirSync(dirname(logPath), { recursive: true });
 if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
-  console.log(JSON.stringify({
-    ok: true,
-    skipped: true,
-    reason: 'daily-e2e not-before guard',
+  console.log(renderCronRichSummary({
+    title: 'Gana v9 · Daily E2E omitido',
+    status: 'skipped',
     date,
-    dailyBatchId,
-    notBefore,
     timezone: TIMEZONE,
-    now: guatemalaTimeParts(),
-  }, null, 2));
+    rows: [
+      ['Motivo', 'not-before guard'],
+      ['Batch', dailyBatchId],
+      ['No antes de', notBefore],
+      ['Hora GT', guatemalaTimeParts()],
+    ],
+    footer: '⏭️ No se corrió nada todavía; el catch-up lo intenta de nuevo en ventana válida.',
+  }));
   process.exit(0);
 }
 let acquiredRunLock = false;
@@ -50,15 +54,19 @@ if (!args.force) {
 }
 if (!args.force && !acquiredRunLock) {
   const retryAfter = typeof existingRunLock?.retryAfter === 'string' ? existingRunLock.retryAfter : undefined;
-  console.log(JSON.stringify({
-    ok: true,
-    skipped: true,
-    reason: retryAfter ? 'daily-e2e retry pending after empty or failed run' : 'daily-e2e already ran or is running for this date',
+  console.log(renderCronRichSummary({
+    title: 'Gana v9 · Daily E2E omitido',
+    status: 'skipped',
     date,
-    dailyBatchId,
-    lockPath,
-    ...(retryAfter ? { retryAfter } : {}),
-  }, null, 2));
+    timezone: TIMEZONE,
+    rows: [
+      ['Motivo', retryAfter ? 'retry pendiente tras run vacío/fallido' : 'ya corrió o sigue en curso'],
+      ['Batch', dailyBatchId],
+      ['Retry after', retryAfter],
+      ['Lock', compactPath(lockPath)],
+    ],
+    footer: '⏭️ Sin duplicar publicaciones; lock activo.',
+  }));
   process.exit(0);
 }
 const startedAt = new Date();
@@ -128,7 +136,7 @@ try {
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
     sentRecommendations = true;
-    console.log(notify.stdout.trim());
+    const recommendationNotify = parseJsonObject(notify.stdout);
     const councilNotify = spawnSync('node', [
       'scripts/gana-council-review-notify.mjs',
       '--artifact', recommendationsPath,
@@ -143,7 +151,22 @@ try {
     writeLogLine(logFd, councilNotify.stdout.trim());
     if (councilNotify.stderr.trim()) writeLogLine(logFd, councilNotify.stderr.trim());
     if (councilNotify.status !== 0) throw new Error(`council notification failed with exit ${councilNotify.status}`);
-    console.log(councilNotify.stdout.trim());
+    const councilNotifyResult = parseJsonObject(councilNotify.stdout);
+    console.log(renderCronRichSummary({
+      title: 'Gana v9 · Daily E2E publicado',
+      status: 'ok',
+      date,
+      timezone: TIMEZONE,
+      rows: [
+        ['Batch', dailyBatchId],
+        ['Selecciones', selectionCount],
+        ['Run exit', result.status ?? 'unknown'],
+        ['Discord recomendaciones', recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')],
+        ['Discord council', councilNotifyResult?.discordResult?.message_id],
+      ],
+      artifacts: [recommendationsPath, logPath].map(compactPath),
+      footer: '🛡️ Revisión manual requerida antes de promoción · sin ejecución monetaria',
+    }));
     if (result.status !== 0) {
       writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
     }
@@ -167,7 +190,20 @@ try {
       ].join('\n'),
       color: 0xf2994a,
     });
-    console.log(JSON.stringify({ ok: false, date, dailyBatchId, logPath, recommendationsPath: latest, status: result.status, signal: result.signal, discordTargets }, null, 2));
+    console.log(renderCronRichSummary({
+      title: 'Gana v9 · Daily E2E requiere revisión',
+      status: 'warning',
+      date,
+      timezone: TIMEZONE,
+      rows: [
+        ['Batch', dailyBatchId],
+        ['Exit', result.status ?? 'unknown'],
+        ['Signal', result.signal ?? 'none'],
+        ['Discord alertas', discordTargets.alerts],
+      ],
+      artifacts: [latest, logPath].filter(Boolean).map(compactPath),
+      footer: '⚠️ Revisar logs antes de promoción; no se enviaron recomendaciones vacías.',
+    }));
     process.exitCode = result.status ?? 1;
   }
 } finally {

@@ -1,0 +1,10 @@
+{
+  "id": "llm-parlay-all-in-v1",
+  "version": "1.0",
+  "title": "LLM Parlay All-In V1",
+  "description": "Selects the safest analytical soccer accumulator from a guarded prediction pool.",
+  "purpose": "To create a single, safe, multi-leg parlay from a pool of predictions.",
+  "inputs": ["predictionPool"],
+  "outputSchema": "output.schema.json",
+  "promptSha256": "62b5dd8ae8eb1199e1606226fd1d7c5b36adcd932b992e13af125d9485f9e4f2"
+}

@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
+import { compactPath, parseJsonObject, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -18,7 +19,17 @@ const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `${runSlug}.
 
 mkdirSync(dirname(logPath), { recursive: true });
 if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, startedAt: new Date().toISOString() })) {
-  console.log(JSON.stringify({ ok: true, skipped: true, reason: 'validation already ran or is running for this date', date, lockPath }, null, 2));
+  console.log(renderCronRichSummary({
+    title: 'Gana v9 · Validación omitida',
+    status: 'skipped',
+    date,
+    timezone: TIMEZONE,
+    rows: [
+      ['Motivo', 'ya corrió o sigue en curso'],
+      ['Lock', compactPath(lockPath)],
+    ],
+    footer: '⏭️ Sin duplicar validaciones.',
+  }));
   process.exit(0);
 }
 const startedAt = Date.now();
@@ -66,7 +77,8 @@ try {
     writeLogLine(logFd, notify.stdout.trim());
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`validation notification failed with exit ${notify.status}`);
-    console.log(notify.stdout.trim());
+    const notifyResult = parseJsonObject(notify.stdout);
+    let feedbackResult;
     if (recommendationArtifact && validationsArtifact) {
       const feedback = spawnSync('node', [
         'scripts/gana-council-feedback.mjs',
@@ -83,8 +95,24 @@ try {
       writeLogLine(logFd, feedback.stdout.trim());
       if (feedback.stderr.trim()) writeLogLine(logFd, feedback.stderr.trim());
       if (feedback.status !== 0) throw new Error(`council feedback failed with exit ${feedback.status}`);
-      console.log(feedback.stdout.trim());
+      feedbackResult = parseJsonObject(feedback.stdout);
     }
+    console.log(renderCronRichSummary({
+      title: 'Gana v9 · Validación publicada',
+      status: validation.status === 0 ? 'ok' : 'review',
+      date,
+      timezone: TIMEZONE,
+      rows: [
+        ['Validate exit', validation.status ?? 'unknown'],
+        ['Metrics exit', metrics.status ?? 'unknown'],
+        ['Discord stats', notifyResult?.discordResult?.message_id ?? notifyResult?.message_id],
+        ['Discord feedback', feedbackResult?.discordResult?.message_id],
+      ],
+      artifacts: [recommendationArtifact, validationsArtifact, metricsArtifact, logPath].filter(Boolean).map(compactPath),
+      footer: validation.status === 0
+        ? '✅ Validación/métricas publicadas · revisar antes de ajustar promoción'
+        : '⚠️ Validación con revisión pendiente · no maquillar resultados',
+    }));
     process.exitCode = validation.status === 0 ? 0 : validation.status ?? 1;
     handled = true;
   }
@@ -106,7 +134,19 @@ try {
         color: 0xf2994a,
       }],
     });
-    console.log(JSON.stringify({ ok: false, date, logPath, validationsArtifact, metricsArtifact, validationStatus: validation.status, metricsStatus: metrics.status, discordTargets }, null, 2));
+    console.log(renderCronRichSummary({
+      title: 'Gana v9 · Validaciones requieren revisión',
+      status: 'warning',
+      date,
+      timezone: TIMEZONE,
+      rows: [
+        ['Validate exit', validation.status ?? 'unknown'],
+        ['Metrics exit', metrics.status ?? 'unknown'],
+        ['Discord alertas', discordTargets.alerts],
+      ],
+      artifacts: [validationsArtifact, metricsArtifact, logPath].filter(Boolean).map(compactPath),
+      footer: '⚠️ Revisar logs antes de ajustar promoción.',
+    }));
     process.exitCode = metrics.status ?? validation.status ?? 1;
   }
 } finally {

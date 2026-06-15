@@ -119,19 +119,23 @@ describe('discord recommendation notifier', () => {
     const titles = payload.embeds.map((embed) => embed.title ?? '');
     const requiredEmbed = payload.embeds.find((embed) => /^🌍 Obligatorio/.test(embed.title ?? ''));
     const predictionEmbed = payload.embeds.find((embed) => /^📌 Predicciones obligatorias/.test(embed.title ?? ''));
-    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
+    const principalEmbed = payload.embeds.find((embed) => /^1️⃣ 💎 principal/.test(embed.title ?? ''));
+    const resultadosEmbed = payload.embeds.find((embed) => /^2️⃣ 🚫 ⚽ resultados/.test(embed.title ?? ''));
 
     assert.deepEqual(titles, [
       '🏆 Gana v9 · Recomendaciones',
       '1️⃣ ⚖️ Team A vs Team B',
       '🌍 Obligatorio · World Cup',
       '📌 Predicciones obligatorias · World Cup',
-      '🎛️ Parlays obligatorios · World Cup',
+      '1️⃣ 💎 principal · Canada vs Bosnia & Herzegovina',
+      '2️⃣ 🚫 ⚽ resultados',
+      '3️⃣ 🚫 🧩 mixto-seguro',
       '',
     ]);
     assert.ok(requiredEmbed);
     assert.ok(predictionEmbed);
-    assert.ok(parlayEmbed);
+    assert.ok(principalEmbed);
+    assert.ok(resultadosEmbed);
     assert.match(payload.embeds[0].description, /📅 Diario: 📦 1 parlay · 📌 0 simples/);
     assert.match(payload.embeds[0].description, /🌍 Obligatorio World Cup: 🟡 📦 1 parlay · 📌 1 predicción/);
     assert.match(payload.embeds[0].description, /📊 Total enviado: 📦 2 parlays · 📌 1 predicción/);
@@ -141,16 +145,159 @@ describe('discord recommendation notifier', () => {
     assert.match(requiredEmbed.description, /📌 1 predicción obligatoria · 🎛️ 1\/3 parlays seleccionados/);
     assert.match(predictionEmbed.description, /✅ Canada vs Bosnia & Herzegovina/);
     assert.match(predictionEmbed.description, /Canada gana @ 1.87/);
-    assert.match(parlayEmbed.description, /💎 principal/);
-    assert.doesNotMatch(parlayEmbed.description, /✅ 💎 principal · 1 selección/);
-    assert.match(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
-    assert.match(parlayEmbed.description, /📊 Cuota 1.22 · 🍀 Conf 63%/);
-    assert.match(parlayEmbed.description, /🚫 ⚽ resultados/);
+    assert.doesNotMatch(predictionEmbed.description, /Edge|codex|gemini/);
+    assert.doesNotMatch(principalEmbed.description, /✅ 💎 principal · 1 selección/);
+    assert.match(principalEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
+    assert.match(principalEmbed.description, /📊 Odds 1.22 · 🍀 Conf 63%/);
+    assert.match(resultadosEmbed.description, /No publicado/);
     assert.doesNotMatch(JSON.stringify(payload), /Sin selecciones/);
     assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
   });
 
-  it('prints kickoff times in Guatemala time for daily and required fixtures', () => {
+  it('prints every required parlay leg up to the native compact limit', () => {
+    const artifact = sampleArtifactWithRequiredLeague();
+    const principal = artifact.requiredLeagueRecommendations.parlayProjections[0];
+    principal.combinedOdds = 1.64;
+    principal.aggregateConfidence = 0.6103;
+    principal.legs = [
+      requiredParlayLeg('Qatar vs Switzerland', 'double_chance', 'draw_or_away', 1.05),
+      requiredParlayLeg('Brazil vs Morocco', 'double_chance', 'home_or_draw', 1.14),
+      requiredParlayLeg('Haiti vs Scotland', 'double_chance', 'draw_or_away', 1.17),
+      requiredParlayLeg('Australia vs Türkiye', 'double_chance', 'draw_or_away', 1.17),
+    ];
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const parlayEmbed = payload.embeds.find((embed) => /^1️⃣ 💎 principal/.test(embed.title ?? ''));
+
+    assert.ok(parlayEmbed);
+    assert.match(parlayEmbed.title, /Qatar vs Switzerland \+ Brazil vs Morocco \+ Haiti vs Scotland \+ Australia vs Türkiye/);
+    assert.match(parlayEmbed.description, /Qatar vs Switzerland: Empate o Switzerland @ 1\.05/);
+    assert.match(parlayEmbed.description, /Brazil vs Morocco: Brazil o empate @ 1\.14/);
+    assert.match(parlayEmbed.description, /Haiti vs Scotland: Empate o Scotland @ 1\.17/);
+    assert.match(parlayEmbed.description, /Australia vs Türkiye: Empate o Türkiye @ 1\.17/);
+    assert.match(parlayEmbed.description, /📊 Odds 1\.64 · 🍀 Conf 61\.03%/);
+  });
+
+  it('adds required league general predictions grouped as match analysis', () => {
+    const artifact = sampleArtifactWithRequiredLeague();
+    artifact.requiredLeagueGeneralPredictions = [
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'h2h',
+        selection: 'home',
+        odds: 1.87,
+        confidence: 0.63,
+        expectedEdge: 0.04,
+        provider: 'codex',
+        status: 'review-required',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'h2h',
+        selection: 'home',
+        odds: 1.87,
+        confidence: 0.7,
+        expectedEdge: 0.06,
+        provider: 'gemini',
+        status: 'promotable',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'double_chance',
+        selection: 'home_or_draw',
+        odds: 1.22,
+        confidence: 0.58,
+        expectedEdge: -0.01,
+        provider: 'codex',
+        status: 'blocked',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'goals_over_under',
+        selection: 'under',
+        line: 2.5,
+        odds: 1.64,
+        confidence: 0.66,
+        expectedEdge: 0.0316,
+        provider: 'codex',
+        status: 'review-required',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'goals_over_under',
+        selection: 'over',
+        line: 3.5,
+        odds: 2.4,
+        confidence: 0.55,
+        expectedEdge: 0.02,
+        provider: 'gemini',
+        status: 'review-required',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'corners_over_under',
+        selection: 'under',
+        line: 9.5,
+        odds: 1.8,
+        confidence: 0.52,
+        expectedEdge: 0.0136,
+        provider: 'codex',
+        status: 'review-required',
+      },
+      {
+        fixture: 'USA vs Paraguay',
+        providerFixtureId: '1489370',
+        market: 'btts',
+        selection: 'no',
+        odds: 1.7,
+        confidence: 0.57,
+        expectedEdge: 0.0233,
+        provider: 'codex',
+        status: 'review-required',
+      },
+    ];
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+    const titles = payload.embeds.map((embed) => embed.title ?? '');
+    const generalEmbed = payload.embeds.find((embed) => /^📋 Predicciones generales/.test(embed.title ?? ''));
+
+    assert.deepEqual(titles, [
+      '🏆 Gana v9 · Recomendaciones',
+      '1️⃣ ⚖️ Team A vs Team B',
+      '🌍 Obligatorio · World Cup',
+      '📌 Predicciones obligatorias · World Cup',
+      '📋 Predicciones generales · World Cup',
+      '1️⃣ 💎 principal · Canada vs Bosnia & Herzegovina',
+      '2️⃣ 🚫 ⚽ resultados',
+      '3️⃣ 🚫 🧩 mixto-seguro',
+      '',
+    ]);
+    assert.match(generalEmbed.description, /Canada vs Bosnia & Herzegovina/);
+    assert.match(generalEmbed.description, /\t✅ ⚽ Canada gana @ 1\.87 · Conf 67%/);
+    assert.match(generalEmbed.description, /\t🚫 👥 Canada o empate @ 1\.22 · Conf 58%/);
+    assert.match(generalEmbed.description, /\t🟡 🥅 Menos de 2\.5 goles @ 1\.64 · Conf 66%/);
+    assert.doesNotMatch(generalEmbed.description, /Más de 3\.5 goles/);
+    assert.match(generalEmbed.description, /\t🟡 ⛳ Menos de 9\.5 corners @ 1\.8 · Conf 52%/);
+    assert.doesNotMatch(generalEmbed.description, /🎯/);
+    assert.match(generalEmbed.description, /\t🟡 🤝🏻 Ambos anotan: No @ 1\.7 · Conf 57%/);
+    assert.doesNotMatch(generalEmbed.description, /Resultado:/);
+    assert.doesNotMatch(generalEmbed.description, /Doble oportunidad:/);
+    assert.doesNotMatch(generalEmbed.description, /Conf 63-70%/);
+    assert.doesNotMatch(generalEmbed.description, /Edge/);
+    assert.doesNotMatch(generalEmbed.description, /codex|gemini/);
+    assert.doesNotMatch(generalEmbed.description, /Ambos anotan: Ambos anotan/);
+    assert.match(message, /📋 Predicciones generales · World Cup/);
+    assert.match(message, /\t✅ ⚽ Canada gana @ 1\.87 · Conf 67%/);
+  });
+
+  it('keeps kickoff times only in selection titles and required fixture summaries', () => {
     const artifact = sampleArtifactWithRequiredLeague();
     artifact.recommendations[0].kind = 'atomic-prediction';
     artifact.recommendations[0].legs[0].display = {
@@ -180,9 +327,9 @@ describe('discord recommendation notifier', () => {
     const joined = JSON.stringify(payload);
     const requiredEmbed = payload.embeds.find((embed) => /^🌍 Obligatorio/.test(embed.title ?? ''));
     const predictionEmbed = payload.embeds.find((embed) => /^📌 Predicciones obligatorias/.test(embed.title ?? ''));
-    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
+    const parlayEmbed = payload.embeds.find((embed) => /^1️⃣ 💎 principal/.test(embed.title ?? ''));
 
-    assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30/);
+    assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30 · h2h home/);
     assert.doesNotMatch(payload.embeds[1].title, /14:30 GT/);
     assert.match(payload.embeds[1].description, /Team A vs Team B: h2h home @ 1.4/);
     assert.doesNotMatch(payload.embeds[1].description, /Team A vs Team B · 14:30: h2h home @ 1.4/);
@@ -190,6 +337,7 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(requiredEmbed.description, /13:00 GT/);
     assert.match(predictionEmbed.description, /Canada vs Bosnia & Herzegovina\n/);
     assert.doesNotMatch(predictionEmbed.description, /Canada vs Bosnia & Herzegovina · 13:00/);
+    assert.match(parlayEmbed.title, /Canada vs Bosnia & Herzegovina · 13:00/);
     assert.match(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
     assert.doesNotMatch(parlayEmbed.description, /⚽ Canada vs Bosnia & Herzegovina · 13:00: Canada gana @ 1.87/);
     assert.match(message, /Team A vs Team B · 14:30/);
@@ -223,7 +371,9 @@ describe('discord recommendation notifier', () => {
       '🏆 Gana v9 · Recomendaciones',
       '🌍 Obligatorio · World Cup',
       '📌 Predicciones obligatorias · World Cup',
-      '🎛️ Parlays obligatorios · World Cup',
+      '1️⃣ 💎 principal · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
+      '2️⃣ ⚽ resultados · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
+      '3️⃣ 🧩 mixto-seguro · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
       '',
     ]);
     assert.match(payload.embeds[0].description, /📅 Diario: 📦 0 parlays · 📌 0 simples/);
@@ -252,13 +402,14 @@ describe('discord recommendation notifier', () => {
     };
 
     const payload = buildDiscordPayload(artifact, { max: 1 });
-    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
+    const principalEmbed = payload.embeds.find((embed) => /^1️⃣ 💎 principal/.test(embed.title ?? ''));
+    const resultadosEmbed = payload.embeds.find((embed) => /^2️⃣ 🚫 ⚽ resultados/.test(embed.title ?? ''));
 
-    assert.match(parlayEmbed.description, /💎 principal/);
-    assert.doesNotMatch(parlayEmbed.description, /✅ 💎 principal · 2 selecciones/);
-    assert.match(parlayEmbed.description, /🚫 ⚽ resultados/);
-    assert.match(parlayEmbed.description, /Duplicado de principal; no se publica cupón idéntico\./);
-    assert.doesNotMatch(parlayEmbed.description, /identical required-league parlay/);
+    assert.ok(principalEmbed);
+    assert.ok(resultadosEmbed);
+    assert.doesNotMatch(principalEmbed.description, /✅ 💎 principal · 2 selecciones/);
+    assert.match(resultadosEmbed.description, /Duplicado de principal; no se publica cupón idéntico\./);
+    assert.doesNotMatch(resultadosEmbed.description, /identical required-league parlay/);
   });
 
   it('prioritizes required confidence-floor reasons over duplicate risk flags', () => {
@@ -288,18 +439,20 @@ describe('discord recommendation notifier', () => {
     };
 
     const payload = buildDiscordPayload(artifact, { max: 1 });
-    const parlayEmbed = payload.embeds.find((embed) => /^🎛️ Parlays obligatorios/.test(embed.title ?? ''));
+    const blockedEmbeds = payload.embeds.filter((embed) => /^\d️⃣ 🚫/.test(embed.title ?? ''));
+    const diagnosticEmbed = payload.embeds.find((embed) => /^🔎 Mejor combo evaluado/.test(embed.title ?? ''));
 
-    assert.match(parlayEmbed.description, /No publicado: confianza agregada insuficiente\./);
-    assert.match(parlayEmbed.description, /🔎 Mejor combo evaluado/);
-    assert.match(parlayEmbed.description, /Canada vs Bosnia & Herzegovina: Menos de 2\.5 goles @ 1\.64 · Conf 66%/);
-    assert.match(parlayEmbed.description, /USA vs Paraguay: Menos de 2\.5 goles @ 1\.53 · Conf 65%/);
-    assert.match(parlayEmbed.description, /📊 Cuota 2\.51 · 🍀 Conf 42\.9% · 📈 Edge 7\.64%/);
-    assert.match(parlayEmbed.description, /🚧 No supera piso: confianza agregada 42\.90% < 45\.00%/);
-    assert.equal((parlayEmbed.description.match(/Mejor combo evaluado/g) ?? []).length, 1);
-    assert.doesNotMatch(parlayEmbed.description, /mejor combo rechazado:/);
-    assert.doesNotMatch(parlayEmbed.description, /No se publica principal/);
-    assert.doesNotMatch(parlayEmbed.description, /Duplicado de/);
+    assert.equal(blockedEmbeds.length, 3);
+    assert.ok(diagnosticEmbed);
+    assert.equal(blockedEmbeds.every((embed) => /No publicado: confianza agregada insuficiente\./.test(embed.description ?? '')), true);
+    assert.match(diagnosticEmbed.description, /Canada vs Bosnia & Herzegovina: Menos de 2\.5 goles @ 1\.64 · Conf 66%/);
+    assert.match(diagnosticEmbed.description, /USA vs Paraguay: Menos de 2\.5 goles @ 1\.53 · Conf 65%/);
+    assert.match(diagnosticEmbed.description, /📊 Odds 2\.51 · 🍀 Conf 42\.9% · 📈 Edge 7\.64%/);
+    assert.match(diagnosticEmbed.description, /🚧 No supera piso: confianza agregada 42\.90% < 45\.00%/);
+    assert.equal(payload.embeds.filter((embed) => /^🔎 Mejor combo evaluado/.test(embed.title ?? '')).length, 1);
+    assert.doesNotMatch(diagnosticEmbed.description, /mejor combo rechazado:/);
+    assert.doesNotMatch(JSON.stringify(blockedEmbeds), /No se publica principal/);
+    assert.doesNotMatch(JSON.stringify(blockedEmbeds), /Duplicado de/);
   });
 
   it('uses hydrated display labels and never renders full UUID vs UUID fixtures', () => {
@@ -380,9 +533,9 @@ describe('discord recommendation notifier', () => {
     const message = buildGatewayMessage(artifact, { max: 1 });
 
     assert.match(payload.embeds[1].description, /> 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
-    assert.match(payload.embeds[1].description, /> 🎯 Team A vs Team B: corners under 9.5 @ 1.82/);
+    assert.match(payload.embeds[1].description, /> ⛳ Team A vs Team B: corners under 9.5 @ 1.82/);
     assert.match(message, /> 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
-    assert.match(message, /> 🎯 Team A vs Team B: corners under 9.5 @ 1.82/);
+    assert.match(message, /> ⛳ Team A vs Team B: corners under 9.5 @ 1.82/);
   });
 
   it('caps native Discord embeds at the platform limit', () => {
@@ -665,6 +818,24 @@ function sampleArtifactWithRequiredLeague() {
   return {
     ...sampleArtifact(),
     requiredLeagueRecommendations: sampleRequiredLeagueRecommendations(),
+  };
+}
+
+function requiredParlayLeg(fixture, market, selection, odds) {
+  const [homeTeamName, awayTeamName] = fixture.split(' vs ');
+  return {
+    fixture,
+    providerFixtureId: fixture,
+    market,
+    selection,
+    odds,
+    confidence: 0.8,
+    display: {
+      fixtureLabel: fixture,
+      homeTeamName,
+      awayTeamName,
+      leagueName: 'World Cup',
+    },
   };
 }
 

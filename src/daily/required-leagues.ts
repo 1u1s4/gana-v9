@@ -32,6 +32,10 @@ export const DAILY_REQUIRED_LEAGUE_DEFAULTS: DailyRequiredLeagueInput[] = [
 export const DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER = ['principal', 'resultados', 'mixto-seguro'] as const;
 const REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE = 0.62;
 const REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE = 0.45;
+const REQUIRED_LEAGUE_SAFETY_DOUBLE_CHANCE_MAX_ODDS = 1.25;
+const REQUIRED_LEAGUE_SAFETY_DOUBLE_CHANCE_MIN_MODEL_CONFIDENCE = 0.5;
+const REQUIRED_LEAGUE_SAFETY_TOTALS_MAX_ODDS = 1.6;
+const REQUIRED_LEAGUE_SAFETY_BREAK_EVEN_EDGE_FLOOR = -0.015;
 export type DailyRequiredLeagueParlayApproach = typeof DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER[number];
 export type DailyRequiredLeagueGoalStatus = 'passed' | 'review-required';
 
@@ -89,6 +93,7 @@ export interface DailyRequiredLeagueAtomicProjection {
   odds: number;
   confidence: number;
   expectedEdge: number;
+  safetyOverride?: 'market-implied-double-chance' | 'market-implied-conservative-total';
   status: string;
   warnings: string[];
   reasons: string[];
@@ -213,6 +218,11 @@ export function buildRequiredLeagueRecommendations(input: {
     ...input,
     coverageFixtures,
   });
+  const parlayProjectionDrafts = buildRequiredLeagueAtomicProjectionDrafts({
+    ...input,
+    coverageFixtures,
+    includeSafetyBlocked: true,
+  });
   const atomicProjections = selectRequiredLeagueAtomicProjections(atomicProjectionDrafts);
   const parlayProjections = input.requiredLeagues.flatMap((league) => {
     const leagueFixtures = coverageFixtures.filter((fixture) => sameRequiredLeague(fixture.league, league));
@@ -220,7 +230,7 @@ export function buildRequiredLeagueRecommendations(input: {
     return buildRequiredLeagueParlayProjections(
       league,
       atomicProjections.filter((projection) => sameRequiredLeague(projection.league, league)),
-      atomicProjectionDrafts.filter((projection) => sameRequiredLeague(projection.league, league)),
+      parlayProjectionDrafts.filter((projection) => sameRequiredLeague(projection.league, league)),
       leagueFixtures.length,
     );
   });
@@ -304,7 +314,7 @@ export function buildRequiredLeagueRecommendations(input: {
       defaultRequiredLeagues: DAILY_REQUIRED_LEAGUE_DEFAULTS,
       parlayProfiles: DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER,
       atomicSelection: 'best non-blocked prediction per required fixture, promotable preferred over review-required',
-      parlaySelection: 'LLM-style atomic portfolio planner: build up to three distinct required-league coupons from non-blocked projections, rejecting non-positive portfolio edge or low aggregate confidence and balancing confidence, positive atomic edge, market diversity, leg reuse, and realistic odds',
+      parlaySelection: 'safety-first required-league planner: prefer low-variance double-chance coverage, conservative totals pairs, and best double-chance pairs; allow market-implied safety confidence for low-price blocked double-chance candidates while keeping traceable review-required risk flags',
     },
     analyticalArtifactOnly: true,
     executionCapability: 'none',
@@ -402,6 +412,7 @@ function buildRequiredLeagueAtomicProjectionDrafts(input: {
   timezone?: string;
   resolveModel: DailyRequiredLeagueModelResolver;
   coverageFixtures: readonly DailyRequiredLeagueCoverageFixture[];
+  includeSafetyBlocked?: boolean;
 }): DailyRequiredLeagueAtomicProjection[] {
   const requiredFixturesById = new Map(input.coverageFixtures.map((fixture) => [fixture.fixtureId, fixture]));
   const requiredFixturesByProviderId = new Map(input.coverageFixtures.map((fixture) => [fixture.providerFixtureId, fixture]));
@@ -416,7 +427,8 @@ function buildRequiredLeagueAtomicProjectionDrafts(input: {
         ?? requiredFixturesByProviderId.get(scoring.providerFixtureId ?? '');
       if (!requiredFixture) continue;
       for (const prediction of scoring.predictions) {
-        if (prediction.status === 'blocked') continue;
+        const safetyOverride = requiredLeagueSafetyOverride(prediction);
+        if (prediction.status === 'blocked' && !(input.includeSafetyBlocked && safetyOverride)) continue;
         if (!isFallbackPredictionCandidate(prediction)) continue;
         const display = requiredFixture.display;
         const candidate: AtomicPredictionCandidate = {
@@ -435,7 +447,12 @@ function buildRequiredLeagueAtomicProjectionDrafts(input: {
   }
 
   const drafts = [...groups.values()]
-    .map((candidates) => toRequiredLeagueAtomicProjection(candidates, requiredFixturesById, requiredFixturesByProviderId))
+    .map((candidates) => toRequiredLeagueAtomicProjection(
+      candidates,
+      requiredFixturesById,
+      requiredFixturesByProviderId,
+      input.includeSafetyBlocked === true,
+    ))
     .filter((projection): projection is DailyRequiredLeagueAtomicProjection => Boolean(projection))
     .sort((a, b) =>
       requiredAtomicProjectionScore(b) - requiredAtomicProjectionScore(a)
@@ -462,6 +479,7 @@ function toRequiredLeagueAtomicProjection(
   candidates: AtomicPredictionCandidate[],
   requiredFixturesById: ReadonlyMap<string, DailyRequiredLeagueCoverageFixture>,
   requiredFixturesByProviderId: ReadonlyMap<string, DailyRequiredLeagueCoverageFixture>,
+  allowSafetyConfidence = false,
 ): DailyRequiredLeagueAtomicProjection | undefined {
   const ordered = [...candidates].sort((a, b) =>
     requiredPredictionCandidateScore(b) - requiredPredictionCandidateScore(a)
@@ -475,8 +493,20 @@ function toRequiredLeagueAtomicProjection(
   if (!fixture) return undefined;
   const providers = uniqueStrings(ordered.map((candidate) => candidate.provider)) as DailyE2EProvider[];
   const sourceRunIds = uniqueStrings(ordered.map((candidate) => candidate.runId));
-  const confidence = round(average(ordered.map((candidate) => candidate.prediction.confidence)), 6);
-  const edge = round(average(ordered.map((candidate) => candidate.edge)), 6);
+  const safetyOverrides = allowSafetyConfidence
+    ? uniqueStrings(ordered.map((candidate) => requiredLeagueSafetyOverride(candidate.prediction) ?? ''))
+    : [];
+  const safetyOverride = safetyOverrides.includes('market-implied-double-chance')
+    ? 'market-implied-double-chance'
+    : safetyOverrides.includes('market-implied-conservative-total')
+      ? 'market-implied-conservative-total'
+      : undefined;
+  const confidence = round(average(ordered.map((candidate) =>
+    allowSafetyConfidence ? requiredLeagueCandidateConfidence(candidate) : candidate.prediction.confidence,
+  )), 6);
+  const edge = round(average(ordered.map((candidate) =>
+    allowSafetyConfidence ? requiredLeagueCandidateEdge(candidate) : candidate.edge,
+  )), 6);
   const warnings = uniqueStrings(ordered.flatMap((candidate) => [
     ...(candidate.prediction.warnings ?? []),
     ...(candidate.prediction.blockers ?? []),
@@ -506,17 +536,58 @@ function toRequiredLeagueAtomicProjection(
     odds: round(primary.prediction.odds, 6),
     confidence,
     expectedEdge: edge,
+    ...(safetyOverride ? { safetyOverride } : {}),
     status: primary.prediction.status,
     warnings,
     reasons: uniqueStrings([
       `required league ${fixture.league.name ?? fixture.league.providerCompetitionId}`,
       `best available non-blocked projection for ${fixture.fixture}`,
+      safetyOverride ? `safety override: ${safetyOverride}` : '',
       providers.length > 1 ? `provider agreement: ${providers.join(', ')}` : `provider: ${primary.provider}`,
       `confidence ${round(confidence, 3)}`,
       `edge ${round(edge, 3)}`,
     ]),
     ...(primary.prediction.rationale ? { rationale: primary.prediction.rationale } : {}),
   };
+}
+
+function requiredLeagueSafetyOverride(
+  prediction: AtomicPredictionCandidate['prediction'],
+): DailyRequiredLeagueAtomicProjection['safetyOverride'] | undefined {
+  if (prediction.market === 'double_chance'
+    && prediction.selection !== 'home_or_away'
+    && prediction.odds <= REQUIRED_LEAGUE_SAFETY_DOUBLE_CHANCE_MAX_ODDS
+    && prediction.confidence >= REQUIRED_LEAGUE_SAFETY_DOUBLE_CHANCE_MIN_MODEL_CONFIDENCE) {
+    return 'market-implied-double-chance';
+  }
+  if (prediction.market === 'goals_over_under'
+    && prediction.odds <= REQUIRED_LEAGUE_SAFETY_TOTALS_MAX_ODDS
+    && Number.isFinite(prediction.line)
+    && (
+      (prediction.selection === 'under' && Number(prediction.line) >= 3.25)
+      || (prediction.selection === 'over' && Number(prediction.line) <= 1.5)
+    )) {
+    return 'market-implied-conservative-total';
+  }
+  return undefined;
+}
+
+function requiredLeagueCandidateConfidence(candidate: AtomicPredictionCandidate): number {
+  const override = requiredLeagueSafetyOverride(candidate.prediction);
+  if (!override) return candidate.prediction.confidence;
+  return Math.max(candidate.prediction.confidence, requiredLeagueImpliedConfidence(candidate.prediction));
+}
+
+function requiredLeagueCandidateEdge(candidate: AtomicPredictionCandidate): number {
+  const override = requiredLeagueSafetyOverride(candidate.prediction);
+  if (!override) return candidate.edge;
+  const confidence = requiredLeagueCandidateConfidence(candidate);
+  return Math.max(candidate.edge, (candidate.prediction.odds * confidence) - 1, 0);
+}
+
+function requiredLeagueImpliedConfidence(prediction: AtomicPredictionCandidate['prediction']): number {
+  if (Number.isFinite(prediction.impliedProbability)) return clamp(prediction.impliedProbability, 0.01, 0.99);
+  return clamp(1 / prediction.odds, 0.01, 0.99);
 }
 
 type RequiredLeagueMarketFamily = 'result' | 'totals' | 'corners' | 'other';
@@ -529,34 +600,36 @@ interface RequiredLeagueParlayApproachSpec {
   targetOddsIdeal: number;
   preferredFamilies: readonly RequiredLeagueMarketFamily[];
   preferMixedFamilies?: boolean;
+  strategy?: 'double-chance-coverage' | 'safe-totals-pair' | 'best-double-chance-pair';
 }
 
 const REQUIRED_LEAGUE_PARLAY_APPROACH_SPECS: readonly RequiredLeagueParlayApproachSpec[] = [
   {
     profile: 'principal',
-    intent: 'mejor cupón base desde las atómicas principales, con mezcla de mercado cuando aporta estabilidad',
-    targetOddsMin: 2.2,
-    targetOddsMax: 4.2,
-    targetOddsIdeal: 3.2,
-    preferredFamilies: ['totals', 'result'],
-    preferMixedFamilies: true,
+    intent: 'cobertura segura de resultado: doble oportunidad favorita/no pierde en todos los fixtures requeridos cuando esté disponible',
+    targetOddsMin: 1.35,
+    targetOddsMax: 2.2,
+    targetOddsIdeal: 1.65,
+    preferredFamilies: ['result'],
+    strategy: 'double-chance-coverage',
   },
   {
     profile: 'resultados',
-    intent: 'cupón alterno de resultado, priorizando h2h y evitando mercados auxiliares débiles',
-    targetOddsMin: 2.4,
-    targetOddsMax: 4.6,
-    targetOddsIdeal: 3.6,
-    preferredFamilies: ['result'],
+    intent: 'cupón de totales conservadores: preferir under alto u over bajo antes que líneas agresivas',
+    targetOddsMin: 1.55,
+    targetOddsMax: 2.5,
+    targetOddsIdeal: 1.9,
+    preferredFamilies: ['totals'],
+    strategy: 'safe-totals-pair',
   },
   {
     profile: 'mixto-seguro',
-    intent: 'cupón alterno no rígido: prioriza la mejor mezcla positiva antes que forzar un tema de mercado débil',
-    targetOddsMin: 2,
-    targetOddsMax: 4,
-    targetOddsIdeal: 3,
-    preferredFamilies: ['result', 'totals'],
-    preferMixedFamilies: true,
+    intent: 'mejor combinación corta de doble oportunidad entre los fixtures requeridos',
+    targetOddsMin: 1.18,
+    targetOddsMax: 1.7,
+    targetOddsIdeal: 1.35,
+    preferredFamilies: ['result'],
+    strategy: 'best-double-chance-pair',
   },
 ];
 
@@ -653,12 +726,17 @@ function buildRequiredLeagueParlayProjections(
         `atomic portfolio planner: ${spec.intent}`,
         `generated ${spec.profile} addendum from ${legs.length} distinct required fixtures with a unique required-league signature`,
         `market families: ${uniqueStrings(legs.map(requiredLeagueProjectionMarketFamily)).join(', ')}`,
+        legs.some((projection) => projection.safetyOverride)
+          ? `safety overrides: ${uniqueStrings(legs.map((projection) => projection.safetyOverride ?? '')).join(', ')}`
+          : '',
         `providers: ${providers.join(', ') || 'unknown'}`,
-      ],
+      ].filter(Boolean),
       riskFlags: uniqueStrings([
         'required-league-addendum',
         'review-required',
         'atomic-portfolio-planner',
+        ...(legs.some((projection) => projection.safetyOverride) ? ['market-implied-safety-confidence'] : []),
+        ...(legs.some((projection) => projection.status === 'blocked') ? ['blocked-leg-safety-override'] : []),
         ...(legs.some((projection) => requiredLeagueProjectionMarketFamily(projection) === 'corners') ? ['corners-market'] : []),
         ...(expectedEdge <= 0 ? ['non-positive-expected-edge'] : []),
       ]),
@@ -704,6 +782,19 @@ function selectRequiredLeagueParlayLegs(
     anchorPredictionIds: ReadonlySet<string>;
   },
 ): RequiredLeagueParlayLegSelection | undefined {
+  if (spec.strategy === 'double-chance-coverage') {
+    const selected = selectRequiredLeagueDoubleChanceCoverage(spec, atomicProjections, context);
+    if (selected) return selected;
+  }
+  if (spec.strategy === 'safe-totals-pair') {
+    const selected = selectRequiredLeagueSafeTotalsPair(spec, atomicProjections, context);
+    if (selected) return selected;
+  }
+  if (spec.strategy === 'best-double-chance-pair') {
+    const selected = selectRequiredLeagueBestDoubleChancePair(spec, atomicProjections, context);
+    if (selected) return selected;
+  }
+
   const ordered = [...atomicProjections]
     .sort((a, b) =>
       requiredLeagueAtomicPortfolioProjectionScore(b) - requiredLeagueAtomicPortfolioProjectionScore(a)
@@ -746,6 +837,143 @@ function selectRequiredLeagueParlayLegs(
       || a.signature.localeCompare(b.signature)
     )
     .find((combination) => !context.usedSignatures.has(combination.signature));
+}
+
+function selectRequiredLeagueDoubleChanceCoverage(
+  spec: RequiredLeagueParlayApproachSpec,
+  atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
+  context: Parameters<typeof selectRequiredLeagueParlayLegs>[2],
+): RequiredLeagueParlayLegSelection | undefined {
+  const bestByFixture = new Map<string, DailyRequiredLeagueAtomicProjection>();
+  for (const projection of atomicProjections.filter(requiredLeagueIsSafetyDoubleChance)) {
+    const current = bestByFixture.get(projection.fixtureId);
+    if (!current || requiredLeagueSafetyDoubleChanceScore(projection) > requiredLeagueSafetyDoubleChanceScore(current)) {
+      bestByFixture.set(projection.fixtureId, projection);
+    }
+  }
+  const legs = [...bestByFixture.values()].sort(compareRequiredLeagueParlayLegOrder);
+  return buildRequiredLeagueParlayLegSelection(spec, legs, context, { allowBreakEvenSafety: true });
+}
+
+function selectRequiredLeagueSafeTotalsPair(
+  spec: RequiredLeagueParlayApproachSpec,
+  atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
+  context: Parameters<typeof selectRequiredLeagueParlayLegs>[2],
+): RequiredLeagueParlayLegSelection | undefined {
+  const ordered = atomicProjections
+    .filter(requiredLeagueIsConservativeTotal)
+    .sort((a, b) => requiredLeagueConservativeTotalScore(b) - requiredLeagueConservativeTotalScore(a)
+      || b.confidence - a.confidence
+      || a.odds - b.odds);
+  const combinations: RequiredLeagueParlayLegSelection[] = [];
+  for (let leftIndex = 0; leftIndex < ordered.length; leftIndex += 1) {
+    const left = ordered[leftIndex] as DailyRequiredLeagueAtomicProjection;
+    for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
+      const right = ordered[rightIndex] as DailyRequiredLeagueAtomicProjection;
+      if (left.fixtureId === right.fixtureId) continue;
+      const selected = buildRequiredLeagueParlayLegSelection(spec, [left, right], context, { allowBreakEvenSafety: true });
+      if (selected) combinations.push(selected);
+    }
+  }
+  return combinations.sort((a, b) =>
+    requiredLeagueTotalsPairShapeScore(b.legs) - requiredLeagueTotalsPairShapeScore(a.legs)
+    || b.aggregateConfidence - a.aggregateConfidence
+    || b.score - a.score
+    || a.signature.localeCompare(b.signature)
+  )[0];
+}
+
+function selectRequiredLeagueBestDoubleChancePair(
+  spec: RequiredLeagueParlayApproachSpec,
+  atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
+  context: Parameters<typeof selectRequiredLeagueParlayLegs>[2],
+): RequiredLeagueParlayLegSelection | undefined {
+  const ordered = atomicProjections
+    .filter(requiredLeagueIsSafetyDoubleChance)
+    .sort((a, b) => requiredLeagueSafetyDoubleChanceScore(b) - requiredLeagueSafetyDoubleChanceScore(a)
+      || b.confidence - a.confidence
+      || a.odds - b.odds);
+  const combinations: RequiredLeagueParlayLegSelection[] = [];
+  for (let leftIndex = 0; leftIndex < ordered.length; leftIndex += 1) {
+    const left = ordered[leftIndex] as DailyRequiredLeagueAtomicProjection;
+    for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
+      const right = ordered[rightIndex] as DailyRequiredLeagueAtomicProjection;
+      if (left.fixtureId === right.fixtureId) continue;
+      const selected = buildRequiredLeagueParlayLegSelection(spec, [left, right], context, { allowBreakEvenSafety: true });
+      if (selected) combinations.push(selected);
+    }
+  }
+  return combinations.sort((a, b) =>
+    b.aggregateConfidence - a.aggregateConfidence
+    || a.combinedOdds - b.combinedOdds
+    || b.score - a.score
+    || a.signature.localeCompare(b.signature)
+  )[0];
+}
+
+function buildRequiredLeagueParlayLegSelection(
+  spec: RequiredLeagueParlayApproachSpec,
+  inputLegs: readonly DailyRequiredLeagueAtomicProjection[],
+  context: Parameters<typeof selectRequiredLeagueParlayLegs>[2],
+  options: { allowBreakEvenSafety?: boolean } = {},
+): RequiredLeagueParlayLegSelection | undefined {
+  const legs = [...inputLegs].sort(compareRequiredLeagueParlayLegOrder);
+  if (legs.length < 2) return undefined;
+  if (new Set(legs.map((leg) => leg.fixtureId)).size !== legs.length) return undefined;
+  const signature = requiredLeagueParlayLegsSignature(legs);
+  if (context.usedSignatures.has(signature)) return undefined;
+  const fixturePairSignature = requiredLeagueFixturePairSignature(legs);
+  const metrics = requiredLeagueParlayPortfolioMetrics(legs);
+  const edgeFloor = options.allowBreakEvenSafety ? REQUIRED_LEAGUE_SAFETY_BREAK_EVEN_EDGE_FLOOR : 0;
+  if (metrics.expectedEdge <= edgeFloor) return undefined;
+  if (metrics.aggregateConfidence < REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE) return undefined;
+  if (metrics.minConfidence < REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE) return undefined;
+  return {
+    legs,
+    signature,
+    fixturePairSignature,
+    ...metrics,
+    score: requiredLeagueParlaySelectionScore(spec, legs, context, fixturePairSignature),
+  };
+}
+
+function requiredLeagueIsSafetyDoubleChance(projection: DailyRequiredLeagueAtomicProjection): boolean {
+  return projection.market === 'double_chance'
+    && projection.selection !== 'home_or_away'
+    && projection.odds <= REQUIRED_LEAGUE_SAFETY_DOUBLE_CHANCE_MAX_ODDS
+    && projection.confidence >= REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE
+    && projection.safetyOverride === 'market-implied-double-chance';
+}
+
+function requiredLeagueIsConservativeTotal(projection: DailyRequiredLeagueAtomicProjection): boolean {
+  return projection.market === 'goals_over_under'
+    && projection.safetyOverride === 'market-implied-conservative-total'
+    && projection.confidence >= REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE;
+}
+
+function requiredLeagueSafetyDoubleChanceScore(projection: DailyRequiredLeagueAtomicProjection): number {
+  return round((projection.confidence * 0.8)
+    + ((1 / Math.max(1.01, projection.odds)) * 0.18)
+    + (projection.providers.length > 1 ? 0.04 : 0)
+    - (projection.odds * 0.02), 6);
+}
+
+function requiredLeagueConservativeTotalScore(projection: DailyRequiredLeagueAtomicProjection): number {
+  const line = Number(projection.line ?? 0);
+  const lowOverBonus = projection.selection === 'over' && line <= 1.5 ? 0.22 : 0;
+  const highUnderBonus = projection.selection === 'under' && line >= 3.5 ? 0.22 : projection.selection === 'under' && line >= 3.25 ? 0.14 : 0;
+  return round((projection.confidence * 0.72)
+    + lowOverBonus
+    + highUnderBonus
+    + (projection.status === 'promotable' ? 0.05 : 0)
+    - (Math.log2(Math.max(1.01, projection.odds)) * 0.04), 6);
+}
+
+function requiredLeagueTotalsPairShapeScore(legs: readonly DailyRequiredLeagueAtomicProjection[]): number {
+  const hasLowOver = legs.some((projection) => projection.selection === 'over' && Number(projection.line ?? 0) <= 1.5);
+  const hasHighUnder = legs.some((projection) => projection.selection === 'under' && Number(projection.line ?? 0) >= 3.25);
+  return (hasLowOver && hasHighUnder ? 0.35 : 0)
+    + legs.reduce((sum, projection) => sum + requiredLeagueConservativeTotalScore(projection), 0);
 }
 
 function bestRequiredLeagueParlayDiagnostic(

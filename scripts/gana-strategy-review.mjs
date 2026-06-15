@@ -3,6 +3,7 @@ import { mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync } from
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { resolveDiscordTarget } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
+import { compactPath, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -53,19 +54,23 @@ try {
     ], env);
   }
   const ok = review.status === 0;
-  console.log(JSON.stringify({
-    ok,
+  console.log(renderCronRichSummary({
+    title: ok ? 'Gana v9 · Strategy review publicado' : 'Gana v9 · Strategy review requiere revisión',
+    status: ok && (!notify || notifyResult?.status === 0) ? 'ok' : 'warning',
     date,
-    logPath,
-    reviewArtifact,
-    validationStatus: validation.status,
-    metricsStatus: metrics.status,
-    reviewStatus: review.status,
-    notifyStatus: notifyResult?.status,
-    gatewayTarget,
-    model: env.AGENT_MODEL,
-    reasoningEffort: env.AGENT_REASONING_EFFORT,
-  }, null, 2));
+    timezone: TIMEZONE,
+    rows: [
+      ['Validate exit', validation.status ?? 'unknown'],
+      ['Metrics exit', metrics.status ?? 'unknown'],
+      ['Review exit', review.status ?? 'unknown'],
+      ['Notify exit', notifyResult?.status ?? (notify ? 'not-run' : 'disabled')],
+      ['Modelo', env.AGENT_MODEL],
+      ['Reasoning', env.AGENT_REASONING_EFFORT],
+      ['Target', gatewayTarget],
+    ],
+    artifacts: [reviewArtifact, logPath].filter(Boolean).map(compactPath),
+    footer: ok ? '🧠 Revisión estratégica lista para lectura humana.' : '⚠️ Revisar logs antes de actuar.',
+  }));
   process.exitCode = ok && (!notify || notifyResult?.status === 0) ? 0 : notifyResult?.status ?? review.status ?? 1;
 } finally {
   closeSync(logFd);
