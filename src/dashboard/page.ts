@@ -36,13 +36,14 @@ ${DASHBOARD_STYLE_BLOCK}
         <div class="filters-panel-head">
           <h2>Filtros</h2>
           <div class="filter-actions">
+            <button class="icon-btn filters-toggle" id="filters-toggle" aria-controls="filters-body" aria-expanded="true" title="Mostrar u ocultar filtros" type="button">Ocultar</button>
             <button class="icon-btn" data-date-preset="yesterday" title="Filtrar ayer" type="button">Ayer</button>
             <button class="icon-btn" data-date-preset="today" title="Filtrar hoy" type="button">Hoy</button>
             <button class="icon-btn" data-date-preset="tomorrow" title="Filtrar mañana" type="button">Mañana</button>
             <button class="icon-btn primary" title="Actualizar" type="submit">Actualizar</button>
           </div>
         </div>
-        <div class="filters-body">
+        <div class="filters-body" id="filters-body">
           <div class="filters-grid">
             <label>Fecha desde <input type="date" name="dateFrom"></label>
             <label>Fecha hasta <input type="date" name="dateTo"></label>
@@ -138,7 +139,7 @@ ${DASHBOARD_STYLE_BLOCK}
             <span class="muted-inline" id="pager-meta">Página 1</span>
           </div>
         </div>
-        <aside class="panel module-shell">
+        <aside class="panel module-shell" id="detail-panel">
           <div class="panel-head"><h2>Detalle</h2></div>
           <div class="detail" id="detail"><span class="muted">Selecciona una fila para revisar el detalle.</span></div>
         </aside>

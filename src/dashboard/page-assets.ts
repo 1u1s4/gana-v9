@@ -297,6 +297,7 @@ export const DASHBOARD_STYLE_BLOCK = String.raw`  <style>
       vertical-align: 1px;
     }
     .filter-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
+    .filters-toggle { display: none; }
     .quick-explore {
       margin-top: 8px;
       padding-top: 8px;
@@ -727,6 +728,7 @@ export const DASHBOARD_STYLE_BLOCK = String.raw`  <style>
       gap: 8px;
       padding: 8px;
     }
+    .mobile-card-list { display: none; }
     .entity-card {
       min-width: 0;
       min-height: 206px;
@@ -914,15 +916,86 @@ export const DASHBOARD_STYLE_BLOCK = String.raw`  <style>
       .panel { min-height: 320px; }
     }
     @media (max-width: 680px) {
-      header,
-      .brand,
-      .hero-actions { align-items: flex-start; flex-direction: column; }
-      .brand { gap: 4px; }
-      .lede { display: block; margin: 2px 0 0; }
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+        min-height: 0;
+        gap: 6px;
+        padding: 8px;
+      }
+      .brand {
+        width: 100%;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .brand::before { display: none; }
+      .lede { display: block; margin: 0; font-size: 9px; }
+      .hero-actions {
+        width: 100%;
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      #updated { flex: 1 1 100%; }
       .filters-grid,
-      .stats,
-      .tabs { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .shell { padding: 4px; }
+      .filters-toggle { display: inline-flex; }
+      .filters-surface.filters-collapsed .filters-body { display: none; }
+      .filters-panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .filter-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      input,
+      select,
+      .icon-btn { min-height: 36px; }
+      .tab {
+        min-height: 36px;
+        min-width: 96px;
+        flex: 0 0 auto;
+        padding: 0 10px;
+      }
+      .tabs {
+        grid-row: 2;
+        display: flex;
+        grid-template-columns: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x proximity;
+      }
+      .tab { scroll-snap-align: start; }
+      .stats { grid-row: 3; }
+      .content { grid-row: 4; }
+      .stat { min-height: 62px; }
+      .metric-strip,
+      .insight-grid,
+      .daily-meta,
+      .recommendation-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric-charts {
+        min-width: 0;
+        grid-template-columns: 1fr;
+      }
+      .bar-row { grid-template-columns: minmax(74px, 0.9fr) minmax(80px, 1fr) 42px; }
+      .mobile-card-list {
+        display: grid;
+        gap: 8px;
+        padding: 8px;
+      }
+      .mobile-card-list + .table-wrap { display: none; }
+      #list.table-host {
+        max-height: 62vh;
+        overflow: auto;
+      }
+      .content .panel { min-height: 0; }
+      #detail-panel { min-height: 320px; }
+      .kv { grid-template-columns: 82px minmax(0, 1fr); }
     }
   </style>`;
 
@@ -1034,7 +1107,9 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
         selectedId: null,
         metadata: null,
         theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+        filtersCollapsed: true,
       };
+      const mobileFiltersMedia = window.matchMedia ? window.matchMedia('(max-width: 680px)') : null;
 
       const $ = (selector) => document.querySelector(selector);
       const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -1156,6 +1231,28 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
         if (!pill) return;
         pill.textContent = text;
         pill.className = 'connection-pill' + (tone ? ' ' + tone : '');
+      }
+
+      function isMobileLayout() {
+        return !!mobileFiltersMedia?.matches;
+      }
+
+      function syncFiltersPanel() {
+        const panel = $('#filters');
+        const toggle = $('#filters-toggle');
+        if (!panel || !toggle) return;
+        const collapsed = isMobileLayout() && state.filtersCollapsed;
+        panel.classList.toggle('filters-collapsed', collapsed);
+        toggle.hidden = !isMobileLayout();
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+        toggle.textContent = collapsed ? 'Mostrar' : 'Ocultar';
+      }
+
+      function focusDetailOnMobile() {
+        if (!isMobileLayout()) return;
+        const panel = $('#detail-panel');
+        if (!panel) return;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
 
       const badgeClass = (status) => {
@@ -1716,7 +1813,24 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
       function renderFixtureRows(rows) {
         const sort = state.sort;
         const headers = TAB_SORT_HEADERS.fixtures;
-        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+        const mobileCards = '<div class="mobile-card-list">' + rows.map((row) => {
+          const latest = row.latestPrediction;
+          const validation = row.latestValidation;
+          return '<article class="entity-card' + selectedClass('fixture', row.id) + '" data-kind="fixture" data-id="' + esc(row.id) + '">' +
+            '<div class="card-head"><div><b>' + esc(matchName(row)) + '</b><div class="sub">' + esc(fixtureMeta(row)) + '</div></div><div>' + badge(row.status) + '</div></div>' +
+            '<div class="card-body">' +
+              '<div class="metric-strip">' +
+                metricBox('Pred.', esc(row.predictionCount ?? 0), null) +
+                metricBox('Legs', esc(row.parlayLegCount ?? 0), null) +
+                metricBox('Val.', esc(row.validationCount ?? 0), null) +
+              '</div>' +
+              (latest ? '<div class="detail-line"><b>' + esc(marketLabel(latest)) + '</b><span class="sub">odds ' + fmtNum(latest.odds) + ' · edge ' + fmtPct(latest.edge, 1) + ' · conf. ' + fmtPct(latest.confidence, 1) + '</span></div>' : '<span class="muted-inline">Sin predicción</span>') +
+              '<div class="metric-row"><span>' + fmtScore(row) + '</span><span>' + (validation ? badge(validation.status) : '<span class="muted-inline">Sin validación</span>') + '</span></div>' +
+            '</div>' +
+            '<div class="card-foot"><span class="mono">' + esc(row.id) + '</span></div>' +
+          '</article>';
+        }).join('') + '</div>';
+        $('#list').innerHTML = mobileCards + '<div class="table-wrap"><table><thead><tr>' +
           headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
             (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
           '</tr></thead><tbody>' +
@@ -1786,7 +1900,20 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
 
       function renderValidationRows(rows) {
         const sort = state.sort;
-        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+        const mobileCards = '<div class="mobile-card-list">' + rows.map((row) => {
+          const target = validationTargetForRow(row);
+          const summary = target.summary || target.id || '—';
+          return '<article class="entity-card' + selectedClass('validation', row.id) + '" data-kind="validation" data-id="' + esc(row.id) + '">' +
+            '<div class="card-head"><div><b>' + esc(target.label) + '</b><div class="sub">' + esc(summary) + '</div></div><div>' + badge(row.status) + '</div></div>' +
+            '<div class="card-body">' +
+              '<div class="metric-row"><span class="sub">Evaluado</span><b>' + esc(fmtDate(row.evaluatedAt || row.createdAt)) + '</b></div>' +
+              '<div class="detail-line"><span class="sub">' + esc(row.reason || 'Sin motivo') + '</span></div>' +
+              (target.kind && target.id ? '<button class="chip-btn crosslink" data-kind="' + esc(target.kind) + '" data-id="' + esc(target.id) + '" type="button">Ver objetivo</button>' : '') +
+            '</div>' +
+            '<div class="card-foot"><span class="mono">' + esc(row.id) + '</span></div>' +
+          '</article>';
+        }).join('') + '</div>';
+        $('#list').innerHTML = mobileCards + '<div class="table-wrap"><table><thead><tr>' +
           '<th><button class="sort" data-sort="evaluatedAt"><span>Evaluado</span><span>' +
           (sort === 'evaluatedAt' ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>' +
           '<th><button class="sort" data-sort="status"><span>Estado</span><span>' +
@@ -1807,13 +1934,26 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
               (hasTarget && target.id ? '<div class="sub mono"><span class="crosslink" data-kind="' + esc(target.kind) + '" data-id="' + esc(target.id) + '">' + esc(target.id) +
                 '</span></div>' : '') + '</td><td>' + fmtDate(row.createdAt) + '</td></tr>';
           }).join('') +
-          '</tbody></table>';
+          '</tbody></table></div>';
       }
 
       function renderRunRows(rows) {
         const headers = TAB_SORT_HEADERS.runs;
         const sort = state.sort;
-        $('#list').innerHTML = '<div class="table-wrap"><table><thead><tr>' +
+        const mobileCards = '<div class="mobile-card-list">' + rows.map((row) => '<article class="entity-card' + selectedClass('run', row.id) + '" data-kind="run" data-id="' + esc(row.id) + '">' +
+          '<div class="card-head"><div><b>' + esc(row.verdict || row.status || 'run') + '</b><div class="sub mono">' + esc(row.id) + '</div></div><div>' + badge(row.status) + '</div></div>' +
+          '<div class="card-body">' +
+            '<div class="metric-strip">' +
+              metricBox('Pred.', esc(row.predictionCount ?? 0), null) +
+              metricBox('Parlays', esc(row.parlayCount ?? 0), null) +
+              metricBox('Val.', esc(row.validationCount ?? 0), null) +
+            '</div>' +
+            '<div class="detail-line"><span class="sub">' + esc(row.providerAgentic || '—') + ' · ' + esc(row.profile || '—') + ' · ' + esc(row.runtime || '—') + '</span></div>' +
+            '<div class="metric-row"><span class="sub">Inicio</span><b>' + esc(fmtDate(row.startedAt || row.createdAt)) + '</b></div>' +
+          '</div>' +
+          '<div class="card-foot"><span class="sub">' + esc(fmtDate(row.completedAt)) + '</span></div>' +
+        '</article>').join('') + '</div>';
+        $('#list').innerHTML = mobileCards + '<div class="table-wrap"><table><thead><tr>' +
           headers.map(([label, field]) => '<th><button class="sort" data-sort="' + esc(field) + '"><span>' + esc(label) + '</span><span>' +
             (sort === field ? (state.direction === 'asc' ? '▲' : '▼') : '') + '</span></button></th>').join('') +
           '<th>Proveedor</th><th>Actividad</th>' +
@@ -1824,7 +1964,7 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
             '</td><td>' + esc(row.providerAgentic || '—') + ' · ' + esc(row.profile) + ' · ' + esc(row.runtime) + '</td><td>' +
             esc((row.predictionCount ?? 0) + ' pred. · ' + (row.parlayCount ?? 0) + ' parlays · ' + (row.validationCount ?? 0) + ' val.') +
             '</td></tr>').join('') +
-          '</tbody></table>';
+          '</tbody></table></div>';
       }
 
       function renderMetricRows(rows) {
@@ -2323,6 +2463,11 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
         applyTheme('dark');
       });
 
+      $('#filters-toggle').addEventListener('click', () => {
+        state.filtersCollapsed = !state.filtersCollapsed;
+        syncFiltersPanel();
+      });
+
       document.getElementById('tabs').addEventListener('click', (event) => {
         const button = event.target.closest('[data-tab]');
         if (button) {
@@ -2333,6 +2478,10 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
       $('#filters').addEventListener('submit', (event) => {
         event.preventDefault();
         applyFiltersFromForm();
+        if (isMobileLayout()) {
+          state.filtersCollapsed = true;
+          syncFiltersPanel();
+        }
         load();
       });
 
@@ -2386,6 +2535,7 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
         state.selectedId = id;
         try {
           await loadEntity(kind, id);
+          focusDetailOnMobile();
         } catch {
           $('#detail').innerHTML = '<span class="error">No se pudo cargar el detalle solicitado.</span>';
         }
@@ -2463,6 +2613,8 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
         load();
       });
 
+      window.addEventListener('resize', syncFiltersPanel);
+
       function syncFromLocation() {
         syncStateFromUrl();
         const tabInput = '#tabs button[data-tab="' + state.tab + '"]';
@@ -2479,6 +2631,7 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
 
       async function boot() {
         applyTheme(state.theme);
+        syncFiltersPanel();
         syncStateFromUrl();
         try {
           await loadMetadata();

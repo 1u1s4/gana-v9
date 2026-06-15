@@ -65,6 +65,23 @@ describe('dashboard page UX affordances', () => {
     assert.match(html, /flagUrl/);
   });
 
+  it('renders mobile dashboard controls and card fallbacks for table tabs', () => {
+    const html = dashboardHtml();
+
+    assert.match(html, /id="filters-toggle"/);
+    assert.match(html, /id="filters-body"/);
+    assert.match(html, /id="detail-panel"/);
+    assert.match(html, /function syncFiltersPanel/);
+    assert.match(html, /function focusDetailOnMobile/);
+    assert.match(html, /filters-collapsed/);
+    assert.match(html, /@media \(max-width: 680px\)/);
+    assert.match(html, /\.tabs \{\n\s+grid-row: 2;\n\s+display: flex;/);
+    assert.match(html, /mobile-card-list/);
+    assert.match(html, /function renderFixtureRows/);
+    assert.match(html, /function renderValidationRows/);
+    assert.match(html, /function renderRunRows/);
+  });
+
   it('does not schedule automatic overview refreshes', () => {
     const html = dashboardHtml();
 

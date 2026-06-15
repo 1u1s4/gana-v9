@@ -100,7 +100,7 @@ node scripts/gana-daily-e2e-and-notify.mjs \
   --gemini-model "$GANA_DAILY_GEMINI_MODEL" \
   --threshold "$GANA_LOW_ODDS_THRESHOLD" \
   --provider-concurrency "$GANA_DAILY_PROVIDER_CONCURRENCY" \
-  --max-fixtures "${GANA_DAILY_MAX_FIXTURES:-${GANA_CRON_MAX_FIXTURES_PER_RUN:-100}}" \
+  --max-fixtures "${GANA_DAILY_MAX_FIXTURES:-${GANA_CRON_MAX_FIXTURES_PER_RUN:-10000}}" \
   --web "${GANA_WEB_MODE:-live}" \
   --parlay-profile "${GANA_PARLAY_PROFILE:-portfolio-v2}" \
   --required-leagues "$GANA_DAILY_REQUIRED_LEAGUES" \

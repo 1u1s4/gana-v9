@@ -4,7 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
-import { compactPath, parseJsonObject, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
+import { buildCronOutcome, compactPath, durationBetween, parseJsonObject, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
+import { countPublishableSelections, readCurrentRecommendationArtifact } from './lib/daily-e2e-wrapper-state.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -27,11 +28,21 @@ if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
   throw new Error('--provider-concurrency must be a positive integer.');
 }
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}.log`);
+const outcomePath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}-outcome.json`);
 const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
 const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `daily-e2e-${date}.lock`);
 
 mkdirSync(dirname(logPath), { recursive: true });
 if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
+  writeOutcome(buildCronOutcome({
+    flow: 'daily-e2e',
+    status: 'skipped',
+    date,
+    timezone: TIMEZONE,
+    batchId: dailyBatchId,
+    reason: 'not-before guard',
+    artifacts: [outcomePath],
+  }));
   console.log(renderCronRichSummary({
     title: 'Gana v9 · Daily E2E omitido',
     status: 'skipped',
@@ -54,6 +65,16 @@ if (!args.force) {
 }
 if (!args.force && !acquiredRunLock) {
   const retryAfter = typeof existingRunLock?.retryAfter === 'string' ? existingRunLock.retryAfter : undefined;
+  writeOutcome(buildCronOutcome({
+    flow: 'daily-e2e',
+    status: 'skipped',
+    date,
+    timezone: TIMEZONE,
+    batchId: dailyBatchId,
+    reason: retryAfter ? 'retry pending' : 'lock active',
+    artifacts: [lockPath, outcomePath],
+    retryAfter,
+  }));
   console.log(renderCronRichSummary({
     title: 'Gana v9 · Daily E2E omitido',
     status: 'skipped',
@@ -118,8 +139,15 @@ try {
   writeLogLine(logFd, `completed ${completedAt.toISOString()} status=${result.status} signal=${result.signal ?? 'none'}`);
   if (result.error) writeLogLine(logFd, `error ${result.error.message}`);
 
-  const selectionCount = existsSync(recommendationsPath) ? recommendationSelectionCount(recommendationsPath) : 0;
-  if (existsSync(recommendationsPath) && selectionCount > 0) {
+  const artifactState = readCurrentRecommendationArtifact(recommendationsPath, { date, dailyBatchId, startedAt });
+  const publishableCounts = artifactState.ok ? countPublishableSelections(artifactState.artifact) : {
+    total: 0,
+    recommendations: 0,
+    requiredAtomic: 0,
+    requiredSelectedParlays: 0,
+  };
+  const selectionCount = publishableCounts.total;
+  if (artifactState.ok && selectionCount > 0) {
     const notify = spawnSync('node', [
       '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs',
       '--artifact', recommendationsPath,
@@ -159,13 +187,50 @@ try {
       timezone: TIMEZONE,
       rows: [
         ['Batch', dailyBatchId],
-        ['Selecciones', selectionCount],
+        ['Publicables', selectionCount],
+        ['Daily recs', publishableCounts.recommendations],
+        ['Obligatorias', publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays],
         ['Run exit', result.status ?? 'unknown'],
+        ['Duración', durationBetween(startedAt, completedAt)],
         ['Discord recomendaciones', recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')],
         ['Discord council', councilNotifyResult?.discordResult?.message_id],
       ],
-      artifacts: [recommendationsPath, logPath].map(compactPath),
+      artifacts: [recommendationsPath, logPath, outcomePath].map(compactPath),
       footer: '🛡️ Revisión manual requerida antes de promoción · sin ejecución monetaria',
+    }));
+    if (acquiredRunLock) {
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: 'published',
+        selectionCount,
+        recommendationCount: publishableCounts.recommendations,
+        requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
+        completedAt: completedAt.toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e',
+      status: 'published',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      startedAt,
+      completedAt,
+      command,
+      exitStatus: result.status,
+      signal: result.signal,
+      counts: publishableCounts,
+      notifications: {
+        recommendations: recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean),
+        council: councilNotifyResult?.discordResult?.message_id,
+      },
+      artifacts: [
+        { label: 'recommendations', path: recommendationsPath },
+        { label: 'log', path: logPath },
+        { label: 'outcome', path: outcomePath },
+      ],
     }));
     if (result.status !== 0) {
       writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
@@ -173,12 +238,15 @@ try {
     process.exitCode = 0;
     handled = true;
   }
-  if (existsSync(recommendationsPath) && selectionCount === 0) {
-    writeLogLine(logFd, `recommendations artifact contains zero selections; sending operational alert instead of empty Discord recommendations: ${recommendationsPath}`);
+  if (artifactState.ok && selectionCount === 0) {
+    writeLogLine(logFd, `recommendations artifact contains zero publishable selections; sending operational alert instead of empty Discord recommendations: ${recommendationsPath}`);
+  }
+  if (!artifactState.ok) {
+    writeLogLine(logFd, `recommendations artifact is not publishable for this run: ${artifactState.reason}`);
   }
 
   if (!handled) {
-    const latest = existsSync(recommendationsPath) ? recommendationsPath : findLatestRecommendations(date);
+    const latest = artifactState.ok ? recommendationsPath : findLatestRecommendations(date);
     await sendStatus(discordTargets.alerts, {
       title: '⚠️ Gana v9 · Daily E2E requiere revisión',
       description: [
@@ -199,17 +267,40 @@ try {
         ['Batch', dailyBatchId],
         ['Exit', result.status ?? 'unknown'],
         ['Signal', result.signal ?? 'none'],
+        ['Duración', durationBetween(startedAt, completedAt)],
+        ['Artifact gate', artifactState.reason],
+        ['Publicables', selectionCount],
         ['Discord alertas', discordTargets.alerts],
       ],
-      artifacts: [latest, logPath].filter(Boolean).map(compactPath),
+      artifacts: [latest, logPath, outcomePath].filter(Boolean).map(compactPath),
       footer: '⚠️ Revisar logs antes de promoción; no se enviaron recomendaciones vacías.',
     }));
-    process.exitCode = result.status ?? 1;
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e',
+      status: 'review-required',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      startedAt,
+      completedAt,
+      command,
+      exitStatus: result.status,
+      signal: result.signal,
+      reason: artifactState.reason,
+      counts: publishableCounts,
+      notifications: { alerts: discordTargets.alerts },
+      artifacts: [
+        ...(latest ? [{ label: 'latest', path: latest }] : []),
+        { label: 'log', path: logPath },
+        { label: 'outcome', path: outcomePath },
+      ],
+    }));
+    process.exitCode = result.status === 0 ? 1 : result.status ?? 1;
   }
 } finally {
   if (acquiredRunLock && !sentRecommendations) {
     const retryAfter = new Date(Date.now() + retryDelayMs).toISOString();
-    writeRetryableLock(lockPath, {
+    writeLock(lockPath, {
       date,
       dailyBatchId,
       status: 'retryable',
@@ -278,9 +369,14 @@ function acquireOnce(path, ttlMs, payload) {
   return true;
 }
 
-function writeRetryableLock(path, payload) {
+function writeLock(path, payload) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function writeOutcome(payload) {
+  mkdirSync(dirname(outcomePath), { recursive: true });
+  writeFileSync(outcomePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function readJsonFile(path) {
@@ -340,17 +436,6 @@ function requireValue(argv, index, flag) {
 function writeLogLine(fd, line) {
   if (!line) return;
   writeSync(fd, `${line}\n`);
-}
-
-function recommendationSelectionCount(path) {
-  try {
-    const artifact = JSON.parse(readFileSync(path, 'utf8'));
-    if (Array.isArray(artifact.recommendations)) return artifact.recommendations.length;
-    if (Array.isArray(artifact.selections)) return artifact.selections.length;
-    return 0;
-  } catch {
-    return 0;
-  }
 }
 
 function findLatestRecommendations(date) {
