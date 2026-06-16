@@ -455,7 +455,7 @@ export function selectRecommendations(artifact) {
   ];
 }
 
-function attachRequiredLeagueRecommendations(artifact, artifactPath) {
+export function attachRequiredLeagueRecommendations(artifact, artifactPath) {
   if (artifact.requiredLeagueRecommendations && typeof artifact.requiredLeagueRecommendations === 'object') return;
   const requiredPath = typeof artifact.requiredLeagueRecommendationsPath === 'string'
     ? artifact.requiredLeagueRecommendationsPath.trim()
@@ -475,7 +475,7 @@ function attachRequiredLeagueRecommendations(artifact, artifactPath) {
   }
 }
 
-function attachRequiredLeagueGeneralPredictions(artifact, artifactPath) {
+export function attachRequiredLeagueGeneralPredictions(artifact, artifactPath) {
   if (Array.isArray(artifact.requiredLeagueGeneralPredictions)) return;
   const data = requiredLeagueData(artifact);
   const fixtures = Array.isArray(data?.coverage?.fixtures) ? data.coverage.fixtures : [];
@@ -550,7 +550,7 @@ function formatParlayApproachLines(approaches, label = '🎛️ Enfoques') {
   return [`${label}: ${compact.join(' · ')}`];
 }
 
-function requiredLeagueData(artifact) {
+export function requiredLeagueData(artifact) {
   const embedded = artifact?.requiredLeagueRecommendations;
   if (embedded && typeof embedded === 'object') return embedded;
   if (artifact?.requiredLeagueCoverage || artifact?.requiredLeagueGoalCheck) {
@@ -1104,7 +1104,7 @@ function percentFromMatch(value, pattern) {
   return Number.isFinite(parsed) ? parsed / 100 : null;
 }
 
-function formatRequiredPick(item) {
+export function formatRequiredPick(item) {
   const market = stringOrFallback(item?.market, 'market');
   const selection = stringOrFallback(item?.selection, 'selection');
   const line = Number.isFinite(item?.line) ? formatMetricNumber(item.line, 2) : '';
@@ -1150,7 +1150,7 @@ function requiredLeagueTeams(item) {
     : { home: undefined, away: undefined };
 }
 
-function requiredLeagueTitle(data) {
+export function requiredLeagueTitle(data) {
   const leagues = Array.isArray(data.requiredLeagues)
     ? data.requiredLeagues
     : Array.isArray(data.goalCheck?.requiredLeagues)
@@ -1166,15 +1166,15 @@ function requiredLeagueTitle(data) {
     || 'ligas requeridas';
 }
 
-function requiredLeagueStatus(data) {
+export function requiredLeagueStatus(data) {
   return stringOrFallback(data.goalCheck?.status ?? data.coverage?.status ?? data.status, 'review-required');
 }
 
-function requiredLeagueFixtureLabel(item) {
+export function requiredLeagueFixtureLabel(item) {
   return compactFixtureName(rawRequiredLeagueFixtureLabel(item));
 }
 
-function requiredLeagueFixtureLabelWithKickoff(item) {
+export function requiredLeagueFixtureLabelWithKickoff(item) {
   return fixtureLabelWithKickoff(rawRequiredLeagueFixtureLabel(item), item);
 }
 
@@ -1458,7 +1458,7 @@ export function formatCompactLeg(leg, options = {}) {
   return `${formatMarketIcon(leg)} ${displayFixtureNameWithOptions(leg, options)}: ${formatCompactSelection(leg)} @ ${formatMetricNumber(leg.odds, 2)}`;
 }
 
-function formatMarketIcon(leg) {
+export function formatMarketIcon(leg) {
   const market = stringOrFallback(leg?.market, 'market');
   if (market === 'corners_over_under') return '⛳';
   if (market === 'goals_over_under' || market === 'btts') return '🥅';

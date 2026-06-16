@@ -3,14 +3,25 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  attachRequiredLeagueGeneralPredictions,
+  attachRequiredLeagueRecommendations,
   formatCompactLeg,
   formatExposurePercent,
+  formatMarketIcon,
   formatMetricNumber,
   formatPercent,
+  formatRequiredPick,
   formatStakeRecommendation,
+  parlayProfileEmoji,
+  rankEmoji,
   recommendationCounts,
   recommendationKind,
   recommendationTitle,
+  requiredLeagueData,
+  requiredLeagueFixtureLabel,
+  requiredLeagueFixtureLabelWithKickoff,
+  requiredLeagueStatus,
+  requiredLeagueTitle,
   selectRecommendations,
   sendDiscordNativePayload,
   sendDiscordPayload,
@@ -119,12 +130,20 @@ export function findLatestRecommendationArtifact(root = DEFAULT_ARTIFACT_ROOT, d
 export function loadDailyStats(metricsPath, validationPath, recommendationPath) {
   const metricsArtifact = readJson(metricsPath);
   const validationArtifact = validationPath ? readJson(validationPath) : undefined;
-  const recommendationArtifact = recommendationPath ? readJson(recommendationPath) : undefined;
+  const recommendationArtifact = recommendationPath ? loadRecommendationArtifact(recommendationPath) : undefined;
   return { metricsArtifact, validationArtifact, recommendationArtifact };
 }
 
+function loadRecommendationArtifact(recommendationPath) {
+  const artifact = readJson(recommendationPath);
+  attachRequiredLeagueRecommendations(artifact, recommendationPath);
+  attachRequiredLeagueGeneralPredictions(artifact, recommendationPath);
+  return artifact;
+}
+
 export function buildDiscordPayload(metricsArtifact, options = {}) {
-  const snapshot = selectMetricSnapshot(metricsArtifact, options.date);
+  const metricSnapshot = selectMetricSnapshot(metricsArtifact, options.date);
+  const snapshot = recommendationMetricSnapshot(metricSnapshot, options);
   const validationArtifact = options.validationArtifact;
   const validationCount = Array.isArray(validationArtifact?.validations) ? validationArtifact.validations.length : undefined;
   const gateVerdict = validationArtifact?.gateResult?.verdict;
@@ -160,7 +179,8 @@ export function buildDiscordPayload(metricsArtifact, options = {}) {
 }
 
 export function buildGatewayMessage(metricsArtifact, options = {}) {
-  const snapshot = selectMetricSnapshot(metricsArtifact, options.date);
+  const metricSnapshot = selectMetricSnapshot(metricsArtifact, options.date);
+  const snapshot = recommendationMetricSnapshot(metricSnapshot, options);
   const validationArtifact = options.validationArtifact;
   const validationCount = Array.isArray(validationArtifact?.validations) ? validationArtifact.validations.length : undefined;
   const gateVerdict = validationArtifact?.gateResult?.verdict;
@@ -190,25 +210,27 @@ export function buildValidationMirrorPayload(recommendationArtifact, options = {
   const counts = recommendationCounts(validatedRecommendations);
   const statusCounts = countRecommendationStatuses(validatedRecommendations);
   const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
-  const headerLines = [
-    options.testLabel ? `Nota: ${options.testLabel}` : undefined,
-    `Fecha: ${date}`,
-    `Selecciones: ${counts.parlay} parlays, ${counts.atomic} simples`,
-    `Resultado: ${formatRecommendationStatusSummary(statusCounts)}`,
-    'Uso: tracking analitico; sin ejecucion monetaria.',
-    '',
-  ].filter((line) => line !== undefined);
-  const embeds = [];
+  const embeds = [{
+    title: '📊 Gana v9 · Validación de recomendaciones',
+    description: [
+      options.testLabel ? `🧪 ${options.testLabel}` : undefined,
+      `📅 ${date}`,
+      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
+      `Resultado: ${formatRecommendationStatusSummary(statusCounts)}`,
+      'Tracking analítico · Sin ejecución monetaria',
+    ].filter(Boolean).join('\n'),
+    color: 0x2f80ed,
+    footer: { text: 'Gana Hermes · Discord native embeds' },
+    timestamp: new Date().toISOString(),
+  }];
 
-  if (validatedRecommendations.length) {
-    embeds.push(...validationMirrorSummaryEmbeds(validatedRecommendations, headerLines));
-  } else {
-    embeds.push({
-      title: 'Sin selecciones',
-      description: [...headerLines, 'El artifact de recomendaciones no contiene selecciones para validar.'].join('\n'),
-      color: 0x828282,
-    });
-  }
+  if (validatedRecommendations.length) embeds.push(...validationMirrorSelectionEmbeds(validatedRecommendations));
+  else embeds.push({
+    title: 'Sin selecciones',
+    description: 'El artifact de recomendaciones no contiene selecciones para validar.',
+    color: 0x828282,
+  });
+  embeds.push(...validationMirrorRequiredLeagueEmbeds(recommendationArtifact, validationIndex));
 
   return {
     username: stringOrFallback(options.username, 'Gana Hermes'),
@@ -216,6 +238,10 @@ export function buildValidationMirrorPayload(recommendationArtifact, options = {
     content: '',
     embeds,
   };
+}
+
+export function buildValidationMirrorPayloads(recommendationArtifact, options = {}) {
+  return chunkPayloadEmbeds(buildValidationMirrorPayload(recommendationArtifact, options), 10);
 }
 
 export function buildValidationMirrorMessage(recommendationArtifact, options = {}) {
@@ -227,29 +253,26 @@ export function buildValidationMirrorMessage(recommendationArtifact, options = {
   const statusCounts = countRecommendationStatuses(validatedRecommendations);
   const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
   const lines = [
-    'Gana v9 - Validacion de recomendaciones',
+    '📊 Gana v9 · Validación de recomendaciones',
     '',
-    options.testLabel ? `Nota: ${options.testLabel}` : undefined,
-    `Fecha: ${date}`,
-    `Selecciones: ${counts.parlay} parlays, ${counts.atomic} simples`,
+    options.testLabel ? `🧪 ${options.testLabel}` : undefined,
+    `📅 ${date}`,
+    `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
     `Resultado: ${formatRecommendationStatusSummary(statusCounts)}`,
-    'Uso: tracking analitico; sin ejecucion monetaria.',
+    'Tracking analítico · Sin ejecución monetaria',
     '',
   ].filter((line) => line !== undefined);
 
   if (!validatedRecommendations.length) {
     lines.push('> Sin selecciones: el artifact de recomendaciones no contiene selecciones para validar.', '');
   } else {
-    const exceptions = validatedRecommendations
-      .map((recommendation, index) => ({ recommendation, index }))
-      .filter(({ recommendation }) => !['won', 'voided'].includes(normalizeStatus(recommendation.validationStatus)));
-    if (!exceptions.length) lines.push('Sin fallos abiertos: todas las selecciones resueltas cerraron ganadas/anuladas.', '');
-    for (const { recommendation, index } of exceptions) {
-      lines.push(...formatValidationMirrorSummaryLines(recommendation, index));
+    for (const [index, recommendation] of validatedRecommendations.entries()) {
+      lines.push(...formatValidationMirrorSelectionLines(recommendation, index));
     }
   }
+  lines.push(...formatValidationMirrorRequiredLeagueMessageLines(recommendationArtifact, validationIndex));
 
-  lines.push('Revisar pendientes y muestras pequenas antes de ajustar promocion.');
+  lines.push('Revisar pendientes y muestras pequeñas antes de ajustar promoción.');
   return lines.join('\n');
 }
 
@@ -259,12 +282,15 @@ export async function runDailyStatsNotification(options) {
   const { metricsArtifact, validationArtifact } = loadDailyStats(metricsPath, validationPath);
   const snapshot = selectMetricSnapshot(metricsArtifact, options.date);
   const recommendationPath = resolveRecommendationArtifactPath({ ...options, date: options.date ?? snapshot.metricDate });
-  const recommendationArtifact = recommendationPath ? readJson(recommendationPath) : undefined;
-  const payload = buildDiscordPayload(metricsArtifact, { ...options, validationArtifact });
-  const gatewayMessage = buildGatewayMessage(metricsArtifact, { ...options, validationArtifact });
+  const recommendationArtifact = recommendationPath ? loadRecommendationArtifact(recommendationPath) : undefined;
+  const payload = buildDiscordPayload(metricsArtifact, { ...options, validationArtifact, recommendationArtifact });
+  const gatewayMessage = buildGatewayMessage(metricsArtifact, { ...options, validationArtifact, recommendationArtifact });
   const mirrorPayload = recommendationArtifact
     ? buildValidationMirrorPayload(recommendationArtifact, { ...options, date: snapshot.metricDate, validationArtifact })
     : undefined;
+  const mirrorPayloads = recommendationArtifact
+    ? buildValidationMirrorPayloads(recommendationArtifact, { ...options, date: snapshot.metricDate, validationArtifact })
+    : [];
   const mirrorGatewayMessage = recommendationArtifact
     ? buildValidationMirrorMessage(recommendationArtifact, { ...options, date: snapshot.metricDate, validationArtifact })
     : undefined;
@@ -281,6 +307,7 @@ export async function runDailyStatsNotification(options) {
       payload,
       gatewayMessage,
       mirrorPayload,
+      mirrorPayloads,
       mirrorGatewayMessage,
     };
   }
@@ -295,62 +322,396 @@ export async function runDailyStatsNotification(options) {
 
   if (options.transport === 'discord-native') {
     const discordResult = sendDiscordNativePayload(options.gatewayTarget, payload, { hermesPython: options.hermesPython });
-    const mirrorDiscordResult = mirrorPayload
-      ? sendDiscordNativePayload(options.gatewayTarget, mirrorPayload, { hermesPython: options.hermesPython })
-      : undefined;
-    return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, gatewayTarget: options.gatewayTarget, discordResult, mirrorDiscordResult };
+    const mirrorDiscordResults = mirrorPayloads.map((item) => sendDiscordNativePayload(options.gatewayTarget, item, { hermesPython: options.hermesPython }));
+    return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, gatewayTarget: options.gatewayTarget, discordResult, mirrorDiscordResult: mirrorDiscordResults[0], mirrorDiscordResults };
   }
 
   const discordStatus = await sendDiscordPayload(options.webhookUrl, payload);
-  const mirrorDiscordStatus = mirrorPayload ? await sendDiscordPayload(options.webhookUrl, mirrorPayload) : undefined;
-  return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, discordStatus: discordStatus.status, mirrorDiscordStatus: mirrorDiscordStatus?.status };
-}
-
-function validationMirrorSummaryEmbeds(recommendations, headerLines = []) {
-  const embeds = [];
-  let current = [...headerLines];
-  const exceptions = recommendations
-    .map((recommendation, index) => ({ recommendation, index }))
-    .filter(({ recommendation }) => !['won', 'voided'].includes(normalizeStatus(recommendation.validationStatus)));
-  if (!exceptions.length) current.push('Sin fallos abiertos: todas las selecciones resueltas cerraron ganadas/anuladas.');
-  for (const { recommendation, index } of exceptions) {
-    const candidate = formatValidationMirrorSummaryLines(recommendation, index);
-    const next = [...current, ...candidate];
-    if (current.length > headerLines.length && next.join('\n').length > DISCORD_DESCRIPTION_LIMIT) {
-      embeds.push(validationMirrorSummaryEmbed(current, embeds.length));
-      current = [...headerLines, ...candidate];
-    } else {
-      current = next;
-    }
+  const mirrorDiscordStatuses = [];
+  for (const item of mirrorPayloads) {
+    const result = await sendDiscordPayload(options.webhookUrl, item);
+    mirrorDiscordStatuses.push(result.status);
   }
-  if (current.length) embeds.push(validationMirrorSummaryEmbed(current, embeds.length));
-  return embeds;
+  return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, discordStatus: discordStatus.status, mirrorDiscordStatus: mirrorDiscordStatuses[0], mirrorDiscordStatuses };
 }
 
-function validationMirrorSummaryEmbed(lines, pageIndex) {
-  return {
-    title: pageIndex === 0 ? 'Gana v9 - Validacion de recomendaciones' : `Gana v9 - Validacion de recomendaciones ${pageIndex + 1}`,
-    description: truncate(lines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
-    color: 0x2f80ed,
-    footer: { text: 'Gana Hermes · Discord native embeds' },
-    timestamp: new Date().toISOString(),
-  };
+function validationMirrorSelectionEmbeds(recommendations) {
+  return recommendations.map((recommendation, index) => {
+    const rank = num(recommendation.rank) || index + 1;
+    const kind = recommendationKind(recommendation);
+    const status = normalizeStatus(recommendation.validationStatus);
+    return {
+      title: `${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
+      description: truncate(formatValidationMirrorSelectionBody(recommendation, status).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+      color: statusColor(status),
+    };
+  });
 }
 
-function formatValidationMirrorSummaryLines(recommendation, index) {
+function formatValidationMirrorSelectionLines(recommendation, index) {
   const rank = num(recommendation.rank) || index + 1;
   const kind = recommendationKind(recommendation);
   const status = normalizeStatus(recommendation.validationStatus);
-  const type = kind === 'atomic-prediction' ? 'Simple' : 'Parlay';
   const lines = [
-    `${rank}. ${type}: ${validationMirrorSummaryTitle(recommendation, kind)} - ${statusLabel(status)} (${formatValidationMirrorLegSummary(recommendation.legs)})`,
-    formatValidationMirrorMetricLine(recommendation, status),
+    `${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
+    ...formatValidationMirrorSelectionBody(recommendation, status),
+    '',
   ];
-
-  const exceptionLines = formatValidationMirrorExceptionLines(recommendation.legs, status);
-  if (exceptionLines.length) lines.push(...exceptionLines);
-  lines.push('');
   return lines;
+}
+
+function formatValidationMirrorSelectionBody(recommendation, status) {
+  const lines = [];
+  if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
+    for (const leg of recommendation.legs.slice(0, 8)) {
+      lines.push(`${statusIcon(leg.validationStatus)} ${formatCompactLeg(leg)}`);
+      lines.push(`   Real: ${formatActualResult(leg)}`);
+    }
+    if (recommendation.legs.length > 8) lines.push(`+${recommendation.legs.length - 8} selecciones adicionales`);
+  } else {
+    lines.push('Sin detalle de selecciones.');
+  }
+  lines.push(formatValidationMirrorMetricLine(recommendation, status));
+  return lines;
+}
+
+function validationMirrorRequiredLeagueEmbeds(recommendationArtifact, validationIndex) {
+  const data = requiredLeagueValidationData(recommendationArtifact, validationIndex);
+  if (!data) return [];
+  const title = requiredLeagueTitle(data);
+  const embeds = [];
+  const summaryLines = formatRequiredLeagueValidationSummaryLines(data);
+  if (summaryLines.length) {
+    embeds.push({
+      title: `🌍 Obligatorio · ${title}`,
+      description: truncate(summaryLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+      color: requiredLeagueStatus(data) === 'passed' ? 0x27ae60 : 0xf2994a,
+    });
+  }
+
+  const predictionLines = formatRequiredLeagueValidationPredictionLines(data);
+  if (predictionLines.length) {
+    embeds.push({
+      title: `📌 Predicciones obligatorias · ${title}`,
+      description: truncate(predictionLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+      color: 0x9b51e0,
+    });
+  }
+
+  const generalLines = formatRequiredLeagueValidationGeneralPredictionLines(data);
+  for (const [index, description] of chunkLinesByLimit(generalLines.map((line) => `> ${line}`), DISCORD_DESCRIPTION_LIMIT).entries()) {
+    embeds.push({
+      title: index === 0
+        ? `📋 Predicciones generales · ${title}`
+        : `📋 Predicciones generales cont. ${index + 1} · ${title}`,
+      description: truncate(description, DISCORD_DESCRIPTION_LIMIT),
+      color: 0x56ccf2,
+    });
+  }
+
+  embeds.push(...requiredLeagueValidationParlayEmbeds(data));
+  return embeds;
+}
+
+function formatValidationMirrorRequiredLeagueMessageLines(recommendationArtifact, validationIndex) {
+  const data = requiredLeagueValidationData(recommendationArtifact, validationIndex);
+  if (!data) return [];
+  const title = requiredLeagueTitle(data);
+  const lines = [];
+  const summaryLines = formatRequiredLeagueValidationSummaryLines(data);
+  if (summaryLines.length) {
+    lines.push('', `🌍 Obligatorio · ${title}`, ...summaryLines.map((line) => `> ${line}`));
+  }
+  const predictionLines = formatRequiredLeagueValidationPredictionLines(data);
+  if (predictionLines.length) {
+    lines.push('', `📌 Predicciones obligatorias · ${title}`, ...predictionLines.map((line) => `> ${line}`));
+  }
+  const generalLines = formatRequiredLeagueValidationGeneralPredictionLines(data);
+  if (generalLines.length) {
+    lines.push('', `📋 Predicciones generales · ${title}`, ...generalLines.map((line) => `> ${line}`));
+  }
+  const parlayLines = formatRequiredLeagueValidationParlayMessageLines(data);
+  if (parlayLines.length) {
+    lines.push('', ...parlayLines);
+  }
+  if (lines.length) lines.push('');
+  return lines;
+}
+
+function requiredLeagueValidationData(recommendationArtifact, validationIndex) {
+  const data = requiredLeagueData(recommendationArtifact);
+  if (!data) return undefined;
+  const generalPredictions = Array.isArray(data.generalPredictions)
+    ? data.generalPredictions
+    : Array.isArray(recommendationArtifact?.requiredLeagueGeneralPredictions)
+      ? recommendationArtifact.requiredLeagueGeneralPredictions
+      : [];
+  return {
+    ...data,
+    atomicProjections: Array.isArray(data.atomicProjections)
+      ? data.atomicProjections.map((projection) => applyRequiredLeagueValidationOverlay(projection, validationIndex))
+      : [],
+    parlayProjections: Array.isArray(data.parlayProjections)
+      ? data.parlayProjections.map((projection) => {
+        const legs = Array.isArray(projection?.legs)
+          ? projection.legs.map((leg) => applyRequiredLeagueValidationOverlay(leg, validationIndex))
+          : [];
+        return {
+          ...projection,
+          legs,
+          validationStatus: aggregateRecommendationStatus(legs, projection.validationStatus),
+        };
+      })
+      : [],
+    generalPredictions: generalPredictions.map((prediction) => applyRequiredLeagueValidationOverlay(prediction, validationIndex)),
+  };
+}
+
+function applyRequiredLeagueValidationOverlay(item, validationIndex) {
+  const validation = requiredLeagueValidationForItem(item, validationIndex);
+  if (!validation) return { ...item };
+  return {
+    ...item,
+    validationStatus: validation.__fixtureFallback ? item?.validationStatus : resolveLegStatus(item, validation),
+    validationReason: validation?.reason || validation?.outcome?.reason || item?.validationReason,
+    validationActual: resolveValidationActual(validation) ?? item?.validationActual,
+  };
+}
+
+function requiredLeagueValidationForItem(item, validationIndex) {
+  const predictionId = typeof item?.predictionId === 'string' ? item.predictionId.trim() : '';
+  if (predictionId) {
+    const predictionValidation = validationIndex.byPredictionId.get(predictionId);
+    if (predictionValidation) return predictionValidation;
+  }
+  const artifactSelectionId = requiredLeagueArtifactSelectionId(item);
+  if (artifactSelectionId) {
+    const artifactValidation = validationIndex.byArtifactSelectionId.get(artifactSelectionId);
+    if (artifactValidation) return artifactValidation;
+  }
+  const fixtureId = typeof item?.fixtureId === 'string' ? item.fixtureId.trim() : '';
+  const fixtureValidation = fixtureId ? validationIndex.byFixtureId.get(fixtureId) : undefined;
+  return fixtureValidation
+    ? { ...fixtureValidation, status: item?.validationStatus, outcome: { status: item?.validationStatus }, __fixtureFallback: true }
+    : undefined;
+}
+
+function requiredLeagueArtifactSelectionId(item) {
+  const fixtureId = typeof item?.fixtureId === 'string' ? item.fixtureId.trim() : '';
+  const market = typeof item?.market === 'string' ? item.market.trim() : '';
+  const selection = typeof item?.selection === 'string' ? item.selection.trim() : '';
+  if (!fixtureId || !market || !selection) return '';
+  const providerFixtureId = typeof item?.providerFixtureId === 'string' ? item.providerFixtureId.trim() : '';
+  const line = Number.isFinite(item?.line) ? String(item.line) : '';
+  return ['required-league-general', fixtureId, providerFixtureId, market, selection, line].join('|');
+}
+
+function formatRequiredLeagueValidationSummaryLines(data) {
+  const lines = [];
+  const fixtures = Array.isArray(data.coverage?.fixtures) ? data.coverage.fixtures : [];
+  for (const fixture of fixtures.slice(0, 4)) {
+    const status = stringOrFallback(fixture?.status, 'unknown');
+    const icon = status === 'covered' ? '✅' : status === 'missing-predictions' ? '🚫' : '🟡';
+    const predictionCount = Number.isFinite(fixture?.predictionCount) ? fixture.predictionCount : 0;
+    const promotableCount = Number.isFinite(fixture?.promotableCount) ? fixture.promotableCount : 0;
+    const detail = status === 'missing-predictions'
+      ? 'sin predicción válida'
+      : `${promotableCount} ${promotableCount === 1 ? 'proyección fuerte' : 'proyecciones fuertes'} / ${predictionCount} ${predictionCount === 1 ? 'predicción' : 'predicciones'}`;
+    lines.push(`${icon} ${requiredLeagueFixtureLabelWithKickoff(fixture)}:`);
+    lines.push(detail);
+  }
+
+  const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
+  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  const selectedParlays = parlayProjections.filter((projection) => projection?.status === 'selected').length;
+  if (atomic.length || parlayProjections.length) {
+    lines.push(`📌 ${atomic.length} ${atomic.length === 1 ? 'predicción obligatoria' : 'predicciones obligatorias'} · 🎛️ ${selectedParlays}/${parlayProjections.length} ${parlayProjections.length === 1 ? 'parlay seleccionado' : 'parlays seleccionados'}`);
+  }
+  return lines;
+}
+
+function formatRequiredLeagueValidationPredictionLines(data) {
+  const lines = [];
+  const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
+  for (const projection of atomic.slice(0, 4)) {
+    const metrics = [
+      `${formatMarketIcon(projection)} ${formatRequiredPick(projection)} @ ${formatMetricNumber(projection?.odds, 2)}`,
+      `Conf ${formatPercent(projection?.confidence)}`,
+    ].filter(Boolean).join(' · ');
+    lines.push(`${requiredLeagueValidationIcon(projection)} ${requiredLeagueFixtureLabel(projection)}`);
+    lines.push(`   ${metrics}`);
+    lines.push(`   Real: ${formatActualResult(projection)}`);
+  }
+  return lines;
+}
+
+function formatRequiredLeagueValidationGeneralPredictionLines(data) {
+  const predictions = Array.isArray(data.generalPredictions) ? data.generalPredictions : [];
+  if (!predictions.length) return [];
+  const fixtures = Array.isArray(data.coverage?.fixtures) ? data.coverage.fixtures : [];
+  const lines = [];
+  const used = new Set();
+  for (const fixture of fixtures) {
+    const matches = predictions
+      .map((prediction, index) => ({ prediction, index }))
+      .filter(({ prediction, index }) => !used.has(index) && sameRequiredLeagueFixture(prediction, fixture));
+    const groups = groupRequiredLeagueValidationGeneralPredictions(matches.map(({ prediction }) => prediction));
+    if (!groups.length) continue;
+    lines.push(requiredLeagueFixtureLabel(fixture));
+    for (const { index } of matches) used.add(index);
+    for (const group of groups.slice(0, 8)) {
+      lines.push(`   ${formatRequiredLeagueValidationGeneralPredictionGroup(group)}`);
+      const actual = group.predictions.find(hasValidationDetail);
+      if (actual) lines.push(`   Real: ${formatActualResult(actual)}`);
+    }
+  }
+  const unmatched = predictions.filter((_, index) => !used.has(index));
+  for (const group of groupRequiredLeagueValidationGeneralPredictions(unmatched).slice(0, 8)) {
+    lines.push(requiredLeagueFixtureLabel(group.predictions[0]));
+    lines.push(`   ${formatRequiredLeagueValidationGeneralPredictionGroup(group)}`);
+    const actual = group.predictions.find(hasValidationDetail);
+    if (actual) lines.push(`   Real: ${formatActualResult(actual)}`);
+  }
+  return lines;
+}
+
+function groupRequiredLeagueValidationGeneralPredictions(predictions) {
+  const groups = new Map();
+  for (const prediction of predictions) {
+    const line = Number.isFinite(prediction?.line) ? formatMetricNumber(prediction.line, 2) : '';
+    const key = [
+      requiredLeagueFixtureKeys(prediction)[0] ?? requiredLeagueFixtureLabel(prediction),
+      stringOrFallback(prediction?.market, ''),
+      stringOrFallback(prediction?.selection, ''),
+      line,
+    ].join('|');
+    if (!groups.has(key)) {
+      groups.set(key, {
+        market: prediction?.market,
+        selection: prediction?.selection,
+        line: Number.isFinite(prediction?.line) ? prediction.line : undefined,
+        odds: [],
+        confidence: [],
+        predictions: [],
+      });
+    }
+    const group = groups.get(key);
+    if (Number.isFinite(prediction?.odds)) group.odds.push(prediction.odds);
+    if (Number.isFinite(prediction?.confidence)) group.confidence.push(prediction.confidence);
+    group.predictions.push(prediction);
+  }
+  return [...groups.values()];
+}
+
+function formatRequiredLeagueValidationGeneralPredictionGroup(group) {
+  const representative = {
+    ...group.predictions[0],
+    market: group.market,
+    selection: group.selection,
+    line: group.line,
+    odds: meanFinite(group.odds),
+    confidence: meanFinite(group.confidence),
+  };
+  return [
+    `${requiredLeagueValidationIcon(group.predictions)} ${formatMarketIcon(representative)} ${formatRequiredPick(representative)} @ ${formatMetricNumber(representative?.odds, 2)}`,
+    `Conf ${formatPercent(representative?.confidence)}`,
+  ].filter(Boolean).join(' · ');
+}
+
+function sameRequiredLeagueFixture(a, b) {
+  const keysA = requiredLeagueFixtureKeys(a);
+  const keysB = new Set(requiredLeagueFixtureKeys(b));
+  return keysA.some((key) => keysB.has(key));
+}
+
+function requiredLeagueFixtureKeys(item) {
+  return [
+    item?.fixtureId,
+    item?.providerFixtureId,
+    item?.fixture,
+    item?.display?.fixtureLabel,
+  ].filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim());
+}
+
+function requiredLeagueValidationParlayEmbeds(data) {
+  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  return parlayProjections.slice(0, 3).map((projection, index) => ({
+    title: requiredLeagueValidationParlayTitle(projection, index),
+    description: truncate(formatRequiredLeagueValidationParlayBody(projection).map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+    color: statusColor(projection.validationStatus),
+  }));
+}
+
+function formatRequiredLeagueValidationParlayMessageLines(data) {
+  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  const lines = [];
+  for (const [index, projection] of parlayProjections.slice(0, 3).entries()) {
+    lines.push(requiredLeagueValidationParlayTitle(projection, index));
+    lines.push(...formatRequiredLeagueValidationParlayBody(projection).map((line) => `> ${line}`));
+    lines.push('');
+  }
+  return lines;
+}
+
+function requiredLeagueValidationParlayTitle(projection, index) {
+  const profile = stringOrFallback(projection?.profile, 'profile unknown');
+  const legs = Array.isArray(projection?.legs) ? projection.legs : [];
+  const title = legs.slice(0, 4).map(requiredLeagueFixtureLabel).join(' + ');
+  const extra = legs.length > 4 ? ` +${legs.length - 4}` : '';
+  return truncate([
+    `${rankEmoji(index + 1)} ${statusIcon(projection.validationStatus)} ${parlayProfileEmoji(profile)} ${profile}`,
+    title ? `${title}${extra}` : undefined,
+  ].filter(Boolean).join(' · '), 256);
+}
+
+function formatRequiredLeagueValidationParlayBody(projection) {
+  const legs = Array.isArray(projection?.legs) ? projection.legs : [];
+  const lines = [];
+  for (const leg of legs.slice(0, 8)) {
+    lines.push(`${statusIcon(leg.validationStatus)} ${formatMarketIcon(leg)} ${requiredLeagueFixtureLabel(leg)}: ${formatRequiredPick(leg)} @ ${formatMetricNumber(leg?.odds, 2)}`);
+    lines.push(`   Real: ${formatActualResult(leg)}`);
+  }
+  if (!legs.length) lines.push(formatRequiredLeagueBlockedReason(projection));
+  lines.push(formatRequiredLeagueValidationParlayMetricLine(projection));
+  return lines.filter(Boolean);
+}
+
+function formatRequiredLeagueValidationParlayMetricLine(projection) {
+  const status = normalizeStatus(projection.validationStatus);
+  return [
+    `📊 Resultado ${statusIcon(status)} ${status}`,
+    `Odds ${formatMetricNumber(projection.combinedOdds, 2)}`,
+    `🍀 Conf ${formatPercent(projection.aggregateConfidence)}`,
+  ].filter(Boolean).join(' · ');
+}
+
+function formatRequiredLeagueBlockedReason(projection) {
+  const reasons = Array.isArray(projection?.reasons) ? projection.reasons : [];
+  if (String(projection?.status) === 'blocked') return 'No publicado: sin cupón válido.';
+  return stringOrFallback(reasons[0], 'Sin detalle de selecciones.');
+}
+
+function hasValidationDetail(item) {
+  return Boolean(item?.validationActual || item?.validationReason);
+}
+
+function requiredLeagueValidationIcon(itemOrItems) {
+  const items = Array.isArray(itemOrItems) ? itemOrItems : [itemOrItems];
+  const validationStatuses = items
+    .map((item) => item?.validationStatus)
+    .filter((status) => typeof status === 'string' && status.trim());
+  if (validationStatuses.length) {
+    return statusIcon(aggregateRecommendationStatus(validationStatuses.map((status) => ({ validationStatus: status })), undefined));
+  }
+  const statuses = items.map((item) => stringOrFallback(item?.status, 'review-required'));
+  if (statuses.includes('promotable') || statuses.includes('selected')) return '✅';
+  if (statuses.includes('blocked')) return '🚫';
+  return '🟡';
+}
+
+function meanFinite(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : undefined;
 }
 
 function countRecommendationStatuses(recommendations) {
@@ -359,6 +720,27 @@ function countRecommendationStatuses(recommendations) {
     counts[normalizeStatus(recommendation?.validationStatus)] += 1;
   }
   return counts;
+}
+
+function statusIcon(status) {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'won') return '✅';
+  if (normalized === 'lost') return '❌';
+  if (normalized === 'voided') return '➖';
+  if (normalized === 'pending') return '⏳';
+  if (normalized === 'blocked') return '🚫';
+  if (normalized === 'unvalidated') return '⚪';
+  return '❔';
+}
+
+function statusColor(status) {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'won') return 0x27ae60;
+  if (normalized === 'lost') return 0xeb5757;
+  if (normalized === 'voided') return 0x828282;
+  if (normalized === 'pending') return 0xf2c94c;
+  if (normalized === 'blocked') return 0xf2994a;
+  return 0x9b51e0;
 }
 
 function formatRecommendationStatusSummary(counts) {
@@ -373,28 +755,17 @@ function formatRecommendationStatusSummary(counts) {
   ].filter(Boolean).join(', ') || 'sin selecciones';
 }
 
-function validationMirrorSummaryTitle(recommendation, kind) {
-  if (kind === 'atomic-prediction') return recommendationTitle(recommendation);
-  const fixtures = Array.isArray(recommendation.legs)
-    ? recommendation.legs
-      .map((leg) => (typeof leg?.fixture === 'string' ? leg.fixture.trim() : ''))
-      .filter(Boolean)
-    : [];
-  const uniqueFixtures = [...new Set(fixtures)];
-  return uniqueFixtures.length ? uniqueFixtures.join(' + ') : recommendationTitle(recommendation);
-}
-
 function formatValidationMirrorMetricLine(recommendation, status) {
-  const normalized = normalizeStatus(status);
   const stake = formatStakeRecommendation(recommendation);
   const parts = [
+    `📊 Resultado ${statusIcon(status)} ${status}`,
     `Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
-    normalized === 'won' ? undefined : `Conf ${formatPercent(recommendation.aggregateConfidence)}`,
-    normalized === 'won' ? undefined : `Edge ${formatPercent(recommendation.expectedEdge)}`,
-    normalized === 'won' ? undefined : stake ? `Stake ${stake}` : undefined,
+    `🍀 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
+    stake ? `💵 Stake ${stake}` : undefined,
   ];
-  if (normalized !== 'won' && !stake) parts.push(`Expo ${formatExposurePercent(recommendation)}`);
-  return `Detalle: ${parts.filter(Boolean).join(' · ')}`;
+  if (!stake) parts.push(`📌 Expo ${formatExposurePercent(recommendation)}`);
+  return parts.filter(Boolean).join(' · ');
 }
 
 function formatValidationMirrorLegSummary(legs) {
@@ -420,6 +791,58 @@ function countLegStatuses(legs) {
   return counts;
 }
 
+function formatActualResult(leg) {
+  const actual = leg?.validationActual;
+  if (actual && typeof actual === 'object') {
+    const summary = typeof actual.summary === 'string' && actual.summary.trim() ? actual.summary.trim() : '';
+    const score = formatActualScore(actual.fixture);
+    if (leg.market === 'corners_over_under') {
+      const corners = formatActualCorners(actual.statistics);
+      if (corners) return corners;
+      if (/corners/i.test(summary)) return summary;
+      return score ? `corners no disponibles (${score})` : 'corners no disponibles';
+    }
+    if (leg.market === 'goals_over_under') {
+      const goals = actual.fixture ? num(actual.fixture.scoreHome) + num(actual.fixture.scoreAway) : undefined;
+      return Number.isFinite(goals) ? `goles totales ${goals}${score ? ` (${score})` : ''}` : score || 'score no disponible';
+    }
+    if (leg.market === 'btts') {
+      if (actual.fixture && Number.isFinite(actual.fixture.scoreHome) && Number.isFinite(actual.fixture.scoreAway)) {
+        const yesNo = actual.fixture.scoreHome > 0 && actual.fixture.scoreAway > 0 ? 'SI' : 'NO';
+        return `BTTS ${yesNo} (${formatActualScore(actual.fixture)})`;
+      }
+      return score || 'score no disponible';
+    }
+    if (score) return score;
+    if (summary) return summary;
+  }
+  const reason = leg?.validationReason;
+  if (reason === 'fixture-cancelled') return 'partido cancelado';
+  if (reason === 'fixture-not-completed') return 'partido pendiente/no finalizado';
+  if (reason === 'corners-statistics-unavailable') return 'corners no disponibles';
+  if (reason === 'final-score-unavailable') return 'score final no disponible';
+  if (typeof reason === 'string' && reason.trim()) return reason.trim();
+  return 'no disponible en artifact';
+}
+
+function formatActualScore(fixture) {
+  if (!fixture || typeof fixture !== 'object') return '';
+  if (Number.isFinite(fixture.scoreHome) && Number.isFinite(fixture.scoreAway)) return `${fixture.scoreHome}-${fixture.scoreAway}`;
+  return '';
+}
+
+function formatActualCorners(statistics) {
+  if (!statistics || typeof statistics !== 'object') return '';
+  if (Number.isFinite(statistics.totalCorners) && Number.isFinite(statistics.cornersHome) && Number.isFinite(statistics.cornersAway)) {
+    return `corners totales ${statistics.totalCorners} (${statistics.cornersHome}-${statistics.cornersAway})`;
+  }
+  if (Number.isFinite(statistics.totalCorners)) return `corners totales ${statistics.totalCorners}`;
+  if (Number.isFinite(statistics.cornersHome) && Number.isFinite(statistics.cornersAway)) {
+    return `corners ${statistics.cornersHome}-${statistics.cornersAway} (total ${statistics.cornersHome + statistics.cornersAway})`;
+  }
+  return '';
+}
+
 function formatValidationMirrorExceptionLines(legs, recommendationStatus) {
   if (!Array.isArray(legs) || !legs.length) return [];
   const normalized = normalizeStatus(recommendationStatus);
@@ -439,23 +862,49 @@ function formatPlainLeg(leg) {
 }
 
 function buildValidationIndex(validationArtifact) {
-  const index = new Map();
+  const index = {
+    byPredictionId: new Map(),
+    byArtifactSelectionId: new Map(),
+    byFixtureId: new Map(),
+  };
   if (!Array.isArray(validationArtifact?.validations)) return index;
   for (const validation of validationArtifact.validations) {
-    const predictionId = typeof validation?.predictionId === 'string' ? validation.predictionId.trim() : '';
-    if (predictionId) index.set(predictionId, validation);
+    addValidationIndexEntry(index, validation);
+    for (const legOutcome of Array.isArray(validation?.outcome?.legOutcomes) ? validation.outcome.legOutcomes : []) {
+      addValidationIndexEntry(index, legOutcome);
+    }
   }
   return index;
+}
+
+function addValidationIndexEntry(index, validation) {
+  if (!validation || typeof validation !== 'object') return;
+  const predictionId = typeof validation?.predictionId === 'string' ? validation.predictionId.trim() : '';
+  if (predictionId) index.byPredictionId.set(predictionId, validation);
+  const artifactSelectionId = typeof validation?.metadata?.artifactSelectionId === 'string'
+    ? validation.metadata.artifactSelectionId.trim()
+    : '';
+  if (artifactSelectionId) index.byArtifactSelectionId.set(artifactSelectionId, validation);
+  const fixtureId = typeof validation?.fixtureId === 'string' ? validation.fixtureId.trim() : '';
+  if (fixtureId && resolveValidationActual(validation)) {
+    const current = index.byFixtureId.get(fixtureId);
+    const nextActual = resolveValidationActual(validation);
+    const currentActual = resolveValidationActual(current);
+    if (!current || (hasActualStatistics(nextActual) && !hasActualStatistics(currentActual))) {
+      index.byFixtureId.set(fixtureId, validation);
+    }
+  }
 }
 
 function applyValidationOverlay(recommendation, validationIndex) {
   const legs = Array.isArray(recommendation.legs)
     ? recommendation.legs.map((leg) => {
-      const validation = validationIndex.get(leg?.predictionId);
+      const validation = validationIndex.byPredictionId.get(leg?.predictionId);
       return {
         ...leg,
         validationStatus: resolveLegStatus(leg, validation),
         validationReason: validation?.reason || validation?.outcome?.reason || leg?.validationReason,
+        validationActual: resolveValidationActual(validation),
       };
     })
     : [];
@@ -464,6 +913,23 @@ function applyValidationOverlay(recommendation, validationIndex) {
     legs,
     validationStatus: aggregateRecommendationStatus(legs, recommendation.validationStatus),
   };
+}
+
+function resolveValidationActual(validation) {
+  if (!validation || typeof validation !== 'object') return undefined;
+  if (validation.actual && typeof validation.actual === 'object') return validation.actual;
+  const resultInput = validation.resultInput;
+  if (resultInput && typeof resultInput === 'object') {
+    return {
+      fixture: resultInput.fixture,
+      statistics: resultInput.statistics,
+    };
+  }
+  return undefined;
+}
+
+function hasActualStatistics(actual) {
+  return Boolean(actual?.statistics && typeof actual.statistics === 'object');
 }
 
 function resolveLegStatus(leg, validation) {
@@ -546,6 +1012,88 @@ function selectMetricSnapshot(artifact, date) {
   }
   if (artifact?.metricDate) return artifact;
   throw new Error('daily-metrics artifact does not contain a metric snapshot.');
+}
+
+function recommendationMetricSnapshot(metricSnapshot, options = {}) {
+  const artifact = options.recommendationArtifact;
+  if (!artifact || typeof artifact !== 'object') return metricSnapshot;
+  const validationIndex = buildValidationIndex(options.validationArtifact);
+  const max = parseMaxRecommendations(String(options.maxRecommendations ?? DEFAULT_MAX_RECOMMENDATIONS));
+  const recommendations = selectRecommendations(artifact)
+    .slice(0, Math.min(max, DEFAULT_MAX_RECOMMENDATIONS))
+    .map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
+  const atomic = recommendations.filter((recommendation) => recommendationKind(recommendation) === 'atomic-prediction');
+  const parlays = recommendations.filter((recommendation) => recommendationKind(recommendation) !== 'atomic-prediction');
+  return {
+    ...metricSnapshot,
+    predictionMetrics: summarizeRecommendationMetrics(atomic, true),
+    parlayMetrics: summarizeRecommendationMetrics(parlays, false),
+  };
+}
+
+function summarizeRecommendationMetrics(recommendations, includeEdge) {
+  const rows = recommendations.map((recommendation) => ({
+    status: normalizeStatus(recommendation.validationStatus),
+    odds: finiteOrNull(recommendation.combinedOdds),
+    confidence: finiteOrNull(recommendation.aggregateConfidence),
+    edge: finiteOrNull(recommendation.expectedEdge),
+    provider: stringOrFallback(recommendation.providerAgentic ?? recommendation.provider, 'publicadas'),
+  }));
+  const settled = rows.filter((row) => row.status === 'won' || row.status === 'lost').length;
+  const won = rows.filter((row) => row.status === 'won').length;
+  const lost = rows.filter((row) => row.status === 'lost').length;
+  const metrics = {
+    total: rows.length,
+    won,
+    lost,
+    voided: rows.filter((row) => row.status === 'voided').length,
+    pending: rows.filter((row) => row.status === 'pending').length,
+    blocked: rows.filter((row) => row.status === 'blocked').length,
+    unvalidated: rows.filter((row) => row.status === 'unvalidated' || row.status === 'unknown').length,
+    settled,
+    hitRate: settled ? (won / settled) * 100 : null,
+    avgOdds: meanFinite(rows.map((row) => row.odds)),
+    avgConfidence: meanFinite(rows.map((row) => row.confidence)),
+    byProvider: summarizeRecommendationProviderBuckets(rows, includeEdge),
+  };
+  if (includeEdge) metrics.avgEdge = meanFinite(rows.map((row) => row.edge));
+  return metrics;
+}
+
+function summarizeRecommendationProviderBuckets(rows, includeEdge) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = row.provider || 'publicadas';
+    const current = grouped.get(key) ?? [];
+    current.push(row);
+    grouped.set(key, current);
+  }
+  return [...grouped.entries()].map(([key, values]) => {
+    const settled = values.filter((row) => row.status === 'won' || row.status === 'lost').length;
+    const won = values.filter((row) => row.status === 'won').length;
+    const lost = values.filter((row) => row.status === 'lost').length;
+    const bucket = {
+      key,
+      label: key,
+      total: values.length,
+      won,
+      lost,
+      voided: values.filter((row) => row.status === 'voided').length,
+      pending: values.filter((row) => row.status === 'pending').length,
+      blocked: values.filter((row) => row.status === 'blocked').length,
+      unvalidated: values.filter((row) => row.status === 'unvalidated' || row.status === 'unknown').length,
+      settled,
+      hitRate: settled ? (won / settled) * 100 : null,
+      avgOdds: meanFinite(values.map((row) => row.odds)),
+      avgConfidence: meanFinite(values.map((row) => row.confidence)),
+    };
+    if (includeEdge) bucket.avgEdge = meanFinite(values.map((row) => row.edge));
+    return bucket;
+  }).sort((a, b) => b.total - a.total || a.key.localeCompare(b.key));
+}
+
+function finiteOrNull(value) {
+  return Number.isFinite(value) ? value : null;
 }
 
 function formatCompactMetricSummary(metrics, includeEdge) {
@@ -661,6 +1209,36 @@ function stringOrFallback(value, fallback) {
 function truncate(value, limit) {
   if (value.length <= limit) return value;
   return `${value.slice(0, Math.max(0, limit - 1))}…`;
+}
+
+function chunkLinesByLimit(lines, limit) {
+  const chunks = [];
+  let current = [];
+  let length = 0;
+  for (const line of lines) {
+    const addition = current.length ? line.length + 1 : line.length;
+    if (current.length && length + addition > limit) {
+      chunks.push(current.join('\n'));
+      current = [];
+      length = 0;
+    }
+    current.push(line);
+    length += current.length === 1 ? line.length : line.length + 1;
+  }
+  if (current.length) chunks.push(current.join('\n'));
+  return chunks;
+}
+
+function chunkPayloadEmbeds(payload, maxEmbeds) {
+  if (!Array.isArray(payload?.embeds) || payload.embeds.length <= maxEmbeds) return [payload];
+  const chunks = [];
+  for (let index = 0; index < payload.embeds.length; index += maxEmbeds) {
+    chunks.push({
+      ...payload,
+      embeds: payload.embeds.slice(index, index + maxEmbeds),
+    });
+  }
+  return chunks;
 }
 
 function usage() {

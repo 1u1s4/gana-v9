@@ -162,9 +162,28 @@ describe('daily metrics service', () => {
           legs: [{ predictionId: 'prediction-3' }],
         },
       ],
+      requiredLeagueRecommendations: {
+        atomicProjections: [{ predictionId: 'prediction-required-1' }],
+        parlayProjections: [{
+          profile: 'principal',
+          legs: [{ predictionId: 'prediction-required-2' }],
+        }],
+        generalPredictions: [{
+          fixtureId: 'fixture-required-1',
+          providerFixtureId: 'provider-required-1',
+          fixture: 'Required A vs Required B',
+          market: 'goals_over_under',
+          selection: 'over',
+          line: 1.5,
+          odds: 1.25,
+          confidence: 0.7,
+          status: 'promotable',
+        }],
+      },
     }));
     const predictionQueries: any[] = [];
     const parlayQueries: any[] = [];
+    let artifactPayload: any;
     const db = {
       prediction: {
         findMany: async (args: any) => {
@@ -186,12 +205,22 @@ describe('daily metrics service', () => {
       recommendationArtifact,
     }, { runId: 'metrics-run-published' }, {
       db,
-      writeArtifact: () => '/tmp/daily-metrics.json',
+      writeArtifact: (_runId, _name, payload) => {
+        artifactPayload = payload;
+        return '/tmp/daily-metrics.json';
+      },
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(predictionQueries[0].where.id.in, ['prediction-1', 'prediction-2', 'prediction-3']);
+    assert.deepEqual(predictionQueries[0].where.id.in, [
+      'prediction-1',
+      'prediction-2',
+      'prediction-3',
+      'prediction-required-1',
+      'prediction-required-2',
+    ]);
     assert.deepEqual(parlayQueries[0].where.id.in, ['parlay-1']);
+    assert.equal(artifactPayload.recommendationTargets.artifactSelections.length, 1);
   });
 
   it('writes chart-ready labels in artifacts without circular metric references', async () => {

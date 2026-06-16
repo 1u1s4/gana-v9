@@ -57,6 +57,11 @@ describe('discord daily stats notifier', () => {
   });
 
   it('builds a validated mirror of the prior recommendation message', () => {
+    const statsPayload = buildDiscordPayload(sampleMetricsArtifact(), {
+      date: '2026-05-14',
+      validationArtifact: sampleValidationArtifact(),
+      recommendationArtifact: sampleRecommendationArtifact(),
+    });
     const payload = buildValidationMirrorPayload(sampleRecommendationArtifact(), {
       date: '2026-05-14',
       validationArtifact: sampleValidationArtifact(),
@@ -70,20 +75,39 @@ describe('discord daily stats notifier', () => {
       maxRecommendations: 2,
     });
 
-    assert.equal(payload.embeds.length, 1);
-    assert.equal(payload.embeds[0].title, 'Gana v9 - Validacion de recomendaciones');
-    assert.match(payload.embeds[0].description, /Nota: Esto es una prueba/);
-    assert.match(payload.embeds[0].description, /Selecciones: 1 parlays, 1 simples/);
+    assert.match(statsPayload.embeds[0].description, /Predicciones: 1 ganadas, 0 perdidas, total 1, hit 100%, odds 1.82/);
+    assert.match(statsPayload.embeds[0].description, /Parlays: 0 ganadas, 1 perdidas, total 1, hit 0%, odds 2.24/);
+    assert.equal(payload.embeds.length, 7);
+    assert.equal(payload.embeds[0].title, '📊 Gana v9 · Validación de recomendaciones');
+    assert.match(payload.embeds[0].description, /🧪 Esto es una prueba/);
+    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 1 simples/);
     assert.match(payload.embeds[0].description, /Resultado: 1 ganadas, 1 perdidas/);
-    assert.match(payload.embeds[0].description, /1\. Parlay: Team A vs Team B - perdido \(1 ganado · 1 perdido\)/);
-    assert.match(payload.embeds[0].description, /Detalle: Odds 2.24 · Conf 74% · Edge 8% · Stake 10/);
-    assert.match(payload.embeds[0].description, /Fallo\/pendiente: perdido - Team A vs Team B: goals under 2.5 @ 1.6/);
-    assert.doesNotMatch(payload.embeds[0].description, /h2h home @ 1.4/);
-    assert.doesNotMatch(payload.embeds[0].description, /2\. Simple: Team C vs Team D/);
-    assert.doesNotMatch(payload.embeds[0].description, /Odds 1.82/);
-    assert.doesNotMatch(payload.embeds[0].description, /Stake 5/);
-    assert.doesNotMatch(payload.embeds[0].description, /[📊🎯🧩✅❌⏳⚪]/u);
-    assert.doesNotMatch(message, /2\. Simple: Team C vs Team D/);
+    assert.match(payload.embeds[1].title, /1️⃣ ❌ Team A vs Team B/);
+    assert.match(payload.embeds[1].description, /✅ ⚽ Team A vs Team B: h2h home @ 1.4/);
+    assert.match(payload.embeds[1].description, /Real: 2-1/);
+    assert.match(payload.embeds[1].description, /❌ 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
+    assert.match(payload.embeds[1].description, /Real: goles totales 3 \(2-1\)/);
+    assert.match(payload.embeds[1].description, /Resultado ❌ lost · Odds 2.24 · 🍀 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
+    assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.match(payload.embeds[2].description, /✅ ⛳ Team C vs Team D: corners under 9.5 @ 1.82/);
+    assert.match(payload.embeds[2].description, /Real: corners totales 8 \(5-3\)/);
+    assert.match(payload.embeds[2].description, /💵 Stake 5/);
+    assert.equal(payload.embeds[3].title, '🌍 Obligatorio · World Cup');
+    assert.match(payload.embeds[3].description, /Team E vs Team F · 13:00:/);
+    assert.match(payload.embeds[3].description, /1 proyección fuerte \/ 3 predicciones/);
+    assert.equal(payload.embeds[4].title, '📌 Predicciones obligatorias · World Cup');
+    assert.match(payload.embeds[4].description, /✅ Team E vs Team F/);
+    assert.match(payload.embeds[4].description, /🥅 Más de 1.5 goles @ 1.22 · Conf 80%/);
+    assert.match(payload.embeds[4].description, /Real: goles totales 2 \(1-1\)/);
+    assert.equal(payload.embeds[5].title, '📋 Predicciones generales · World Cup');
+    assert.match(payload.embeds[5].description, /❌ 🥅 Ambos anotan: No @ 1.7 · Conf 65%/);
+    assert.match(payload.embeds[5].description, /Real: BTTS SI \(1-1\)/);
+    assert.match(payload.embeds[6].title, /1️⃣ ✅ 💎 principal · Team E vs Team F/);
+    assert.match(payload.embeds[6].description, /✅ ⚽ Team E vs Team F: Team E o empate @ 1.1/);
+    assert.match(payload.embeds[6].description, /Real: 1-1/);
+    assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.match(message, /🌍 Obligatorio · World Cup/);
+    assert.match(message, /📋 Predicciones generales · World Cup/);
     assert.doesNotMatch(message, /\bbet\b/i);
   });
 
@@ -235,6 +259,76 @@ function sampleRecommendationArtifact() {
         }],
       },
     ],
+    requiredLeagueRecommendations: {
+      requiredLeagues: [{ name: 'World Cup' }],
+      coverage: {
+        fixtures: [{
+          fixtureId: 'wc-1',
+          fixture: 'Team E vs Team F',
+          display: {
+            fixtureLabel: 'Team E vs Team F',
+            homeTeamName: 'Team E',
+            awayTeamName: 'Team F',
+            kickoffLocal: '2026-05-14T13:00:00-06:00',
+          },
+          status: 'covered',
+          promotableCount: 1,
+          predictionCount: 3,
+        }],
+      },
+      goalCheck: { status: 'passed', requiredLeagues: [{ name: 'World Cup' }] },
+      atomicProjections: [{
+        predictionId: 'required-atomic-goals',
+        fixtureId: 'wc-1',
+        fixture: 'Team E vs Team F',
+        display: {
+          fixtureLabel: 'Team E vs Team F',
+          homeTeamName: 'Team E',
+          awayTeamName: 'Team F',
+        },
+        market: 'goals_over_under',
+        selection: 'over',
+        line: 1.5,
+        odds: 1.22,
+        confidence: 0.8,
+        status: 'promotable',
+      }],
+      generalPredictions: [{
+        predictionId: 'required-general-btts',
+        fixtureId: 'wc-1',
+        fixture: 'Team E vs Team F',
+        display: {
+          fixtureLabel: 'Team E vs Team F',
+          homeTeamName: 'Team E',
+          awayTeamName: 'Team F',
+        },
+        market: 'btts',
+        selection: 'no',
+        odds: 1.7,
+        confidence: 0.65,
+        status: 'promotable',
+      }],
+      parlayProjections: [{
+        profile: 'principal',
+        status: 'selected',
+        combinedOdds: 1.1,
+        aggregateConfidence: 0.75,
+        legs: [{
+          predictionId: 'required-parlay-dc',
+          fixtureId: 'wc-1',
+          fixture: 'Team E vs Team F',
+          display: {
+            fixtureLabel: 'Team E vs Team F',
+            homeTeamName: 'Team E',
+            awayTeamName: 'Team F',
+          },
+          market: 'double_chance',
+          selection: 'home_or_draw',
+          odds: 1.1,
+          confidence: 0.75,
+        }],
+      }],
+    },
   };
 }
 
@@ -286,9 +380,36 @@ function sampleValidationArtifact() {
     target: { date: '2026-05-14' },
     gateResult: { verdict: 'won', reasons: [], warnings: [] },
     validations: [
-      { predictionId: 'prediction-h2h-win', status: 'won' },
-      { predictionId: 'prediction-goals-loss', status: 'lost' },
-      { predictionId: 'prediction-corners-win', status: 'won' },
+      {
+        predictionId: 'prediction-h2h-win',
+        status: 'won',
+        actual: { summary: '2-1', fixture: { scoreHome: 2, scoreAway: 1 } },
+      },
+      {
+        predictionId: 'prediction-goals-loss',
+        status: 'lost',
+        actual: { summary: 'goles totales 3 (2-1)', fixture: { scoreHome: 2, scoreAway: 1 } },
+      },
+      {
+        predictionId: 'prediction-corners-win',
+        status: 'won',
+        actual: { summary: 'corners totales 8 (5-3)', statistics: { cornersHome: 5, cornersAway: 3, totalCorners: 8 } },
+      },
+      {
+        predictionId: 'required-atomic-goals',
+        status: 'won',
+        actual: { summary: 'goles totales 2 (1-1)', fixture: { scoreHome: 1, scoreAway: 1 } },
+      },
+      {
+        predictionId: 'required-general-btts',
+        status: 'lost',
+        actual: { summary: 'BTTS SI (1-1)', fixture: { scoreHome: 1, scoreAway: 1 } },
+      },
+      {
+        predictionId: 'required-parlay-dc',
+        status: 'won',
+        actual: { summary: '1-1', fixture: { scoreHome: 1, scoreAway: 1 } },
+      },
     ],
   };
 }

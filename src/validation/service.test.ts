@@ -204,6 +204,10 @@ describe('runValidation prediction targets', () => {
       assert.equal(result.ok, true);
       assert.equal(result.validations[0]?.status, expected);
       assert.equal(result.validations[0]?.outcome.status, expected);
+      if (market === 'goals_over_under') assert.equal(result.validations[0]?.actual?.summary, 'goles totales 3 (2-1)');
+      else if (market === 'btts') assert.equal(result.validations[0]?.actual?.summary, 'BTTS SI (2-1)');
+      else if (market === 'corners_over_under') assert.equal(result.validations[0]?.actual?.summary, 'corners totales 10 (6-4)');
+      else assert.equal(result.validations[0]?.actual?.summary, '2-1');
     });
   }
 
@@ -433,6 +437,23 @@ describe('runValidation parlay and date targets', () => {
           legs: [{ predictionId: 'prediction-atomic-1' }],
         },
       ],
+      requiredLeagueRecommendations: {
+        atomicProjections: [{ predictionId: 'prediction-required-atomic-1' }],
+        parlayProjections: [{
+          profile: 'principal',
+          legs: [{ predictionId: 'prediction-required-parlay-leg-1' }],
+        }],
+        generalPredictions: [{
+          fixtureId: 'fixture-1',
+          providerFixtureId: '1001',
+          fixture: 'Team A vs Team B',
+          market: 'btts',
+          selection: 'yes',
+          odds: 1.8,
+          confidence: 0.7,
+          status: 'promotable',
+        }],
+      },
     }));
     const predictionReads: string[] = [];
     const parlayReads: string[] = [];
@@ -465,9 +486,16 @@ describe('runValidation parlay and date targets', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.deepEqual(predictionReads, ['prediction-parlay-leg-1', 'prediction-atomic-1']);
+    assert.deepEqual(predictionReads, [
+      'prediction-parlay-leg-1',
+      'prediction-atomic-1',
+      'prediction-required-atomic-1',
+      'prediction-required-parlay-leg-1',
+    ]);
     assert.deepEqual(parlayReads, ['parlay-1']);
-    assert.equal(result.validations.length, 3);
+    assert.equal(result.validations.length, 6);
+    assert.equal(result.validations.at(-1)?.metadata?.source, 'required-league-general');
+    assert.equal(result.validations.at(-1)?.actual?.summary, 'BTTS SI (2-1)');
     assert.equal(result.target.recommendationArtifact, recommendationArtifact);
   });
 
@@ -604,5 +632,6 @@ describe('runValidation parlay and date targets', () => {
     assert.equal(result.ok, true);
     assert.equal(result.validations.length, 3);
     assert.deepEqual(fetchInputs.map((input) => input.market), ['h2h', 'corners_over_under']);
+    assert.equal(result.validations.find((item) => item.predictionId === 'prediction-corners')?.actual?.summary, 'corners totales 10 (6-4)');
   });
 });

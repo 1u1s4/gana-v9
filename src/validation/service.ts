@@ -10,7 +10,7 @@ import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
 import { getPrismaClient } from '../storage/db.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
-import { readRecommendationArtifactTargets } from '../recommendations/artifact.js';
+import { readRecommendationArtifactTargets, type RecommendationArtifactSelection } from '../recommendations/artifact.js';
 import type {
   ArtifactRecord,
   FixtureRecord,
@@ -57,8 +57,23 @@ export interface ValidationArtifactView {
   providerSnapshotId?: string;
   status: ValidationStatus;
   reason?: string;
+  actual?: ValidationActualView;
   outcome: SettlementOutcome | { status: ValidationStatus; reason?: string; legOutcomes?: ValidationArtifactView[] };
   evaluatedAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ValidationActualView {
+  summary: string;
+  fixture?: {
+    scoreHome?: number;
+    scoreAway?: number;
+  };
+  statistics?: {
+    cornersHome?: number;
+    cornersAway?: number;
+    totalCorners?: number;
+  };
 }
 
 export interface ValidationRunResult {
@@ -257,7 +272,12 @@ async function validateDateTarget(
       DATE_VALIDATION_CONCURRENCY,
       (parlay) => validateParlayRecord(context, parlay, evaluatedAt, runId),
     );
-    return [...predictionValidations, ...parlayValidations];
+    const artifactSelectionValidations = await mapLimit(
+      targets.artifactSelections,
+      DATE_VALIDATION_CONCURRENCY,
+      (selection) => validateArtifactSelectionRecord(context, selection, evaluatedAt, runId),
+    );
+    return [...predictionValidations, ...parlayValidations, ...artifactSelectionValidations];
   }
 
   const [predictions, parlays] = await Promise.all([
@@ -297,6 +317,61 @@ async function validatePredictionTarget(
   return validatePredictionRecord(context, prediction, evaluatedAt, runId);
 }
 
+async function validateArtifactSelectionRecord(
+  context: ValidationExecutionContext,
+  artifactSelection: RecommendationArtifactSelection,
+  evaluatedAt: string,
+  runId: string,
+): Promise<PendingValidation> {
+  const fixture = await findFixture(context, artifactSelection.fixtureId);
+  if (!fixture) throw new Error(`Fixture "${artifactSelection.fixtureId}" was not found for recommendation artifact selection.`);
+  const selection = selectionFromArtifactSelection(artifactSelection);
+  const fetched = await fetchValidationResult(context, fixture, selection.market);
+  const outcome = settleMarket({
+    selection,
+    fixture: fetched.fixture,
+    statistics: fetched.statistics,
+    evaluatedAt,
+  });
+  const actual = buildActualView(selection.market, fetched);
+  const resultInput = compactJson({
+    selection,
+    fixture: fetched.fixture,
+    statistics: fetched.statistics,
+  });
+
+  return validationFor({
+    runId,
+    fixtureId: fixture.id,
+    providerSnapshotId: fetched.providerSnapshotId,
+    status: outcome.status,
+    reason: outcome.reason,
+    evaluatedAt,
+    outcome,
+    actual,
+    resultInput,
+    evidenceIds: [],
+    metadata: {
+      source: artifactSelection.source,
+      artifactSelectionId: artifactSelection.artifactSelectionId,
+      providerFixtureId: fixture.providerFixtureId,
+      resultProviderSnapshotId: fetched.resultProviderSnapshotId ?? null,
+      statisticsProviderSnapshotId: fetched.statisticsProviderSnapshotId ?? null,
+      modelProbability: numberOrUndefined(artifactSelection.confidence),
+      promptVersion: 'required-league-general-artifact',
+      modelId: 'artifact-selection',
+      market: artifactSelection.market,
+      league: fixture.competitionId ?? 'unknown-league',
+      fixture: artifactSelection.fixture,
+      odds: artifactSelection.odds ?? null,
+      confidence: artifactSelection.confidence ?? null,
+      expectedEdge: artifactSelection.expectedEdge ?? null,
+      display: artifactSelection.display ?? null,
+      status: artifactSelection.status ?? null,
+    },
+  });
+}
+
 async function validatePredictionRecord(
   context: ValidationExecutionContext,
   prediction: PredictionRecord,
@@ -320,6 +395,7 @@ async function validatePredictionRecord(
     fixture: fetched.fixture,
     statistics: fetched.statistics,
   });
+  const actual = buildActualView(selection.market, fetched);
 
   return validationFor({
     runId,
@@ -330,6 +406,7 @@ async function validatePredictionRecord(
     reason: outcome.reason,
     evaluatedAt,
     outcome,
+    actual,
     resultInput,
     evidenceIds,
     metadata: {
@@ -382,6 +459,7 @@ async function validateParlayRecord(
       statistics: fetched.statistics,
       evaluatedAt,
     });
+    const actual = buildActualView(selection.market, fetched);
     await repositories.parlayLegs.updateStatus(leg.id, outcome.status);
     if (fetched.providerSnapshotId) providerSnapshotIds.add(fetched.providerSnapshotId);
     resultInputs.push(compactJson({ legId: leg.id, selection, fixture: fetched.fixture, statistics: fetched.statistics }));
@@ -391,6 +469,7 @@ async function validateParlayRecord(
       providerSnapshotId: fetched.providerSnapshotId,
       status: outcome.status,
       reason: outcome.reason,
+      actual,
       outcome,
       evaluatedAt,
     });
@@ -497,6 +576,7 @@ function validationFor(input: {
   reason?: string;
   evaluatedAt: string;
   outcome: ValidationArtifactView['outcome'];
+  actual?: ValidationActualView;
   resultInput?: JsonValue | null;
   evidenceIds?: string[];
   metadata?: Record<string, unknown>;
@@ -508,8 +588,10 @@ function validationFor(input: {
     ...(input.providerSnapshotId && { providerSnapshotId: input.providerSnapshotId }),
     status: input.status,
     ...(input.reason && { reason: input.reason }),
+    ...(input.actual && { actual: input.actual }),
     outcome: input.outcome,
     evaluatedAt: input.evaluatedAt,
+    ...(input.metadata && { metadata: compactJson(input.metadata ?? {}) as Record<string, unknown> }),
   };
   return {
     view,
@@ -528,6 +610,57 @@ function validationFor(input: {
       evidenceIds: input.evidenceIds ?? null,
       metadata: compactJson(input.metadata ?? {}),
     },
+  };
+}
+
+function buildActualView(market: MarketKey, fetched: ValidationResultFetchResult): ValidationActualView {
+  const scoreHome = fetched.fixture.scoreHome;
+  const scoreAway = fetched.fixture.scoreAway;
+  const fixtureScore = Number.isFinite(scoreHome) && Number.isFinite(scoreAway)
+    ? {
+      scoreHome: scoreHome as number,
+      scoreAway: scoreAway as number,
+    }
+    : undefined;
+  const cornersHome = fetched.statistics?.cornersHome;
+  const cornersAway = fetched.statistics?.cornersAway;
+  const totalCorners = Number.isFinite(cornersHome) && Number.isFinite(cornersAway)
+    ? Number(cornersHome) + Number(cornersAway)
+    : undefined;
+  const statistics = fetched.statistics
+    ? {
+      ...(Number.isFinite(cornersHome) && { cornersHome }),
+      ...(Number.isFinite(cornersAway) && { cornersAway }),
+      ...(Number.isFinite(totalCorners) && { totalCorners }),
+    }
+    : undefined;
+  const score = fixtureScore ? `${fixtureScore.scoreHome}-${fixtureScore.scoreAway}` : '';
+  if (market === 'corners_over_under') {
+    return {
+      summary: Number.isFinite(totalCorners)
+        ? `corners totales ${totalCorners}${Number.isFinite(statistics?.cornersHome) && Number.isFinite(statistics?.cornersAway) ? ` (${statistics?.cornersHome}-${statistics?.cornersAway})` : ''}`
+        : 'corners no disponibles',
+      ...(fixtureScore && { fixture: fixtureScore }),
+      ...(statistics && { statistics }),
+    };
+  }
+  if (market === 'goals_over_under') {
+    const totalGoals = fixtureScore ? Number(fixtureScore.scoreHome) + Number(fixtureScore.scoreAway) : undefined;
+    return {
+      summary: Number.isFinite(totalGoals) ? `goles totales ${totalGoals}${score ? ` (${score})` : ''}` : 'score no disponible',
+      ...(fixtureScore && { fixture: fixtureScore }),
+    };
+  }
+  if (market === 'btts') {
+    const btts = fixtureScore ? fixtureScore.scoreHome > 0 && fixtureScore.scoreAway > 0 : undefined;
+    return {
+      summary: typeof btts === 'boolean' ? `BTTS ${btts ? 'SI' : 'NO'}${score ? ` (${score})` : ''}` : 'score no disponible',
+      ...(fixtureScore && { fixture: fixtureScore }),
+    };
+  }
+  return {
+    summary: score || 'score no disponible',
+    ...(fixtureScore && { fixture: fixtureScore }),
   };
 }
 
@@ -550,6 +683,18 @@ function selectionFromParlayLeg(leg: ParlayLegRecord): MarketSelection {
     odds: numberValue(leg.odds),
     impliedProbability: 1 / numberValue(leg.odds),
     sourceSnapshotId: leg.id,
+  };
+}
+
+function selectionFromArtifactSelection(selection: RecommendationArtifactSelection): MarketSelection {
+  const odds = numberValue(selection.odds);
+  return {
+    market: marketKey(selection.market),
+    selection: selection.selection,
+    line: numberOrUndefined(selection.line),
+    odds,
+    impliedProbability: Number.isFinite(odds) && odds > 0 ? 1 / odds : NaN,
+    sourceSnapshotId: selection.artifactSelectionId,
   };
 }
 
