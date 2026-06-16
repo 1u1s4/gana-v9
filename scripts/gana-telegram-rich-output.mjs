@@ -9,17 +9,22 @@ export function renderCronRichSummary(input = {}) {
 }
 
 export function emitCronRichSummary(input = {}) {
-  const message = renderCronRichSummary(input);
-  if (!isDirectTelegramEnabled()) {
+  const direct = isDirectTelegramEnabled();
+  const message = direct
+    ? renderCronTelegramHtml({ ...input, format: 'telegram-html' })
+    : renderCronRichSummary(input);
+  if (!direct) {
     console.log(message);
     return { delivered: false, target: undefined };
   }
   const target = process.env.GANA_CRON_TELEGRAM_TARGET || 'telegram';
   const result = sendViaHermesGateway(target, message);
   if (result.success) return { delivered: true, target, result };
-  console.error(`direct telegram delivery failed: ${result.error || JSON.stringify(result)}`);
-  console.log(message);
-  return { delivered: false, target, result };
+  const botResult = sendViaTelegramBotApi(target, message);
+  if (botResult.success) return { delivered: true, target, result: botResult };
+  console.error(`direct telegram delivery failed: ${botResult.error || result.error || JSON.stringify(botResult)}`);
+  console.log(renderCronRichSummary(input));
+  return { delivered: false, target, result: botResult };
 }
 
 export function renderCronMarkdownSummary({
@@ -290,5 +295,57 @@ function sendViaHermesGateway(target, message) {
     return JSON.parse(result.stdout || '{}');
   } catch {
     return { success: false, error: `invalid gateway response: ${result.stdout}` };
+  }
+}
+
+function sendViaTelegramBotApi(target, message) {
+  const hermesHome = process.env.HERMES_HOME || `${process.env.HOME}/.hermes`;
+  const python = process.env.HERMES_GATEWAY_PYTHON || `${hermesHome}/hermes-agent/venv/bin/python3`;
+  const payload = JSON.stringify({ target, message, envPath: `${hermesHome}/.env` });
+  const script = [
+    'import json, os, sys, urllib.parse, urllib.request',
+    'payload=json.loads(sys.stdin.read())',
+    'env={}',
+    'try:',
+    '    data=open(payload["envPath"], encoding="utf-8").read().splitlines()',
+    'except FileNotFoundError:',
+    '    data=[]',
+    'for line in data:',
+    '    line=line.strip()',
+    '    if not line or line.startswith("#") or "=" not in line: continue',
+    '    k,v=line.split("=",1)',
+    '    v=v.strip()',
+    '    if len(v)>=2 and v[0]==v[-1] and v[0] in ("\\\'", "\\\""): v=v[1:-1]',
+    '    env.setdefault(k.strip(), v)',
+    'token=os.environ.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_TOKEN")',
+    'target=payload.get("target") or "telegram"',
+    'chat=os.environ.get("TELEGRAM_HOME_CHANNEL") or env.get("TELEGRAM_HOME_CHANNEL")',
+    'if isinstance(target, str) and target.startswith("telegram:"):',
+    '    parts=target.split(":",1)',
+    '    if len(parts)>1 and parts[1]: chat=parts[1]',
+    'if not token or not chat:',
+    '    print(json.dumps({"success":False,"error":"missing TELEGRAM_BOT_TOKEN or TELEGRAM_HOME_CHANNEL"}))',
+    '    raise SystemExit(0)',
+    'body=urllib.parse.urlencode({"chat_id":chat,"text":payload["message"],"parse_mode":"HTML","disable_web_page_preview":"true"}).encode()',
+    'try:',
+    '    with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", body, timeout=20) as r:',
+    '        raw=r.read().decode("utf-8", "replace")',
+    '    result=json.loads(raw)',
+    '    print(json.dumps({"success":bool(result.get("ok")),"platform":"telegram","chat_id":chat,"message_id":result.get("result",{}).get("message_id"),"raw_ok":result.get("ok")}))',
+    'except Exception as e:',
+    '    print(json.dumps({"success":False,"error":str(e)}))',
+  ].join('\n');
+  const result = spawnSync(python, ['-c', script], {
+    input: payload,
+    encoding: 'utf8',
+    env: process.env,
+    maxBuffer: 1024 * 1024,
+  });
+  if (result.error) return { success: false, error: result.error.message };
+  if (result.status !== 0) return { success: false, error: result.stderr || `exit ${result.status}` };
+  try {
+    return JSON.parse(result.stdout || '{}');
+  } catch {
+    return { success: false, error: `invalid telegram bot response: ${result.stdout}` };
   }
 }

@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
-import { compactPath, parseJsonObject, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
+import { compactPath, emitCronRichSummary, parseJsonObject } from './gana-telegram-rich-output.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -21,7 +21,7 @@ mkdirSync(dirname(logPath), { recursive: true });
 const existingRunLock = !args.force && existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
 if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, status: 'running', startedAt: new Date().toISOString() })) {
   const skip = describeValidationLock(existingRunLock);
-  console.log(renderCronRichSummary({
+  emitCronRichSummary({
     title: 'Gana v9 · Validación omitida',
     status: 'skipped',
     date,
@@ -32,7 +32,7 @@ if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, 
       lockPath,
     }),
     footer: skip.footer,
-  }));
+  });
   process.exit(0);
 }
 const startedAt = Date.now();
@@ -100,7 +100,7 @@ try {
       if (feedback.status !== 0) throw new Error(`council feedback failed with exit ${feedback.status}`);
       feedbackResult = parseJsonObject(feedback.stdout);
     }
-    console.log(renderCronRichSummary({
+    emitCronRichSummary({
       title: 'Gana v9 · Validación publicada',
       status: validation.status === 0 ? 'ok' : 'review',
       date,
@@ -122,7 +122,7 @@ try {
       footer: validation.status === 0
         ? '✅ Validación/métricas publicadas · revisar antes de ajustar promoción'
         : '⚠️ Validación con revisión pendiente · no maquillar resultados',
-    }));
+    });
     writeLock(lockPath, {
       date,
       runSlug,
@@ -158,7 +158,7 @@ try {
         color: 0xf2994a,
       }],
     });
-    console.log(renderCronRichSummary({
+    emitCronRichSummary({
       title: 'Gana v9 · Validaciones requieren revisión',
       status: 'warning',
       date,
@@ -172,7 +172,7 @@ try {
         `Log: ${compactPath(logPath)}`,
       ].filter(Boolean),
       footer: '⚠️ Revisar logs antes de ajustar promoción.',
-    }));
+    });
     writeLock(lockPath, {
       date,
       runSlug,

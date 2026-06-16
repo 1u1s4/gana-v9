@@ -3,7 +3,7 @@ import { mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync } from
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { resolveDiscordTarget } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
-import { compactPath, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
+import { compactPath, emitCronRichSummary } from './gana-telegram-rich-output.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -54,7 +54,7 @@ try {
     ], env);
   }
   const ok = review.status === 0;
-  console.log(renderCronRichSummary({
+  emitCronRichSummary({
     title: ok ? 'Gana v9 · Strategy review publicado' : 'Gana v9 · Strategy review requiere revisión',
     status: ok && (!notify || notifyResult?.status === 0) ? 'ok' : 'warning',
     date,
@@ -71,7 +71,7 @@ try {
       `Log: ${compactPath(logPath)}`,
     ].filter(Boolean),
     footer: ok ? '🧠 Revisión estratégica lista para lectura humana.' : '⚠️ Revisar logs antes de actuar.',
-  }));
+  });
   process.exitCode = ok && (!notify || notifyResult?.status === 0) ? 0 : notifyResult?.status ?? review.status ?? 1;
 } finally {
   closeSync(logFd);

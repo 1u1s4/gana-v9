@@ -31,6 +31,7 @@ const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}.log`)
 const outcomePath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}-outcome.json`);
 const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
 const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `daily-e2e-${date}.lock`);
+const publishedSkipNoticePath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'notifications', `daily-e2e-${date}-published.notified`);
 
 mkdirSync(dirname(logPath), { recursive: true });
 if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
@@ -76,6 +77,9 @@ if (!args.force && !acquiredRunLock) {
     artifacts: [lockPath, outcomePath],
     retryAfter,
   }));
+  if (skip.reason === 'already published' && hasPublishedSkipNotice(publishedSkipNoticePath)) {
+    process.exit(0);
+  }
   emitCronRichSummary({
     title: 'Gana v9 · Daily E2E omitido',
     status: 'skipped',
@@ -90,6 +94,9 @@ if (!args.force && !acquiredRunLock) {
     }),
     footer: skip.footer,
   });
+  if (skip.reason === 'already published') {
+    writePublishedSkipNotice(publishedSkipNoticePath, { date, dailyBatchId, lockPath, notifiedAt: new Date().toISOString() });
+  }
   process.exit(0);
 }
 const startedAt = new Date();
@@ -237,7 +244,7 @@ try {
         { label: 'log', path: logPath },
         { label: 'outcome', path: outcomePath },
       ],
-    });
+    }));
     if (result.status !== 0) {
       writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
     }
@@ -300,7 +307,7 @@ try {
         { label: 'log', path: logPath },
         { label: 'outcome', path: outcomePath },
       ],
-    });
+    }));
     process.exitCode = result.status === 0 ? 1 : result.status ?? 1;
   }
 } finally {
@@ -376,6 +383,15 @@ function acquireOnce(path, ttlMs, payload) {
 }
 
 function writeLock(path, payload) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function hasPublishedSkipNotice(path) {
+  return existsSync(path);
+}
+
+function writePublishedSkipNotice(path, payload) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
 }
