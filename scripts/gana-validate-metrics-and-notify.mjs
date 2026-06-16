@@ -142,22 +142,45 @@ try {
   }
 
   if (!handled) {
-    await sendDiscordNativePayload(discordTargets.alerts, {
-      username: 'Gana Hermes',
-      allowed_mentions: { parse: [] },
-      content: '',
-      embeds: [{
-        title: '⚠️ Gana v9 · Validaciones requieren revisión',
-        description: [
-          `📅 ${date} · ${TIMEZONE}`,
-          `🧪 validate exit ${validation.status ?? 'unknown'}`,
-          `📊 metrics exit ${metrics.status ?? 'unknown'}`,
-          metricsArtifact ? `📈 metrics ${metricsArtifact}` : '📈 sin artifact de métricas',
-          '🛡️ Revisar logs antes de ajustar promoción.',
-        ].join('\n'),
-        color: 0xf2994a,
-      }],
-    });
+    const reviewLock = {
+      date,
+      runSlug,
+      status: 'review-required',
+      validationExit: validation.status ?? null,
+      metricsExit: metrics.status ?? null,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      artifacts: [validationsArtifact, metricsArtifact, logPath].filter(Boolean),
+      notifications: { alerts: discordTargets.alerts },
+    };
+    writeLock(lockPath, reviewLock);
+    let alertError;
+    try {
+      await sendDiscordNativePayload(discordTargets.alerts, {
+        username: 'Gana Hermes',
+        allowed_mentions: { parse: [] },
+        content: '',
+        embeds: [{
+          title: '⚠️ Gana v9 · Validaciones requieren revisión',
+          description: [
+            `📅 ${date} · ${TIMEZONE}`,
+            `🧪 validate exit ${validation.status ?? 'unknown'}`,
+            `📊 metrics exit ${metrics.status ?? 'unknown'}`,
+            metricsArtifact ? `📈 metrics ${metricsArtifact}` : '📈 sin artifact de métricas',
+            '🛡️ Revisar logs antes de ajustar promoción.',
+          ].join('\n'),
+          color: 0xf2994a,
+        }],
+      });
+    } catch (err) {
+      alertError = err instanceof Error ? err.message : String(err);
+      writeLogLine(logFd, `alert notification failed: ${alertError}`);
+      writeLock(lockPath, {
+        ...reviewLock,
+        updatedAt: new Date().toISOString(),
+        notifications: { alerts: discordTargets.alerts, alertError },
+      });
+    }
     emitCronRichSummary({
       title: 'Gana v9 · Validaciones requieren revisión',
       status: 'warning',
@@ -172,17 +195,6 @@ try {
         `Log: ${compactPath(logPath)}`,
       ].filter(Boolean),
       footer: '⚠️ Revisar logs antes de ajustar promoción.',
-    });
-    writeLock(lockPath, {
-      date,
-      runSlug,
-      status: 'review-required',
-      validationExit: validation.status ?? null,
-      metricsExit: metrics.status ?? null,
-      completedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      artifacts: [validationsArtifact, metricsArtifact, logPath].filter(Boolean),
-      notifications: { alerts: discordTargets.alerts },
     });
     process.exitCode = metrics.status ?? validation.status ?? 1;
   }

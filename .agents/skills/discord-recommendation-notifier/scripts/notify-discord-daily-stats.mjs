@@ -8,7 +8,6 @@ import {
   formatMetricNumber,
   formatPercent,
   formatStakeRecommendation,
-  rankEmoji,
   recommendationCounts,
   recommendationKind,
   recommendationTitle,
@@ -131,38 +130,24 @@ export function buildDiscordPayload(metricsArtifact, options = {}) {
   const gateVerdict = validationArtifact?.gateResult?.verdict;
   const embeds = [
     {
-      title: '📊 Gana v9 · Validación diaria',
+      title: 'Gana v9 - Validacion diaria',
       description: [
-        options.testLabel ? `🧪 ${options.testLabel}` : undefined,
-        `📅 ${snapshot.metricDate} · ${snapshot.timezone || options.timezone || DEFAULT_TIMEZONE}`,
-        `✅ ${totalSettled(snapshot)} resueltas · ⏳ ${totalPending(snapshot)} pendientes · ⚪ ${totalUnvalidated(snapshot)} sin validar`,
-        '⚠️ Tracking analítico · Sin ejecución monetaria',
+        options.testLabel ? `Nota: ${options.testLabel}` : undefined,
+        `Fecha: ${snapshot.metricDate} (${snapshot.timezone || options.timezone || DEFAULT_TIMEZONE})`,
+        `Estado: ${totalSettled(snapshot)} resueltas, ${totalPending(snapshot)} pendientes, ${totalUnvalidated(snapshot)} sin validar`,
+        '',
+        `Predicciones: ${formatCompactMetricSummary(snapshot.predictionMetrics, true)}`,
+        formatBucketSummary('Providers', snapshot.predictionMetrics?.byProvider),
+        `Parlays: ${formatCompactMetricSummary(snapshot.parlayMetrics, false)}`,
+        '',
+        gateVerdict ? `Gate: ${gateVerdict}` : undefined,
+        validationCount !== undefined ? `Artifact de validacion: ${validationCount} registros` : undefined,
+        `Scope: ${snapshot.scope || metricsArtifact.scope || 'daily'}`,
+        'Uso: tracking analitico; sin ejecucion monetaria.',
       ].filter(Boolean).join('\n'),
       color: headerColor(snapshot),
       footer: { text: 'Gana Hermes · Discord native embeds' },
       timestamp: new Date().toISOString(),
-    },
-    metricEmbed('🎯 Predicciones', snapshot.predictionMetrics, {
-      topTitle: '🤖 Providers',
-      topBuckets: snapshot.predictionMetrics?.byProvider,
-      edge: true,
-      color: 0x2f80ed,
-    }),
-    metricEmbed('🧩 Parlays', snapshot.parlayMetrics, {
-      topTitle: '🧪 Perfiles',
-      topBuckets: snapshot.parlayMetrics?.byProfile,
-      edge: false,
-      color: 0x9b51e0,
-    }),
-    {
-      title: '🛡️ Control',
-      description: truncate([
-        gateVerdict ? `> Gate: ${gateVerdict}` : undefined,
-        validationCount !== undefined ? `> Validaciones del artifact: ${validationCount}` : undefined,
-        `> Scope: ${snapshot.scope || metricsArtifact.scope || 'daily'}`,
-        '> Revisión manual requerida antes de promover conclusiones.',
-      ].filter(Boolean).join('\n'), DISCORD_DESCRIPTION_LIMIT),
-      color: 0x56ccf2,
     },
   ];
 
@@ -180,23 +165,20 @@ export function buildGatewayMessage(metricsArtifact, options = {}) {
   const validationCount = Array.isArray(validationArtifact?.validations) ? validationArtifact.validations.length : undefined;
   const gateVerdict = validationArtifact?.gateResult?.verdict;
   return [
-    '📊 Gana v9 · Validación diaria',
+    'Gana v9 - Validacion diaria',
     '',
-    options.testLabel ? `🧪 ${options.testLabel}` : undefined,
-    `📅 ${snapshot.metricDate} · ${snapshot.timezone || options.timezone || DEFAULT_TIMEZONE}`,
-    `✅ ${totalSettled(snapshot)} resueltas · ⏳ ${totalPending(snapshot)} pendientes · ⚪ ${totalUnvalidated(snapshot)} sin validar`,
-    '⚠️ Tracking analítico · Sin ejecución monetaria',
+    options.testLabel ? `Nota: ${options.testLabel}` : undefined,
+    `Fecha: ${snapshot.metricDate} (${snapshot.timezone || options.timezone || DEFAULT_TIMEZONE})`,
+    `Estado: ${totalSettled(snapshot)} resueltas, ${totalPending(snapshot)} pendientes, ${totalUnvalidated(snapshot)} sin validar`,
     '',
-    '━━━━━━━━━━━━━━━━━━',
+    `Predicciones: ${formatCompactMetricSummary(snapshot.predictionMetrics, true)}`,
+    formatBucketSummary('Providers', snapshot.predictionMetrics?.byProvider),
+    `Parlays: ${formatCompactMetricSummary(snapshot.parlayMetrics, false)}`,
     '',
-    ...formatMetricLines('🎯 Predicciones', snapshot.predictionMetrics, snapshot.predictionMetrics?.byProvider, true),
-    ...formatMetricLines('🧩 Parlays', snapshot.parlayMetrics, snapshot.parlayMetrics?.byProfile, false),
-    '━━━━━━━━━━━━━━━━━━',
-    '',
-    gateVerdict ? `🛡️ Gate: ${gateVerdict}` : undefined,
-    validationCount !== undefined ? `📌 Validaciones del artifact: ${validationCount}` : undefined,
-    `📁 Scope: ${snapshot.scope || metricsArtifact.scope || 'daily'}`,
-    '🛡️ Revisión manual requerida antes de promover conclusiones.',
+    gateVerdict ? `Gate: ${gateVerdict}` : undefined,
+    validationCount !== undefined ? `Artifact de validacion: ${validationCount} registros` : undefined,
+    `Scope: ${snapshot.scope || metricsArtifact.scope || 'daily'}`,
+    'Uso: tracking analitico; sin ejecucion monetaria.',
   ].filter((line) => line !== undefined).join('\n');
 }
 
@@ -206,34 +188,27 @@ export function buildValidationMirrorPayload(recommendationArtifact, options = {
   const validationIndex = buildValidationIndex(options.validationArtifact);
   const validatedRecommendations = recommendations.map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
   const counts = recommendationCounts(validatedRecommendations);
+  const statusCounts = countRecommendationStatuses(validatedRecommendations);
   const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
-  const embeds = [{
-    title: '📊 Gana v9 · Validación de recomendaciones',
-    description: [
-      options.testLabel ? `🧪 ${options.testLabel}` : undefined,
-      `📅 Recomendaciones ${date} · espejo validado`,
-      `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
-      '⚠️ Tracking analítico · Sin ejecución monetaria',
-    ].filter(Boolean).join('\n'),
-    color: 0x2f80ed,
-    footer: { text: 'Gana Hermes · Discord native embeds' },
-    timestamp: new Date().toISOString(),
-  }];
+  const headerLines = [
+    options.testLabel ? `Nota: ${options.testLabel}` : undefined,
+    `Fecha: ${date}`,
+    `Selecciones: ${counts.parlay} parlays, ${counts.atomic} simples`,
+    `Resultado: ${formatRecommendationStatusSummary(statusCounts)}`,
+    'Uso: tracking analitico; sin ejecucion monetaria.',
+    '',
+  ].filter((line) => line !== undefined);
+  const embeds = [];
 
   if (validatedRecommendations.length) {
-    embeds.push(...validatedRecommendations.map((recommendation, index) => validationMirrorEmbed(recommendation, index)));
+    embeds.push(...validationMirrorSummaryEmbeds(validatedRecommendations, headerLines));
   } else {
     embeds.push({
       title: 'Sin selecciones',
-      description: '> El artifact de recomendaciones no contiene selecciones para validar.',
+      description: [...headerLines, 'El artifact de recomendaciones no contiene selecciones para validar.'].join('\n'),
       color: 0x828282,
     });
   }
-
-  embeds.push({
-    description: '🛡️ Validación espejo de las recomendaciones enviadas. Revisar pendientes y muestras pequeñas antes de ajustar promoción.',
-    color: 0x56ccf2,
-  });
 
   return {
     username: stringOrFallback(options.username, 'Gana Hermes'),
@@ -249,32 +224,32 @@ export function buildValidationMirrorMessage(recommendationArtifact, options = {
   const validationIndex = buildValidationIndex(options.validationArtifact);
   const validatedRecommendations = recommendations.map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
   const counts = recommendationCounts(validatedRecommendations);
+  const statusCounts = countRecommendationStatuses(validatedRecommendations);
   const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
   const lines = [
-    '📊 Gana v9 · Validación de recomendaciones',
+    'Gana v9 - Validacion de recomendaciones',
     '',
-    options.testLabel ? `🧪 ${options.testLabel}` : undefined,
-    `📅 Recomendaciones ${date} · espejo validado`,
-    `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
-    '⚠️ Tracking analítico · Sin ejecución monetaria',
-    '',
-    '━━━━━━━━━━━━━━━━━━',
+    options.testLabel ? `Nota: ${options.testLabel}` : undefined,
+    `Fecha: ${date}`,
+    `Selecciones: ${counts.parlay} parlays, ${counts.atomic} simples`,
+    `Resultado: ${formatRecommendationStatusSummary(statusCounts)}`,
+    'Uso: tracking analitico; sin ejecucion monetaria.',
     '',
   ].filter((line) => line !== undefined);
 
   if (!validatedRecommendations.length) {
     lines.push('> Sin selecciones: el artifact de recomendaciones no contiene selecciones para validar.', '');
   } else {
-    for (const [index, recommendation] of validatedRecommendations.entries()) {
-      lines.push(...formatValidationMirrorLines(recommendation, index));
+    const exceptions = validatedRecommendations
+      .map((recommendation, index) => ({ recommendation, index }))
+      .filter(({ recommendation }) => !['won', 'voided'].includes(normalizeStatus(recommendation.validationStatus)));
+    if (!exceptions.length) lines.push('Sin fallos abiertos: todas las selecciones resueltas cerraron ganadas/anuladas.', '');
+    for (const { recommendation, index } of exceptions) {
+      lines.push(...formatValidationMirrorSummaryLines(recommendation, index));
     }
   }
 
-  lines.push(
-    '━━━━━━━━━━━━━━━━━━',
-    '',
-    '🛡️ Validación espejo de las recomendaciones enviadas. Revisar pendientes y muestras pequeñas antes de ajustar promoción.',
-  );
+  lines.push('Revisar pendientes y muestras pequenas antes de ajustar promocion.');
   return lines.join('\n');
 }
 
@@ -331,56 +306,136 @@ export async function runDailyStatsNotification(options) {
   return { metricsPath, validationPath, recommendationPath, metricDate: snapshot.metricDate, transport: options.transport, discordStatus: discordStatus.status, mirrorDiscordStatus: mirrorDiscordStatus?.status };
 }
 
-function validationMirrorEmbed(recommendation, index) {
-  const rank = num(recommendation.rank) || index + 1;
-  const kind = recommendationKind(recommendation);
-  const status = normalizeStatus(recommendation.validationStatus);
-  const legLines = Array.isArray(recommendation.legs) && recommendation.legs.length
-    ? recommendation.legs.slice(0, 8).map((leg) => `> ${statusIcon(leg.validationStatus)} ${formatCompactLeg(leg)}`)
-    : ['> Sin detalle de selecciones.'];
-  if (Array.isArray(recommendation.legs) && recommendation.legs.length > 8) {
-    legLines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
+function validationMirrorSummaryEmbeds(recommendations, headerLines = []) {
+  const embeds = [];
+  let current = [...headerLines];
+  const exceptions = recommendations
+    .map((recommendation, index) => ({ recommendation, index }))
+    .filter(({ recommendation }) => !['won', 'voided'].includes(normalizeStatus(recommendation.validationStatus)));
+  if (!exceptions.length) current.push('Sin fallos abiertos: todas las selecciones resueltas cerraron ganadas/anuladas.');
+  for (const { recommendation, index } of exceptions) {
+    const candidate = formatValidationMirrorSummaryLines(recommendation, index);
+    const next = [...current, ...candidate];
+    if (current.length > headerLines.length && next.join('\n').length > DISCORD_DESCRIPTION_LIMIT) {
+      embeds.push(validationMirrorSummaryEmbed(current, embeds.length));
+      current = [...headerLines, ...candidate];
+    } else {
+      current = next;
+    }
   }
-  legLines.push(formatValidationMirrorMetricLine(recommendation, status));
+  if (current.length) embeds.push(validationMirrorSummaryEmbed(current, embeds.length));
+  return embeds;
+}
 
+function validationMirrorSummaryEmbed(lines, pageIndex) {
   return {
-    title: `${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`,
-    description: truncate(legLines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
-    color: statusColor(status),
+    title: pageIndex === 0 ? 'Gana v9 - Validacion de recomendaciones' : `Gana v9 - Validacion de recomendaciones ${pageIndex + 1}`,
+    description: truncate(lines.join('\n'), DISCORD_DESCRIPTION_LIMIT),
+    color: 0x2f80ed,
+    footer: { text: 'Gana Hermes · Discord native embeds' },
+    timestamp: new Date().toISOString(),
   };
 }
 
-function formatValidationMirrorLines(recommendation, index) {
+function formatValidationMirrorSummaryLines(recommendation, index) {
   const rank = num(recommendation.rank) || index + 1;
   const kind = recommendationKind(recommendation);
   const status = normalizeStatus(recommendation.validationStatus);
-  const lines = [`${rankEmoji(rank)} ${statusIcon(status)} ${kind === 'atomic-prediction' ? '📌 Simple · ' : ''}${recommendationTitle(recommendation)}`];
+  const type = kind === 'atomic-prediction' ? 'Simple' : 'Parlay';
+  const lines = [
+    `${rank}. ${type}: ${validationMirrorSummaryTitle(recommendation, kind)} - ${statusLabel(status)} (${formatValidationMirrorLegSummary(recommendation.legs)})`,
+    formatValidationMirrorMetricLine(recommendation, status),
+  ];
 
-  if (Array.isArray(recommendation.legs) && recommendation.legs.length) {
-    for (const leg of recommendation.legs.slice(0, 8)) {
-      lines.push(`> ${statusIcon(leg.validationStatus)} ${formatCompactLeg(leg)}`);
-    }
-    if (recommendation.legs.length > 8) lines.push(`> +${recommendation.legs.length - 8} selecciones adicionales`);
-  } else {
-    lines.push('> Sin detalle de selecciones.');
-  }
-
-  lines.push(formatValidationMirrorMetricLine(recommendation, status));
+  const exceptionLines = formatValidationMirrorExceptionLines(recommendation.legs, status);
+  if (exceptionLines.length) lines.push(...exceptionLines);
   lines.push('');
   return lines;
 }
 
+function countRecommendationStatuses(recommendations) {
+  const counts = { won: 0, lost: 0, voided: 0, pending: 0, blocked: 0, unvalidated: 0, unknown: 0 };
+  for (const recommendation of Array.isArray(recommendations) ? recommendations : []) {
+    counts[normalizeStatus(recommendation?.validationStatus)] += 1;
+  }
+  return counts;
+}
+
+function formatRecommendationStatusSummary(counts) {
+  return [
+    counts.won ? `${counts.won} ganadas` : undefined,
+    counts.lost ? `${counts.lost} perdidas` : undefined,
+    counts.voided ? `${counts.voided} anuladas` : undefined,
+    counts.pending ? `${counts.pending} pendientes` : undefined,
+    counts.blocked ? `${counts.blocked} bloqueadas` : undefined,
+    counts.unvalidated ? `${counts.unvalidated} sin validar` : undefined,
+    counts.unknown ? `${counts.unknown} desconocidas` : undefined,
+  ].filter(Boolean).join(', ') || 'sin selecciones';
+}
+
+function validationMirrorSummaryTitle(recommendation, kind) {
+  if (kind === 'atomic-prediction') return recommendationTitle(recommendation);
+  const fixtures = Array.isArray(recommendation.legs)
+    ? recommendation.legs
+      .map((leg) => (typeof leg?.fixture === 'string' ? leg.fixture.trim() : ''))
+      .filter(Boolean)
+    : [];
+  const uniqueFixtures = [...new Set(fixtures)];
+  return uniqueFixtures.length ? uniqueFixtures.join(' + ') : recommendationTitle(recommendation);
+}
+
 function formatValidationMirrorMetricLine(recommendation, status) {
+  const normalized = normalizeStatus(status);
   const stake = formatStakeRecommendation(recommendation);
   const parts = [
-    `> 📊 Resultado ${statusIcon(status)} ${status}`,
     `Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
-    `🍀 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
-    `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
-    stake ? `💵 Stake ${stake}` : undefined,
+    normalized === 'won' ? undefined : `Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    normalized === 'won' ? undefined : `Edge ${formatPercent(recommendation.expectedEdge)}`,
+    normalized === 'won' ? undefined : stake ? `Stake ${stake}` : undefined,
   ];
-  if (!stake) parts.push(`📌 Expo ${formatExposurePercent(recommendation)}`);
-  return parts.filter(Boolean).join(' · ');
+  if (normalized !== 'won' && !stake) parts.push(`Expo ${formatExposurePercent(recommendation)}`);
+  return `Detalle: ${parts.filter(Boolean).join(' · ')}`;
+}
+
+function formatValidationMirrorLegSummary(legs) {
+  if (!Array.isArray(legs) || !legs.length) return 'sin legs';
+  const counts = countLegStatuses(legs);
+  const parts = [
+    counts.won ? `${counts.won} ganado` : undefined,
+    counts.lost ? `${counts.lost} perdido` : undefined,
+    counts.voided ? `${counts.voided} anulado` : undefined,
+    counts.pending ? `${counts.pending} pendiente` : undefined,
+    counts.blocked ? `${counts.blocked} bloqueado` : undefined,
+    counts.unvalidated ? `${counts.unvalidated} sin validar` : undefined,
+    counts.unknown ? `${counts.unknown} desconocido` : undefined,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : `${legs.length} legs`;
+}
+
+function countLegStatuses(legs) {
+  const counts = { won: 0, lost: 0, voided: 0, pending: 0, blocked: 0, unvalidated: 0, unknown: 0 };
+  for (const leg of Array.isArray(legs) ? legs : []) {
+    counts[normalizeStatus(leg?.validationStatus)] += 1;
+  }
+  return counts;
+}
+
+function formatValidationMirrorExceptionLines(legs, recommendationStatus) {
+  if (!Array.isArray(legs) || !legs.length) return [];
+  const normalized = normalizeStatus(recommendationStatus);
+  if (normalized === 'won' || normalized === 'voided') return [];
+  const exceptionStatuses = new Set(['lost', 'pending', 'blocked', 'unvalidated', 'unknown']);
+  const exceptions = legs.filter((leg) => exceptionStatuses.has(normalizeStatus(leg?.validationStatus)));
+  const lines = exceptions
+    .slice(0, 3)
+    .map((leg) => `Fallo/pendiente: ${statusLabel(leg.validationStatus)} - ${formatPlainLeg(leg)}`);
+  const hidden = exceptions.length - lines.length;
+  if (hidden > 0) lines.push(`Fallo/pendiente: +${hidden} legs con estado abierto/problematico`);
+  return lines;
+}
+
+function formatPlainLeg(leg) {
+  return formatCompactLeg(leg).replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').replace(/\s+/g, ' ').trim();
 }
 
 function buildValidationIndex(validationArtifact) {
@@ -436,25 +491,15 @@ function normalizeStatus(value) {
   return 'unknown';
 }
 
-function statusIcon(status) {
+function statusLabel(status) {
   const normalized = normalizeStatus(status);
-  if (normalized === 'won') return '✅';
-  if (normalized === 'lost') return '❌';
-  if (normalized === 'voided') return '➖';
-  if (normalized === 'pending') return '⏳';
-  if (normalized === 'blocked') return '🚫';
-  if (normalized === 'unvalidated') return '⚪';
-  return '❔';
-}
-
-function statusColor(status) {
-  const normalized = normalizeStatus(status);
-  if (normalized === 'won') return 0x27ae60;
-  if (normalized === 'lost') return 0xeb5757;
-  if (normalized === 'voided') return 0x828282;
-  if (normalized === 'pending') return 0xf2c94c;
-  if (normalized === 'blocked') return 0xf2994a;
-  return 0x9b51e0;
+  if (normalized === 'won') return 'ganado';
+  if (normalized === 'lost') return 'perdido';
+  if (normalized === 'voided') return 'anulado';
+  if (normalized === 'pending') return 'pendiente';
+  if (normalized === 'blocked') return 'bloqueado';
+  if (normalized === 'unvalidated') return 'sin validar';
+  return 'desconocido';
 }
 
 function collectArtifacts(root, fileName) {
@@ -503,40 +548,26 @@ function selectMetricSnapshot(artifact, date) {
   throw new Error('daily-metrics artifact does not contain a metric snapshot.');
 }
 
-function metricEmbed(title, metrics, options) {
-  return {
-    title,
-    description: truncate(formatMetricDescription(metrics, options.topTitle, options.topBuckets, options.edge), DISCORD_DESCRIPTION_LIMIT),
-    color: options.color,
-  };
-}
-
-function formatMetricDescription(metrics, topTitle, topBuckets, includeEdge) {
-  if (!metrics) return '> Sin datos.';
-  const lines = [
-    `> ✅ ${num(metrics.won)} · ❌ ${num(metrics.lost)} · ➖ ${num(metrics.voided)} · ⏳ ${num(metrics.pending)} · 🚫 ${num(metrics.blocked)} · ⚪ ${num(metrics.unvalidated)}`,
-    `> 📌 Total ${num(metrics.total)} · 📈 Hit ${formatHitRate(metrics.hitRate)} · 🎲 Odds ${formatNumber(metrics.avgOdds, 3)} · 🍀 Conf ${formatConfidence(metrics.avgConfidence)}${includeEdge ? ` · 📊 Edge ${formatSignedPercent(metrics.avgEdge)}` : ''}`,
+function formatCompactMetricSummary(metrics, includeEdge) {
+  if (!metrics) return 'sin datos';
+  const parts = [
+    `${num(metrics.won)} ganadas`,
+    `${num(metrics.lost)} perdidas`,
+    num(metrics.pending) ? `${num(metrics.pending)} pendientes` : undefined,
+    num(metrics.unvalidated) ? `${num(metrics.unvalidated)} sin validar` : undefined,
+    `total ${num(metrics.total)}`,
+    `hit ${formatHitRate(metrics.hitRate)}`,
+    `odds ${formatNumber(metrics.avgOdds, 3)}`,
+    `conf ${formatConfidence(metrics.avgConfidence)}`,
+    includeEdge ? `edge ${formatSignedPercent(metrics.avgEdge)}` : undefined,
   ];
-  const bucketLines = formatBucketLines(topTitle, topBuckets);
-  if (bucketLines.length) lines.push(...bucketLines);
-  return lines.join('\n');
+  return parts.filter(Boolean).join(', ');
 }
 
-function formatMetricLines(title, metrics, buckets, includeEdge) {
-  return [
-    title,
-    formatMetricDescription(metrics, '', buckets, includeEdge),
-    '',
-  ];
-}
-
-function formatBucketLines(title, buckets) {
-  if (!Array.isArray(buckets) || !buckets.length) return [];
-  const lines = title ? [`> ${title}:`] : [];
-  for (const bucket of buckets.slice(0, 3)) {
-    lines.push(`> • ${bucket.label || bucket.key}: ${num(bucket.total)} total · ${bucket.won}-${bucket.lost} · hit ${formatHitRate(bucket.hitRate)}`);
-  }
-  return lines;
+function formatBucketSummary(title, buckets) {
+  if (!Array.isArray(buckets) || !buckets.length) return undefined;
+  const summaries = buckets.slice(0, 3).map((bucket) => `${bucket.label || bucket.key} ${num(bucket.total)} (${num(bucket.won)}-${num(bucket.lost)}, hit ${formatHitRate(bucket.hitRate)})`);
+  return `${title}: ${summaries.join('; ')}`;
 }
 
 function totalSettled(snapshot) {

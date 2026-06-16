@@ -63,7 +63,7 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-strat
 
 The strategy review notifier should stay technical and compact: include review scope/date range, model/reasoning, prediction/parlay hit-rate context, effective/failure patterns, proposed Harness changes with priority/status/files/rationale/impact/verification, and a final analytical-only note.
 
-When a matching recommendations artifact exists for the validation date, the daily stats notifier sends two native Discord messages: the aggregate validation summary and a validated mirror of the prior recommendations message. The mirror preserves recommendation order and compact selection format while prefixing each recommendation and leg with its validation result (`✅`, `❌`, `➖`, `⏳`, `🚫`, `⚪`).
+When a matching recommendations artifact exists for the validation date, the daily stats notifier sends two native Discord messages: one sober aggregate validation summary and one compact validated mirror of the prior recommendations message. Validation messages should be text-forward with minimal emojis: one native box for daily metrics, one native box for the mirror when it fits Discord limits, plain status words, aggregate recommendation results, and only the lost/pending/blocked/unvalidated selections and legs needed to explain non-won outcomes. Won selections should be counted, not replayed line by line.
 
 ## Message Rules
 
@@ -92,8 +92,8 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Preserve the Gana policy: analytical artifact only, no monetary execution, no guarantees.
 - When the artifact includes `stakeRecommendation`, show only the bucketed analytical bank percentage as `💵 Stake N`; allowed buckets are `1, 5, 10, 15, 20, 25`.
 - Do not include payment links, bookmaker instructions, auto-execution language, or monetary execution claims.
-- Validation stat notifications must use the same native embed policy and must label the output as analytical statistics.
-- Validation notifications should include the recommendation mirror unless `--no-recommendation-mirror` is explicitly provided. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.
+- Validation stat notifications must use native embeds, but keep them sober: no status emoji rows, no repeated chart/shield icons, one concise metrics box, and plain labels such as `ganadas`, `perdidas`, `pendientes`, and `sin validar`.
+- Validation notifications should include the compact recommendation mirror unless `--no-recommendation-mirror` is explicitly provided. The mirror should count won picks and only expand failed/open selections and legs. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.
 - Council notifications must be decision-useful and easy to read: show a short summary, picks to publish/review, and picks to block with a brief Spanish reason. A bare list of scores is not acceptable.
 
 ## Style Persistence

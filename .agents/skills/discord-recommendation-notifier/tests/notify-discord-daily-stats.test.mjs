@@ -27,13 +27,15 @@ describe('discord daily stats notifier', () => {
 
     assert.equal(payload.username, 'Hermes Test');
     assert.deepEqual(payload.allowed_mentions, { parse: [] });
-    assert.equal(payload.embeds[0].title, '📊 Gana v9 · Validación diaria');
-    assert.match(payload.embeds[0].description, /📅 2026-05-14 · America\/Guatemala/);
-    assert.match(payload.embeds[1].title, /🎯 Predicciones/);
-    assert.match(payload.embeds[1].description, /> ✅ 8 · ❌ 2 · ➖ 1 · ⏳ 3 · 🚫 0 · ⚪ 1/);
-    assert.match(payload.embeds[1].description, /> 📌 Total 15 · 📈 Hit 80% · 🎲 Odds 1.72 · 🍀 Conf 69% · 📊 Edge \+5.5%/);
-    assert.match(payload.embeds[2].title, /🧩 Parlays/);
-    assert.match(payload.embeds[3].description, /> Gate: won/);
+    assert.equal(payload.embeds.length, 1);
+    assert.equal(payload.embeds[0].title, 'Gana v9 - Validacion diaria');
+    assert.match(payload.embeds[0].description, /Fecha: 2026-05-14 \(America\/Guatemala\)/);
+    assert.match(payload.embeds[0].description, /Estado: 12 resueltas, 3 pendientes, 1 sin validar/);
+    assert.match(payload.embeds[0].description, /Predicciones: 8 ganadas, 2 perdidas, 3 pendientes, 1 sin validar, total 15, hit 80%, odds 1.72, conf 69%, edge \+5.5%/);
+    assert.match(payload.embeds[0].description, /Providers: codex 8 \(5-1, hit 83.3%\); gemini 7 \(3-1, hit 75%\)/);
+    assert.match(payload.embeds[0].description, /Parlays: 1 ganadas, 1 perdidas, total 2, hit 50%, odds 2.18, conf 58%/);
+    assert.match(payload.embeds[0].description, /Gate: won/);
+    assert.doesNotMatch(payload.embeds[0].description, /[📊🎯🧩✅❌⏳⚪]/u);
     assert.doesNotMatch(JSON.stringify(payload), /\bstake\b/i);
     assert.doesNotMatch(JSON.stringify(payload), /\bbet\b/i);
   });
@@ -44,11 +46,12 @@ describe('discord daily stats notifier', () => {
       validationArtifact: sampleValidationArtifact(),
     });
 
-    assert.match(message, /📊 Gana v9 · Validación diaria/);
-    assert.match(message, /🎯 Predicciones/);
-    assert.match(message, /🧩 Parlays/);
-    assert.match(message, /🛡️ Gate: won/);
-    assert.match(message, /🛡️ Revisión manual requerida antes de promover conclusiones/);
+    assert.match(message, /Gana v9 - Validacion diaria/);
+    assert.match(message, /Predicciones:/);
+    assert.match(message, /Parlays:/);
+    assert.match(message, /Gate: won/);
+    assert.match(message, /Uso: tracking analitico; sin ejecucion monetaria/);
+    assert.doesNotMatch(message, /[📊🎯🧩✅❌⏳⚪]/u);
     assert.doesNotMatch(message, /\bstake\b/i);
     assert.doesNotMatch(message, /\bbet\b/i);
   });
@@ -67,19 +70,20 @@ describe('discord daily stats notifier', () => {
       maxRecommendations: 2,
     });
 
-    assert.equal(payload.embeds[0].title, '📊 Gana v9 · Validación de recomendaciones');
-    assert.match(payload.embeds[0].description, /🧪 Esto es una prueba/);
-    assert.match(payload.embeds[0].description, /📦 1 parlays · 📌 1 simples/);
-    assert.match(payload.embeds[1].title, /1️⃣ ❌ Team A vs Team B/);
-    assert.match(payload.embeds[1].description, /> ✅ ⚽ Team A vs Team B: h2h home @ 1.4/);
-    assert.match(payload.embeds[1].description, /> ❌ 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
-    assert.match(payload.embeds[1].description, /Resultado ❌ lost/);
-    assert.match(payload.embeds[1].description, /💵 Stake 10/);
-    assert.doesNotMatch(payload.embeds[1].description, /Expo/);
-    assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
-    assert.match(payload.embeds[2].description, /> ✅ ⛳ Team C vs Team D: corners under 9.5 @ 1.82/);
-    assert.match(payload.embeds[2].description, /💵 Stake 5/);
-    assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.equal(payload.embeds.length, 1);
+    assert.equal(payload.embeds[0].title, 'Gana v9 - Validacion de recomendaciones');
+    assert.match(payload.embeds[0].description, /Nota: Esto es una prueba/);
+    assert.match(payload.embeds[0].description, /Selecciones: 1 parlays, 1 simples/);
+    assert.match(payload.embeds[0].description, /Resultado: 1 ganadas, 1 perdidas/);
+    assert.match(payload.embeds[0].description, /1\. Parlay: Team A vs Team B - perdido \(1 ganado · 1 perdido\)/);
+    assert.match(payload.embeds[0].description, /Detalle: Odds 2.24 · Conf 74% · Edge 8% · Stake 10/);
+    assert.match(payload.embeds[0].description, /Fallo\/pendiente: perdido - Team A vs Team B: goals under 2.5 @ 1.6/);
+    assert.doesNotMatch(payload.embeds[0].description, /h2h home @ 1.4/);
+    assert.doesNotMatch(payload.embeds[0].description, /2\. Simple: Team C vs Team D/);
+    assert.doesNotMatch(payload.embeds[0].description, /Odds 1.82/);
+    assert.doesNotMatch(payload.embeds[0].description, /Stake 5/);
+    assert.doesNotMatch(payload.embeds[0].description, /[📊🎯🧩✅❌⏳⚪]/u);
+    assert.doesNotMatch(message, /2\. Simple: Team C vs Team D/);
     assert.doesNotMatch(message, /\bbet\b/i);
   });
 
@@ -148,7 +152,7 @@ describe('discord daily stats notifier', () => {
     assert.equal(result.dryRun, true);
     assert.equal(result.metricDate, '2026-05-14');
     assert.equal(result.gatewayTarget, 'discord:123');
-    assert.equal(result.payload.embeds[0].title, '📊 Gana v9 · Validación diaria');
+    assert.equal(result.payload.embeds[0].title, 'Gana v9 - Validacion diaria');
     assert.equal(result.mirrorPayload, undefined);
   });
 });
