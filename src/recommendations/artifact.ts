@@ -28,6 +28,7 @@ export interface RecommendationArtifactSelection {
 export function readRecommendationArtifactTargets(path: string): RecommendationArtifactTargets {
   const artifact = JSON.parse(readFileSync(path, 'utf-8'));
   attachRequiredLeagueRecommendations(artifact, path);
+  attachRequiredLeagueGeneralPredictions(artifact, path);
   return recommendationArtifactTargets(artifact, path);
 }
 
@@ -35,6 +36,10 @@ export function recommendationArtifactTargets(artifact: unknown, sourcePath?: st
   const payload = objectRecord(artifact);
   const recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
   const requiredLeague = objectRecord(payload.requiredLeagueRecommendations);
+  const generalPredictions = [
+    ...(Array.isArray(requiredLeague.generalPredictions) ? requiredLeague.generalPredictions : []),
+    ...(Array.isArray(payload.requiredLeagueGeneralPredictions) ? payload.requiredLeagueGeneralPredictions : []),
+  ];
   const predictionIds = new Set<string>();
   const parlayIds = new Set<string>();
   const artifactSelections = new Map<string, RecommendationArtifactSelection>();
@@ -72,7 +77,7 @@ export function recommendationArtifactTargets(artifact: unknown, sourcePath?: st
     }
   }
 
-  for (const prediction of Array.isArray(requiredLeague.generalPredictions) ? requiredLeague.generalPredictions : []) {
+  for (const prediction of generalPredictions) {
     const selection = artifactSelectionFromRequiredGeneralPrediction(prediction);
     if (!selection) continue;
     if (!artifactSelections.has(selection.artifactSelectionId)) artifactSelections.set(selection.artifactSelectionId, selection);
@@ -101,6 +106,97 @@ function attachRequiredLeagueRecommendations(artifact: Record<string, unknown>, 
   } catch {
     // Keep target extraction resilient; the main recommendations still remain valid.
   }
+}
+
+function attachRequiredLeagueGeneralPredictions(artifact: Record<string, unknown>, artifactPath: string): void {
+  if (Array.isArray(artifact.requiredLeagueGeneralPredictions)) return;
+  const data = requiredLeagueData(artifact);
+  const rawFixtures = objectRecord(data.coverage).fixtures;
+  const fixtures = Array.isArray(rawFixtures) ? rawFixtures : [];
+  if (!fixtures.length) return;
+  const comparisonPath = stringValue(artifact.providerComparisonPath);
+  if (!comparisonPath) return;
+  const resolved = isAbsolute(comparisonPath) ? comparisonPath : resolve(dirname(artifactPath), comparisonPath);
+  if (!existsSync(resolved)) return;
+  try {
+    const comparison = JSON.parse(readFileSync(resolved, 'utf-8'));
+    const predictions = requiredLeagueGeneralPredictionsFromComparison(comparison, fixtures);
+    if (predictions.length) artifact.requiredLeagueGeneralPredictions = predictions;
+  } catch {
+    // Required league validation remains scoped to explicit recommendations if comparison data is unavailable.
+  }
+}
+
+function requiredLeagueData(artifact: Record<string, unknown>): Record<string, unknown> {
+  const embedded = objectRecord(artifact.requiredLeagueRecommendations);
+  if (Object.keys(embedded).length) return embedded;
+  return {
+    coverage: artifact.requiredLeagueCoverage,
+    goalCheck: artifact.requiredLeagueGoalCheck,
+    atomicProjections: artifact.requiredLeagueAtomicProjections,
+    parlayProjections: artifact.requiredLeagueParlayProjections,
+  };
+}
+
+function requiredLeagueGeneralPredictionsFromComparison(comparison: unknown, fixtures: unknown[]): Record<string, unknown>[] {
+  const fixtureByKey = requiredLeagueFixtureMetaByKey(fixtures);
+  const rawItems = objectRecord(comparison).items;
+  const items = Array.isArray(rawItems) ? rawItems : [];
+  const predictions: Record<string, unknown>[] = [];
+  for (const itemValue of items) {
+    const item = objectRecord(itemValue);
+    const fixture = requiredLeagueFixtureKeys(item).map((key) => fixtureByKey.get(key)).find(Boolean);
+    if (!fixture) continue;
+    const providers = Array.isArray(item.providers) ? item.providers : [];
+    for (const providerValue of providers) {
+      const provider = objectRecord(providerValue);
+      const line = numberOrNull(provider.line) ?? numberOrNull(item.line);
+      predictions.push({
+        fixtureId: stringValue(item.fixtureId) ?? stringValue(fixture.fixtureId) ?? '',
+        providerFixtureId: stringValue(item.providerFixtureId) ?? stringValue(fixture.providerFixtureId) ?? '',
+        fixture: stringValue(fixture.fixture) ?? requiredLeagueFixtureLabel(fixture),
+        display: objectRecord(fixture.display),
+        market: stringValue(item.market) ?? '',
+        selection: stringValue(provider.selection) ?? '',
+        line,
+        odds: numberOrNull(provider.odds),
+        confidence: numberOrNull(provider.confidence),
+        expectedEdge: numberOrNull(provider.edge),
+        provider: stringValue(provider.provider) ?? 'provider',
+        status: stringValue(provider.status) ?? 'review-required',
+      });
+    }
+  }
+  return predictions;
+}
+
+function requiredLeagueFixtureMetaByKey(fixtures: unknown[]): Map<string, Record<string, unknown>> {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const fixtureValue of fixtures) {
+    const fixture = objectRecord(fixtureValue);
+    for (const key of requiredLeagueFixtureKeys(fixture)) {
+      if (key && !byKey.has(key)) byKey.set(key, fixture);
+    }
+  }
+  return byKey;
+}
+
+function requiredLeagueFixtureKeys(item: Record<string, unknown>): string[] {
+  return [
+    item.fixtureId,
+    item.providerFixtureId,
+    item.fixture,
+    objectRecord(item.display).fixtureLabel,
+  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .map((value) => value.trim());
+}
+
+function requiredLeagueFixtureLabel(item: Record<string, unknown>): string {
+  return stringValue(item.fixture)
+    ?? stringValue(objectRecord(item.display).fixtureLabel)
+    ?? [stringValue(objectRecord(item.display).homeTeamName), stringValue(objectRecord(item.display).awayTeamName)].filter(Boolean).join(' vs ')
+    ?? stringValue(item.providerFixtureId)
+    ?? 'fixture unknown';
 }
 
 function artifactSelectionFromRequiredGeneralPrediction(value: unknown): RecommendationArtifactSelection | undefined {
