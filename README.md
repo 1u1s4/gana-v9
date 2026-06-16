@@ -233,6 +233,10 @@ Before publishing or pushing public branches, run:
 gitleaks detect --source . --redact=100 --no-banner
 ```
 
+Skill documentation:
+
+- [Repo skills guide](docs/skills.md) documents `.agents/skills` operational runbooks and `skills/` harness prompt contracts.
+
 ## License
 
 No license file is currently included. Add a license before publishing the repository as open source.

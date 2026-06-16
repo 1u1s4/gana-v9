@@ -233,6 +233,10 @@ Antes de publicar o hacer push de ramas publicas, ejecuta:
 gitleaks detect --source . --redact=100 --no-banner
 ```
 
+Documentacion de skills:
+
+- [Guia de skills del repo](docs/skills.md) documenta los runbooks operativos en `.agents/skills` y los contratos de prompts del harness en `skills/`.
+
 ## Licencia
 
 El repositorio todavia no incluye archivo de licencia. Agrega una licencia antes de publicarlo como open source.
