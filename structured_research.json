@@ -1,185 +1,468 @@
-
 {
   "sources": [
     {
-      "id": "provider-snapshot-fixture",
-      "type": "provider-snapshot",
-      "url": null,
+      "id": "source_web_search_placeholder",
+      "type": "web-search",
+      "url": "https://www.google.com/search?q=Grebbestad+vs+Vänersborgs+IF+Division+2+-+Norra+Götaland",
+      "title": "Google Search for Grebbestad vs Vänersborgs IF",
+      "capturedAt": "2026-06-17T16:58:01.106Z",
+      "metadata": {
+        "search_query": "Grebbestad vs Vänersborgs IF Division 2 - Norra Götaland",
+        "result_status": "no_direct_results_found"
+      }
+    },
+    {
+      "id": "source_api_football_fixture",
+      "type": "api-football",
+      "url": "N/A",
       "title": "API-Football Fixture Data",
-      "capturedAt": "2026-06-14T17:20:23.718Z",
-      "hash": "1cf19ea1-3566-48e8-b409-d198bc94ccf0",
-      "metadata": {}
+      "capturedAt": "2026-06-17T16:16:27.636Z",
+      "hash": "f9c55d2c-2785-43e7-b2b8-fb28cfa4e032",
+      "metadata": {
+        "fixtureId": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "homeTeamName": "Grebbestad",
+        "awayTeamName": "Vänersborgs IF",
+        "competitionName": "Division 2 - Norra Götaland"
+      }
     },
     {
-      "id": "provider-snapshot-odds",
-      "type": "provider-snapshot",
-      "url": null,
-      "title": "API-Football Odds Snapshot",
-      "capturedAt": "2026-06-14T17:20:26.109Z",
-      "hash": "5d95fcbb-0549-4679-a3e4-406db24afc97",
-      "metadata": {}
-    },
-    {
-      "id": "web-search-aljazeera",
-      "type": "web-search",
-      "url": "https://www.aljazeera.com/sports/2026/6/14/spain-vs-cape-verde-world-cup-2026-preview",
-      "title": "Spain vs Cape Verde: World Cup 2026 preview",
-      "capturedAt": "2026-06-14T17:22:00.000Z",
-      "hash": null,
-      "metadata": {}
-    },
-    {
-      "id": "web-search-goal",
-      "type": "web-search",
-      "url": "https://www.goal.com/en/match/spain-v-cape-verde-islands/preview/d23b4c730ldu9j2psv3j2p4y",
-      "title": "Spain vs Cape Verde Islands Preview",
-      "capturedAt": "2026-06-14T17:22:00.000Z",
-      "hash": null,
-      "metadata": {}
+      "id": "source_api_football_odds",
+      "type": "api-football",
+      "url": "N/A",
+      "title": "API-Football Odds Data",
+      "capturedAt": "2026-06-17T16:58:05.777Z",
+      "hash": "b628a82b-9198-4ce9-aefb-4f1ee1bf116b",
+      "metadata": {
+        "fixtureId": "2fab9fc9-766e-4f57-b7d4-a3c7-ab47379b66b0"
+      }
     }
   ],
   "evidenceItems": [
     {
-      "id": "ev-h2h-odds-pinnacle",
-      "sourceId": "provider-snapshot-odds",
-      "claimIds": ["claim-h2h-spain-win"],
-      "snippet": "Pinnacle odds: Home 1.09, Draw 11.48, Away 21.17",
-      "summary": "Pinnacle's odds heavily favor Spain to win with an implied probability of 91.7%.",
-      "confidence": 0.95,
-      "metadata": {}
+      "id": "evidence_h2h_home_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Home win odds (10Bet): 1.68",
+      "summary": "10Bet offers 1.68 for Grebbestad to win.",
+      "confidence": 0.8,
+      "metadata": {
+        "market": "h2h",
+        "selection": "home",
+        "bookmaker": "10Bet",
+        "price": 1.68
+      }
     },
     {
-      "id": "ev-h2h-web-analyst",
-      "sourceId": "web-search-aljazeera",
-      "claimIds": ["claim-h2h-spain-win"],
-      "snippet": "Supercomputer gives Spain an 87.2% probability of winning.",
-      "summary": "An Al Jazeera article cites a supercomputer prediction that gives Spain an 87.2% chance of winning the match.",
-      "confidence": 0.85,
-      "metadata": {}
+      "id": "evidence_h2h_draw_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Draw odds (10Bet): 3.8",
+      "summary": "10Bet offers 3.8 for a draw.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "h2h",
+        "selection": "draw",
+        "bookmaker": "10Bet",
+        "price": 3.8
+      }
     },
     {
-      "id": "ev-btts-yes-web",
-      "sourceId": "web-search-goal",
-      "claimIds": ["claim-btts-yes"],
-      "snippet": "Cape Verde has scored in 13 of their last 14 matches, while Spain failed to keep clean sheets in their final warm-up games against Peru (3-1) and Iraq (1-1).",
-      "summary": "Cape Verde has a strong scoring record, finding the net in 13 of their last 14 games. Spain has conceded in recent friendlies.",
-      "confidence": 0.70,
-      "metadata": {}
-    },
-     {
-      "id": "ev-btts-no-odds",
-      "sourceId": "provider-snapshot-odds",
-      "claimIds": ["claim-btts-no"],
-      "snippet": "Bet365 BTTS 'No' price: 1.53",
-      "summary": "Bet365 odds imply a 65.4% probability that both teams will not score.",
-      "confidence": 0.65,
-      "metadata": {}
+      "id": "evidence_h2h_away_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Away win odds (10Bet): 4.1",
+      "summary": "10Bet offers 4.1 for Vänersborgs IF to win.",
+      "confidence": 0.8,
+      "metadata": {
+        "market": "h2h",
+        "selection": "away",
+        "bookmaker": "10Bet",
+        "price": 4.1
+      }
     },
     {
-        "id": "ev-ou-over2.5-odds",
-        "sourceId": "provider-snapshot-odds",
-        "claimIds": ["claim-ou-over2.5"],
-        "snippet": "Bet365 Over 2.5 goals price: 1.36",
-        "summary": "Bet365 odds imply a 73.5% probability of over 2.5 goals being scored in the match.",
-        "confidence": 0.75,
-        "metadata": {}
+      "id": "evidence_h2h_home_marathonbet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Home win odds (Marathonbet): 1.63",
+      "summary": "Marathonbet offers 1.63 for Grebbestad to win.",
+      "confidence": 0.8,
+      "metadata": {
+        "market": "h2h",
+        "selection": "home",
+        "bookmaker": "Marathonbet",
+        "price": 1.63
+      }
     },
     {
-        "id": "ev-double-chance-spain-draw",
-        "sourceId": "provider-snapshot-odds",
-        "claimIds": ["claim-dc-spain-draw"],
-        "snippet": "Bet365 Double Chance 'home_or_draw' price: 1.01",
-        "summary": "Bet365 odds give an extremely high probability (99%) to a Spain win or draw result.",
-        "confidence": 0.99,
-        "metadata": {}
+      "id": "evidence_h2h_draw_marathonbet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Draw odds (Marathonbet): 3.8",
+      "summary": "Marathonbet offers 3.8 for a draw.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "h2h",
+        "selection": "draw",
+        "bookmaker": "Marathonbet",
+        "price": 3.8
+      }
+    },
+    {
+      "id": "evidence_h2h_away_marathonbet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Away win odds (Marathonbet): 4.25",
+      "summary": "Marathonbet offers 4.25 for Vänersborgs IF to win.",
+      "confidence": 0.8,
+      "metadata": {
+        "market": "h2h",
+        "selection": "away",
+        "bookmaker": "Marathonbet",
+        "price": 4.25
+      }
+    },
+    {
+      "id": "evidence_goals_over_2_5_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Goals over 2.5 odds (10Bet): 1.48",
+      "summary": "10Bet offers 1.48 for over 2.5 goals.",
+      "confidence": 0.75,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 2.5,
+        "bookmaker": "10Bet",
+        "price": 1.48
+      }
+    },
+    {
+      "id": "evidence_goals_under_2_5_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Goals under 2.5 odds (10Bet): 2.5",
+      "summary": "10Bet offers 2.5 for under 2.5 goals.",
+      "confidence": 0.75,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "under",
+        "line": 2.5,
+        "bookmaker": "10Bet",
+        "price": 2.5
+      }
+    },
+    {
+      "id": "evidence_goals_over_2_5_marathonbet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Goals over 2.5 odds (Marathonbet): 1.44",
+      "summary": "Marathonbet offers 1.44 for over 2.5 goals.",
+      "confidence": 0.75,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 2.5,
+        "bookmaker": "Marathonbet",
+        "price": 1.44
+      }
+    },
+    {
+      "id": "evidence_goals_under_2_5_marathonbet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Goals under 2.5 odds (Marathonbet): 2.42",
+      "summary": "Marathonbet offers 2.42 for under 2.5 goals.",
+      "confidence": 0.75,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "under",
+        "line": 2.5,
+        "bookmaker": "Marathonbet",
+        "price": 2.42
+      }
+    },
+    {
+      "id": "evidence_btts_yes_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Both teams to score yes odds (10Bet): 1.45",
+      "summary": "10Bet offers 1.45 for both teams to score.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "btts",
+        "selection": "yes",
+        "bookmaker": "10Bet",
+        "price": 1.45
+      }
+    },
+    {
+      "id": "evidence_btts_no_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Both teams to score no odds (10Bet): 2.45",
+      "summary": "10Bet offers 2.45 for both teams not to score.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "btts",
+        "selection": "no",
+        "bookmaker": "10Bet",
+        "price": 2.45
+      }
+    },
+    {
+      "id": "evidence_double_chance_home_draw_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Double chance home or draw odds (10Bet): 1.15",
+      "summary": "10Bet offers 1.15 for Grebbestad to win or draw.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "home_or_draw",
+        "bookmaker": "10Bet",
+        "price": 1.15
+      }
+    },
+    {
+      "id": "evidence_double_chance_home_away_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Double chance home or away odds (10Bet): 1.18",
+      "summary": "10Bet offers 1.18 for Grebbestad to win or Vänersborgs IF to win.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "home_or_away",
+        "bookmaker": "10Bet",
+        "price": 1.18
+      }
+    },
+    {
+      "id": "evidence_double_chance_draw_away_10bet",
+      "sourceId": "source_api_football_odds",
+      "claimIds": [],
+      "snippet": "Double chance draw or away odds (10Bet): 2.05",
+      "summary": "10Bet offers 2.05 for a draw or Vänersborgs IF to win.",
+      "confidence": 0.7,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "draw_or_away",
+        "bookmaker": "10Bet",
+        "price": 2.05
+      }
     }
   ],
   "claims": [
     {
-      "id": "claim-h2h-spain-win",
-      "statement": "Spain is the strong favorite to win the match against Cape Verde.",
+      "id": "claim_h2h_home",
+      "statement": "Grebbestad is favored to win, with best odds of 1.63.",
       "subject": {
         "type": "market",
-        "id": "7d6de56e-5263-4b0c-9447-0bb2d66f06f2",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
         "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["ev-h2h-odds-pinnacle", "ev-h2h-web-analyst"],
+      "evidenceIds": [
+        "evidence_h2h_home_10bet",
+        "evidence_h2h_home_marathonbet"
+      ],
       "conflictStatus": "none",
-      "metadata": {}
-    },
-    {
-      "id": "claim-btts-yes",
-      "statement": "There is a reasonable chance for both teams to score.",
-      "subject": {
-        "type": "market",
-        "id": "7d6de56e-5263-4b0c-9447-0bb2d66f06f2",
-        "market": "btts"
-      },
-      "supportLevel": "partially-supported",
-      "evidenceIds": ["ev-btts-yes-web"],
-      "conflictStatus": "conflict",
       "metadata": {
-          "conflictingClaimIds": ["claim-btts-no"]
+        "selection": "home",
+        "best_price": 1.63
       }
     },
     {
-      "id": "claim-btts-no",
-      "statement": "It is more likely that at least one team will fail to score.",
+      "id": "claim_h2h_draw",
+      "statement": "A draw has odds of 3.8 from both bookmakers.",
       "subject": {
         "type": "market",
-        "id": "7d6de56e-5263-4b0c-9447-0bb2d66f06f2",
-        "market": "btts"
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "h2h"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["ev-btts-no-odds"],
-      "conflictStatus": "conflict",
-       "metadata": {
-          "conflictingClaimIds": ["claim-btts-yes"]
+      "evidenceIds": [
+        "evidence_h2h_draw_10bet",
+        "evidence_h2h_draw_marathonbet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "draw",
+        "best_price": 3.8
       }
     },
     {
-      "id": "claim-ou-over2.5",
-      "statement": "The match is likely to have over 2.5 goals.",
+      "id": "claim_h2h_away",
+      "statement": "Vänersborgs IF is less favored to win, with best odds of 4.25.",
       "subject": {
         "type": "market",
-        "id": "7d6de56e-5263-4b0c-9447-0bb2d66f06f2",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_h2h_away_10bet",
+        "evidence_h2h_away_marathonbet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "away",
+        "best_price": 4.25
+      }
+    },
+    {
+      "id": "claim_goals_over_2_5",
+      "statement": "The odds for over 2.5 goals are 1.48 (10Bet) and 1.44 (Marathonbet).",
+      "subject": {
+        "type": "market",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
         "market": "goals_over_under"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["ev-ou-over2.5-odds"],
+      "evidenceIds": [
+        "evidence_goals_over_2_5_10bet",
+        "evidence_goals_over_2_5_marathonbet"
+      ],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {
+        "selection": "over",
+        "line": 2.5,
+        "best_price": 1.44
+      }
     },
     {
-      "id": "claim-dc-spain-draw",
-      "statement": "Spain or Draw is a near certainty.",
-       "subject": {
+      "id": "claim_goals_under_2_5",
+      "statement": "The odds for under 2.5 goals are 2.5 (10Bet) and 2.42 (Marathonbet).",
+      "subject": {
         "type": "market",
-        "id": "7d6de56e-5263-4b0c-9447-0bb2d66f06f2",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_goals_under_2_5_10bet",
+        "evidence_goals_under_2_5_marathonbet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "under",
+        "line": 2.5,
+        "best_price": 2.5
+      }
+    },
+    {
+      "id": "claim_btts_yes",
+      "statement": "Both teams to score 'Yes' is offered at 1.45 (10Bet).",
+      "subject": {
+        "type": "market",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_btts_yes_10bet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "yes",
+        "best_price": 1.45
+      }
+    },
+    {
+      "id": "claim_btts_no",
+      "statement": "Both teams to score 'No' is offered at 2.45 (10Bet).",
+      "subject": {
+        "type": "market",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_btts_no_10bet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "no",
+        "best_price": 2.45
+      }
+    },
+    {
+      "id": "claim_double_chance_home_draw",
+      "statement": "Double chance 'Home or Draw' is offered at 1.15 (10Bet).",
+      "subject": {
+        "type": "market",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
         "market": "double_chance"
       },
       "supportLevel": "supported",
-      "evidenceIds": ["ev-double-chance-spain-draw"],
+      "evidenceIds": [
+        "evidence_double_chance_home_draw_10bet"
+      ],
       "conflictStatus": "none",
-      "metadata": {}
+      "metadata": {
+        "selection": "home_or_draw",
+        "best_price": 1.15
+      }
+    },
+    {
+      "id": "claim_double_chance_home_away",
+      "statement": "Double chance 'Home or Away' is offered at 1.18 (10Bet).",
+      "subject": {
+        "type": "market",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_double_chance_home_away_10bet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "home_or_away",
+        "best_price": 1.18
+      }
+    },
+    {
+      "id": "claim_double_chance_draw_away",
+      "statement": "Double chance 'Draw or Away' is offered at 2.05 (10Bet).",
+      "subject": {
+        "type": "market",
+        "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_double_chance_draw_away_10bet"
+      ],
+      "conflictStatus": "none",
+      "metadata": {
+        "selection": "draw_or_away",
+        "best_price": 2.05
+      }
     }
   ],
   "gateResult": {
-    "verdict": "promotable",
+    "verdict": "review-required",
     "reasons": [
-      "Structured research generated with sufficient evidence for h2h, goals_over_under, double_chance, and btts markets.",
-      "Web-search evidence was successfully included."
+      "Web-search evidence for specific fixture details is missing.",
+      "Market 'corners_over_under' had no available odds or evidence."
     ],
-    "warnings": [
-        "No specific evidence was found for the 'corners_over_under' market."
-    ]
+    "warnings": []
   },
-    "metadata": {
-        "marketCoverage": {
-            "requiredMarkets": ["h2h", "double_chance", "goals_over_under", "corners_over_under", "btts"],
-            "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
-            "skippedMarkets": ["corners_over_under"]
-        }
+  "warnings": [],
+  "metadata": {
+    "fixture": {
+      "id": "2fab9fc9-766e-4f57-b757-707b333a75f0",
+      "homeTeamName": "Grebbestad",
+      "awayTeamName": "Vänersborgs IF",
+      "competitionName": "Division 2 - Norra Götaland",
+      "scheduledAt": "2026-06-18T17:00:00.000Z"
+    },
+    "marketCoverage": {
+      "skippedMarkets": [
+        "corners_over_under"
+      ]
     }
+  }
 }

@@ -1,0 +1,143 @@
+{
+  "sources": [
+    {
+      "id": "source_1",
+      "type": "web-search",
+      "url": "about:blank",
+      "title": "Web search failed to retrieve results",
+      "capturedAt": "2026-06-17T17:05:17.245Z",
+      "hash": "n/a",
+      "metadata": {
+        "reason": "Web search query 'Elva vs Viimsi football prediction Esiliiga A head to head stats recent form' returned no results."
+      }
+    },
+    {
+      "id": "source_2",
+      "type": "provider-snapshot",
+      "url": "n/a",
+      "title": "API-Football Fixture and Odds Snapshot",
+      "capturedAt": "2026-06-17T17:05:20.444Z",
+      "hash": "816493d4-ddd8-46c2-922e-97ebafaeca75",
+      "metadata": {
+        "fixtureId": "2483aef3-5346-4c0b-99a4-7808e6fce88c",
+        "providerSnapshotId": "5ec0994c-d7d1-4ebc-9dd2-3ff194486368"
+      }
+    }
+  ],
+  "evidenceItems": [
+    {
+      "id": "evidence_1",
+      "sourceId": "source_2",
+      "claimIds": [],
+      "snippet": "h2h market: away: 1.73 (57.8%), draw: 4 (25%), home: 3.5 (28.57%)",
+      "summary": "Odds suggest Viimsi (away) is favored in H2H with an implied probability of 57.8%.",
+      "confidence": 0.8,
+      "metadata": {
+        "market": "h2h",
+        "selection": "away",
+        "price": 1.73
+      }
+    },
+    {
+      "id": "evidence_2",
+      "sourceId": "source_2",
+      "claimIds": [],
+      "snippet": "goals_over_under market: over 2.5: 1.5 (66.67%), under 2.5: 2.5 (40%)",
+      "summary": "Odds favor Over 2.5 goals with an implied probability of 66.67%.",
+      "confidence": 0.8,
+      "metadata": {
+        "market": "goals_over_under",
+        "selection": "over",
+        "line": 2.5,
+        "price": 1.5
+      }
+    },
+    {
+      "id": "evidence_3",
+      "sourceId": "source_2",
+      "claimIds": [],
+      "snippet": "double_chance market: draw_or_away: 1.22 (81.97%), home_or_away: 1.17 (85.47%), home_or_draw: 1.91 (52.36%)",
+      "summary": "The 'Draw or Away' double chance has a high implied probability of 81.97%.",
+      "confidence": 0.75,
+      "metadata": {
+        "market": "double_chance",
+        "selection": "draw_or_away",
+        "price": 1.22
+      }
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_1",
+      "statement": "Based on provided odds, Viimsi (away team) is the favorite in the head-to-head market.",
+      "subject": {
+        "type": "market",
+        "id": "2483aef3-5346-4c0b-99a4-7808e6fce88c",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_1"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_2",
+      "statement": "The odds indicate a higher probability of over 2.5 goals in the match.",
+      "subject": {
+        "type": "market",
+        "id": "2483aef3-5346-4c0b-99a4-7808e6fce88c",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_2"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_3",
+      "statement": "The 'Draw or Away' outcome in the double chance market has a very high implied probability.",
+      "subject": {
+        "type": "market",
+        "id": "2483aef3-5346-4c0b-99a4-7808e6fce88c",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evidence_3"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    }
+  ],
+  "gateResult": {
+    "verdict": "review-required",
+    "reasons": [
+      "Web-search evidence is missing due to repeated search failures.",
+      "Research is based solely on provided fixture and odds data, leading to partial evidence.",
+      "Required markets (h2h, double_chance, goals_over_under, btts) are partially covered. 'btts' is missing due to lack of specific data in odds snapshot.",
+      "'corners_over_under' market skipped due to lack of data."
+    ],
+    "warnings": [
+      "Web search failed to retrieve results, impacting comprehensive research."
+    ]
+  },
+  "warnings": [
+    "Web search failed to retrieve results for the query, leading to incomplete research."
+  ],
+  "metadata": {
+    "marketCoverage": {
+      "skippedMarkets": [
+        "btts",
+        "corners_over_under"
+      ],
+      "reasons": {
+        "btts": "No specific information found in odds snapshot for 'btts' market.",
+        "corners_over_under": "No specific information found in odds snapshot or web search regarding corners statistics for this fixture."
+      }
+    }
+  }
+}

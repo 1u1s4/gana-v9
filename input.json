@@ -1,7 +1,7 @@
 {
   "promptVersion": "score-prediction-v2",
-  "runId": "6a56ceac-cc57-4f23-a07f-ade2cb5d7d8d",
-  "createdAt": "2026-06-09T17:24:13.373Z",
+  "runId": "3d51773d-4087-44fb-b75d-57fc1296bda7",
+  "createdAt": "2026-06-16T22:13:50.841Z",
   "webMode": "live",
   "requiredMarkets": [
     "h2h",
@@ -18,90 +18,94 @@
     "btts"
   ],
   "fixture": {
-    "id": "c0ab87dc-a347-42c4-b8c8-28cf6b6aae30",
-    "providerFixtureId": "1493527",
-    "competitionId": "8c54decb-4ac2-44c4-a307-75bea6beb06a",
+    "id": "018a0244-1c4f-4e43-ace7-02776b2f2bca",
+    "providerFixtureId": "1510959",
+    "competitionId": "0c65cd73-40b9-47a1-8b46-0a385523e499",
     "season": 2026,
-    "homeTeamId": "a635174f-50b0-40fd-8cec-9e5b92304dc8",
-    "awayTeamId": "9f2a758f-7a80-49c2-b191-7da44fda16d8",
-    "scheduledAt": "2026-06-10T23:30:00.000Z",
+    "homeTeamId": "a67c501a-78ea-4018-8862-919383d674e9",
+    "awayTeamId": "6d18437a-c9d7-47a6-8a8b-eb0a64c6d8f0",
+    "scheduledAt": "2026-06-17T17:00:00.000Z",
     "status": "scheduled",
     "scoreHome": null,
     "scoreAway": null,
     "includedByFilters": [],
     "metadata": {
       "league": {
-        "id": 255,
-        "name": "USL Championship",
-        "country": "USA",
+        "id": 597,
+        "name": "Division 2 - Södra Götaland",
+        "country": "Sweden",
         "season": 2026,
-        "round": "Group Stage"
+        "round": "Södra Götaland - 13"
       },
       "teams": {
         "home": {
-          "id": 9043,
-          "name": "Detroit City"
+          "id": 20839,
+          "name": "IFK Trelleborg"
         },
         "away": {
-          "id": 3993,
-          "name": "El Paso Locomotive"
+          "id": 12612,
+          "name": "Berga"
         }
       },
-      "venue": "Keyworth Stadium",
-      "round": "Group Stage",
+      "round": "Södra Götaland - 13",
       "timezone": "UTC",
       "apiFootballStatusShort": "NS",
       "apiFootballStatusLong": "Not Started"
     }
   },
   "fixtureStatistics": {
-    "providerFixtureId": "1493527",
-    "capturedAt": "2026-06-09T17:24:15.138Z",
-    "providerSnapshotId": "17a5cc60-1a83-4225-972c-9f94fb45a7a0"
+    "providerFixtureId": "1510959",
+    "capturedAt": "2026-06-16T22:13:51.600Z",
+    "providerSnapshotId": "49ac30f0-5635-4f6e-8dd3-0822eae2f71a"
   },
   "oddsSnapshot": {
-    "id": "480df543-9fff-4f87-8cb6-53c668a5af3b",
-    "fixtureId": "c0ab87dc-a347-42c4-b8c8-28cf6b6aae30",
-    "providerFixtureId": "1493527",
-    "providerSnapshotId": "7eed13aa-60f1-411b-969e-4d8efd704a0a",
-    "bookmakerCount": 2,
-    "capturedAt": "2026-06-09T17:15:28.456Z",
-    "payloadHash": "c3981e771e384f43ff4e25e0235b68bde94e0bef6922b262b7e02557b803d190"
+    "id": "3a412f82-81a5-4efa-bddd-f9e7e6f78fe5",
+    "fixtureId": "018a0244-1c4f-4e43-ace7-02776b2f2bca",
+    "providerFixtureId": "1510959",
+    "providerSnapshotId": "6ebe2bbb-99f4-49e7-ac03-95fc340a1059",
+    "bookmakerCount": 1,
+    "capturedAt": "2026-06-16T21:56:36.227Z",
+    "payloadHash": "b042bc021515df35000bc5fede0f1357104153f8140d9ebfd494195aff94e0e1"
   },
   "researchBundle": {
-    "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a",
-    "runId": "6a56ceac-cc57-4f23-a07f-ade2cb5d7d8d",
+    "id": "08b914df-b622-42f1-a15d-1ef15ae21af8",
+    "runId": "3d51773d-4087-44fb-b75d-57fc1296bda7",
     "status": "promotable",
     "gateResult": {
+      "verdict": "promotable",
       "reasons": [
-        "Structured research generated with sufficient evidence for most required markets.",
-        "Market 'corners_over_under' was requested but lacked specific evidence and odds in the provided data and web search results.",
+        "Research is based on historical data as the match is scheduled for the future and no current information is available.",
+        "Web search for the specific 2026 fixture yielded no results.",
         "objective research gate passed with current web evidence"
       ],
-      "verdict": "promotable",
       "warnings": [
-        "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+        "market corners_over_under skipped/review-required: missing odds quotes for requested market",
+        "The fixture is in the future. All analysis is based on historical head-to-head data and may not reflect future performance."
       ]
     },
     "providerAgentic": "gemini",
-    "model": "gemini-2.5-flash",
+    "model": "gemini-2.5-pro",
     "promptVersion": "research-fixture-v2",
     "warnings": [
-      "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+      "market corners_over_under skipped/review-required: missing odds quotes for requested market",
+      "The fixture is in the future. All analysis is based on historical head-to-head data and may not reflect future performance."
     ],
     "metadata": {
-      "marketScope": [
-        "h2h",
-        "double_chance",
-        "goals_over_under",
-        "corners_over_under",
-        "btts"
-      ],
       "marketCoverage": {
-        "warnings": [
-          "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+        "requiredMarkets": [
+          "h2h",
+          "double_chance",
+          "goals_over_under",
+          "corners_over_under",
+          "btts"
         ],
         "quotedMarkets": [
+          "btts",
+          "double_chance",
+          "goals_over_under",
+          "h2h"
+        ],
+        "evidenceMarkets": [
           "btts",
           "double_chance",
           "goals_over_under",
@@ -113,887 +117,601 @@
             "reason": "missing odds quotes for requested market"
           }
         ],
-        "evidenceMarkets": [
-          "btts",
-          "double_chance",
-          "goals_over_under",
-          "h2h"
-        ],
-        "requiredMarkets": [
-          "h2h",
-          "double_chance",
-          "goals_over_under",
-          "corners_over_under",
-          "btts"
+        "warnings": [
+          "market corners_over_under skipped/review-required: missing odds quotes for requested market"
         ]
       },
-      "referenceRepairs": [
-        "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+      "providerContextWarnings": [],
+      "marketScope": [
+        "h2h",
+        "double_chance",
+        "goals_over_under",
+        "corners_over_under",
+        "btts"
       ],
       "webSearchCoverage": {
         "mode": "live",
         "provider": "gemini",
-        "required": true,
-        "nativeToolUsed": true,
         "nativeSupported": true,
+        "nativeToolUsed": true,
         "browserFallbackUsed": false,
-        "realWebSearchSourceCount": 4,
-        "syntheticWebSearchSourceCount": 0
+        "realWebSearchSourceCount": 2,
+        "syntheticWebSearchSourceCount": 0,
+        "required": true
       },
-      "providerContextWarnings": []
+      "referenceRepairs": [
+        "market corners_over_under skipped/review-required: missing odds quotes for requested market"
+      ]
     }
   },
   "sources": [
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "type": "provider-snapshot",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:source_api_football_fixture",
+      "type": "api-football",
       "url": null,
-      "title": "API-Football Odds and Statistics Snapshot",
-      "externalId": "api-football://source_api_football_snapshot",
+      "title": "API-Football fixture",
+      "externalId": "1510959",
       "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:28.456Z",
+      "capturedAt": "2026-06-16T21:56:32.222Z",
       "metadata": {
-        "providerSnapshotId": "7eed13aa-60f1-411b-969e-4d8efd704a0a"
+        "fixtureId": "018a0244-1c4f-4e43-ace7-02776b2f2bca",
+        "providerFixtureId": "1510959"
       }
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_odds_snapshot",
-      "type": "provider-snapshot",
-      "url": null,
-      "title": "API-Football odds snapshot",
-      "externalId": "1493527",
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:28.456Z",
-      "metadata": {
-        "fixtureId": "c0ab87dc-a347-42c4-b8c8-28cf6b6aae30",
-        "quoteCount": 44,
-        "snapshotId": "7eed13aa-60f1-411b-969e-4d8efd704a0a",
-        "bookmakerCount": 2,
-        "oddsSnapshotId": "480df543-9fff-4f87-8cb6-53c668a5af3b",
-        "providerFixtureId": "1493527"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_fixture_statistics",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:source_api_football_fixture_statistics",
       "type": "api-football",
       "url": null,
       "title": "API-Football fixture statistics",
-      "externalId": "1493527",
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:27.537Z",
+      "externalId": "1510959",
+      "providerSnapshotId": "2e28efdf-8921-4750-a767-972b0d889fcb",
+      "capturedAt": "2026-06-16T21:56:35.379Z",
       "metadata": {
+        "providerFixtureId": "1510959",
         "fields": [
           "cornersHome",
           "cornersAway",
           "totalCorners"
         ],
-        "snapshotId": "a6f38f10-a4d7-479e-9e03-55f25eb0839e",
-        "providerFixtureId": "1493527"
+        "snapshotId": "2e28efdf-8921-4750-a767-972b0d889fcb"
       }
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_soccerpunter",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHncdNChkcYvHpU-4HhapQo-MAM0sz8e4cZTvMqys7LcG2lIgFcpXhwN4XXVxBZL7AzKgbR_gAKcD6sVRHmeYqvN1YsMV3eJPiH-WkfjVJd9O-45SpwEKcRaxRCv70qkl42nrtsNuGx8LrDbLqi1gqbPO6fM51X2ORAIu7URb_WLJMgnrLzZSUgkl5j",
-      "title": "SoccerPunter Match Preview",
-      "externalId": null,
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:24.626Z",
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_kvia",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE7lSy-zlgYf10uKEL_8YgEj6yuMe3M9htP6Yd7GQscZ8RcPT7Ao2I_kWMnqGSB5b8qvr00Xwfy-nt4fbfZzzUDWhzjRg0SSEsfRdwK6yVv_jrrpAYFh6gnIDJpNvEpI_6EuZtdye5uJTWROSbQPfDdwjvRGe4niCKQJJfUs8WsCFg2h9dWzBvS_aN29ffs72OIpM_L0BQ2F5yfPqP_CpSFlIudBr9bwPYRQW_A4awZpN7_vYC34YtR",
-      "title": "KVIA El Paso Locomotive Discipline Report",
-      "externalId": null,
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:24.626Z",
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_footystats",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH-TnvFDPrPbfkRpemhuHbufXgpZwEfPkEzzsCwLHrRtM1MxbX5r400vWqHqypo3QI4RgoIl4WMmWOqNCQn2owlcEQOjcGVsApjn62drki_H89nqWBNdiDFtbBgt02wkK4OeGxNsclA0xuy9Sju9pQgi_nUbYRsC_2Joc-cOlAxubD9K3K1QYKR",
-      "title": "FootyStats Head-to-Head and Form",
-      "externalId": null,
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:24.626Z",
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_eaglepredict",
-      "type": "web-search",
-      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF3MYojQKRV97fHCcBfSQm-f0vUZxiB1z7PCE2ZRo8zHFCNfO9ESmZwhiF1kNT1X0s1SlIDQjkYBV40FvBwexgksfsYtfpbF6fRyv60Wl5acQL8o-2PRb1kZo6Mvg1PIqoLnIYgXhTQt7byghEk3Qf9YCezn-UDd4ZcbZZ1eQPZcXJYLHdhOBSEFGTpzjEo_M2UrK-5LwGREyR71GTostJg-kd8kyUIJaad_WbzFGBHhm3Egg==",
-      "title": "EaglePredict Match Prediction and Betting Tips",
-      "externalId": null,
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:24.626Z",
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_fixture",
-      "type": "api-football",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:source_api_football_odds_snapshot",
+      "type": "provider-snapshot",
       "url": null,
-      "title": "API-Football fixture",
-      "externalId": "1493527",
-      "providerSnapshotId": null,
-      "capturedAt": "2026-06-09T17:15:24.626Z",
+      "title": "API-Football odds snapshot",
+      "externalId": "1510959",
+      "providerSnapshotId": "6ebe2bbb-99f4-49e7-ac03-95fc340a1059",
+      "capturedAt": "2026-06-16T21:56:36.227Z",
       "metadata": {
-        "fixtureId": "c0ab87dc-a347-42c4-b8c8-28cf6b6aae30",
-        "providerFixtureId": "1493527"
+        "fixtureId": "018a0244-1c4f-4e43-ace7-02776b2f2bca",
+        "providerFixtureId": "1510959",
+        "oddsSnapshotId": "3a412f82-81a5-4efa-bddd-f9e7e6f78fe5",
+        "quoteCount": 24,
+        "bookmakerCount": 1,
+        "snapshotId": "6ebe2bbb-99f4-49e7-ac03-95fc340a1059"
+      }
+    },
+    {
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:h2h_history_forebet",
+      "type": "web-search",
+      "url": "https://www.forebet.com/en/predictions-tips-ifk-trelleborg-ifk-berga-13277283",
+      "title": "IFK Trelleborg vs IFK Berga Prediction, H2H, Tip and Match Preview",
+      "externalId": null,
+      "providerSnapshotId": null,
+      "capturedAt": "2026-06-16T22:00:00.000Z",
+      "metadata": {}
+    },
+    {
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:h2h_history_aiscore",
+      "type": "web-search",
+      "url": "https://www.aiscore.com/match-ifk-trelleborg-vs-ifk-berga/ozp8k29z0wn2p4a",
+      "title": "IFK Trelleborg vs IFK Berga live score, H2H and lineups",
+      "externalId": null,
+      "providerSnapshotId": null,
+      "capturedAt": "2026-06-16T22:00:00.000Z",
+      "metadata": {}
+    },
+    {
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:provider_snapshot_fixture",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "API-Football Fixture Snapshot",
+      "externalId": "api-football://provider_snapshot_fixture",
+      "providerSnapshotId": null,
+      "capturedAt": "2026-06-16T21:56:34.671Z",
+      "metadata": {
+        "provider": "api-football",
+        "fixtureId": "1510959"
+      }
+    },
+    {
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:provider_snapshot_odds",
+      "type": "provider-snapshot",
+      "url": null,
+      "title": "API-Football Odds Snapshot",
+      "externalId": "api-football://provider_snapshot_odds",
+      "providerSnapshotId": null,
+      "capturedAt": "2026-06-16T21:56:36.227Z",
+      "metadata": {
+        "provider": "api-football",
+        "fixtureId": "1510959"
       }
     }
   ],
   "evidenceItems": [
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_h2h_unbeaten",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_footystats",
-      "summary": "Detroit City is unbeaten in 3 previous professional meetings against El Paso Locomotive, with 1 win and 2 draws.",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_h2h_dominance",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:h2h_history_forebet",
+      "summary": "IFK Trelleborg has a strong head-to-head record against IFK Berga, remaining undefeated in their four encounters with three wins and one draw.",
       "confidence": 0.9,
-      "claimIds": [],
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_h2h_trelleborg_favored"
+      ],
       "metadata": {}
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_detroit_home_form",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_soccerpunter",
-      "summary": "Detroit City has a perfect home record this season, winning all five matches at Keyworth Stadium.",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_high_scoring_matches",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:h2h_history_aiscore",
+      "summary": "All four historical matches between the two teams have been high-scoring, with each match seeing over 2.5 goals.",
       "confidence": 0.95,
-      "claimIds": [],
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_over_2_5_goals"
+      ],
       "metadata": {}
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_el_paso_recent_form",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_soccerpunter",
-      "summary": "El Paso Locomotive has failed to win any of their last five league matches.",
-      "confidence": 0.85,
-      "claimIds": [],
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_el_paso_discipline",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_kvia",
-      "summary": "El Paso Locomotive has received four straight red cards in their last six games, indicating significant disciplinary issues.",
-      "confidence": 0.8,
-      "claimIds": [],
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_prediction_score",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_eaglepredict",
-      "summary": "The predicted score for the match is Detroit City FC 2-1 El Paso Locomotive FC.",
-      "confidence": 0.85,
-      "claimIds": [],
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_betting_lean_h2h",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_eaglepredict",
-      "summary": "Betting analysis suggests a lean towards a Detroit City win.",
-      "confidence": 0.8,
-      "claimIds": [],
-      "metadata": {}
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_betting_lean_over_2_5",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_eaglepredict",
-      "summary": "Betting analysis suggests a lean towards Over 2.5 total goals.",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_btts_history",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:h2h_history_aiscore",
+      "summary": "Three of the four past matches between IFK Trelleborg and IFK Berga have seen both teams find the net.",
       "confidence": 0.75,
-      "claimIds": [],
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_btts_yes"
+      ],
       "metadata": {}
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_betting_lean_btts",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_eaglepredict",
-      "summary": "Betting analysis suggests a lean towards Both Teams to Score (BTTS) Yes.",
-      "confidence": 0.75,
-      "claimIds": [],
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_h2h",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:provider_snapshot_odds",
+      "summary": "The current odds from Bet365 price IFK Trelleborg as the favorite to win with odds of 1.75.",
+      "confidence": 0.8,
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_h2h_trelleborg_favored"
+      ],
       "metadata": {}
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_h2h_home",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 1.95 for Detroit City to win (H2H).",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 1.95,
-        "market": "h2h",
-        "bookmaker": "Bet365",
-        "selection": "home"
-      }
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_over_under",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:provider_snapshot_odds",
+      "summary": "The odds for 'Over 2.5' goals are 1.62, suggesting it is a likely outcome.",
+      "confidence": 0.7,
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_over_2_5_goals"
+      ],
+      "metadata": {}
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_h2h_draw",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 3.3 for a draw (H2H).",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 3.3,
-        "market": "h2h",
-        "bookmaker": "Bet365",
-        "selection": "draw"
-      }
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_btts",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:provider_snapshot_odds",
+      "summary": "The odds for 'Both Teams to Score: Yes' are 1.67, indicating it is more probable than 'No'.",
+      "confidence": 0.65,
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_btts_yes"
+      ],
+      "metadata": {}
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_h2h_away",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 3.3 for El Paso Locomotive to win (H2H).",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 3.3,
-        "market": "h2h",
-        "bookmaker": "Bet365",
-        "selection": "away"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_goals_over_2_5",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 1.8 for Over 2.5 goals.",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "line": 2.5,
-        "price": 1.8,
-        "market": "goals_over_under",
-        "bookmaker": "Bet365",
-        "selection": "over"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_goals_under_2_5",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 2.0 for Under 2.5 goals.",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "line": 2.5,
-        "price": 2,
-        "market": "goals_over_under",
-        "bookmaker": "Bet365",
-        "selection": "under"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_btts_yes",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 1.67 for Both Teams to Score (BTTS) Yes.",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 1.67,
-        "market": "btts",
-        "bookmaker": "Bet365",
-        "selection": "yes"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_btts_no",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 2.1 for Both Teams to Score (BTTS) No.",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 2.1,
-        "market": "btts",
-        "bookmaker": "Bet365",
-        "selection": "no"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_double_chance_home_or_draw",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 1.25 for Detroit City or Draw (Double Chance).",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 1.25,
-        "market": "double_chance",
-        "bookmaker": "Bet365",
-        "selection": "home_or_draw"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_double_chance_draw_or_away",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 1.7 for Draw or El Paso Locomotive (Double Chance).",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 1.7,
-        "market": "double_chance",
-        "bookmaker": "Bet365",
-        "selection": "draw_or_away"
-      }
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_double_chance_home_or_away",
-      "sourceId": "f164af5c-a09c-4bc4-9283-d33d304eb41a:source_api_football_snapshot",
-      "summary": "Bet365 offers odds of 1.25 for Detroit City or El Paso Locomotive (Double Chance).",
-      "confidence": 0.9,
-      "claimIds": [],
-      "metadata": {
-        "price": 1.25,
-        "market": "double_chance",
-        "bookmaker": "Bet365",
-        "selection": "home_or_away"
-      }
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_double_chance",
+      "sourceId": "08b914df-b622-42f1-a15d-1ef15ae21af8:provider_snapshot_odds",
+      "summary": "The odds for 'Home or Draw' in the double chance market are very low at 1.18, suggesting a high probability of this outcome.",
+      "confidence": 0.85,
+      "claimIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_double_chance_home_draw"
+      ],
+      "metadata": {}
     }
   ],
   "claims": [
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:claim_h2h_detroit_win",
-      "statement": "Detroit City is favored to win against El Paso Locomotive due to their perfect home record, historical head-to-head advantage, and El Paso's poor recent form and disciplinary issues.",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_h2h_trelleborg_favored",
+      "statement": "IFK Trelleborg is the favorite to win the match against Berga.",
       "marketKey": "h2h",
       "selectionKey": null,
       "line": null,
       "supportLevel": "supported",
       "confidence": null,
       "evidenceIds": [
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_h2h_unbeaten",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_detroit_home_form",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_el_paso_recent_form",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_el_paso_discipline",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_prediction_score",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_betting_lean_h2h",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_h2h_home"
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_h2h_dominance",
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_h2h"
       ],
       "conflictStatus": "none"
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:claim_double_chance_home_draw",
-      "statement": "Considering Detroit City's strong home form and historical performance against El Paso, a double chance bet on Detroit City to win or draw is strongly supported.",
-      "marketKey": "double_chance",
-      "selectionKey": null,
-      "line": null,
-      "supportLevel": "supported",
-      "confidence": null,
-      "evidenceIds": [
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_h2h_unbeaten",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_detroit_home_form",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_double_chance_home_or_draw"
-      ],
-      "conflictStatus": "none"
-    },
-    {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:claim_goals_over_2_5",
-      "statement": "The match is predicted to have Over 2.5 goals, supported by the 2-1 score prediction and betting analysis indicating high-scoring tendencies from both teams.",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_over_2_5_goals",
+      "statement": "The match is likely to have over 2.5 goals.",
       "marketKey": "goals_over_under",
       "selectionKey": null,
       "line": null,
       "supportLevel": "supported",
       "confidence": null,
       "evidenceIds": [
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_prediction_score",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_betting_lean_over_2_5",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_goals_over_2_5"
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_high_scoring_matches",
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_over_under"
       ],
       "conflictStatus": "none"
     },
     {
-      "id": "f164af5c-a09c-4bc4-9283-d33d304eb41a:claim_btts_yes",
-      "statement": "Both Teams to Score (BTTS) is likely, with 67% of previous head-to-head matches seeing both teams score, and betting analysis supporting this outcome.",
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_btts_yes",
+      "statement": "It is likely that both teams will score in the match.",
       "marketKey": "btts",
       "selectionKey": null,
       "line": null,
       "supportLevel": "supported",
       "confidence": null,
       "evidenceIds": [
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_betting_lean_btts",
-        "f164af5c-a09c-4bc4-9283-d33d304eb41a:evidence_odds_btts_yes"
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_btts_history",
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_btts"
+      ],
+      "conflictStatus": "none"
+    },
+    {
+      "id": "08b914df-b622-42f1-a15d-1ef15ae21af8:claim_double_chance_home_draw",
+      "statement": "IFK Trelleborg has a high probability of winning or drawing the match.",
+      "marketKey": "double_chance",
+      "selectionKey": null,
+      "line": null,
+      "supportLevel": "supported",
+      "confidence": null,
+      "evidenceIds": [
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_h2h_dominance",
+        "08b914df-b622-42f1-a15d-1ef15ae21af8:evidence_odds_double_chance"
       ],
       "conflictStatus": "none"
     }
   ],
   "allowedQuotes": [
     {
-      "oddsQuoteId": "c452e358-5587-4cda-aaeb-69999d2073a2",
+      "oddsQuoteId": "af917dba-6232-4754-99cb-e80df2039f2a",
       "market": "h2h",
       "selection": "away",
       "line": null,
-      "odds": 3.48,
-      "impliedProbability": 0.287356,
-      "marketImpliedProbability": 0.295193,
-      "marketFairProbability": 0.269865,
-      "consensusFairOdds": 3.705557,
-      "overround": 0.093766,
-      "marketEfficiencyScore": 0.6768,
+      "odds": 3.6,
+      "impliedProbability": 0.277778,
+      "marketImpliedProbability": 0.277778,
+      "marketFairProbability": 0.246479,
+      "consensusFairOdds": 4.057143,
+      "overround": 0.126984,
+      "marketEfficiencyScore": 0.5167,
       "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "1598f1f2-0416-4feb-9ea3-3d2298ce2954",
+      "oddsQuoteId": "cf78367a-379a-4618-9c20-7aaea97c09e1",
       "market": "h2h",
       "selection": "draw",
       "line": null,
-      "odds": 3.62,
-      "impliedProbability": 0.276243,
-      "marketImpliedProbability": 0.289637,
-      "marketFairProbability": 0.264665,
-      "consensusFairOdds": 3.778357,
-      "overround": 0.093766,
-      "marketEfficiencyScore": 0.6768,
+      "odds": 3.6,
+      "impliedProbability": 0.277778,
+      "marketImpliedProbability": 0.277778,
+      "marketFairProbability": 0.246479,
+      "consensusFairOdds": 4.057143,
+      "overround": 0.126984,
+      "marketEfficiencyScore": 0.5167,
       "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "843a8129-cbdf-49a2-b8af-870c7152bd6b",
+      "oddsQuoteId": "147861fb-afbe-4dca-a0f7-ef941fa77d0c",
       "market": "h2h",
       "selection": "home",
       "line": null,
-      "odds": 1.98,
-      "impliedProbability": 0.505051,
-      "marketImpliedProbability": 0.508936,
-      "marketFairProbability": 0.46547,
-      "consensusFairOdds": 2.148367,
-      "overround": 0.093766,
-      "marketEfficiencyScore": 0.6768,
+      "odds": 1.75,
+      "impliedProbability": 0.571429,
+      "marketImpliedProbability": 0.571429,
+      "marketFairProbability": 0.507042,
+      "consensusFairOdds": 1.972222,
+      "overround": 0.126984,
+      "marketEfficiencyScore": 0.5167,
       "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "b9adf440-30a5-4761-87d7-e6bf84c5c28c",
+      "oddsQuoteId": "ac548083-c014-4f0b-b4fb-87226fdb004f",
       "market": "double_chance",
       "selection": "draw_or_away",
       "line": null,
-      "odds": 1.7,
-      "impliedProbability": 0.588235,
-      "marketImpliedProbability": 0.588235,
-      "marketFairProbability": 0.268817,
-      "consensusFairOdds": 3.72,
-      "overround": 1.188235,
+      "odds": 2.1,
+      "impliedProbability": 0.47619,
+      "marketImpliedProbability": 0.47619,
+      "marketFairProbability": 0.219331,
+      "consensusFairOdds": 4.559322,
+      "overround": 1.171106,
       "marketEfficiencyScore": 0.5167,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "8e9216c3-5f54-4510-8f80-1704d1ae8a5d",
+      "oddsQuoteId": "8ac2de87-3dd8-4b25-84e4-4890f9d82ef5",
       "market": "double_chance",
       "selection": "home_or_away",
       "line": null,
-      "odds": 1.25,
-      "impliedProbability": 0.8,
-      "marketImpliedProbability": 0.8,
-      "marketFairProbability": 0.365591,
-      "consensusFairOdds": 2.735294,
-      "overround": 1.188235,
+      "odds": 1.18,
+      "impliedProbability": 0.847458,
+      "marketImpliedProbability": 0.847458,
+      "marketFairProbability": 0.390335,
+      "consensusFairOdds": 2.561905,
+      "overround": 1.171106,
       "marketEfficiencyScore": 0.5167,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "59f37b73-d5ed-48f9-a648-e0588a6a11dc",
+      "oddsQuoteId": "1cfd8325-8a81-4743-97ac-883b07a50eb5",
       "market": "double_chance",
       "selection": "home_or_draw",
       "line": null,
-      "odds": 1.25,
-      "impliedProbability": 0.8,
-      "marketImpliedProbability": 0.8,
-      "marketFairProbability": 0.365591,
-      "consensusFairOdds": 2.735294,
-      "overround": 1.188235,
+      "odds": 1.18,
+      "impliedProbability": 0.847458,
+      "marketImpliedProbability": 0.847458,
+      "marketFairProbability": 0.390335,
+      "consensusFairOdds": 2.561905,
+      "overround": 1.171106,
       "marketEfficiencyScore": 0.5167,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "e452be35-f823-492e-a505-dc5c4901f244",
+      "oddsQuoteId": "9d4109e4-e3e4-4298-9139-478aceb06aa8",
       "market": "goals_over_under",
       "selection": "over",
       "line": 1.5,
-      "odds": 1.24,
-      "impliedProbability": 0.806452,
-      "marketImpliedProbability": 0.813062,
-      "marketFairProbability": 0.760126,
-      "consensusFairOdds": 1.315572,
-      "overround": 0.069641,
-      "marketEfficiencyScore": 0.7295,
+      "odds": 1.2,
+      "impliedProbability": 0.833333,
+      "marketImpliedProbability": 0.833333,
+      "marketFairProbability": 0.783002,
+      "consensusFairOdds": 1.277136,
+      "overround": 0.06428,
+      "marketEfficiencyScore": 0.6327,
       "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "172df7f1-79e8-4438-9014-8da956543c9b",
+      "oddsQuoteId": "bde97607-c9fd-41f7-8371-3f86d58843d7",
       "market": "goals_over_under",
       "selection": "under",
       "line": 1.5,
-      "odds": 4,
-      "impliedProbability": 0.25,
-      "marketImpliedProbability": 0.256579,
-      "marketFairProbability": 0.239874,
-      "consensusFairOdds": 4.168853,
-      "overround": 0.069641,
-      "marketEfficiencyScore": 0.7295,
+      "odds": 4.33,
+      "impliedProbability": 0.230947,
+      "marketImpliedProbability": 0.230947,
+      "marketFairProbability": 0.216998,
+      "consensusFairOdds": 4.608333,
+      "overround": 0.06428,
+      "marketEfficiencyScore": 0.6327,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "3591efb8-8ab9-4dce-9f65-b4d372497a2b",
+      "oddsQuoteId": "d5d2aebb-2096-45e3-bfa6-23742f39d5e5",
       "market": "goals_over_under",
       "selection": "over",
       "line": 2.5,
-      "odds": 1.8,
-      "impliedProbability": 0.555556,
-      "marketImpliedProbability": 0.558677,
-      "marketFairProbability": 0.528329,
-      "consensusFairOdds": 1.892759,
-      "overround": 0.057433,
-      "marketEfficiencyScore": 0.7608,
+      "odds": 1.62,
+      "impliedProbability": 0.617284,
+      "marketImpliedProbability": 0.617284,
+      "marketFairProbability": 0.581395,
+      "consensusFairOdds": 1.72,
+      "overround": 0.061728,
+      "marketEfficiencyScore": 0.6381,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "555b42ab-ba62-42c8-9b17-18cf7e45da38",
+      "oddsQuoteId": "8986698c-da0f-409b-9558-d61405298054",
       "market": "goals_over_under",
       "selection": "under",
       "line": 2.5,
-      "odds": 2.01,
-      "impliedProbability": 0.497512,
-      "marketImpliedProbability": 0.498756,
-      "marketFairProbability": 0.471671,
-      "consensusFairOdds": 2.120124,
-      "overround": 0.057433,
-      "marketEfficiencyScore": 0.7608,
+      "odds": 2.25,
+      "impliedProbability": 0.444444,
+      "marketImpliedProbability": 0.444444,
+      "marketFairProbability": 0.418605,
+      "consensusFairOdds": 2.388889,
+      "overround": 0.061728,
+      "marketEfficiencyScore": 0.6381,
       "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "265e92ff-225b-4b55-9d30-b7253a8abec8",
+      "oddsQuoteId": "3d47c25c-9617-4bce-a62f-eeae376fb393",
       "market": "goals_over_under",
       "selection": "over",
       "line": 3.5,
-      "odds": 2.91,
-      "impliedProbability": 0.343643,
-      "marketImpliedProbability": 0.353639,
-      "marketFairProbability": 0.329514,
-      "consensusFairOdds": 3.034774,
-      "overround": 0.073101,
-      "marketEfficiencyScore": 0.7209,
+      "odds": 2.5,
+      "impliedProbability": 0.4,
+      "marketImpliedProbability": 0.4,
+      "marketFairProbability": 0.375,
+      "consensusFairOdds": 2.666667,
+      "overround": 0.066667,
+      "marketEfficiencyScore": 0.6278,
       "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "ffe9f0ac-0164-48d3-a866-31b5c86020af",
+      "oddsQuoteId": "30dfd06f-55d0-4ce1-b011-554758c66c05",
       "market": "goals_over_under",
       "selection": "under",
       "line": 3.5,
-      "odds": 1.4,
-      "impliedProbability": 0.714286,
-      "marketImpliedProbability": 0.719462,
-      "marketFairProbability": 0.670486,
-      "consensusFairOdds": 1.491455,
-      "overround": 0.073101,
-      "marketEfficiencyScore": 0.7209,
+      "odds": 1.5,
+      "impliedProbability": 0.666667,
+      "marketImpliedProbability": 0.666667,
+      "marketFairProbability": 0.625,
+      "consensusFairOdds": 1.6,
+      "overround": 0.066667,
+      "marketEfficiencyScore": 0.6278,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "5714ba13-d4f4-4222-b075-9ecd755bed83",
+      "oddsQuoteId": "9a13b84f-2d30-4899-8c1d-10dfbe37d3db",
       "market": "goals_over_under",
       "selection": "over",
       "line": 0.5,
-      "odds": 1.04,
-      "impliedProbability": 0.961538,
-      "marketImpliedProbability": 0.961538,
-      "marketFairProbability": 0.896414,
-      "consensusFairOdds": 1.115556,
-      "overround": 0.07265,
-      "marketEfficiencyScore": 0.6153,
-      "lowLiquidity": true,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "0ccfce18-6f7e-47fc-859e-e655afa39727",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 0.5,
-      "odds": 9,
-      "impliedProbability": 0.111111,
-      "marketImpliedProbability": 0.111111,
-      "marketFairProbability": 0.103586,
-      "consensusFairOdds": 9.653846,
-      "overround": 0.07265,
-      "marketEfficiencyScore": 0.6153,
-      "lowLiquidity": true,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "f7305743-71ea-43ed-917f-9d594bf2e06c",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 4.5,
-      "odds": 5.41,
-      "impliedProbability": 0.184843,
-      "marketImpliedProbability": 0.192421,
-      "marketFairProbability": 0.179225,
-      "consensusFairOdds": 5.579569,
-      "overround": 0.073496,
-      "marketEfficiencyScore": 0.7226,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "f60487b5-1dfb-4016-8e6d-14f70ded6c57",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 4.5,
-      "odds": 1.14,
-      "impliedProbability": 0.877193,
-      "marketImpliedProbability": 0.881074,
-      "marketFairProbability": 0.820775,
-      "consensusFairOdds": 1.218361,
-      "overround": 0.073496,
-      "marketEfficiencyScore": 0.7226,
-      "lowLiquidity": true,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "8260c20d-f6d4-4c9d-a6b7-03c7f24f9a68",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 5.5,
-      "odds": 8.5,
-      "impliedProbability": 0.117647,
-      "marketImpliedProbability": 0.117647,
-      "marketFairProbability": 0.109948,
-      "consensusFairOdds": 9.095238,
-      "overround": 0.070028,
-      "marketEfficiencyScore": 0.6208,
-      "lowLiquidity": true,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "8591ea26-be15-4b81-a4d1-31bb20b85324",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 5.5,
-      "odds": 1.05,
-      "impliedProbability": 0.952381,
-      "marketImpliedProbability": 0.952381,
-      "marketFairProbability": 0.890052,
-      "consensusFairOdds": 1.123529,
-      "overround": 0.070028,
-      "marketEfficiencyScore": 0.6208,
-      "lowLiquidity": true,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "ff7dd47d-5a4f-4488-bcb2-9c3a99df2ee6",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.25,
-      "odds": 1.57,
-      "impliedProbability": 0.636943,
-      "marketImpliedProbability": 0.636943,
-      "marketFairProbability": 0.59949,
-      "consensusFairOdds": 1.668085,
-      "overround": 0.062475,
-      "marketEfficiencyScore": 0.6365,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "d1429cb0-3d3f-4b77-bc5b-bbbbbfa674e9",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 2.25,
-      "odds": 2.35,
-      "impliedProbability": 0.425532,
-      "marketImpliedProbability": 0.425532,
-      "marketFairProbability": 0.40051,
-      "consensusFairOdds": 2.496815,
-      "overround": 0.062475,
-      "marketEfficiencyScore": 0.6365,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "42a9eb33-8720-4dce-874a-bbb7ae4fd1d5",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.75,
-      "odds": 1.99,
-      "impliedProbability": 0.502513,
-      "marketImpliedProbability": 0.502513,
-      "marketFairProbability": 0.476316,
-      "consensusFairOdds": 2.099448,
-      "overround": 0.054999,
-      "marketEfficiencyScore": 0.6521,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "9baf6a87-5629-46de-9e7c-dc01fe5e94e8",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 2.75,
-      "odds": 1.81,
-      "impliedProbability": 0.552486,
-      "marketImpliedProbability": 0.552486,
-      "marketFairProbability": 0.523684,
-      "consensusFairOdds": 1.909548,
-      "overround": 0.054999,
-      "marketEfficiencyScore": 0.6521,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "6cba9c23-7ee1-4797-981d-534dc16ee976",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 3.25,
-      "odds": 2.63,
-      "impliedProbability": 0.380228,
-      "marketImpliedProbability": 0.380228,
-      "marketFairProbability": 0.356968,
-      "consensusFairOdds": 2.80137,
-      "overround": 0.06516,
-      "marketEfficiencyScore": 0.6309,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "bf8db5a8-9644-44fc-ada9-21fc6df7049b",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 3.25,
-      "odds": 1.46,
-      "impliedProbability": 0.684932,
-      "marketImpliedProbability": 0.684932,
-      "marketFairProbability": 0.643032,
-      "consensusFairOdds": 1.555133,
-      "overround": 0.06516,
-      "marketEfficiencyScore": 0.6309,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "7a53d273-c8d1-4d90-89c7-d12eb17e33d4",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 3,
-      "odds": 2.33,
-      "impliedProbability": 0.429185,
-      "marketImpliedProbability": 0.429185,
-      "marketFairProbability": 0.404092,
-      "consensusFairOdds": 2.474684,
-      "overround": 0.062096,
-      "marketEfficiencyScore": 0.6373,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "2c38667c-f7ec-4414-87ca-5358aff61757",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2,
-      "odds": 1.38,
-      "impliedProbability": 0.724638,
-      "marketImpliedProbability": 0.724638,
-      "marketFairProbability": 0.680556,
-      "consensusFairOdds": 1.469388,
-      "overround": 0.064774,
-      "marketEfficiencyScore": 0.6317,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "f082117c-5cb7-4881-9c5c-cd94d3e123d7",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 2,
-      "odds": 2.94,
-      "impliedProbability": 0.340136,
-      "marketImpliedProbability": 0.340136,
-      "marketFairProbability": 0.319444,
-      "consensusFairOdds": 3.130435,
-      "overround": 0.064774,
-      "marketEfficiencyScore": 0.6317,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "2ddc84b9-45e6-4ce7-805a-0c5f51aacc08",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 3,
-      "odds": 1.58,
-      "impliedProbability": 0.632911,
-      "marketImpliedProbability": 0.632911,
-      "marketFairProbability": 0.595908,
-      "consensusFairOdds": 1.678112,
-      "overround": 0.062096,
-      "marketEfficiencyScore": 0.6373,
-      "lowLiquidity": true,
-      "bookmaker": "Pinnacle",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "f19af56b-68c6-43e5-9574-d9bd23edb96f",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 6.5,
-      "odds": 13,
-      "impliedProbability": 0.076923,
-      "marketImpliedProbability": 0.076923,
-      "marketFairProbability": 0.072091,
-      "consensusFairOdds": 13.871287,
-      "overround": 0.067022,
-      "marketEfficiencyScore": 0.627,
-      "lowLiquidity": true,
-      "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
-    },
-    {
-      "oddsQuoteId": "414a3164-766f-47c0-89bb-d9e204636fb9",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 6.5,
       "odds": 1.01,
       "impliedProbability": 0.990099,
       "marketImpliedProbability": 0.990099,
-      "marketFairProbability": 0.927909,
-      "consensusFairOdds": 1.077692,
-      "overround": 0.067022,
-      "marketEfficiencyScore": 0.627,
+      "marketFairProbability": 0.936914,
+      "consensusFairOdds": 1.067333,
+      "overround": 0.056766,
+      "marketEfficiencyScore": 0.6484,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "49d527d3-7133-47fa-a53c-1935def08bf0",
+      "oddsQuoteId": "fb12fed2-f043-4d6d-8249-d19d709f8026",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 0.5,
+      "odds": 15,
+      "impliedProbability": 0.066667,
+      "marketImpliedProbability": 0.066667,
+      "marketFairProbability": 0.063086,
+      "consensusFairOdds": 15.851485,
+      "overround": 0.056766,
+      "marketEfficiencyScore": 0.6484,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "cc1826bb-1b42-4b57-ba7b-f9b7fc0e8c11",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 4.5,
+      "odds": 4.33,
+      "impliedProbability": 0.230947,
+      "marketImpliedProbability": 0.230947,
+      "marketFairProbability": 0.216998,
+      "consensusFairOdds": 4.608333,
+      "overround": 0.06428,
+      "marketEfficiencyScore": 0.6327,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "015a5cb4-3876-45db-bdfa-f9daf45f75e3",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 4.5,
+      "odds": 1.2,
+      "impliedProbability": 0.833333,
+      "marketImpliedProbability": 0.833333,
+      "marketFairProbability": 0.783002,
+      "consensusFairOdds": 1.277136,
+      "overround": 0.06428,
+      "marketEfficiencyScore": 0.6327,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "bd47e7ff-45e3-4f00-9630-746e042eec2d",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 5.5,
+      "odds": 7.5,
+      "impliedProbability": 0.133333,
+      "marketImpliedProbability": 0.133333,
+      "marketFairProbability": 0.124854,
+      "consensusFairOdds": 8.009346,
+      "overround": 0.067913,
+      "marketEfficiencyScore": 0.6252,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "f54f4d8f-cfa0-475e-9017-e1b7f2b4c072",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 5.5,
+      "odds": 1.07,
+      "impliedProbability": 0.934579,
+      "marketImpliedProbability": 0.934579,
+      "marketFairProbability": 0.875146,
+      "consensusFairOdds": 1.142667,
+      "overround": 0.067913,
+      "marketEfficiencyScore": 0.6252,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "8597dd0a-e0a4-498e-8dc3-b4b5ae044c01",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 6.5,
+      "odds": 11,
+      "impliedProbability": 0.090909,
+      "marketImpliedProbability": 0.090909,
+      "marketFairProbability": 0.084859,
+      "consensusFairOdds": 11.784314,
+      "overround": 0.071301,
+      "marketEfficiencyScore": 0.6181,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "cce096b9-72c0-43b1-9aa8-e5908ca1fcaa",
+      "market": "goals_over_under",
+      "selection": "under",
+      "line": 6.5,
+      "odds": 1.02,
+      "impliedProbability": 0.980392,
+      "marketImpliedProbability": 0.980392,
+      "marketFairProbability": 0.915141,
+      "consensusFairOdds": 1.092727,
+      "overround": 0.071301,
+      "marketEfficiencyScore": 0.6181,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "bcf773fa-c6cb-4faa-93ec-379c14995ddb",
       "market": "goals_over_under",
       "selection": "over",
       "line": 7.5,
+      "odds": 17,
+      "impliedProbability": 0.058824,
+      "marketImpliedProbability": 0.058824,
+      "marketFairProbability": 1,
+      "consensusFairOdds": 1,
+      "overround": -0.941176,
+      "marketEfficiencyScore": 0.7667,
+      "lowLiquidity": true,
+      "bookmaker": "Bet365",
+      "capturedAt": "2026-06-16T21:56:36.227Z"
+    },
+    {
+      "oddsQuoteId": "10fd6a16-40d3-47aa-be25-304877058088",
+      "market": "goals_over_under",
+      "selection": "over",
+      "line": 8.5,
       "odds": 21,
       "impliedProbability": 0.047619,
       "marketImpliedProbability": 0.047619,
@@ -1003,10 +721,10 @@
       "marketEfficiencyScore": 0.7667,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "7edd14ef-4945-49e5-aab6-659a6b501a9a",
+      "oddsQuoteId": "77ffeaaa-9677-47b2-8246-2b90c11540e7",
       "market": "btts",
       "selection": "no",
       "line": null,
@@ -1019,10 +737,10 @@
       "marketEfficiencyScore": 0.6104,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     },
     {
-      "oddsQuoteId": "158650e4-34c7-4167-94a6-45d9a0fc36ae",
+      "oddsQuoteId": "4a3f8455-3d29-4aeb-8003-6d20a7811a98",
       "market": "btts",
       "selection": "yes",
       "line": null,
@@ -1035,10 +753,8 @@
       "marketEfficiencyScore": 0.6104,
       "lowLiquidity": true,
       "bookmaker": "Bet365",
-      "capturedAt": "2026-06-09T17:15:28.456Z"
+      "capturedAt": "2026-06-16T21:56:36.227Z"
     }
   ],
-  "providerContextWarnings": [
-    "scoring prompt allowedQuotes trimmed from 44 to 33 representative quotes"
-  ]
+  "providerContextWarnings": []
 }

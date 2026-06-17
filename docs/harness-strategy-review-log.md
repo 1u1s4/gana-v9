@@ -870,3 +870,67 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Cap effective confidence for brittle BTTS and mid-price totals legs (ready-for-implementation) — src/prediction/service.ts, src/parlay/rules.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, skills/score-prediction-v2/prompt.md
 - [high] Make validation freshness bucket-aware by market, profile, provider, and model (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts
 - [medium] Add rolling model calibration demotion instead of static model lists only (proposed) — src/metrics/daily.ts, src/daily/recommendation-policy.ts, src/prediction/service.ts
+
+## 2026-06-16 · strategy-2026-06-15
+
+- Run: strategy-review-2026-06-15-5a0ef92b
+- Dates: 2026-06-15
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-15-5a0ef92b/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-15-5a0ef92b/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 13-5 hit 72.2% (151 total)
+- Parlays: 1-1 hit 50.0% (23 total)
+
+### Proposed Modifications
+
+- [high] Gate strategy learning on bucket-level validation freshness (ready-for-implementation) — src/strategy-review/daily.ts, src/metrics/daily.ts, src/daily/e2e.ts
+- [high] Demote h2h single-result picks from automatic promotion (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [high] Quarantine parlay-all-in from final daily promotion (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/parlay/analysis.ts, src/parlay/service.ts
+- [high] Apply fragile low-priced total-over risk to atomic and final selection (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Add overconfidence dampers for uncalibrated 90%+ selections (proposed) — src/prediction/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Keep BTTS and corners as watchlist markets until settlement exists (needs-more-data) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/filters/low-odds-selector.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-06-17 · strategy-2026-06-16
+
+- Run: strategy-review-2026-06-16-e844f061
+- Dates: 2026-06-16
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-16-e844f061/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-16-e844f061/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 65-36 hit 64.4% (183 total)
+- Parlays: 11-9 hit 55.0% (21 total)
+
+### Proposed Modifications
+
+- [high] Add market-level validation freshness and void-rate gates (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts
+- [high] Demote BTTS to review-only until calibration recovers (ready-for-implementation) — src/scoring/edge-gate.ts, src/prediction/gates.ts, src/parlay/eligibility.ts, src/parlay/profile-specs.ts, skills/score-prediction-v2/prompt.md
+- [high] Tighten final parlay odds and confidence windows (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/parlay/profile-specs.ts, src/parlay/ranker.ts
+- [medium] Promote duplicate leg-set history into ranking risk (proposed) — src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts
+- [medium] Add rolling profile and model cooldown gates (needs-more-data) — src/metrics/daily.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts
+- [medium] Inject validation feedback into scoring prompts (ready-for-implementation) — src/prediction/prompts.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/daily/e2e.ts
+- [medium] Tag atomic prediction strategy profiles (proposed) — src/prediction/prompts.ts, src/metrics/daily.ts, src/daily/recommendation-policy.ts
+
+## 2026-06-17 · strategy-2026-06-16
+
+- Run: strategy-review-2026-06-16-333b318f
+- Dates: 2026-06-16
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-16-333b318f/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-16-333b318f/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 65-36 hit 64.4% (183 total)
+- Parlays: 11-9 hit 55.0% (21 total)
+
+### Proposed Modifications
+
+- [high] Gate promotion on bucket-level validation freshness (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts
+- [high] Make BTTS and fragile low-price total overs watchlist-only until calibrated (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Lower strict final parlay odds ceiling to the winning window (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/parlay/profile-specs.ts
+- [high] Suppress duplicate parlay leg sets before persistence and metrics (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/metrics/daily.ts, src/daily/recommendation-policy.ts
+- [medium] Align portfolio-v2 generation with final allowed profiles (ready-for-implementation) — src/daily/e2e.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts, src/parlay/analysis.ts
+- [medium] Add sample-size guarded model/profile cooldowns (needs-more-data) — src/daily/recommendation-policy.ts, src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md

@@ -1,120 +1,465 @@
 {
-  "predictions": [
+  "sources": [
     {
-      "oddsQuoteId": "27e2fe1e-8a65-4067-a1e6-b376cc7a07bd",
-      "market": "h2h",
-      "selection": "home",
-      "line": null,
-      "odds": 2.11,
-      "probability": 0.48,
-      "modelProbability": 0.48,
-      "marketFairProbability": 0.4462,
-      "edge": 0.0338,
-      "confidence": 0.65,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:web_evidence_h2h_1",
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:api_evidence_h2h_1"
-      ],
-      "claimIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:claim_h2h_1"
-      ],
-      "rationale": "Colorado Springs has a higher market fair probability and current H2H odds indicate a slightly higher implied win probability, supported by historical head-to-head data.",
-      "warnings": []
+      "id": "web_source_1",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHziui5TGB6EXE_tQkQaRGutMXSyoB8BkrqqFxzsRGxdAQVL8U6NPZZ4eLHxMjqBMCrmgHRdPJ0EuCDjiBywGjzt3QcmqjdnURewmgdy_JYOe_PE04tIlx0dLY6fblis6a2unI_tkvUIAM6_Cu772bAqsRfFj5JIq7EYgzs08PcpNnTWDGEDPp1X3d0XdiCwao=",
+      "title": "Flashscore.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
     },
     {
-      "oddsQuoteId": "5da85c34-fc6f-412b-9e5c-733d92b1907c",
-      "market": "double_chance",
-      "selection": "home_or_draw",
-      "line": null,
-      "odds": 1.3,
-      "probability": 0.77,
-      "modelProbability": 0.77,
-      "marketFairProbability": 0.353591,
-      "edge": 0.416409,
-      "confidence": 0.8,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:api_evidence_double_chance_1"
-      ],
-      "claimIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:claim_double_chance_1"
-      ],
-      "rationale": "Model strongly favors Home or Draw, supported by market consensus for this outcome. The high edge suggests a potential value opportunity.",
-      "warnings": []
+      "id": "web_source_2",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG1skb6uyd1jDwQqWbGilgFXIE9ZiS0kjs55NmVV-pkEWCW5jt9umQxI5AmMdFzXPb2nABqGD-uqHKbSCZAPxxzjOLUGdsS0GL7nIUU4aMAZxk7pSwCs5c4FUSaiItsS07KXlj4SechbFvASzqTFRBC5JR9aHykBvFW1P4o_AkHBEx95cVp",
+      "title": "AIScore.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
     },
     {
-      "oddsQuoteId": "34189aff-fbf4-47d8-b7ff-8538361bd8ba",
-      "market": "goals_over_under",
-      "selection": "under",
-      "line": 2.5,
-      "odds": 1.67,
-      "probability": 0.6,
-      "modelProbability": 0.6,
-      "marketFairProbability": 0.572651,
-      "edge": 0.027349,
-      "confidence": 0.6,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:api_evidence_goals_1"
-      ],
-      "claimIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:claim_goals_1"
-      ],
-      "rationale": "Model predicts a moderate chance of Under 2.5 goals, aligning with market implied probabilities and fair probability.",
-      "warnings": []
+      "id": "web_source_3",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFhxjOaYATdIt5uOYz-DHJEkKNRE4IdE_gF0sXUtWiUUbFGY5-9bnFcg5L0fShVsbTd6Xw_RfMvH3KCvx3ioJi0RcpXWkwPvVYa9nDmYG3y_mJ_rm_PhobzsQfMkjMsiaBTNG1yzvOikOH22qSnqyhrQdyZUnfJxg==",
+      "title": "Futbol24.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
     },
     {
-      "oddsQuoteId": "f07f969c-f29e-4d94-bd9b-fee5ac66dd24",
-      "market": "btts",
-      "selection": "no",
-      "line": null,
-      "odds": 1.8,
-      "probability": 0.55,
-      "modelProbability": 0.55,
-      "marketFairProbability": 0.514825,
-      "edge": 0.035175,
-      "confidence": 0.55,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:api_evidence_btts_1"
-      ],
-      "claimIds": [
-        "03bbf09b-cbb3-42ce-be65-e97d13cdc2f3:claim_btts_1"
-      ],
-      "rationale": "Market indicates a balanced BTTS market; model suggests a slight edge for BTTS No, consistent with fair probability estimates.",
-      "warnings": []
+      "id": "web_source_4",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFhoRFSDePN3GfmZxqrFnVzCTmYJuHJhvKa4lytZNhI9BOULCJ4yTBpKGEvKIZVEJqEGiiMlmLeOCbCOWCaIwGq_f6H-EylJtwhPoT9yO-E1dPdhLbSYxYXltv6ppGN3bkj_yWPvNfjpBbyUujfnBoNByBq58j5iOcDcuwWac=",
+      "title": "AIScore.com (Standings)",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
     },
     {
-      "oddsQuoteId": "32fa2619-76e4-4353-a311-2b2c9286e8da",
-      "market": "corners_over_under",
-      "selection": "over",
-      "line": 8.5,
-      "odds": 1.7,
-      "probability": 0.58,
-      "modelProbability": 0.58,
-      "marketFairProbability": 0.550265,
-      "edge": 0.029735,
-      "confidence": 0.3,
-      "confidenceBand": "low",
-      "blockers": [],
-      "promotable": false,
-      "evidenceIds": [],
-      "claimIds": [],
-      "rationale": "Prediction based on general market probabilities; explicit warning due to missing market-specific research evidence for corners_over_under. Relying on general fixture context.",
-      "warnings": [
-        "missing market-specific research evidence for corners_over_under; relying on general fixture context"
-      ]
+      "id": "web_source_5",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFkaxgMtSazv3_V1F3ObBlmSM77_mq7oIWw8PueCxjH5uroZ6e-vSZjIc3jei6zcojPWP_3eYyFcY6nVhW2v2ZrptCiWLEx7tevOAsuHjqExTqb-XH6Ir7h7gdXcVf2Kn6x5P3VVPVBksx-qx4ASydTDbn5FhyY7A1nix3jaxfFxFe2bJSiMOjhA_YIoxf5LFI5",
+      "title": "Forebet.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_6",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEdgfUrdl2Ip-ozXMY98FtDS2bGlAZ6P96YyoVTw26PLuxD5NA3FihwxTWpNmP0CrsqKJ6H5FRDnUxcAVL0wiEDdRE01OF_eIOlyc6cCKCdtgzPK98E4TG9FSyNri_wj5xBfdt7trBwqcWIZ8Cis4_pDQyEnblMp6BzascWxricu5QT0hbw22wzUI2o0oX0Dq7Vt0EEC5_eT8sLJfrXBzWHUhV2TrMq",
+      "title": "EaglePredict.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_7",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGRPR1emunrYh24f143qRzlRWnDw2hf5M1c1JqD7FAUsET2EeivM9bREnLcLyeOX6jdMa7KwuHVIQlAkSI5aNwiobmXTNhUdjMbDycq_rT4T3tK7P8-GFWvhyFI3RIo5hpUL7cECVyiQRwzRvYl9MCY_Q==",
+      "title": "Fotmob.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_8",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGcAudACNBXc1SFADtfcGFF_UOgzXR5t2s_zB3EY4CNEW_FUY5csq_j-xlW3l0WtCxmNPDYzqN3k1XyxHbF_yQXSSBHp1QDPs7NEAPXv51OBHFb2igrhiKuACE3cSXnt_ntXpLy2MoH9TsiZxSKKFbWpKuz95jV_MX4mzbvQ_NrBIa7f3bQc3TwtDtuPoj66CE=",
+      "title": "Wincomparator.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_9",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGm5UDYmw3EEMYHsObc8xJDMH9WbnIAA1H6A9rmK4HmK6eD-eKjVk737h--FAhiFIv1ay9zYbTCy64vUVM6s-E_Kjp14Exm2SW3vMhHABuCTaGDDxl0cLnISRle5t7VQnekq9oGUZSdkwJZLLzz--SjA-MoaZq57zO8fwRx8rdk-AhVPcuzXhTMh1n-JZgWww==",
+      "title": "Footystats.org",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_10",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFUVoWuj00OfMMTqhdH8BzU8s5W87wF92RbYvUkCvpTN-nLEBPOx0CyNwGqbsUF3BUhvIG7C0KK8pJt4Rps1O8g_OzQGomISw_F8q_thQ5KbyV10_NUTclhpP1mrgytcAEACsxCYzd5ZnkQG8Ac9UjTWHO6MmnfWr7_h4E-XjddB_mzNR4RXsw=",
+      "title": "AIScore.com (H2H)",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_11",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGvfOchStAa6JyI0QhuUuvHJ1RipW6tvckoofN7HJCvL16DZNHJ0y8pKQh1Fk7ASUUXbhPz5uf6jnkP1_a2ywCQv3BcoCmeQciCiwwyJFwF-JZN6rwH5b2VT2Igemz9tjJW1zYy2XMuww3jbg-Y7dI0eVGeKeMQVnONvweDN3zNc8bFIvBBNmu0-HiEmA1aJj7vn38IGqqTT5COJxPjnz4eW2p6OUKBgaGXMgisrDw==",
+      "title": "365Scores.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_12",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEmkZIUyESgERqOLAt3Gfa81aazrTYNBfNBmAtEmduAKZUzWE-atMvNifon-hrFSK1NUWV-JEczS_qaHxd-LooBTFLvy7HXHLC9Z5CWHzqxKNCCo7WeY3_1ez_pT0tTuUZcsJG9DpOtu7WKVM5EDb6H1zdvBv_ODLMiKacPGLAf7i-hWFHBfTty-NOsixCH-c9d",
+      "title": "Oddslot.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "web_source_13",
+      "type": "web-search",
+      "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEBCTHwyTCzByVhnpQ777jZrI-Rf6Es__Hl8sJ_uDXohiLam8kIdxkxLMq2EiK2jVQV0-fB8jEhWL9jcy7rbPkrQWyHFPVdbKmPrfi242Rjnu8FACbWiia60buFuT2xYV1p_FvhawtvHOkgodmSbXclxge3RgL50PaLOlE=",
+      "title": "Tribuna.com",
+      "capturedAt": "2026-06-17T16:57:02.721Z",
+      "metadata": {}
+    },
+    {
+      "id": "db_source_1",
+      "type": "db",
+      "url": null,
+      "title": "API-Football Fixture Data",
+      "capturedAt": "2026-06-17T16:57:04.631Z",
+      "hash": "2f4e690d-fa6e-47a8-aac2-00f9042f0df3",
+      "metadata": {
+        "provider": "api-football",
+        "providerFixtureId": "1509144"
+      }
+    },
+    {
+      "id": "db_source_2",
+      "type": "db",
+      "url": null,
+      "title": "API-Football Odds Snapshot",
+      "capturedAt": "2026-06-17T16:57:05.908Z",
+      "hash": "94034e36-e7d2-48d0-825d-495e6e0aa103",
+      "metadata": {
+        "oddsSnapshotId": "b57cd858-adb9-468c-8c00-f98130b8ffdf",
+        "bookmakerCount": 1
+      }
     }
   ],
+  "evidenceItems": [
+    {
+      "id": "evidence_1",
+      "sourceId": "web_source_5",
+      "claimIds": [],
+      "snippet": "Dinamo Tbilisi (L-W-L-D-W): Their form has been inconsistent, recently suffering a 2-1 loss to Gagra (June 14) but previously securing a dominant 6-1 win over Meshakhte Tkibuli. Samgurali (W-W-W-L-D): Samgurali entered June on a strong run with three consecutive wins before a slight dip. They have struggled on the road this season, losing approximately 63% of their away fixtures.",
+      "summary": "Dinamo Tbilisi's recent form is inconsistent (L-W-L-D-W). Samgurali has a strong recent run (W-W-W-L-D) but struggles on the road, losing ~63% of away fixtures.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_2",
+      "sourceId": "web_source_9",
+      "claimIds": [],
+      "snippet": "In their last 22 meetings, the record is nearly even: Dinamo Tbilisi Wins: 8, Samgurali Wins: 7, Draws: 7. Last Meeting: Dinamo Tbilisi won 2-1 away at Samgurali on April 25, 2026.",
+      "summary": "In 22 H2H matches, Dinamo Tbilisi has 8 wins, Samgurali 7, and 7 draws. Dinamo Tbilisi won the last encounter 2-1 away on April 25, 2026.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_3",
+      "sourceId": "db_source_2",
+      "claimIds": [],
+      "snippet": "h2h, selection: home, price: 1.73; h2h, selection: draw, price: 3.5; h2h, selection: away, price: 4",
+      "summary": "Bookmaker Bet365 offers H2H odds: Dinamo Tbilisi win at 1.73, Draw at 3.5, Samgurali win at 4.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "h2h",
+        "bookmaker": "Bet365",
+        "quotes": [
+          {"selection": "home", "price": 1.73},
+          {"selection": "draw", "price": 3.5},
+          {"selection": "away", "price": 4}
+        ]
+      }
+    },
+    {
+      "id": "evidence_4",
+      "sourceId": "web_source_9",
+      "claimIds": [],
+      "snippet": "BTTS (Both Teams to Score): Occurred in 64% of their historical H2H meetings.",
+      "summary": "Both Teams to Score (BTTS) has occurred in 64% of historical head-to-head meetings between Dinamo Tbilisi and Samgurali.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_5",
+      "sourceId": "web_source_7",
+      "claimIds": [],
+      "snippet": "Over 2.5 Goals: Historically, 50% of their matches have seen 3 or more goals.",
+      "summary": "Historically, 50% of matches between Dinamo Tbilisi and Samgurali have had over 2.5 goals.",
+      "confidence": 0.8,
+      "metadata": {}
+    },
+    {
+      "id": "evidence_6",
+      "sourceId": "db_source_2",
+      "claimIds": [],
+      "snippet": "goals_over_under, selection: over, line: 2.5, price: 1.9; goals_over_under, selection: under, line: 2.5, price: 1.9",
+      "summary": "Bookmaker Bet365 offers Goals Over/Under 2.5 odds: Over 2.5 at 1.9, Under 2.5 at 1.9.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "goals_over_under",
+        "bookmaker": "Bet365",
+        "quotes": [
+          {"selection": "over", "line": 2.5, "price": 1.9},
+          {"selection": "under", "line": 2.5, "price": 1.9}
+        ]
+      }
+    },
+    {
+      "id": "evidence_7",
+      "sourceId": "db_source_2",
+      "claimIds": [],
+      "snippet": "double_chance, selection: home_or_draw, price: 1.17; double_chance, selection: home_or_away, price: 1.22; double_chance, selection: draw_or_away, price: 1.91",
+      "summary": "Bookmaker Bet365 offers Double Chance odds: Home or Draw at 1.17, Home or Away at 1.22, Draw or Away at 1.91.",
+      "confidence": 1.0,
+      "metadata": {
+        "market": "double_chance",
+        "bookmaker": "Bet365",
+        "quotes": [
+          {"selection": "home_or_draw", "price": 1.17},
+          {"selection": "home_or_away", "price": 1.22},
+          {"selection": "draw_or_away", "price": 1.91}
+        ]
+      }
+    },
+    {
+      "id": "evidence_8",
+      "sourceId": "web_source_6",
+      "claimIds": [],
+      "snippet": "Dinamo Tbilisi averages 1.41 goals scored per match, while Samgurali averages 1.29. However, Samgurali's defense is more vulnerable, conceding 37% more goals than Dinamo (1.59 vs 1.00 per match).",
+      "summary": "Dinamo Tbilisi scores 1.41 goals/match and concedes 1.00 goals/match. Samgurali scores 1.29 goals/match and concedes 1.59 goals/match, indicating a more vulnerable defense.",
+      "confidence": 0.85,
+      "metadata": {}
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim_1",
+      "statement": "Dinamo Tbilisi has won 8 out of 22 head-to-head matches against Samgurali.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {"team": "Dinamo Tbilisi", "statistic": "H2H Wins"}
+    },
+    {
+      "id": "claim_2",
+      "statement": "Samgurali has won 7 out of 22 head-to-head matches against Dinamo Tbilisi.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {"team": "Samgurali", "statistic": "H2H Wins"}
+    },
+    {
+      "id": "claim_3",
+      "statement": "There have been 7 draws in 22 head-to-head matches between Dinamo Tbilisi and Samgurali.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {"statistic": "H2H Draws"}
+    },
+    {
+      "id": "claim_4",
+      "statement": "Dinamo Tbilisi won the last head-to-head match against Samgurali 2-1 away on April 25, 2026.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_2"],
+      "conflictStatus": "none",
+      "metadata": {"team": "Dinamo Tbilisi", "statistic": "Last H2H Result"}
+    },
+    {
+      "id": "claim_5",
+      "statement": "Bet365 odds for Dinamo Tbilisi to win (H2H) are 1.73.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_3"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "home", "price": 1.73}
+    },
+    {
+      "id": "claim_6",
+      "statement": "Bet365 odds for a draw (H2H) are 3.5.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_3"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "draw", "price": 3.5}
+    },
+    {
+      "id": "claim_7",
+      "statement": "Bet365 odds for Samgurali to win (H2H) are 4.0.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "h2h"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_3"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "away", "price": 4.0}
+    },
+    {
+      "id": "claim_8",
+      "statement": "Both Teams to Score (BTTS) has occurred in 64% of historical head-to-head matches.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "btts"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_4"],
+      "conflictStatus": "none",
+      "metadata": {"statistic": "BTTS Percentage"}
+    },
+    {
+      "id": "claim_9",
+      "statement": "Historically, 50% of matches between Dinamo Tbilisi and Samgurali have had over 2.5 goals.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_5"],
+      "conflictStatus": "none",
+      "metadata": {"statistic": "Over 2.5 Goals Percentage"}
+    },
+    {
+      "id": "claim_10",
+      "statement": "Bet365 odds for Over 2.5 Goals are 1.9.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_6"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "over", "line": 2.5, "price": 1.9}
+    },
+    {
+      "id": "claim_11",
+      "statement": "Bet365 odds for Under 2.5 Goals are 1.9.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "goals_over_under"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_6"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "under", "line": 2.5, "price": 1.9}
+    },
+    {
+      "id": "claim_12",
+      "statement": "Bet365 odds for Double Chance 'Home or Draw' are 1.17.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_7"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "home_or_draw", "price": 1.17}
+    },
+    {
+      "id": "claim_13",
+      "statement": "Bet365 odds for Double Chance 'Home or Away' are 1.22.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_7"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "home_or_away", "price": 1.22}
+    },
+    {
+      "id": "claim_14",
+      "statement": "Bet365 odds for Double Chance 'Draw or Away' are 1.91.",
+      "subject": {
+        "type": "market",
+        "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+        "market": "double_chance"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_7"],
+      "conflictStatus": "none",
+      "metadata": {"selection": "draw_or_away", "price": 1.91}
+    },
+    {
+      "id": "claim_15",
+      "statement": "Dinamo Tbilisi averages 1.41 goals scored per match and concedes 1.00 goals per match.",
+      "subject": {
+        "type": "team",
+        "id": "1a841459-b0a6-46ab-80ec-96b1b2624cc8"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_8"],
+      "conflictStatus": "none",
+      "metadata": {"team": "Dinamo Tbilisi", "statistic": "Goals Scored/Conceded"}
+    },
+    {
+      "id": "claim_16",
+      "statement": "Samgurali averages 1.29 goals scored per match and concedes 1.59 goals per match, indicating a more vulnerable defense.",
+      "subject": {
+        "type": "team",
+        "id": "514c0c95-3e47-4221-8377-b4b638ccbe75"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": ["evidence_8"],
+      "conflictStatus": "none",
+      "metadata": {"team": "Samgurali", "statistic": "Goals Scored/Conceded"}
+    }
+  ],
+  "gateResult": {
+    "verdict": "promotable",
+    "reasons": [
+      "Structured research generated with sufficient evidence from web search and database sources.",
+      "Web-search evidence is included as required by live webMode.",
+      "All required markets (h2h, double_chance, goals_over_under, btts) have associated claims and evidence from web search or API-Football odds, except corners_over_under."
+    ],
+    "warnings": []
+  },
   "warnings": [],
-  "metadata": {}
+  "metadata": {
+    "marketCoverage": {
+      "coveredMarkets": ["h2h", "double_chance", "goals_over_under", "btts"],
+      "skippedMarkets": [
+        {
+          "market": "corners_over_under",
+          "reason": "No relevant information found in web search results or API-Football odds."
+        }
+      ]
+    },
+    "fixture": {
+      "id": "564a80f5-49b1-44e8-8678-7a5952b2f8ea",
+      "homeTeamName": "Dinamo Tbilisi",
+      "awayTeamName": "Samgurali",
+      "competitionName": "Erovnuli Liga",
+      "scheduledAt": "2026-06-18T16:00:00.000Z"
+    }
+  }
 }

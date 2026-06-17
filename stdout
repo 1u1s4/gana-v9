@@ -1,82 +1,255 @@
 {
-  "predictions": [
+  "sources": [
     {
-      "oddsQuoteId": "c3215705-bd4c-4d8e-a4ec-64a7cea840bc",
-      "market": "h2h",
-      "selection": "home",
-      "line": null,
-      "odds": 1.5,
-      "probability": 0.68,
-      "modelProbability": 0.68,
-      "marketFairProbability": 0.594656,
-      "edge": 0.02,
-      "confidence": 0.75,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-h2h-odds",
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-form-standing",
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-h2h-history"
-      ],
-      "claimIds": [
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:claim-h2h-home-win"
-      ],
-      "rationale": "Bulls Academy is favored due to better league standing and positive historical odds. Rydalmere is on a 5-game winless streak, further supporting a home win.",
-      "warnings": []
+      "id": "src_api_football",
+      "type": "api-football",
+      "url": "N/A",
+      "title": "API-Football Fixture and Statistics",
+      "capturedAt": "2026-06-17T16:36:49.130Z",
+      "metadata": {
+        "fixtureId": "645388fc-0f74-4832-b8be-8f56912c3018",
+        "providerFixtureId": "1510612"
+      }
     },
     {
-      "oddsQuoteId": "91242bcd-c958-4e86-9976-d09babccbbdc",
-      "market": "double_chance",
-      "selection": "home_or_away",
-      "line": null,
-      "odds": 1.22,
-      "probability": 0.85,
-      "modelProbability": 0.85,
-      "marketFairProbability": 0.374424,
-      "edge": 0.037,
-      "confidence": 0.8,
-      "confidenceBand": "high",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-double-chance-odds",
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-h2h-history"
-      ],
-      "claimIds": [
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:claim-double-chance-no-draw"
-      ],
-      "rationale": "Historical head-to-head matches show no draws. Odds also suggest a low probability of a draw, indicating a decisive result.",
-      "warnings": []
+      "id": "src_odds_snapshot",
+      "type": "provider-snapshot",
+      "url": "N/A",
+      "title": "Bookmaker Odds Snapshot",
+      "capturedAt": "2026-06-17T16:36:53.506Z",
+      "metadata": {
+        "oddsSnapshotId": "6185e8ef-a392-4df1-a908-a90032a7dcb2"
+      }
     },
     {
-      "oddsQuoteId": "a476a189-b6d3-46a2-9d7f-9f4dc9dacf47",
-      "market": "goals_over_under",
-      "selection": "over",
-      "line": 2.5,
-      "odds": 1.6,
-      "probability": 0.65,
-      "modelProbability": 0.65,
-      "marketFairProbability": 0.589744,
-      "edge": 0.04,
-      "confidence": 0.78,
-      "confidenceBand": "medium",
-      "blockers": [],
-      "promotable": true,
-      "evidenceIds": [
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-goals-over-under-odds",
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:evidence-team-avg-goals"
-      ],
-      "claimIds": [
-        "eeb7ad01-a86e-41b8-bf0c-0b7f89dbb727:claim-goals-over-2.5"
-      ],
-      "rationale": "Bet365 odds favor over 2.5 goals. Both teams have a history of high-scoring games, especially Rydalmere with 3.17 average goals per game.",
-      "warnings": []
+      "id": "src_web_sofascore",
+      "type": "web-search",
+      "url": "https://www.sofascore.com/team/football/husqvarna-ff/28169",
+      "title": "Husqvarna FF - Sofascore",
+      "capturedAt": "2026-06-17T16:36:49.130Z",
+      "hash": "AUZIYQE4YVYiQMVrnMWdb1gFsakoO4UI1C0oRgOowm8-YxproEwI7Rj1M52By8geKYvGVvB1oDSY-rujANXsI4gYev7yl4BP6G06Z314y-Ae5CyA4j5Ltns5qq4VR188RAOhvjMG2uIU5H6KEHj8rxWsOXG5VNneK1ACxdnznUOAgvimwwgDMI8=",
+      "metadata": {}
+    },
+    {
+      "id": "src_web_betmines",
+      "type": "web-search",
+      "url": "https://www.betmines.com/football-predictions/sweden/division-2-norra-gotland/lidkoping-vs-husqvarna",
+      "title": "Lidkoping vs Husqvarna Prediction - Betmines",
+      "capturedAt": "2026-06-17T16:36:49.130Z",
+      "hash": "AUZIYQFHUUH-OIeItocdjG7Y8ZrW8kdVSK13va2gLUXBLwd_MsXRAuT6h3LSfdKs4B4dI9zM9zGnQDfY3glAAFa4uFKTHG-dtS1s8trA-bR2OrkIi2T6Bgjj7nmkGQoIgWkzP3FLfk1X7NARaV81Vl1gMQWgp-iJeyCsa-g4IBpRdXRA0A==",
+      "metadata": {}
     }
   ],
-  "warnings": [
-    "market corners_over_under skipped/review-required: missing odds quotes for requested market",
-    "market btts skipped/review-required: missing odds quotes for requested market"
+  "evidenceItems": [
+    {
+      "id": "evi_fixture_details",
+      "sourceId": "src_api_football",
+      "claimIds": [],
+      "snippet": "Lidköping vs Husqvarna in Division 2 - Norra Götaland, scheduled for 2026-06-18T16:30:00.000Z.",
+      "summary": "Fixture details from API-Football.",
+      "confidence": 1.0,
+      "metadata": {}
+    },
+    {
+      "id": "evi_h2h_odds_away",
+      "sourceId": "src_odds_snapshot",
+      "claimIds": [],
+      "snippet": "Market: h2h, Selection: away, Price: 1.38",
+      "summary": "Odds for Husqvarna FF to win (away).",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evi_h2h_odds_home",
+      "sourceId": "src_odds_snapshot",
+      "claimIds": [],
+      "snippet": "Market: h2h, Selection: home, Price: 6.00",
+      "summary": "Odds for Lidköping to win (home).",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evi_h2h_odds_draw",
+      "sourceId": "src_odds_snapshot",
+      "claimIds": [],
+      "snippet": "Market: h2h, Selection: draw, Price: 4.50",
+      "summary": "Odds for a draw.",
+      "confidence": 0.95,
+      "metadata": {}
+    },
+    {
+      "id": "evi_husqvarna_form",
+      "sourceId": "src_web_sofascore",
+      "claimIds": [],
+      "snippet": "Husqvarna FF: Currently ranked 1st in the league. They are in exceptional form with 10 wins, 0 losses, and 2 draws this season.",
+      "summary": "Husqvarna FF's strong league position and form.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evi_lidkoping_form",
+      "sourceId": "src_web_sofascore",
+      "claimIds": [],
+      "snippet": "Lidköpings FK: Currently ranked 12th. Their recent form has been struggling, with 1 win and 4 losses in their last five matches.",
+      "summary": "Lidköping FK's poor league position and recent form.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evi_husqvarna_avg_goals_scored",
+      "sourceId": "src_web_betmines",
+      "claimIds": [],
+      "snippet": "Husqvarna FF Avg. Goals Scored: 2.58 per match",
+      "summary": "Husqvarna FF's average goals scored.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evi_lidkoping_avg_goals_conceded",
+      "sourceId": "src_web_betmines",
+      "claimIds": [],
+      "snippet": "Lidköpings FK Avg. Goals Conceded: 2.50 per match",
+      "summary": "Lidköping FK's average goals conceded.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evi_lidkoping_avg_goals_scored",
+      "sourceId": "src_web_betmines",
+      "claimIds": [],
+      "snippet": "Lidköpings FK Avg. Goals Scored: 1.08 per match",
+      "summary": "Lidköping FK's average goals scored.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evi_husqvarna_avg_goals_conceded",
+      "sourceId": "src_web_betmines",
+      "claimIds": [],
+      "snippet": "Husqvarna FF Avg. Goals Conceded: 0.67 per match",
+      "summary": "Husqvarna FF's average goals conceded.",
+      "confidence": 0.85,
+      "metadata": {}
+    },
+    {
+      "id": "evi_goals_over25_odds",
+      "sourceId": "src_odds_snapshot",
+      "claimIds": [],
+      "snippet": "Market: goals_over_under, Selection: over, Line: 2.5, Price: 1.44",
+      "summary": "Odds for Over 2.5 goals.",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evi_btts_yes_odds",
+      "sourceId": "src_odds_snapshot",
+      "claimIds": [],
+      "snippet": "Market: btts, Selection: yes, Price: 1.67",
+      "summary": "Odds for Both Teams To Score (Yes).",
+      "confidence": 0.9,
+      "metadata": {}
+    },
+    {
+      "id": "evi_double_chance_draw_away_odds",
+      "sourceId": "src_odds_snapshot",
+      "claimIds": [],
+      "snippet": "Market: double_chance, Selection: draw_or_away, Price: 1.08",
+      "summary": "Odds for Draw or Away win (Husqvarna FF).",
+      "confidence": 0.95,
+      "metadata": {}
+    }
   ],
-  "metadata": {}
+  "claims": [
+    {
+      "id": "claim_h2h_away_win",
+      "statement": "Husqvarna FF is strongly favored to win the match against Lidköping due to their superior league position, exceptional form, and favorable betting odds.",
+      "subject": {
+        "type": "market",
+        "id": "645388fc-0f74-4832-b8be-8f56912c3018",
+        "market": "h2h",
+        "selection": "away"
+      },
+      "supportLevel": "strongly-supported",
+      "evidenceIds": [
+        "evi_h2h_odds_away",
+        "evi_h2h_odds_home",
+        "evi_husqvarna_form",
+        "evi_lidkoping_form"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_double_chance_draw_away",
+      "statement": "There is a high probability of either a draw or an away win for Husqvarna FF, reflected by very low odds.",
+      "subject": {
+        "type": "market",
+        "id": "645388fc-0f74-4832-b8be-8f56912c3018",
+        "market": "double_chance",
+        "selection": "draw_or_away"
+      },
+      "supportLevel": "strongly-supported",
+      "evidenceIds": [
+        "evi_double_chance_draw_away_odds",
+        "evi_husqvarna_form"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_goals_over_2_5",
+      "statement": "The match is likely to have over 2.5 goals, given Husqvarna FF's high average goals scored and Lidköping FK's high average goals conceded, supported by the betting odds.",
+      "subject": {
+        "type": "market",
+        "id": "645388fc-0f74-4832-b8be-8f56912c3018",
+        "market": "goals_over_under",
+        "line": 2.5,
+        "selection": "over"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evi_husqvarna_avg_goals_scored",
+        "evi_lidkoping_avg_goals_conceded",
+        "evi_goals_over25_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    },
+    {
+      "id": "claim_btts_yes",
+      "statement": "Both teams are likely to score in this match, considering Husqvarna FF's scoring ability and Lidköping FK's ability to score at home, despite their overall poor form.",
+      "subject": {
+        "type": "market",
+        "id": "645388fc-0f74-4832-b8be-8f56912c3018",
+        "market": "btts",
+        "selection": "yes"
+      },
+      "supportLevel": "supported",
+      "evidenceIds": [
+        "evi_husqvarna_avg_goals_scored",
+        "evi_lidkoping_avg_goals_scored",
+        "evi_husqvarna_avg_goals_conceded",
+        "evi_lidkoping_avg_goals_conceded",
+        "evi_btts_yes_odds"
+      ],
+      "conflictStatus": "none",
+      "metadata": {}
+    }
+  ],
+  "gateResult": {
+    "verdict": "promotable",
+    "reasons": [
+      "structured research generated with sufficient evidence",
+      "web-search evidence included as webMode is live"
+    ],
+    "warnings": []
+  },
+  "warnings": [],
+  "metadata": {
+    "marketCoverage": {
+      "skippedMarkets": [
+        "corners_over_under"
+      ]
+    }
+  }
 }

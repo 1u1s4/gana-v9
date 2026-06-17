@@ -1,15 +1,1 @@
-{
-  "parlays": [
-    {
-      "title": "Parlay refinado",
-      "predictionIds": [
-        "1c372948-4b45-4c8f-8916-d214ae9c0842",
-        "275e981e-25bd-44f8-a62d-69ea73eff45a"
-      ],
-      "rationale": "Selected two independent short-price H2H home favorites. Tartu Welco (1.27) is a league leader with strong form and high edge. Bulls Academy (1.50) has better league standing and faces a winless opponent. Both are highly confident and have short odds, aligning with retrospective insights favoring stable low-odds legs and preferring 2-leg parlays for safety. Omitted legs were either explicitly disallowed (inflated double-chance edge, fragile low total over) or less preferred (BTTS 'yes') based on retrospective analysis.",
-      "riskNotes": [
-        "Both legs have low liquidity and prediction 3 has an uncalibrated high-confidence band warning, suggesting potential model overconfidence."
-      ]
-    }
-  ]
-}
+{"parlays":[{"title":"Parlay all-in seguro","predictionIds":["20c3855b-a336-4e42-adbb-cbae947828b9","b4c04da3-30a9-4998-b5be-92845ef4a933","db6da8a7-0dd1-48c7-b881-75dde8ccebd7","4c648446-80f6-4f5b-aeb5-8f4cec47972a","1fb2f4c3-e3e0-4faa-9ca0-3fb1534cc694","fc723271-8713-42d7-a305-c0f73c348e5a"],"rationale":"The parlay consists of six highly promotable legs with strong underlying probabilities and conservative odds, all within the preferred odds range of 1.01-1.20. Each selected leg is either a double chance or a head-to-head favorite, or a low goals_over_under line (Over 1.5), demonstrating inherent safety. Predictions were chosen to ensure at most one leg per fixture. Predictions with lower confidence or 'review-required' status were omitted to maintain overall parlay strength and avoid fragility, especially those with warnings indicating distorted probabilities or uncalibrated confidence.","riskNotes":["low_edge","low_liquidity","fragile_low_price_dc","fragile_low_total_over","low_liquidity_h2h_favorite"]}],"noParlayReason":null}
