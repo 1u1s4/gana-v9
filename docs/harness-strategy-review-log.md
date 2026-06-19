@@ -934,3 +934,45 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Suppress duplicate parlay leg sets before persistence and metrics (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/metrics/daily.ts, src/daily/recommendation-policy.ts
 - [medium] Align portfolio-v2 generation with final allowed profiles (ready-for-implementation) — src/daily/e2e.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts, src/parlay/analysis.ts
 - [medium] Add sample-size guarded model/profile cooldowns (needs-more-data) — src/daily/recommendation-policy.ts, src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-18 · strategy-2026-06-17
+
+- Run: strategy-review-2026-06-17-5486f7fd
+- Dates: 2026-06-17
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-17-5486f7fd/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-17-5486f7fd/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 179-106 hit 62.8% (392 total)
+- Parlays: 13-4 hit 76.5% (17 total)
+
+### Proposed Modifications
+
+- [high] Add bucket-level validation freshness gates (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [high] Treat fair-probability-capped low-price double_chance as hard parlay and atomic risk (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [high] Constrain parlay-all-in final eligibility and combined-odds windows (ready-for-implementation) — src/parlay/profile-specs.ts, src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts
+- [high] Demote BTTS and fragile totals from fallback publication (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Move semantic parlay dedupe before persistence and metrics (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts
+- [medium] Add sample-size guarded model cooldowns (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/gates.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-18 · strategy-2026-06-17
+
+- Run: strategy-review-2026-06-17-2a4258af
+- Dates: 2026-06-17
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-17-2a4258af/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-17-2a4258af/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 179-106 hit 62.8% (392 total)
+- Parlays: 13-4 hit 76.5% (17 total)
+
+### Proposed Modifications
+
+- [high] Gate promotion on bucket-level validation freshness (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [high] Constrain parlay-all-in final eligibility and odds window (ready-for-implementation) — src/parlay/profile-specs.ts, src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts
+- [high] Demote BTTS and fragile totals from fallback publication (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/profile-specs.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Treat low-price double_chance fair-probability anomalies as hard risk (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [high] Move semantic parlay dedupe before persistence and metrics (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts
+- [medium] Add sample-size guarded model and profile cooldowns (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/gates.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
