@@ -57,10 +57,10 @@ describe('discord recommendation notifier', () => {
     const message = buildGatewayMessage(sampleArtifactWithAtomic(), { max: 2 });
 
     assert.match(payload.embeds[0].description, /📦 1 parlay · 📌 1 simple/);
-    assert.match(payload.embeds[2].title, /📌 Simple · Team C vs Team D · h2h away/);
+    assert.match(payload.embeds[2].title, /📌 Simple · Team C vs Team D$/);
     assert.match(payload.embeds[2].description, /> ⚽ Team C vs Team D: h2h away @ 1.18/);
     assert.match(payload.embeds[2].description, /💵 Stake 10/);
-    assert.match(message, /2️⃣ 📌 Simple · Team C vs Team D · h2h away/);
+    assert.match(message, /2️⃣ 📌 Simple · Team C vs Team D\n> ⚽ Team C vs Team D: h2h away @ 1.18/);
   });
 
   it('labels parlay recommendation titles with profile-specific emojis', () => {
@@ -375,7 +375,8 @@ describe('discord recommendation notifier', () => {
     const predictionEmbed = payload.embeds.find((embed) => /^📌 Predicciones obligatorias/.test(embed.title ?? ''));
     const parlayEmbed = payload.embeds.find((embed) => /^1️⃣ 💎 principal/.test(embed.title ?? ''));
 
-    assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30 · h2h home/);
+    assert.match(payload.embeds[1].title, /Team A vs Team B · 14:30$/);
+    assert.doesNotMatch(payload.embeds[1].title, /h2h home/);
     assert.doesNotMatch(payload.embeds[1].title, /14:30 GT/);
     assert.match(payload.embeds[1].description, /Team A vs Team B: h2h home @ 1.4/);
     assert.doesNotMatch(payload.embeds[1].description, /Team A vs Team B · 14:30: h2h home @ 1.4/);
@@ -549,7 +550,7 @@ describe('discord recommendation notifier', () => {
     const payloads = buildDiscordPayloads(artifact, { max: 2 });
     const message = buildGatewayMessage(artifact, { max: 2 });
 
-    assert.match(payloads[0].embeds[2].title, /📌 Simple · Team A vs Team B · h2h away/);
+    assert.match(payloads[0].embeds[2].title, /📌 Simple · Team A vs Team B$/);
     assert.match(payloads[0].embeds[2].description, /> ⚽ Team A vs Team B: h2h away @ 1.18/);
     assert.doesNotMatch(JSON.stringify(payloads), new RegExp(fixtureId));
     assert.doesNotMatch(message, new RegExp(fixtureId));

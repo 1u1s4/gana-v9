@@ -1412,7 +1412,7 @@ export function recommendationTitle(recommendation) {
   }
   if (recommendationKind(recommendation) === 'atomic-prediction') {
     const leg = recommendation.legs[0];
-    return `${displayFixtureName(leg)} · ${formatCompactSelection(leg)}`;
+    return displayFixtureName(leg);
   }
   return recommendation.legs
     .slice(0, 3)

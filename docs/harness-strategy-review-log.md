@@ -1020,3 +1020,26 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Use per-market validation freshness before learning from buckets (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts
 - [high] Calibrate confidence and edge by odds and market bucket (proposed) — src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md
 - [medium] Constrain daily parlay profiles to validated low-variance families (needs-more-data) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/parlay/rules.ts
+
+## 2026-06-20 · strategy-2026-06-19
+
+- Run: strategy-review-2026-06-19-c607bf86
+- Dates: 2026-06-19
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-19-c607bf86/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-19-c607bf86/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 126-65 hit 66.0% (254 total)
+- Parlays: 2-3 hit 40.0% (6 total)
+
+### Proposed Modifications
+
+- [high] Gate promotion and strategy learning by market-level validation freshness (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts, src/strategy-review/daily.ts
+- [high] Hard-filter analytical fallback recommendations with final risk flags (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/e2e.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [high] Demote h2h away and double_chance home_or_away at scoring time (ready-for-implementation) — src/prediction/service.ts, src/prediction/gates.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [high] Move semantic parlay dedupe before persistence (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.ts
+- [high] Split portfolio-v2 into publishable and exploratory profile sets (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/parlay/analysis.ts
+- [medium] Add odds-bucket review floors for high-odds predictions and parlays (proposed) — src/scoring/edge-gate.ts, src/prediction/gates.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Rebalance default market coverage toward BTTS and conservative totals (proposed) — src/filters/low-odds-selector.ts, src/daily/e2e.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Keep corners watchlist-only until settlement coverage recovers (ready-for-implementation) — src/prediction/gates.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md

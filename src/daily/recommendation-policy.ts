@@ -22,6 +22,12 @@ export const DAILY_ATOMIC_RECOMMENDATION_LIMIT = 10;
 export const ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR = 0.9;
 export const ATOMIC_RECOMMENDATION_EDGE_FLOOR = 0;
 export const ATOMIC_RECOMMENDATION_PROFILE = 'atomic-high-confidence';
+export const ATOMIC_SAFETY_DOUBLE_CHANCE_MIN_ODDS = 1.05;
+export const ATOMIC_SAFETY_DOUBLE_CHANCE_MAX_ODDS = 1.25;
+export const ATOMIC_SAFETY_MIN_EFFECTIVE_CONFIDENCE = 0.7;
+export const ATOMIC_SAFETY_TOTALS_MAX_ODDS = 1.6;
+export const ATOMIC_SAFETY_BREAK_EVEN_EDGE_FLOOR = -0.05;
+export const ATOMIC_SAFETY_REVIEW_EDGE_FLOOR = 0.01;
 export const DAILY_STAKE_BUCKETS = [1, 5, 10, 15, 20, 25] as const;
 export const VALIDATION_FRESHNESS_MIN_COVERAGE = 0.6;
 export const VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE = 0.25;
@@ -348,7 +354,13 @@ export function buildFallbackAtomicPredictionRecommendations(
     excludedFixtureIds,
   );
   const nonBlocked = candidates.filter((candidate) => candidate.prediction.status !== 'blocked');
-  for (const candidate of nonBlocked.length ? nonBlocked : candidates) {
+  const safetyBlocked = candidates.filter((candidate) =>
+    candidate.prediction.status === 'blocked' && atomicSafetyOverride(candidate.prediction)
+  );
+  const candidatePool = nonBlocked.length
+    ? uniqueCandidatesById([...nonBlocked, ...safetyBlocked])
+    : candidates;
+  for (const candidate of candidatePool) {
     const key = atomicPredictionKey(candidate.prediction);
     groups.set(key, [...(groups.get(key) ?? []), candidate]);
   }
@@ -356,15 +368,8 @@ export function buildFallbackAtomicPredictionRecommendations(
   const ordered = [...groups.values()]
     .map(toAtomicRecommendationDraft)
     .map(markAtomicAsAnalyticalFallback)
-    .sort((a, b) => b.score - a.score || b.aggregateConfidence - a.aggregateConfidence || a.combinedOdds - b.combinedOdds);
-  const selected: AtomicPredictionRecommendation[] = [];
-  const usedFixtureIds = new Set<string>();
-  for (const recommendation of ordered) {
-    const fixtureId = recommendation.legs[0]?.fixtureId;
-    if (fixtureId && usedFixtureIds.has(fixtureId)) continue;
-    if (fixtureId) usedFixtureIds.add(fixtureId);
-    selected.push(recommendation);
-  }
+    .sort(compareAtomicRecommendationsForSelection);
+  const selected = selectAtomicRecommendationsByFixture(ordered);
   return selected.map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
 }
 
@@ -482,7 +487,7 @@ function fixtureFocusSignals(candidate: Pick<AtomicPredictionCandidate, 'fixture
 
 function toFallbackParlayRecommendation(candidates: AtomicPredictionCandidate[], rank: number): DailyFinalRecommendation {
   const combinedOdds = round(candidates.reduce((product, candidate) => product * candidate.prediction.odds, 1), 6);
-  const aggregateConfidence = round(candidates.reduce((product, candidate) => product * clamp(candidate.prediction.confidence, 0.01, 0.99), 1), 6);
+  const aggregateConfidence = round(candidates.reduce((product, candidate) => product * clamp(atomicCandidateEffectiveConfidence(candidate), 0.01, 0.99), 1), 6);
   const providerCount = new Set(candidates.map((candidate) => candidate.provider)).size;
   const adjustedProbability = round(clamp(aggregateConfidence * (providerCount > 1 ? 1.02 : 1), 0.01, 0.99), 6);
   const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
@@ -565,7 +570,7 @@ function parlayLegFromFallbackCandidate(candidate: AtomicPredictionCandidate): P
     selection: prediction.selection,
     line: prediction.line ?? null,
     odds: round(prediction.odds, 6),
-    confidence: round(prediction.confidence, 6),
+    confidence: round(atomicCandidateEffectiveConfidence(candidate), 6),
     validationStatus: 'unvalidated',
     warnings,
     banker,
@@ -639,16 +644,127 @@ export function buildAtomicPredictionRecommendations(
 
   const ordered = [...groups.values()]
     .map(toAtomicRecommendationDraft)
-    .sort((a, b) => b.score - a.score || b.aggregateConfidence - a.aggregateConfidence || a.combinedOdds - b.combinedOdds);
+    .sort(compareAtomicRecommendationsForSelection);
+  const selected = selectAtomicRecommendationsByFixture(ordered);
+  return selected.map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
+}
+
+function uniqueCandidatesById(candidates: readonly AtomicPredictionCandidate[]): AtomicPredictionCandidate[] {
+  const seen = new Set<string>();
+  const unique: AtomicPredictionCandidate[] = [];
+  for (const candidate of candidates) {
+    const id = candidate.prediction.id;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(candidate);
+  }
+  return unique;
+}
+
+function compareAtomicRecommendationsForSelection(a: AtomicPredictionRecommendation, b: AtomicPredictionRecommendation): number {
+  return atomicRecommendationSelectionScore(b) - atomicRecommendationSelectionScore(a)
+    || b.score - a.score
+    || b.aggregateConfidence - a.aggregateConfidence
+    || a.combinedOdds - b.combinedOdds;
+}
+
+function selectAtomicRecommendationsByFixture(
+  ordered: readonly AtomicPredictionRecommendation[],
+): AtomicPredictionRecommendation[] {
+  const byFixture = atomicRecommendationsByFixture(ordered);
   const selected: AtomicPredictionRecommendation[] = [];
   const usedFixtureIds = new Set<string>();
   for (const recommendation of ordered) {
     const fixtureId = recommendation.legs[0]?.fixtureId;
     if (fixtureId && usedFixtureIds.has(fixtureId)) continue;
-    if (fixtureId) usedFixtureIds.add(fixtureId);
-    selected.push(recommendation);
+    const replacement = fixtureId
+      ? saferAtomicReplacement(recommendation, byFixture.get(fixtureId) ?? [recommendation])
+      : recommendation;
+    const replacementFixtureId = replacement.legs[0]?.fixtureId;
+    if (replacementFixtureId && usedFixtureIds.has(replacementFixtureId)) continue;
+    if (replacementFixtureId) usedFixtureIds.add(replacementFixtureId);
+    selected.push(replacement);
   }
-  return selected.map((recommendation, index) => ({ ...recommendation, rank: rankOffset + index + 1 }));
+  return selected;
+}
+
+function atomicRecommendationsByFixture(
+  recommendations: readonly AtomicPredictionRecommendation[],
+): Map<string, AtomicPredictionRecommendation[]> {
+  const byFixture = new Map<string, AtomicPredictionRecommendation[]>();
+  for (const recommendation of recommendations) {
+    const fixtureId = recommendation.legs[0]?.fixtureId;
+    if (!fixtureId) continue;
+    byFixture.set(fixtureId, [...(byFixture.get(fixtureId) ?? []), recommendation]);
+  }
+  return byFixture;
+}
+
+function saferAtomicReplacement(
+  recommendation: AtomicPredictionRecommendation,
+  fixtureRecommendations: readonly AtomicPredictionRecommendation[],
+): AtomicPredictionRecommendation {
+  const leg = recommendation.legs[0];
+  if (!leg) return recommendation;
+  const candidates = fixtureRecommendations
+    .filter((candidate) => candidate.predictionId !== recommendation.predictionId)
+    .filter((candidate) => isSaferAtomicReplacement(recommendation, candidate))
+    .sort((a, b) =>
+      b.aggregateConfidence - a.aggregateConfidence
+      || atomicRecommendationSafetyScore(b) - atomicRecommendationSafetyScore(a)
+      || b.expectedEdge - a.expectedEdge
+      || a.combinedOdds - b.combinedOdds
+    );
+  return candidates[0] ?? recommendation;
+}
+
+function isSaferAtomicReplacement(
+  current: AtomicPredictionRecommendation,
+  candidate: AtomicPredictionRecommendation,
+): boolean {
+  const currentLeg = current.legs[0];
+  const candidateLeg = candidate.legs[0];
+  if (!currentLeg || !candidateLeg) return false;
+  if (!atomicRecommendationSafetyOverride(candidate)) return false;
+  if (candidate.aggregateConfidence + 0.000001 < current.aggregateConfidence) return false;
+
+  if (currentLeg.market === 'h2h' && candidateLeg.market === 'double_chance') {
+    if (currentLeg.selection === 'home') return candidateLeg.selection === 'home_or_draw';
+    if (currentLeg.selection === 'away') return candidateLeg.selection === 'draw_or_away';
+    return false;
+  }
+
+  if (
+    currentLeg.market === 'goals_over_under'
+    && candidateLeg.market === 'goals_over_under'
+    && currentLeg.selection === candidateLeg.selection
+    && Number.isFinite(currentLeg.line)
+    && Number.isFinite(candidateLeg.line)
+  ) {
+    if (currentLeg.selection === 'over') return Number(candidateLeg.line) < Number(currentLeg.line);
+    if (currentLeg.selection === 'under') return Number(candidateLeg.line) > Number(currentLeg.line);
+  }
+
+  return false;
+}
+
+function atomicRecommendationSelectionScore(recommendation: AtomicPredictionRecommendation): number {
+  const safetyOverride = atomicRecommendationSafetyOverride(recommendation);
+  const doubleChancePenalty = safetyOverride === 'model-probability-double-chance' ? 0.25 : 0;
+  const h2hFavoritePenalty = recommendation.riskFlags.includes('low-liquidity-h2h-favorite') ? 0.1 : 0;
+  return recommendation.score - doubleChancePenalty - h2hFavoritePenalty;
+}
+
+function atomicRecommendationSafetyScore(recommendation: AtomicPredictionRecommendation): number {
+  return recommendation.aggregateConfidence
+    + (Math.max(0, recommendation.expectedEdge) * 0.2)
+    - (Math.log2(Math.max(1.01, recommendation.combinedOdds)) * 0.02);
+}
+
+function atomicRecommendationSafetyOverride(recommendation: AtomicPredictionRecommendation): string | undefined {
+  if (recommendation.riskFlags.includes('model-probability-double-chance')) return 'model-probability-double-chance';
+  if (recommendation.riskFlags.includes('model-probability-conservative-total')) return 'model-probability-conservative-total';
+  return undefined;
 }
 
 export function applyDailyStakeRecommendations<T extends DailyFinalRecommendation>(
@@ -817,18 +933,24 @@ function councilComposedParlay(
 
 function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): AtomicPredictionRecommendation {
   const ordered = [...candidates].sort((a, b) =>
-    b.prediction.confidence - a.prediction.confidence
-    || b.edge - a.edge
+    atomicCandidateEffectiveConfidence(b) - atomicCandidateEffectiveConfidence(a)
+    || atomicCandidateEffectiveEdge(b) - atomicCandidateEffectiveEdge(a)
     || a.prediction.odds - b.prediction.odds,
   );
   const primary = ordered[0] as AtomicPredictionCandidate;
   const providers = uniqueStrings(ordered.map((candidate) => candidate.provider)) as DailyE2EProvider[];
   const sourceRunIds = uniqueStrings(ordered.map((candidate) => candidate.runId));
   const predictionIds = uniqueStrings(ordered.map((candidate) => candidate.prediction.id));
-  const confidence = round(average(ordered.map((candidate) => candidate.prediction.confidence)), 6);
-  const edge = round(average(ordered.map((candidate) => candidate.edge)), 6);
+  const confidence = round(average(ordered.map(atomicCandidateEffectiveConfidence)), 6);
+  const edge = round(average(ordered.map(atomicCandidateEffectiveEdge)), 6);
+  const rankingConfidence = round(average(ordered.map((candidate) => candidate.prediction.confidence)), 6);
+  const rankingEdge = round(average(ordered.map((candidate) => candidate.edge)), 6);
   const adjustedProbability = round(clamp(confidence * (providers.length > 1 ? 1.02 : 1), 0.01, 0.99), 6);
-  const riskFlags = atomicRiskFlags(primary.prediction, providers.length);
+  const safetyOverride = atomicSafetyOverride(primary.prediction);
+  const riskFlags = uniqueStrings([
+    ...atomicRiskFlags(primary.prediction, providers.length),
+    ...(safetyOverride ? ['model-probability-safety-confidence', safetyOverride] : []),
+  ]);
   const focusSignals = fixtureFocusSignals(primary);
   const leg = {
     predictionId: primary.prediction.id,
@@ -839,11 +961,11 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     selection: primary.prediction.selection,
     line: primary.prediction.line ?? null,
     odds: round(primary.prediction.odds, 6),
-    confidence: round(primary.prediction.confidence, 6),
+    confidence: round(atomicCandidateEffectiveConfidence(primary), 6),
     validationStatus: 'unvalidated',
     warnings: primary.prediction.warnings ?? [],
     banker: true,
-    bankerReason: `atomic high-confidence selection ${round(primary.prediction.confidence, 3)}`,
+    bankerReason: `atomic high-confidence selection ${round(atomicCandidateEffectiveConfidence(primary), 3)}`,
   };
 
   return {
@@ -859,12 +981,12 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     model: primary.model,
     profile: ATOMIC_RECOMMENDATION_PROFILE,
     validationStatus: 'unvalidated',
-    harnessStatus: primary.prediction.status,
+    harnessStatus: primary.prediction.status === 'blocked' && safetyOverride ? 'review-required' : primary.prediction.status,
     combinedOdds: round(primary.prediction.odds, 6),
     aggregateConfidence: confidence,
     adjustedProbability,
     expectedEdge: edge,
-    score: round(atomicRecommendationScore(confidence, edge, providers.length, riskFlags.length) + fixtureFocusScore(primary), 6),
+    score: round(atomicRecommendationScore(rankingConfidence, rankingEdge, providers.length, riskFlags.length) + fixtureFocusScore(primary), 6),
     exposure: {
       units: 0,
       percentOfAnalyticalBankroll: 0,
@@ -886,9 +1008,10 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
       `profile ${ATOMIC_RECOMMENDATION_PROFILE}`,
       `confidence ${round(confidence, 3)}`,
       `edge ${round(edge, 3)}`,
+      safetyOverride ? `safety override: ${safetyOverride}` : '',
       providers.length > 1 ? `provider agreement: ${providers.join(', ')}` : `provider: ${primary.provider}`,
       ...focusSignals.map((signal) => `focus signal: ${signal}`),
-    ],
+    ].filter(Boolean),
     riskFlags,
     legs: [leg],
   };
@@ -908,6 +1031,61 @@ export function atomicPredictionEdge(prediction: PredictionRecordView): number {
   if (Number.isFinite(prediction.edge)) return prediction.edge as number;
   const probability = prediction.probability ?? prediction.modelProbability ?? prediction.marketFairProbability;
   return Number.isFinite(probability) ? prediction.odds * (probability as number) - 1 : 0;
+}
+
+function atomicCandidateEffectiveConfidence(candidate: AtomicPredictionCandidate): number {
+  const prediction = candidate.prediction;
+  const safetyOverride = atomicSafetyOverride(prediction);
+  if (!safetyOverride) return prediction.confidence;
+  return round(Math.max(prediction.confidence, atomicProbabilityConfidence(prediction)), 6);
+}
+
+function atomicCandidateEffectiveEdge(candidate: AtomicPredictionCandidate): number {
+  const prediction = candidate.prediction;
+  const safetyOverride = atomicSafetyOverride(prediction);
+  if (!safetyOverride) return candidate.edge;
+  const confidenceEdge = prediction.odds * atomicCandidateEffectiveConfidence(candidate) - 1;
+  return round(Math.max(candidate.edge, confidenceEdge, ATOMIC_SAFETY_REVIEW_EDGE_FLOOR), 6);
+}
+
+function atomicSafetyOverride(prediction: PredictionRecordView): 'model-probability-double-chance' | 'model-probability-conservative-total' | undefined {
+  const confidence = atomicProbabilityConfidence(prediction);
+  if (confidence < ATOMIC_SAFETY_MIN_EFFECTIVE_CONFIDENCE) return undefined;
+  const confidenceEdge = prediction.odds * confidence - 1;
+  if (confidenceEdge < ATOMIC_SAFETY_BREAK_EVEN_EDGE_FLOOR) return undefined;
+
+  if (
+    prediction.market === 'double_chance'
+    && prediction.selection !== 'home_or_away'
+    && prediction.odds >= ATOMIC_SAFETY_DOUBLE_CHANCE_MIN_ODDS
+    && prediction.odds <= ATOMIC_SAFETY_DOUBLE_CHANCE_MAX_ODDS
+  ) {
+    return 'model-probability-double-chance';
+  }
+
+  if (
+    prediction.market === 'goals_over_under'
+    && prediction.odds <= ATOMIC_SAFETY_TOTALS_MAX_ODDS
+    && Number.isFinite(prediction.line)
+    && (
+      (prediction.selection === 'over' && Number(prediction.line) <= 1.5)
+      || (prediction.selection === 'under' && Number(prediction.line) >= 3.25)
+    )
+  ) {
+    return 'model-probability-conservative-total';
+  }
+
+  return undefined;
+}
+
+function atomicProbabilityConfidence(prediction: PredictionRecordView): number {
+  return clamp(firstFinite(
+    prediction.modelProbability,
+    prediction.probability,
+    prediction.impliedProbability,
+    prediction.marketImpliedProbability,
+    prediction.confidence,
+  ), 0.01, 0.99);
 }
 
 function atomicRiskFlags(prediction: PredictionRecordView, providerCount: number): string[] {
@@ -1098,6 +1276,14 @@ export function average(values: number[]): number {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
+export function firstFinite(...values: unknown[]): number {
+  for (const value of values) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return 0;
+}
+
 export function round(value: number, digits: number): number {
   return Number(value.toFixed(digits));
 }
@@ -1105,4 +1291,3 @@ export function round(value: number, digits: number): number {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
-

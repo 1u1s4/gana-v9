@@ -70,7 +70,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Keep native Discord embeds/cajas for Discord delivery unless the user explicitly asks for plain text.
 - Header embed format: `🏆 Gana v9 · Recomendaciones`, parlay/simple counts, and artifact date as `DD/MM/YYYY`.
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.
-- Per-atomic embed format: `📌 Simple · ...`, one blockquote selection line, and the same compact metrics line.
+- Per-atomic embed format: `📌 Simple · fixture · kickoff`, one blockquote selection line, and the same compact metrics line. Do not repeat the market/selection in the title.
 - Confidence metrics use the `🍀` icon everywhere; keep `🧠` only when it is a profile emoji such as `parlay-refinado`.
 - Selection boxes should include kickoff times only in titles, never in leg lines. In required-league addendum output, also keep kickoff in the `🌍 Obligatorio` fixture summary lines, but not in required prediction lines or required parlay leg lines.
 - Required-league fixture summary lines should put the fixture/time header on one line ending in `:`, then the projection/prediction count on the next line.
