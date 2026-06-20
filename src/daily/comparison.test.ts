@@ -15,7 +15,7 @@ describe('daily provider comparison', () => {
           model: 'gpt-5.5',
           runId: 'codex-run',
           result: pipelineResult('codex-run', [
-            prediction({ id: 'c-1', fixtureId: 'fixture-a', providerFixtureId: '100', market: 'h2h', selection: 'home', confidence: 0.8, edge: 0.04 }),
+            prediction({ id: 'c-1', fixtureId: 'fixture-a', providerFixtureId: '100', market: 'h2h', selection: 'home', probability: 0.58, modelProbability: 0.59, confidence: 0.8, edge: 0.04 }),
             prediction({ id: 'c-2', fixtureId: 'fixture-b', providerFixtureId: '101', market: 'btts', selection: 'yes', confidence: 0.7, edge: 0.03 }),
             prediction({ id: 'c-3', fixtureId: 'fixture-c', providerFixtureId: '102', market: 'h2h', selection: 'away', confidence: 0.65, edge: 0.01 }),
           ]),
@@ -40,6 +40,8 @@ describe('daily provider comparison', () => {
     assert.equal(comparison.summary.onlyGemini, 1);
     assert.equal(comparison.summary.agreementRate, 0.5);
     assert.equal(comparison.providerSummaries[0]?.totalPredictions, 3);
+    assert.equal(comparison.items.find((item) => item.fixtureId === 'fixture-a')?.providers[0]?.modelProbability, 0.59);
+    assert.equal(comparison.items.find((item) => item.fixtureId === 'fixture-a')?.providers[0]?.probability, 0.58);
     assert.equal(comparison.analyticalArtifactOnly, true);
     assert.equal(comparison.executionCapability, 'none');
     assert.equal(consensus.summary.consensusPredictions, 1);

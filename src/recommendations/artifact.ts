@@ -151,6 +151,12 @@ function requiredLeagueGeneralPredictionsFromComparison(comparison: unknown, fix
     for (const providerValue of providers) {
       const provider = objectRecord(providerValue);
       const line = numberOrNull(provider.line) ?? numberOrNull(item.line);
+      const probability = firstFinite([
+        numberOrNull(provider.modelProbability),
+        numberOrNull(provider.probability),
+      ]);
+      const modelConfidence = numberOrNull(provider.confidence);
+      const displayConfidence = probability ?? modelConfidence;
       predictions.push({
         fixtureId: stringValue(item.fixtureId) ?? stringValue(fixture.fixtureId) ?? '',
         providerFixtureId: stringValue(item.providerFixtureId) ?? stringValue(fixture.providerFixtureId) ?? '',
@@ -160,7 +166,11 @@ function requiredLeagueGeneralPredictionsFromComparison(comparison: unknown, fix
         selection: stringValue(provider.selection) ?? '',
         line,
         odds: numberOrNull(provider.odds),
-        confidence: numberOrNull(provider.confidence),
+        confidence: displayConfidence,
+        displayConfidence,
+        probability: numberOrNull(provider.probability),
+        modelProbability: numberOrNull(provider.modelProbability),
+        modelConfidence,
         expectedEdge: numberOrNull(provider.edge),
         provider: stringValue(provider.provider) ?? 'provider',
         status: stringValue(provider.status) ?? 'review-required',
@@ -226,7 +236,12 @@ function artifactSelectionFromRequiredGeneralPrediction(value: unknown): Recomme
     selection,
     line,
     odds: numberOrNull(item.odds),
-    confidence: numberOrNull(item.confidence),
+    confidence: firstFinite([
+      numberOrNull(item.displayConfidence),
+      numberOrNull(item.modelProbability),
+      numberOrNull(item.probability),
+      numberOrNull(item.confidence),
+    ]),
     expectedEdge: numberOrNull(item.expectedEdge),
     ...(stringValue(item.status) && { status: stringValue(item.status) }),
   };
@@ -252,4 +267,8 @@ function numberOrNull(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function firstFinite(values: Array<number | null>): number | null {
+  return values.find((value): value is number => typeof value === 'number' && Number.isFinite(value)) ?? null;
 }

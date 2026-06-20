@@ -281,7 +281,7 @@ describe('discord recommendation notifier', () => {
     ]);
     assert.match(generalEmbed.description, /Canada vs Bosnia & Herzegovina/);
     assert.match(generalEmbed.description, /\t✅ ⚽ Canada gana @ 1\.87 · Conf 67%/);
-    assert.match(generalEmbed.description, /\t🚫 👥 Canada o empate @ 1\.22 · Conf 58%/);
+    assert.match(generalEmbed.description, /\t🟡 👥 Canada o empate @ 1\.22 · Conf 70%/);
     assert.match(generalEmbed.description, /\t🟡 🥅 Menos de 2\.5 goles @ 1\.64 · Conf 66%/);
     assert.doesNotMatch(generalEmbed.description, /Más de 3\.5 goles/);
     assert.match(generalEmbed.description, /\t🟡 ⛳ Menos de 9\.5 corners @ 1\.8 · Conf 52%/);
@@ -295,6 +295,52 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(generalEmbed.description, /Ambos anotan: Ambos anotan/);
     assert.match(message, /📋 Predicciones generales · World Cup/);
     assert.match(message, /\t✅ ⚽ Canada gana @ 1\.87 · Conf 67%/);
+  });
+
+  it('keeps required general predictions coherent for probabilities and weak binary sides', () => {
+    const artifact = sampleArtifactWithRequiredLeague();
+    artifact.requiredLeagueGeneralPredictions = [
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'h2h',
+        selection: 'home',
+        odds: 1.87,
+        confidence: 0.62,
+        modelProbability: 0.58,
+        provider: 'codex',
+        status: 'review-required',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'double_chance',
+        selection: 'home_or_draw',
+        odds: 1.22,
+        confidence: 0.45,
+        modelProbability: 0.84,
+        provider: 'codex',
+        status: 'blocked',
+      },
+      {
+        fixture: 'Canada vs Bosnia & Herzegovina',
+        providerFixtureId: '1539000',
+        market: 'corners_over_under',
+        selection: 'under',
+        line: 9.5,
+        odds: 1.8,
+        confidence: 0.49,
+        provider: 'codex',
+        status: 'review-required',
+      },
+    ];
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const generalEmbed = payload.embeds.find((embed) => /^📋 Predicciones generales/.test(embed.title ?? ''));
+
+    assert.match(generalEmbed.description, /\t🟡 ⚽ Canada gana @ 1\.87 · Conf 58%/);
+    assert.match(generalEmbed.description, /\t🟡 👥 Canada o empate @ 1\.22 · Conf 84%/);
+    assert.doesNotMatch(generalEmbed.description, /corners/);
   });
 
   it('keeps kickoff times only in selection titles and required fixture summaries', () => {

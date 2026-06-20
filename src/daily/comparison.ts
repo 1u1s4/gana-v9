@@ -85,6 +85,8 @@ export interface DailyProviderPredictionSummary {
   selection: string;
   line: number | null;
   odds: number;
+  probability: number | null;
+  modelProbability: number | null;
   confidence: number;
   edge: number | null;
   status: string;
@@ -190,6 +192,8 @@ function toPredictionSummary(
     selection: prediction.selection,
     line: prediction.line ?? null,
     odds: prediction.odds,
+    probability: prediction.probability ?? null,
+    modelProbability: prediction.modelProbability ?? prediction.probability ?? null,
     confidence: prediction.confidence,
     edge: prediction.edge ?? null,
     status: prediction.status,

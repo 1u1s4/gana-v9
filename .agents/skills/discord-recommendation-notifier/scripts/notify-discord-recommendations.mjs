@@ -15,6 +15,7 @@ const DISCORD_EMBED_LIMIT = 10;
 const DISCORD_NON_SELECTION_EMBEDS = 2;
 const DISCORD_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
 const DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - 1;
+const REQUIRED_GENERAL_HIGH_PROBABILITY_FLOOR = 0.7;
 const GUATEMALA_TIMEZONE = 'America/Guatemala';
 const GUATEMALA_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
   timeZone: GUATEMALA_TIMEZONE,
@@ -507,6 +508,9 @@ function requiredLeagueGeneralPredictionsFromComparison(comparison, fixtures) {
     if (!fixture) continue;
     const providers = Array.isArray(item?.providers) ? item.providers : [];
     for (const provider of providers) {
+      const probability = firstFinite([provider?.modelProbability, provider?.probability]);
+      const modelConfidence = Number.isFinite(provider?.confidence) ? provider.confidence : null;
+      const displayConfidence = probability ?? modelConfidence;
       predictions.push({
         fixtureId: stringOrFallback(item?.fixtureId, fixture.fixtureId ?? ''),
         providerFixtureId: stringOrFallback(item?.providerFixtureId, fixture.providerFixtureId ?? ''),
@@ -516,7 +520,11 @@ function requiredLeagueGeneralPredictionsFromComparison(comparison, fixtures) {
         selection: stringOrFallback(provider?.selection, ''),
         line: Number.isFinite(provider?.line) ? provider.line : Number.isFinite(item?.line) ? item.line : null,
         odds: Number.isFinite(provider?.odds) ? provider.odds : null,
-        confidence: Number.isFinite(provider?.confidence) ? provider.confidence : null,
+        confidence: displayConfidence,
+        displayConfidence,
+        probability: Number.isFinite(provider?.probability) ? provider.probability : null,
+        modelProbability: Number.isFinite(provider?.modelProbability) ? provider.modelProbability : null,
+        modelConfidence,
         expectedEdge: Number.isFinite(provider?.edge) ? provider.edge : null,
         provider: stringOrFallback(provider?.provider, 'provider'),
         status: stringOrFallback(provider?.status, 'review-required'),
@@ -759,7 +767,8 @@ function formatRequiredLeagueGeneralPredictionLines(artifact, data) {
     const groups = groupsByFixture.get(key) ?? [];
     const fixture = requiredLeagueGeneralFixtureForKey(key, fixtureByKey, groups[0]);
     lines.push(requiredLeagueFixtureLabel(fixture));
-    const filteredGroups = filterRequiredLeagueGeneralPredictionGroups(groups)
+    const coherentGroups = cohereRequiredLeagueGeneralPredictionGroups(groups);
+    const filteredGroups = filterRequiredLeagueGeneralPredictionGroups(coherentGroups)
       .sort(compareRequiredLeagueGeneralPredictionGroups);
     for (const group of filteredGroups.slice(0, 8)) {
       lines.push(`\t${formatRequiredLeagueGeneralPredictionGroup(group)}`);
@@ -816,18 +825,80 @@ function filterRequiredLeagueGeneralPredictionGroups(groups) {
   const bestGoalsGroup = groups
     .filter((group) => group?.market === 'goals_over_under')
     .sort((a, b) =>
-      maxRequiredLeagueGeneralConfidence(b) - maxRequiredLeagueGeneralConfidence(a)
-      || requiredLeagueStatusRank(b) - requiredLeagueStatusRank(a)
+      requiredLeagueStatusRank(b) - requiredLeagueStatusRank(a)
+      || maxRequiredLeagueGeneralConfidence(b) - maxRequiredLeagueGeneralConfidence(a)
       || meanFinite(b.predictions?.map((prediction) => prediction?.expectedEdge)) - meanFinite(a.predictions?.map((prediction) => prediction?.expectedEdge)),
     )[0];
-  return groups.filter((group) => group?.market !== 'goals_over_under' || group === bestGoalsGroup);
+  const bestBinaryGroups = new Set();
+  const binaryGroupsByKey = new Map();
+  for (const group of groups) {
+    if (!isRequiredLeagueBinaryDisplayMarket(group?.market)) continue;
+    const key = `${group.market}|${Number.isFinite(group.line) ? formatNumber(group.line, 2) : ''}`;
+    binaryGroupsByKey.set(key, [...(binaryGroupsByKey.get(key) ?? []), group]);
+  }
+  for (const binaryGroups of binaryGroupsByKey.values()) {
+    const best = binaryGroups
+      .sort((a, b) =>
+        maxRequiredLeagueGeneralConfidence(b) - maxRequiredLeagueGeneralConfidence(a)
+        || requiredLeagueStatusRank(b) - requiredLeagueStatusRank(a)
+        || meanFinite(b.predictions?.map((prediction) => prediction?.expectedEdge)) - meanFinite(a.predictions?.map((prediction) => prediction?.expectedEdge)),
+      )[0];
+    if (best && maxRequiredLeagueGeneralConfidence(best) >= 0.5) bestBinaryGroups.add(best);
+  }
+  return groups.filter((group) => {
+    if (group?.market === 'goals_over_under') return group === bestGoalsGroup;
+    if (isRequiredLeagueBinaryDisplayMarket(group?.market)) return bestBinaryGroups.has(group);
+    return true;
+  });
+}
+
+function cohereRequiredLeagueGeneralPredictionGroups(groups) {
+  const h2hConfidenceBySelection = new Map();
+  for (const group of groups) {
+    if (group?.market !== 'h2h') continue;
+    const confidence = maxRequiredLeagueGeneralConfidence(group);
+    if (!Number.isFinite(confidence)) continue;
+    const current = h2hConfidenceBySelection.get(group.selection);
+    if (!Number.isFinite(current) || confidence > current) h2hConfidenceBySelection.set(group.selection, confidence);
+  }
+
+  return groups.map((group) => {
+    if (group?.market !== 'double_chance') return group;
+    const floor = Math.max(...doubleChanceH2hSelections(group.selection)
+      .map((selection) => h2hConfidenceBySelection.get(selection))
+      .filter(Number.isFinite));
+    if (!Number.isFinite(floor) || maxRequiredLeagueGeneralConfidence(group) >= floor) return group;
+    return {
+      ...group,
+      predictions: (Array.isArray(group.predictions) ? group.predictions : []).map((prediction) => {
+        const current = requiredLeagueGeneralPredictionDisplayConfidence(prediction);
+        const displayConfidence = Math.max(Number.isFinite(current) ? current : 0, floor);
+        return {
+          ...prediction,
+          displayConfidence,
+          coherenceAdjusted: true,
+        };
+      }),
+    };
+  });
+}
+
+function doubleChanceH2hSelections(selection) {
+  if (selection === 'home_or_draw') return ['home', 'draw'];
+  if (selection === 'draw_or_away') return ['draw', 'away'];
+  if (selection === 'home_or_away') return ['home', 'away'];
+  return [];
+}
+
+function isRequiredLeagueBinaryDisplayMarket(market) {
+  return market === 'corners_over_under' || market === 'btts';
 }
 
 function formatRequiredLeagueGeneralPredictionGroup(group) {
   const predictions = Array.isArray(group?.predictions) ? group.predictions : [];
   const statusIcon = requiredLeagueGeneralStatusIcon(predictions);
   const odds = formatNumberRange(predictions.map((prediction) => prediction?.odds), 2);
-  const confidence = formatIntegerPercent(meanFinite(predictions.map((prediction) => prediction?.confidence)));
+  const confidence = formatIntegerPercent(requiredLeagueGeneralGroupConfidence(group));
   const parts = [
     `${statusIcon} ${requiredLeagueGeneralMarketIcon(group.market)} ${formatRequiredPick(group)} @ ${odds}`,
     `Conf ${confidence}`,
@@ -848,8 +919,16 @@ function requiredLeagueGeneralStatusIcon(predictions) {
   const statuses = predictions.map((prediction) => stringOrFallback(prediction?.status, 'review-required'));
   if (statuses.includes('promotable') || statuses.includes('selected')) return '✅';
   if (statuses.includes('review-required')) return '🟡';
-  if (statuses.includes('blocked')) return '🚫';
+  if (statuses.includes('blocked')) return requiredLeagueGeneralBlockedButHighProbability(predictions) ? '🟡' : '🚫';
   return '🟡';
+}
+
+function requiredLeagueGeneralBlockedButHighProbability(predictions) {
+  const values = Array.isArray(predictions) ? predictions : [];
+  return values.some((prediction) =>
+    prediction?.market === 'double_chance'
+    && requiredLeagueGeneralPredictionDisplayConfidence(prediction) >= REQUIRED_GENERAL_HIGH_PROBABILITY_FLOOR
+  );
 }
 
 function requiredLeagueStatusRank(group) {
@@ -863,9 +942,23 @@ function requiredLeagueStatusRank(group) {
 
 function maxRequiredLeagueGeneralConfidence(group) {
   const values = (Array.isArray(group?.predictions) ? group.predictions : [])
-    .map((prediction) => prediction?.confidence)
+    .map(requiredLeagueGeneralPredictionDisplayConfidence)
     .filter(Number.isFinite);
   return values.length ? Math.max(...values) : 0;
+}
+
+function requiredLeagueGeneralGroupConfidence(group) {
+  return meanFinite((Array.isArray(group?.predictions) ? group.predictions : [])
+    .map(requiredLeagueGeneralPredictionDisplayConfidence));
+}
+
+function requiredLeagueGeneralPredictionDisplayConfidence(prediction) {
+  return firstFinite([
+    prediction?.displayConfidence,
+    prediction?.modelProbability,
+    prediction?.probability,
+    prediction?.confidence,
+  ]);
 }
 
 function requiredLeagueGeneralMarketIcon(market) {
@@ -1643,6 +1736,10 @@ function meanFinite(values) {
   const finite = values.filter(Number.isFinite);
   if (!finite.length) return NaN;
   return finite.reduce((sum, value) => sum + value, 0) / finite.length;
+}
+
+function firstFinite(values) {
+  return values.find(Number.isFinite) ?? null;
 }
 
 function formatIntegerPercent(value) {
