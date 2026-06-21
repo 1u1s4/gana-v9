@@ -1591,9 +1591,10 @@ export function formatStakeRecommendation(recommendation) {
 
 function formatCompactMetricLine(recommendation) {
   const stake = formatStakeRecommendation(recommendation);
+  const confidence = recommendationMetricConfidence(recommendation);
   const parts = [
     `> 📊 Odds ${formatMetricNumber(recommendation.combinedOdds, 4)}`,
-    `🍀 Conf ${formatPercent(recommendation.aggregateConfidence)}`,
+    Number.isFinite(confidence) ? `🍀 Conf ${formatPercent(confidence)}` : undefined,
     `📈 Edge ${formatPercent(recommendation.expectedEdge)}`,
     stake ? `💵 Stake ${stake}` : undefined,
   ];
@@ -1629,8 +1630,9 @@ function commonRiskFlag(recommendations, fallback) {
 
 function formatMetricLine(recommendation) {
   const parts = [];
-  if (Number.isFinite(recommendation.aggregateConfidence)) {
-    parts.push(`Confidence ${formatPercent(recommendation.aggregateConfidence)}`);
+  const confidence = recommendationMetricConfidence(recommendation);
+  if (Number.isFinite(confidence)) {
+    parts.push(`Confidence ${formatPercent(confidence)}`);
   }
   if (Number.isFinite(recommendation.adjustedProbability)) {
     parts.push(`Adj prob ${formatPercent(recommendation.adjustedProbability)}`);
@@ -1644,6 +1646,18 @@ function formatMetricLine(recommendation) {
     parts.push(`Score ${formatNumber(recommendation.score, 3)}`);
   }
   return parts.join(' | ');
+}
+
+function recommendationMetricConfidence(recommendation) {
+  const candidates = [
+    recommendation?.displayConfidence,
+    recommendation?.aggregateConfidence,
+  ];
+  for (const value of candidates) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
 }
 
 function formatLeg(leg) {

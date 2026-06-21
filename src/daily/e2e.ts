@@ -759,7 +759,7 @@ export async function runDailyE2E(
       atomicConservativeSelection: {
         enabled: true,
         sameFixtureReplacement: 'h2h home/away may be replaced only by the matching double-chance no-loss pick; goals over/under may be replaced only by a safer emitted line in the same direction',
-        displayConfidence: 'uses modelProbability/probability as effective confidence only for conservative double-chance and low-over/high-under total safety overrides',
+        displayConfidence: 'uses modelProbability/probability as the visible confidence metric when available, while ranking keeps the original confidence/edge score',
         doubleChanceMinOdds: ATOMIC_SAFETY_DOUBLE_CHANCE_MIN_ODDS,
         doubleChanceMaxOdds: ATOMIC_SAFETY_DOUBLE_CHANCE_MAX_ODDS,
         totalsMaxOdds: ATOMIC_SAFETY_TOTALS_MAX_ODDS,

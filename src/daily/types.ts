@@ -53,6 +53,7 @@ export interface AtomicPredictionRecommendation {
   harnessStatus: string;
   combinedOdds: number;
   aggregateConfidence: number;
+  displayConfidence?: number;
   adjustedProbability: number;
   expectedEdge: number;
   score: number;

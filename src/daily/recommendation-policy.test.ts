@@ -113,6 +113,8 @@ describe('daily recommendation policy', () => {
 
     assert.equal(recommendations[0].predictionId, 'only-goals-over-25');
     assert.equal(recommendations[0].legs[0]?.line, 2.5);
+    assert.equal(recommendations[0].aggregateConfidence, 0.64);
+    assert.equal(recommendations[0].displayConfidence, 0.75);
     assert.equal(recommendations[0].riskFlags.includes('model-probability-conservative-total'), false);
   });
 });

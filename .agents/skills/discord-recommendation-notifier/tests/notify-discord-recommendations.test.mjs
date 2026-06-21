@@ -53,14 +53,18 @@ describe('discord recommendation notifier', () => {
   });
 
   it('formats atomic high-confidence predictions as simple recommendations', () => {
-    const payload = buildDiscordPayload(sampleArtifactWithAtomic(), { max: 2 });
-    const message = buildGatewayMessage(sampleArtifactWithAtomic(), { max: 2 });
+    const artifact = sampleArtifactWithAtomic();
+    artifact.recommendations[1].displayConfidence = 0.75;
+    const payload = buildDiscordPayload(artifact, { max: 2 });
+    const message = buildGatewayMessage(artifact, { max: 2 });
 
     assert.match(payload.embeds[0].description, /📦 1 parlay · 📌 1 simple/);
     assert.match(payload.embeds[2].title, /📌 Simple · Team C vs Team D$/);
     assert.match(payload.embeds[2].description, /> ⚽ Team C vs Team D: h2h away @ 1.18/);
+    assert.match(payload.embeds[2].description, /🍀 Conf 75%/);
     assert.match(payload.embeds[2].description, /💵 Stake 10/);
     assert.match(message, /2️⃣ 📌 Simple · Team C vs Team D\n> ⚽ Team C vs Team D: h2h away @ 1.18/);
+    assert.match(message, /🍀 Conf 75%/);
   });
 
   it('labels parlay recommendation titles with profile-specific emojis', () => {

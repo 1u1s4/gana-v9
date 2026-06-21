@@ -942,6 +942,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
   const sourceRunIds = uniqueStrings(ordered.map((candidate) => candidate.runId));
   const predictionIds = uniqueStrings(ordered.map((candidate) => candidate.prediction.id));
   const confidence = round(average(ordered.map(atomicCandidateEffectiveConfidence)), 6);
+  const displayConfidence = round(average(ordered.map(atomicCandidateDisplayConfidence)), 6);
   const edge = round(average(ordered.map(atomicCandidateEffectiveEdge)), 6);
   const rankingConfidence = round(average(ordered.map((candidate) => candidate.prediction.confidence)), 6);
   const rankingEdge = round(average(ordered.map((candidate) => candidate.edge)), 6);
@@ -984,6 +985,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     harnessStatus: primary.prediction.status === 'blocked' && safetyOverride ? 'review-required' : primary.prediction.status,
     combinedOdds: round(primary.prediction.odds, 6),
     aggregateConfidence: confidence,
+    displayConfidence,
     adjustedProbability,
     expectedEdge: edge,
     score: round(atomicRecommendationScore(rankingConfidence, rankingEdge, providers.length, riskFlags.length) + fixtureFocusScore(primary), 6),
@@ -1038,6 +1040,13 @@ function atomicCandidateEffectiveConfidence(candidate: AtomicPredictionCandidate
   const safetyOverride = atomicSafetyOverride(prediction);
   if (!safetyOverride) return prediction.confidence;
   return round(Math.max(prediction.confidence, atomicProbabilityConfidence(prediction)), 6);
+}
+
+function atomicCandidateDisplayConfidence(candidate: AtomicPredictionCandidate): number {
+  return round(Math.max(
+    atomicCandidateEffectiveConfidence(candidate),
+    atomicProbabilityConfidence(candidate.prediction),
+  ), 6);
 }
 
 function atomicCandidateEffectiveEdge(candidate: AtomicPredictionCandidate): number {
