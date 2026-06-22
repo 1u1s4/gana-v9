@@ -102,6 +102,7 @@ const METADATA_RISK_FLAGS = new Set([
   'analytical-fallback',
   'review-required',
   'council-composed',
+  'daily-focus-fallback',
 ]);
 const HARD_RISK_FLAGS = new Set([
   'stale-source',

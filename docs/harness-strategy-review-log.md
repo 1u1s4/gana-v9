@@ -1043,3 +1043,47 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Add odds-bucket review floors for high-odds predictions and parlays (proposed) — src/scoring/edge-gate.ts, src/prediction/gates.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
 - [medium] Rebalance default market coverage toward BTTS and conservative totals (proposed) — src/filters/low-odds-selector.ts, src/daily/e2e.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
 - [medium] Keep corners watchlist-only until settlement coverage recovers (ready-for-implementation) — src/prediction/gates.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-06-21 · strategy-2026-06-20
+
+- Run: strategy-review-2026-06-20-209d2448
+- Dates: 2026-06-20
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-20-209d2448/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-20-209d2448/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 53-43 hit 55.2% (124 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Add market-specific validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, src/metrics/daily.ts
+- [high] Tighten H2H automatic eligibility and high-odds exposure (ready-for-implementation) — src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, skills/score-prediction-v2/prompt.md
+- [high] Block fragile low-priced total overs from safety fallback (ready-for-implementation) — src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [high] Run a default conservative parlay profile set when parlayProfile is absent (proposed) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/profile-specs.ts
+- [medium] Make low-odds selection market-aware instead of odds-first (proposed) — src/filters/low-odds-selector.ts, src/parlay/profile-specs.ts, src/parlay/portfolio-risk.ts
+- [medium] Feed settled market and odds-bucket results back into scoring calibration (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md, src/strategy-review/daily.ts
+
+## 2026-06-21 · strategy-2026-06-20
+
+- Run: strategy-review-2026-06-20-3c582fcb
+- Dates: 2026-06-20
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-20-3c582fcb/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-20-3c582fcb/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 8-2 hit 80.0% (124 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Gate strategy learning on settled sample coverage (ready-for-implementation) — src/strategy-review/daily.ts, src/metrics/daily.ts, src/daily/e2e.ts
+- [high] Apply strict risk flags to analytical-fallback atomics (ready-for-implementation) — src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, src/daily/e2e.ts
+- [high] Broaden fragile total-over gates to line-aware risk (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [high] Demote low-liquidity h2h favorites at scoring time (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [medium] Preflight parlay profile viability by unique fixtures (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts
+- [medium] Add guarded conservative totals coverage to low-odds discovery (proposed) — src/filters/low-odds-selector.ts, src/parlay/profile-specs.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md

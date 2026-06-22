@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildFallbackAtomicPredictionRecommendations } from './recommendation-policy.js';
+import {
+  DAILY_PREFERRED_PARLAY_PROFILE_ORDER,
+  buildFallbackAtomicPredictionRecommendations,
+  buildMissingDailyFocusParlayRecommendations,
+} from './recommendation-policy.js';
 
 describe('daily recommendation policy', () => {
   it('replaces an h2h simple with the matching high-probability double-chance safety alternative', () => {
@@ -116,6 +120,66 @@ describe('daily recommendation policy', () => {
     assert.equal(recommendations[0].aggregateConfidence, 0.64);
     assert.equal(recommendations[0].displayConfidence, 0.75);
     assert.equal(recommendations[0].riskFlags.includes('model-probability-conservative-total'), false);
+  });
+
+  it('composes all three daily focus parlays from reviewed simple recommendations when strict profiles are absent', () => {
+    const atomicRecommendations = buildFallbackAtomicPredictionRecommendations(
+      pipeline([
+        prediction({
+          id: 'melbourne-over-25',
+          fixtureId: 'fixture-melbourne',
+          market: 'goals_over_under',
+          selection: 'over',
+          line: 2.5,
+          odds: 1.5,
+          modelProbability: 0.68,
+          probability: 0.68,
+          confidence: 0.68,
+          edge: 0.055,
+          status: 'review-required',
+        }),
+        prediction({
+          id: 'legion-over-25',
+          fixtureId: 'fixture-legion',
+          market: 'goals_over_under',
+          selection: 'over',
+          line: 2.5,
+          odds: 1.08,
+          modelProbability: 0.88,
+          probability: 0.88,
+          confidence: 0.88,
+          edge: 0.0137,
+          status: 'review-required',
+        }),
+        prediction({
+          id: 'shamrock-dc',
+          fixtureId: 'fixture-shamrock',
+          market: 'double_chance',
+          selection: 'home_or_draw',
+          odds: 1.22,
+          modelProbability: 0.79,
+          probability: 0.79,
+          confidence: 0.79,
+          edge: 0.01,
+          status: 'review-required',
+        }),
+      ]),
+      ['codex'],
+      () => 'gpt-5.5',
+      0,
+    );
+
+    const focusParlays = buildMissingDailyFocusParlayRecommendations({
+      recommendations: atomicRecommendations,
+    });
+
+    assert.deepEqual(focusParlays.map((item) => item.profile), DAILY_PREFERRED_PARLAY_PROFILE_ORDER);
+    assert.equal(focusParlays.every((item) => item.kind === 'parlay'), true);
+    assert.equal(focusParlays.every((item) => item.selectionMode === 'analytical-fallback'), true);
+    assert.equal(focusParlays.every((item) => item.harnessStatus === 'review-required'), true);
+    assert.equal(focusParlays.every((item) => item.legs.length >= 2), true);
+    assert.equal(focusParlays.every((item) => item.riskFlags.includes('daily-focus-fallback')), true);
+    assert.equal(focusParlays.every((item) => item.expectedEdge > 0), true);
   });
 });
 

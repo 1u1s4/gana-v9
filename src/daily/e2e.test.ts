@@ -685,6 +685,102 @@ describe('runDailyE2E', () => {
     assert.equal(summary.counts.atomicRecommendations, 1);
   });
 
+  it('fills missing daily focus approaches from reviewable simple recommendations', async () => {
+    const ctx = context();
+    const fixtures = [
+      fixture('2026-06-22T10:15:00.000Z'),
+      { ...fixture('2026-06-22T14:00:00.000Z'), id: 'fixture-legion', providerFixtureId: 'provider-fixture-legion', homeTeamName: 'Legion', awayTeamName: 'Parnu JK Vaprus U21' },
+      { ...fixture('2026-06-22T18:00:00.000Z'), id: 'fixture-shamrock', providerFixtureId: 'provider-fixture-shamrock', homeTeamName: 'Shamrock Rovers', awayTeamName: 'Derry City' },
+    ];
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-06-22',
+      providers: ['codex'],
+      parlayProfile: 'portfolio-v2',
+      persistMetrics: false,
+      dailyBatchId: 'daily-focus-fallback-output',
+    }, ctx.runtime, {
+      repositories: undefined,
+      runPipeline: async (config, input) => {
+        const runId = `${config.provider}-run`;
+        return {
+          ok: true,
+          runId,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'review-required',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures,
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: fixtures.length, hitCount: 0, hits: [], candidateFixtures: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [{
+            ok: true,
+            runId,
+            fixtureId: 'fixture-1',
+            providerFixtureId: 'provider-fixture-1',
+            gateResult: { verdict: 'review-required', reasons: ['manual review required'], warnings: [] },
+            predictions: [
+              fallbackPrediction(runId, 'daily-focus-over-25', 'fixture-1', { odds: 1.5, confidence: 0.68, modelProbability: 0.68, probability: 0.68, edge: 0.055, market: 'goals_over_under', selection: 'over', line: 2.5 }),
+              fallbackPrediction(runId, 'daily-focus-low-over-25', 'fixture-legion', { odds: 1.08, confidence: 0.88, modelProbability: 0.88, probability: 0.88, edge: 0.0137, market: 'goals_over_under', selection: 'over', line: 2.5 }),
+              fallbackPrediction(runId, 'daily-focus-dc', 'fixture-shamrock', { odds: 1.22, confidence: 0.79, modelProbability: 0.79, probability: 0.79, edge: 0.02, market: 'double_chance', selection: 'home_or_draw' }),
+            ],
+          }],
+          parlay: {
+            ok: false,
+            runId,
+            gateResult: { verdict: 'blocked', reasons: ['strict parlay gate found no promotion-safe build'], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: [],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => ({
+        ok: false,
+        runId: runtime.runId ?? 'parlay-run',
+        date: input.date,
+        gateResult: { verdict: 'blocked', reasons: [`${input.portfolio} strict builder found no eligible pool`], warnings: [] },
+        build: { parlay: { id: `${runtime.runId}-parlay`, legs: [], combinedOdds: 0, aggregateConfidence: 0, aggregateQuality: 0 } },
+        persistedParlayIds: [],
+      }) as any,
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: input.runIds?.length ?? 0,
+        top: [],
+        diagnostics: { generatedAt: '2026-06-22T00:00:00.000Z', analyticalArtifactOnly: true, executionCapability: 'none', profileScope: 'all', rawAnalyzed: 0, profileScopedAnalyzed: 0, exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' }, bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' }, universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null }, selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 }, rejected: [] },
+      }) as any,
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: '/tmp/daily-metrics.json',
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.deepEqual(recommendations.parlayApproaches.map((item: any) => [item.profile, item.status]), [
+      ['parlay-diamante', 'selected'],
+      ['parlay-refinado', 'selected'],
+      ['low-variance', 'selected'],
+    ]);
+    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.selectionMode === 'analytical-fallback'), true);
+    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.riskFlags.includes('daily-focus-fallback')), true);
+    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.councilDecision.decision === 'review'), true);
+    assert.equal(recommendations.atomicRecommendations.length, 0);
+  });
+
   it('blocks weak analytical fallback recommendations when strict promotion gates select none', async () => {
     const ctx = context();
     const fixtures = [
@@ -727,11 +823,11 @@ describe('runDailyE2E', () => {
             providerFixtureId: 'provider-fixture-1',
             gateResult: { verdict: 'review-required', reasons: ['manual review required'], warnings: [] },
             predictions: [
-              fallbackPrediction(runId, 'fallback-prediction-1', 'fixture-1', { odds: 1.42, confidence: 0.66, market: 'h2h', selection: 'home' }),
-              fallbackPrediction(runId, 'fallback-prediction-2', 'fixture-2', { odds: 1.36, confidence: 0.64, market: 'goals_over_under', selection: 'over', line: 2.5 }),
-              fallbackPrediction(runId, 'fallback-prediction-3', 'fixture-3', { odds: 1.55, confidence: 0.62, market: 'btts', selection: 'yes' }),
-              fallbackPrediction(runId, 'fallback-prediction-4', 'fixture-4', { odds: 1.48, confidence: 0.6, market: 'h2h', selection: 'away' }),
-              fallbackPrediction(runId, 'fallback-prediction-5', 'fixture-5', { odds: 1.52, confidence: 0.58, market: 'double_chance', selection: 'home_or_draw' }),
+              fallbackPrediction(runId, 'fallback-prediction-1', 'fixture-1', { odds: 1.42, confidence: 0.56, modelProbability: 0.56, probability: 0.56, market: 'h2h', selection: 'home' }),
+              fallbackPrediction(runId, 'fallback-prediction-2', 'fixture-2', { odds: 1.36, confidence: 0.55, modelProbability: 0.55, probability: 0.55, market: 'goals_over_under', selection: 'over', line: 2.5 }),
+              fallbackPrediction(runId, 'fallback-prediction-3', 'fixture-3', { odds: 1.55, confidence: 0.54, modelProbability: 0.54, probability: 0.54, market: 'btts', selection: 'yes' }),
+              fallbackPrediction(runId, 'fallback-prediction-4', 'fixture-4', { odds: 1.48, confidence: 0.53, modelProbability: 0.53, probability: 0.53, market: 'h2h', selection: 'away' }),
+              fallbackPrediction(runId, 'fallback-prediction-5', 'fixture-5', { odds: 1.52, confidence: 0.52, modelProbability: 0.52, probability: 0.52, market: 'double_chance', selection: 'home_or_draw' }),
             ],
           }],
           parlay: {

@@ -54,6 +54,7 @@ import {
   buildDailyParlayApproaches,
   buildFallbackAtomicPredictionRecommendations,
   buildFallbackParlayRecommendations,
+  buildMissingDailyFocusParlayRecommendations,
   hydrateRecommendationDisplay,
   recommendationLegFixtureIds,
   recommendationLegPredictionIds,
@@ -519,6 +520,40 @@ export async function runDailyE2E(
   let finalRecommendations: DailyFinalRecommendation[] = applyDailyStakeRecommendations(
     [...parlayRecommendations, ...atomicRecommendations],
   );
+  const missingDailyFocusParlays = buildMissingDailyFocusParlayRecommendations({
+    recommendations: finalRecommendations,
+    candidateRecommendations: [...parlayRecommendations, ...atomicRecommendations],
+  });
+  if (missingDailyFocusParlays.length) {
+    const preferredProfiles = new Set<string>(DAILY_PREFERRED_PARLAY_PROFILE_ORDER);
+    const preferredParlays = [
+      ...finalRecommendations.filter((recommendation) =>
+        recommendation.kind === 'parlay' && preferredProfiles.has(recommendation.profile)
+      ),
+      ...missingDailyFocusParlays,
+    ].sort((a, b) =>
+      DAILY_PREFERRED_PARLAY_PROFILE_ORDER.indexOf(a.profile as any)
+      - DAILY_PREFERRED_PARLAY_PROFILE_ORDER.indexOf(b.profile as any)
+    );
+    const preferredLegPredictionIds = recommendationLegPredictionIds(preferredParlays);
+    const preferredLegSelectionKeys = recommendationLegSelectionKeys(preferredParlays);
+    const preferredLegFixtureIds = recommendationLegFixtureIds(preferredParlays);
+    const keepNonPreferredParlays = preferredParlays.length < DAILY_PARLAY_RECOMMENDATION_LIMIT;
+    finalRecommendations = applyDailyStakeRecommendations([
+      ...preferredParlays,
+      ...finalRecommendations.filter((recommendation) => {
+        if (recommendation.kind === 'parlay') {
+          return keepNonPreferredParlays && !preferredProfiles.has(recommendation.profile);
+        }
+        const leg = recommendation.legs[0];
+        if (!leg) return true;
+        if (preferredLegPredictionIds.has(recommendation.predictionId)) return false;
+        const selectionKey = legSelectionKeyForDailyRecommendation(leg);
+        if (selectionKey && preferredLegSelectionKeys.has(selectionKey)) return false;
+        return !preferredLegFixtureIds.has(leg.fixtureId);
+      }),
+    ]);
+  }
   let councilCandidateRecommendations = finalRecommendations;
   let council = runRecommendationCouncil({
     date: input.date,
@@ -1218,6 +1253,15 @@ function profilesToPortfolios(profile: DailyParlayProfile | undefined): Array<No
   if (profile === 'portfolio-v2') return ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance', 'balanced', 'market-diverse', 'high-conviction', 'parlay-oro'];
   if (profile === 'balanced') return ['balanced'];
   return [profile];
+}
+
+function legSelectionKeyForDailyRecommendation(leg: DailyFinalRecommendation['legs'][number]): string {
+  return [
+    leg.fixtureId,
+    leg.market,
+    leg.selection,
+    leg.line ?? '',
+  ].join(':');
 }
 
 function dailyValidationFreshness(metrics: DailyMetricsRunResult | undefined, date: string): DailyValidationFreshness {

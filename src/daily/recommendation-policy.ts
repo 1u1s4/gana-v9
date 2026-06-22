@@ -44,6 +44,10 @@ export const DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS = [
   'low-liquidity-h2h-favorite',
 ] as const;
 export const DAILY_FINAL_DEMOTED_MODELS = ['gpt-5.4-mini'] as const;
+const DAILY_FOCUS_FALLBACK_RISK_FLAG = 'daily-focus-fallback';
+const DAILY_FOCUS_PROFILE_WINDOW_MISS_RISK_FLAG = 'profile-window-miss';
+const DAILY_FOCUS_FALLBACK_MIN_LEGS = 2;
+const DAILY_FOCUS_FALLBACK_MAX_SOURCE_LEGS = 18;
 export const ATOMIC_BLOCKED_RISK_FLAGS = [
   'stale-source',
   'corners-market',
@@ -813,6 +817,361 @@ function nearestStakeBucket(value: number): number {
   return DAILY_STAKE_BUCKETS.reduce((best, bucket) =>
     Math.abs(bucket - value) < Math.abs(best - value) ? bucket : best,
   DAILY_STAKE_BUCKETS[0]);
+}
+
+export function buildMissingDailyFocusParlayRecommendations(input: {
+  recommendations: readonly DailyFinalRecommendation[];
+  candidateRecommendations?: readonly DailyFinalRecommendation[];
+}): DailyFinalRecommendation[] {
+  const existingProfiles = new Set(input.recommendations
+    .filter((recommendation) => recommendation.kind === 'parlay')
+    .map((recommendation) => recommendation.profile));
+  const missingProfiles = DAILY_PREFERRED_PARLAY_PROFILE_ORDER.filter((profile) => !existingProfiles.has(profile));
+  if (!missingProfiles.length) return [];
+
+  const candidateLegs = collectDailyFocusLegCandidates([
+    ...(input.candidateRecommendations ?? []),
+    ...input.recommendations,
+  ]);
+  if (candidateLegs.length < DAILY_FOCUS_FALLBACK_MIN_LEGS) return [];
+
+  const usedSelectionKeys = new Set<string>();
+  const composed: DailyFinalRecommendation[] = [];
+  for (const profile of missingProfiles) {
+    const selected = selectDailyFocusLegs(profile, candidateLegs, usedSelectionKeys);
+    if (selected.length < DAILY_FOCUS_FALLBACK_MIN_LEGS) continue;
+    const recommendation = toDailyFocusParlayRecommendation(profile, selected, composed.length + 1);
+    composed.push(recommendation);
+    for (const candidate of selected) {
+      const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
+      if (key) usedSelectionKeys.add(key);
+    }
+  }
+  return composed;
+}
+
+type DailyFocusProfile = typeof DAILY_PREFERRED_PARLAY_PROFILE_ORDER[number];
+
+interface DailyFocusLegCandidate {
+  leg: ParlayAnalysisRecommendation['legs'][number];
+  sourceRunIds: string[];
+  providers: string[];
+  sourceProfiles: string[];
+  sourceRiskFlags: string[];
+  sourceReasons: string[];
+  sourceSelectionModes: string[];
+  sourceEdge: number;
+  sourceScore: number;
+}
+
+function collectDailyFocusLegCandidates(
+  recommendations: readonly DailyFinalRecommendation[],
+): DailyFocusLegCandidate[] {
+  const bestByKey = new Map<string, DailyFocusLegCandidate>();
+  for (const recommendation of recommendations) {
+    for (const leg of recommendation.legs ?? []) {
+      if (!isDailyFocusLegEligible(leg, recommendation)) continue;
+      const key = leg.predictionId || legSelectionKey(leg.fixtureId, leg.market, leg.selection, leg.line);
+      if (!key) continue;
+      const candidate: DailyFocusLegCandidate = {
+        leg: {
+          ...leg,
+          confidence: round(focusLegConfidence(leg, recommendation), 6),
+          odds: round(Number(leg.odds), 6),
+          banker: true,
+          bankerReason: `daily focus fallback leg from ${recommendation.profile}`,
+        },
+        sourceRunIds: uniqueStrings([
+          ...('sourceRunIds' in recommendation ? recommendation.sourceRunIds ?? [] : []),
+          ...('sourceRunId' in recommendation && recommendation.sourceRunId ? [recommendation.sourceRunId] : []),
+        ]),
+        providers: uniqueStrings('providers' in recommendation ? recommendation.providers ?? [] : []),
+        sourceProfiles: [recommendation.profile],
+        sourceRiskFlags: recommendation.riskFlags ?? [],
+        sourceReasons: recommendation.reasons ?? [],
+        sourceSelectionModes: recommendation.selectionMode ? [recommendation.selectionMode] : [],
+        sourceEdge: Number.isFinite(recommendation.expectedEdge) ? recommendation.expectedEdge : 0,
+        sourceScore: Number.isFinite(recommendation.score) ? recommendation.score : 0,
+      };
+      const current = bestByKey.get(key);
+      if (!current || dailyFocusLegScore('parlay-refinado', candidate) > dailyFocusLegScore('parlay-refinado', current)) {
+        bestByKey.set(key, candidate);
+      }
+    }
+  }
+  return [...bestByKey.values()].sort((a, b) =>
+    dailyFocusLegScore('parlay-refinado', b) - dailyFocusLegScore('parlay-refinado', a)
+    || focusLegConfidence(b.leg) - focusLegConfidence(a.leg)
+    || Number(a.leg.odds) - Number(b.leg.odds)
+  );
+}
+
+function isDailyFocusLegEligible(
+  leg: ParlayAnalysisRecommendation['legs'][number],
+  recommendation: DailyFinalRecommendation,
+): boolean {
+  if (!leg.predictionId || !leg.fixtureId) return false;
+  if (!Number.isFinite(leg.odds) || Number(leg.odds) <= 1) return false;
+  if (!Number.isFinite(focusLegConfidence(leg, recommendation)) || focusLegConfidence(leg, recommendation) < 0.6) return false;
+  if (leg.market === 'corners_over_under') return false;
+  const riskFlags = new Set(recommendation.riskFlags ?? []);
+  if (riskFlags.has('blocked-source-prediction')) return false;
+  if (riskFlags.has('stale-source')) return false;
+  if (riskFlags.has('corners-unverified')) return false;
+  if (riskFlags.has('lineup-pending')) return false;
+  if (riskFlags.has('selection-evidence-missing')) return false;
+  if (riskFlags.has('inflated-double-chance-edge')) return false;
+  if (riskFlags.has('overinflated-edge')) return false;
+  return true;
+}
+
+function selectDailyFocusLegs(
+  profile: DailyFocusProfile,
+  candidates: readonly DailyFocusLegCandidate[],
+  usedSelectionKeys: ReadonlySet<string>,
+): DailyFocusLegCandidate[] {
+  const preferred = candidates
+    .filter((candidate) => dailyFocusLegProfileEligible(profile, candidate))
+    .sort((a, b) => dailyFocusLegScore(profile, b) - dailyFocusLegScore(profile, a));
+  const freshPreferred = preferred.filter((candidate) => {
+    const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
+    return key ? !usedSelectionKeys.has(key) : true;
+  });
+  const pools = [
+    freshPreferred,
+    preferred,
+    candidates.filter((candidate) => {
+      const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
+      return key ? !usedSelectionKeys.has(key) : true;
+    }).sort((a, b) => dailyFocusLegScore(profile, b) - dailyFocusLegScore(profile, a)),
+    [...candidates].sort((a, b) => dailyFocusLegScore(profile, b) - dailyFocusLegScore(profile, a)),
+  ];
+  for (const pool of pools) {
+    const selected = bestDailyFocusCombination(profile, pool.slice(0, DAILY_FOCUS_FALLBACK_MAX_SOURCE_LEGS));
+    if (selected.length >= DAILY_FOCUS_FALLBACK_MIN_LEGS) return selected;
+  }
+  return [];
+}
+
+function dailyFocusLegProfileEligible(profile: DailyFocusProfile, candidate: DailyFocusLegCandidate): boolean {
+  const leg = candidate.leg;
+  if (profile === 'parlay-diamante') {
+    return ['h2h', 'double_chance', 'goals_over_under'].includes(leg.market)
+      && Number(leg.odds) <= 1.5;
+  }
+  if (profile === 'low-variance') {
+    return ['h2h', 'double_chance', 'goals_over_under'].includes(leg.market)
+      && Number(leg.odds) <= 1.6;
+  }
+  return ['h2h', 'double_chance', 'goals_over_under', 'btts'].includes(leg.market)
+    && Number(leg.odds) <= 1.8;
+}
+
+function bestDailyFocusCombination(
+  profile: DailyFocusProfile,
+  candidates: readonly DailyFocusLegCandidate[],
+): DailyFocusLegCandidate[] {
+  let best: { legs: DailyFocusLegCandidate[]; score: number } | undefined;
+  const maxLegs = profile === 'low-variance' ? 2 : 3;
+  for (let size = DAILY_FOCUS_FALLBACK_MIN_LEGS; size <= Math.min(maxLegs, candidates.length); size += 1) {
+    collectDailyFocusCombinations(profile, candidates, size, 0, [], (legs, score) => {
+      if (!best || score > best.score) best = { legs, score };
+    });
+  }
+  return best?.legs ?? [];
+}
+
+function collectDailyFocusCombinations(
+  profile: DailyFocusProfile,
+  candidates: readonly DailyFocusLegCandidate[],
+  size: number,
+  start: number,
+  current: DailyFocusLegCandidate[],
+  visit: (legs: DailyFocusLegCandidate[], score: number) => void,
+): void {
+  if (current.length === size) {
+    const fixtureIds = current.map((candidate) => candidate.leg.fixtureId);
+    if (new Set(fixtureIds).size !== fixtureIds.length) return;
+    visit([...current], dailyFocusCombinationScore(profile, current));
+    return;
+  }
+  for (let index = start; index < candidates.length; index += 1) {
+    current.push(candidates[index] as DailyFocusLegCandidate);
+    collectDailyFocusCombinations(profile, candidates, size, index + 1, current, visit);
+    current.pop();
+  }
+}
+
+function dailyFocusCombinationScore(profile: DailyFocusProfile, candidates: readonly DailyFocusLegCandidate[]): number {
+  const combinedOdds = candidates.reduce((product, candidate) => product * Number(candidate.leg.odds), 1);
+  const aggregateConfidence = average(candidates.map((candidate) => focusLegConfidence(candidate.leg)));
+  const marketDiversity = new Set(candidates.map((candidate) => candidate.leg.market)).size / Math.max(1, candidates.length);
+  const profileScore = candidates.reduce((sum, candidate) => sum + dailyFocusLegScore(profile, candidate), 0) / Math.max(1, candidates.length);
+  return profileScore
+    + (aggregateConfidence * 0.35)
+    + (dailyFocusOddsFit(profile, combinedOdds) * 0.15)
+    + (marketDiversity * 0.04)
+    + (Math.max(0, combinedOdds * aggregateConfidence - 1) * 0.08)
+    - ((candidates.length - DAILY_FOCUS_FALLBACK_MIN_LEGS) * 0.015);
+}
+
+function dailyFocusLegScore(profile: DailyFocusProfile, candidate: DailyFocusLegCandidate): number {
+  const leg = candidate.leg;
+  const confidence = focusLegConfidence(leg);
+  const odds = Number(leg.odds);
+  const edge = Math.max(0, candidate.sourceEdge);
+  const marketBoost = dailyFocusMarketBoost(profile, leg);
+  const lowOddsBoost = odds <= 1.25 ? 0.06 : odds <= 1.5 ? 0.025 : 0;
+  const reviewPenalty = candidate.sourceSelectionModes.includes('analytical-fallback') ? 0.015 : 0;
+  const riskPenalty = candidate.sourceRiskFlags.filter((flag) => !['single-selection', 'analytical-fallback', 'review-required'].includes(flag)).length * 0.02;
+  return confidence + (edge * 0.2) + marketBoost + lowOddsBoost + (candidate.sourceScore * 0.04) - reviewPenalty - riskPenalty;
+}
+
+function dailyFocusMarketBoost(profile: DailyFocusProfile, leg: ParlayAnalysisRecommendation['legs'][number]): number {
+  if (profile === 'low-variance') {
+    if (leg.market === 'double_chance') return 0.09;
+    if (leg.market === 'h2h' && Number(leg.odds) <= 1.35) return 0.055;
+    if (leg.market === 'goals_over_under') return conservativeTotalsBoost(leg);
+    return 0;
+  }
+  if (profile === 'parlay-diamante') {
+    if ((leg.market === 'h2h' || leg.market === 'double_chance') && Number(leg.odds) <= 1.25) return 0.085;
+    if (leg.market === 'goals_over_under') return conservativeTotalsBoost(leg) * 0.75;
+    return 0.02;
+  }
+  if (leg.market === 'double_chance') return 0.06;
+  if (leg.market === 'h2h') return 0.045;
+  if (leg.market === 'goals_over_under') return conservativeTotalsBoost(leg);
+  if (leg.market === 'btts' && leg.selection === 'no') return 0.02;
+  return 0;
+}
+
+function conservativeTotalsBoost(leg: ParlayAnalysisRecommendation['legs'][number]): number {
+  const line = Number(leg.line ?? NaN);
+  if (!Number.isFinite(line)) return 0.01;
+  if (leg.selection === 'over') return line <= 1.5 ? 0.06 : line <= 2.5 ? 0.035 : 0.005;
+  if (leg.selection === 'under') return line >= 3.5 ? 0.06 : line >= 2.5 ? 0.03 : 0.005;
+  return 0;
+}
+
+function dailyFocusOddsFit(profile: DailyFocusProfile, combinedOdds: number): number {
+  const [min, max] = profile === 'parlay-diamante'
+    ? [1.1, 1.3]
+    : profile === 'parlay-refinado'
+      ? [1.3, 2.1]
+      : [1.25, 2.2];
+  if (combinedOdds >= min && combinedOdds <= max) return 1;
+  const distance = combinedOdds < min ? min - combinedOdds : combinedOdds - max;
+  return Math.max(0, 1 - distance);
+}
+
+function toDailyFocusParlayRecommendation(
+  profile: DailyFocusProfile,
+  candidates: readonly DailyFocusLegCandidate[],
+  rank: number,
+): DailyFinalRecommendation {
+  const legs = candidates.map((candidate) => ({
+    ...candidate.leg,
+    banker: true,
+    bankerReason: `daily ${profile} fallback leg: confidence ${round(focusLegConfidence(candidate.leg), 3)}`,
+  }));
+  const combinedOdds = round(legs.reduce((product, leg) => product * Number(leg.odds), 1), 6);
+  const aggregateConfidence = round(average(legs.map((leg) => focusLegConfidence(leg))), 6);
+  const adjustedProbability = round(clamp(aggregateConfidence, 0.01, 0.99), 6);
+  const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
+  const sourceRunIds = uniqueStrings(candidates.flatMap((candidate) => candidate.sourceRunIds));
+  const providers = uniqueStrings(candidates.flatMap((candidate) => candidate.providers));
+  const sourceProfiles = uniqueStrings(candidates.flatMap((candidate) => candidate.sourceProfiles));
+  const riskFlags = uniqueStrings([
+    DAILY_FOCUS_FALLBACK_RISK_FLAG,
+    'analytical-fallback',
+    'review-required',
+    ...dailyFocusProfileWindowMiss(profile, combinedOdds),
+    ...candidates.flatMap((candidate) => candidate.sourceRiskFlags),
+  ].filter((flag) => flag !== 'single-selection'));
+  const reasons = uniqueStrings([
+    `daily focus fallback: strict ${profile} build unavailable`,
+    'built from reviewed simple recommendations or candidate parlay legs',
+    'uses average leg confidence for review-only daily focus coverage',
+    `source profiles: ${sourceProfiles.join(', ') || 'unknown'}`,
+    `providers: ${providers.join(', ') || 'unknown'}`,
+    `aggregate confidence ${round(aggregateConfidence, 3)}`,
+    `adjusted edge ${round(expectedEdge, 3)}`,
+    ...dailyFocusProfileWindowReasons(profile, combinedOdds),
+  ]);
+  const parlayId = `daily-focus-${profile}-${createHash('sha256')
+    .update(legs.map((leg) => legSelectionKey(leg.fixtureId, leg.market, leg.selection, leg.line) || leg.predictionId).join('|'))
+    .digest('hex')
+    .slice(0, 16)}`;
+
+  return {
+    kind: 'parlay',
+    rank,
+    parlayId,
+    sourceRunId: sourceRunIds[0] ?? null,
+    sourceRunIds,
+    profile,
+    validationStatus: 'unvalidated',
+    harnessStatus: 'review-required',
+    selectionMode: 'analytical-fallback',
+    fallbackReasons: [`strict ${profile} builder had no selected same-day candidate`],
+    combinedOdds,
+    aggregateConfidence,
+    adjustedProbability,
+    expectedEdge,
+    score: round((aggregateConfidence * 0.64) + (Math.max(0, expectedEdge) * 0.24) + dailyFocusProfileScoreBonus(profile) - (riskFlags.length * 0.006), 6),
+    exposure: {
+      units: 0,
+      percentOfAnalyticalBankroll: 0,
+      policy: 'daily-focus-fallback-review-only-exposure',
+    },
+    stake: {
+      units: 0,
+      percentOfBankroll: 0,
+      policy: 'daily-focus-fallback-review-only-stake',
+    },
+    bankerLegs: legs.map((leg) => ({
+      predictionId: leg.predictionId,
+      fixtureId: leg.fixtureId,
+      fixture: leg.fixture,
+      ...(leg.display ? { display: leg.display } : {}),
+      market: leg.market,
+      selection: leg.selection,
+      line: leg.line,
+      odds: leg.odds,
+      confidence: leg.confidence,
+      reason: leg.bankerReason ?? `daily ${profile} fallback leg`,
+    })),
+    reasons,
+    riskFlags,
+    legs,
+  };
+}
+
+function dailyFocusProfileScoreBonus(profile: DailyFocusProfile): number {
+  return profile === 'parlay-diamante' ? 0.06 : profile === 'low-variance' ? 0.04 : 0.035;
+}
+
+function dailyFocusProfileWindowMiss(profile: DailyFocusProfile, combinedOdds: number): string[] {
+  if (profile === 'parlay-diamante' && (combinedOdds < 1.1 || combinedOdds > 1.3)) return [DAILY_FOCUS_PROFILE_WINDOW_MISS_RISK_FLAG];
+  if (profile === 'parlay-refinado' && (combinedOdds < 1.3 || combinedOdds > 2.1)) return [DAILY_FOCUS_PROFILE_WINDOW_MISS_RISK_FLAG];
+  if (profile === 'low-variance' && (combinedOdds < 1.25 || combinedOdds > 2.2)) return [DAILY_FOCUS_PROFILE_WINDOW_MISS_RISK_FLAG];
+  return [];
+}
+
+function dailyFocusProfileWindowReasons(profile: DailyFocusProfile, combinedOdds: number): string[] {
+  if (!dailyFocusProfileWindowMiss(profile, combinedOdds).length) return [];
+  return [`fallback odds ${round(combinedOdds, 3)} outside strict ${profile} profile window`];
+}
+
+function focusLegConfidence(
+  leg: Pick<ParlayAnalysisRecommendation['legs'][number], 'confidence'>,
+  recommendation?: Pick<DailyFinalRecommendation, 'aggregateConfidence'>,
+): number {
+  const legConfidence = Number(leg.confidence);
+  if (Number.isFinite(legConfidence) && legConfidence > 0) return clamp(legConfidence, 0.01, 0.99);
+  const recommendationConfidence = Number(recommendation?.aggregateConfidence);
+  return Number.isFinite(recommendationConfidence) ? clamp(recommendationConfidence, 0.01, 0.99) : 0;
 }
 
 export function buildCouncilComposedParlayRecommendations(
