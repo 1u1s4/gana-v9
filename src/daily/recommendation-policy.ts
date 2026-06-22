@@ -824,7 +824,7 @@ export function buildMissingDailyFocusParlayRecommendations(input: {
   candidateRecommendations?: readonly DailyFinalRecommendation[];
 }): DailyFinalRecommendation[] {
   const existingProfiles = new Set(input.recommendations
-    .filter((recommendation) => recommendation.kind === 'parlay')
+    .filter((recommendation) => recommendation.kind === 'parlay' && isUsableDailyFocusParlay(recommendation))
     .map((recommendation) => recommendation.profile));
   const missingProfiles = DAILY_PREFERRED_PARLAY_PROFILE_ORDER.filter((profile) => !existingProfiles.has(profile));
   if (!missingProfiles.length) return [];
@@ -848,6 +848,16 @@ export function buildMissingDailyFocusParlayRecommendations(input: {
     }
   }
   return composed;
+}
+
+function isUsableDailyFocusParlay(recommendation: DailyFinalRecommendation): boolean {
+  return recommendation.kind === 'parlay'
+    && Number.isFinite(recommendation.combinedOdds)
+    && recommendation.combinedOdds > 1
+    && Number.isFinite(recommendation.aggregateConfidence)
+    && recommendation.aggregateConfidence >= 0.48
+    && Number.isFinite(recommendation.expectedEdge)
+    && recommendation.expectedEdge > 0;
 }
 
 type DailyFocusProfile = typeof DAILY_PREFERRED_PARLAY_PROFILE_ORDER[number];
@@ -937,8 +947,23 @@ function selectDailyFocusLegs(
     const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
     return key ? !usedSelectionKeys.has(key) : true;
   });
+  const freshKeys = new Set(freshPreferred.map((candidate) =>
+    legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line)
+  ));
+  const freshSupplemented = freshPreferred.length > 0 && freshPreferred.length < DAILY_FOCUS_FALLBACK_MIN_LEGS
+    ? [
+      ...freshPreferred,
+      ...preferred
+        .filter((candidate) => {
+          const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
+          return key ? !freshKeys.has(key) : true;
+        })
+        .slice(0, DAILY_FOCUS_FALLBACK_MIN_LEGS - freshPreferred.length),
+    ]
+    : freshPreferred;
   const pools = [
     freshPreferred,
+    freshSupplemented,
     preferred,
     candidates.filter((candidate) => {
       const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);

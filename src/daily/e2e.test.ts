@@ -281,7 +281,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.atomicRecommendations[0].legs[0].display.fixtureLabel, 'Team A vs Team B');
   });
 
-  it('composes daily parlays from council-kept simples when candidate parlays are rejected', async () => {
+  it('composes daily focus parlays from council-kept simples when candidate parlays are rejected', async () => {
     const ctx = context();
     const fixtures = [
       fixture('2026-05-21T16:00:00.000Z'),
@@ -350,7 +350,9 @@ describe('runDailyE2E', () => {
                 id: 'prediction-atomic-4',
                 fixtureId: 'fixture-4',
                 providerFixtureId: 'provider-fixture-4',
-                odds: 1.48,
+                market: 'double_chance',
+                selection: 'home_or_draw',
+                odds: 1.18,
                 edge: 0.04,
                 confidence: 0.9,
               },
@@ -404,13 +406,13 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.equal(recommendations.parlayRecommendations.length >= 1, true);
-    assert.equal(recommendations.parlayRecommendations[0].riskFlags.includes('council-composed'), true);
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.riskFlags.includes('daily-focus-fallback')), true);
     assert.equal(recommendations.parlayRecommendations[0].legs.length, 2);
     assert.equal(recommendations.recommendations.some((item: any) => item.kind === 'parlay'), true);
   });
 
-  it('keeps council-kept simples when a composed parlay is rejected', async () => {
+  it('fills daily focus parlays instead of leaving only council-kept simples when enough legs exist', async () => {
     const ctx = context();
     const fixtures = [
       fixture('2026-05-22T16:00:00.000Z'),
@@ -522,16 +524,13 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.equal(recommendations.parlayRecommendations.length, 0);
-    assert.deepEqual(recommendations.atomicRecommendations.map((item: any) => item.predictionId), [
-      'fallback-simple-review-1',
-      'fallback-simple-review-2',
-    ]);
-    assert.equal(recommendations.atomicRecommendations.every((item: any) => item.councilDecision.decision === 'review'), true);
-    assert.equal(recommendations.council.reviewCount, 2);
-    assert.equal(recommendations.council.rejectedCount >= 1, true);
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.riskFlags.includes('daily-focus-fallback')), true);
+    assert.equal(recommendations.atomicRecommendations.length, 0);
+    assert.equal(recommendations.council.reviewCount >= 3, true);
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
-    assert.equal(summary.counts.atomicRecommendations, 2);
+    assert.equal(summary.counts.parlayRecommendations, 3);
+    assert.equal(summary.counts.atomicRecommendations, 0);
   });
 
   it('limits final parlays to the three published approaches and excludes used legs from simples', async () => {

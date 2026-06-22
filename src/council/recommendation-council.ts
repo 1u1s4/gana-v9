@@ -234,7 +234,7 @@ function reviewRecommendation(recommendation: CouncilRecommendation, index: numb
   };
   const score = round(average(Object.values(panelScores)), 4);
   const blockers = councilBlockers(recommendation, score, hardRiskCount);
-  const decision: CouncilDecision = blockers.length === 0
+  const rawDecision: CouncilDecision = blockers.length === 0
     && score >= APPROVE_AT
     && confidence >= APPROVE_MIN_CONFIDENCE
     && edge >= APPROVE_MIN_EDGE
@@ -245,6 +245,9 @@ function reviewRecommendation(recommendation: CouncilRecommendation, index: numb
       && edge >= REVIEW_MIN_EDGE
       ? 'review'
       : 'reject';
+  const decision: CouncilDecision = rawDecision === 'approve' && recommendation.selectionMode === 'analytical-fallback'
+    ? 'review'
+    : rawDecision;
 
   return {
     recommendationKey: recommendationKey(recommendation, index),
