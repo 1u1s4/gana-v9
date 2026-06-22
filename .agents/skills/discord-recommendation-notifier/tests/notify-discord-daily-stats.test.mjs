@@ -88,7 +88,7 @@ describe('discord daily stats notifier', () => {
     assert.match(payload.embeds[1].description, /❌ 🥅 Team A vs Team B: goals under 2.5 @ 1.6/);
     assert.match(payload.embeds[1].description, /Real: goles totales 3 \(2-1\)/);
     assert.match(payload.embeds[1].description, /Resultado ❌ lost · Odds 2.24 · 🍀 Conf 74% · 📈 Edge 8% · 💵 Stake 10/);
-    assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.match(payload.embeds[2].title, /2️⃣ ✅ 📌 Simple · Team C vs Team D$/);
     assert.match(payload.embeds[2].description, /✅ ⛳ Team C vs Team D: corners under 9.5 @ 1.82/);
     assert.match(payload.embeds[2].description, /Real: corners totales 8 \(5-3\)/);
     assert.match(payload.embeds[2].description, /💵 Stake 5/);
@@ -105,7 +105,7 @@ describe('discord daily stats notifier', () => {
     assert.match(payload.embeds[6].title, /1️⃣ ✅ 💎 principal · Team E vs Team F/);
     assert.match(payload.embeds[6].description, /✅ ⚽ Team E vs Team F: Team E o empate @ 1.1/);
     assert.match(payload.embeds[6].description, /Real: 1-1/);
-    assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D · corners under 9.5/);
+    assert.match(message, /2️⃣ ✅ 📌 Simple · Team C vs Team D/);
     assert.match(message, /🌍 Obligatorio · World Cup/);
     assert.match(message, /📋 Predicciones generales · World Cup/);
     assert.doesNotMatch(message, /\bbet\b/i);

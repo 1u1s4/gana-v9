@@ -425,11 +425,14 @@ describe('discord recommendation notifier', () => {
       '1️⃣ 💎 principal · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
       '2️⃣ ⚽ resultados · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
       '3️⃣ 🧩 mixto-seguro · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
+      '4️⃣ 💎 parlay-diamante · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
+      '5️⃣ 🧠 parlay-refinado · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
+      '6️⃣ 🛡️ low-variance · USA vs Paraguay + Canada vs Bosnia & Herzegovina',
       '',
     ]);
     assert.match(payload.embeds[0].description, /📅 Diario: 📦 0 parlays · 📌 0 simples/);
-    assert.match(payload.embeds[0].description, /🌍 Obligatorio World Cup: ✅ 📦 3 parlays · 📌 2 predicciones/);
-    assert.match(payload.embeds[0].description, /📊 Total enviado: 📦 3 parlays · 📌 2 predicciones/);
+    assert.match(payload.embeds[0].description, /🌍 Obligatorio World Cup: ✅ 📦 6 parlays · 📌 2 predicciones/);
+    assert.match(payload.embeds[0].description, /📊 Total enviado: 📦 6 parlays · 📌 2 predicciones/);
     assert.match(payload.embeds[0].description, /🎛️ Enfoques diarios:/);
     assert.doesNotMatch(JSON.stringify(payload), /Sin selecciones/);
     assert.doesNotMatch(message, /Sin selecciones/);
@@ -489,18 +492,19 @@ describe('discord recommendation notifier', () => {
       requiredLeagueRecommendations,
     };
 
-    const payload = buildDiscordPayload(artifact, { max: 1 });
-    const blockedEmbeds = payload.embeds.filter((embed) => /^\d️⃣ 🚫/.test(embed.title ?? ''));
-    const diagnosticEmbed = payload.embeds.find((embed) => /^🔎 Mejor combo evaluado/.test(embed.title ?? ''));
+    const payloads = buildDiscordPayloads(artifact, { max: 1 });
+    const embeds = payloads.flatMap((payload) => payload.embeds);
+    const blockedEmbeds = embeds.filter((embed) => /^(?:1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣) 🚫/.test(embed.title ?? ''));
+    const diagnosticEmbed = embeds.find((embed) => /^🔎 Mejor combo evaluado/.test(embed.title ?? ''));
 
-    assert.equal(blockedEmbeds.length, 3);
+    assert.equal(blockedEmbeds.length, 6);
     assert.ok(diagnosticEmbed);
     assert.equal(blockedEmbeds.every((embed) => /No publicado: confianza agregada insuficiente\./.test(embed.description ?? '')), true);
     assert.match(diagnosticEmbed.description, /Canada vs Bosnia & Herzegovina: Menos de 2\.5 goles @ 1\.64 · Conf 66%/);
     assert.match(diagnosticEmbed.description, /USA vs Paraguay: Menos de 2\.5 goles @ 1\.53 · Conf 65%/);
     assert.match(diagnosticEmbed.description, /📊 Odds 2\.51 · 🍀 Conf 42\.9% · 📈 Edge 7\.64%/);
     assert.match(diagnosticEmbed.description, /🚧 No supera piso: confianza agregada 42\.90% < 45\.00%/);
-    assert.equal(payload.embeds.filter((embed) => /^🔎 Mejor combo evaluado/.test(embed.title ?? '')).length, 1);
+    assert.equal(embeds.filter((embed) => /^🔎 Mejor combo evaluado/.test(embed.title ?? '')).length, 1);
     assert.doesNotMatch(diagnosticEmbed.description, /mejor combo rechazado:/);
     assert.doesNotMatch(JSON.stringify(blockedEmbeds), /No se publica principal/);
     assert.doesNotMatch(JSON.stringify(blockedEmbeds), /Duplicado de/);
@@ -1028,7 +1032,14 @@ function sampleRequiredLeagueRecommendationsPassed() {
         },
       },
     ],
-    parlayProjections: ['principal', 'resultados', 'mixto-seguro'].map((profile) => ({
+    parlayProjections: [
+      'principal',
+      'resultados',
+      'mixto-seguro',
+      'parlay-diamante',
+      'parlay-refinado',
+      'low-variance',
+    ].map((profile) => ({
       profile,
       status: 'selected',
       combinedOdds: 3.6456,

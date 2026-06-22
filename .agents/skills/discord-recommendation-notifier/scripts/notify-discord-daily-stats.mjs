@@ -635,7 +635,7 @@ function requiredLeagueFixtureKeys(item) {
 
 function requiredLeagueValidationParlayEmbeds(data) {
   const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
-  return parlayProjections.slice(0, 3).map((projection, index) => ({
+  return parlayProjections.map((projection, index) => ({
     title: requiredLeagueValidationParlayTitle(projection, index),
     description: truncate(formatRequiredLeagueValidationParlayBody(projection).map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
     color: statusColor(projection.validationStatus),
@@ -645,7 +645,7 @@ function requiredLeagueValidationParlayEmbeds(data) {
 function formatRequiredLeagueValidationParlayMessageLines(data) {
   const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
   const lines = [];
-  for (const [index, projection] of parlayProjections.slice(0, 3).entries()) {
+  for (const [index, projection] of parlayProjections.entries()) {
     lines.push(requiredLeagueValidationParlayTitle(projection, index));
     lines.push(...formatRequiredLeagueValidationParlayBody(projection).map((line) => `> ${line}`));
     lines.push('');

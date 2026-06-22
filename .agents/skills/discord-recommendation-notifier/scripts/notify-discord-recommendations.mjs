@@ -86,8 +86,11 @@ export function loadRecommendations(path) {
 }
 
 export function buildDiscordPayload(artifact, options = {}) {
-  const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const requiredLeagueEmbeds = requiredLeagueDiscordEmbeds(artifact);
+  if (requiredLeagueEmbeds.length + DISCORD_NON_SELECTION_EMBEDS > DISCORD_EMBED_LIMIT) {
+    return buildDiscordPayloads(artifact, options)[0];
+  }
+  const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const selectionLimit = Math.min(max, Math.max(1, DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS - requiredLeagueEmbeds.length));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, selectionLimit));
   return buildDiscordPayloadPage(recommendations, { ...options, artifact, artifactDate: artifact?.date });
@@ -96,7 +99,6 @@ export function buildDiscordPayload(artifact, options = {}) {
 export function buildDiscordPayloads(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
-  if (!recommendations.length) return [buildDiscordPayloadPage([], { ...options, artifact, artifactDate: artifact?.date })];
   const pages = paginateDiscordSelectionEmbeds(recommendations, artifact);
   return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
     ...options,
@@ -979,7 +981,7 @@ function formatRequiredLeagueParlayLines(data) {
   const lines = [];
   const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
   const blockedDiagnostics = [];
-  for (const [index, projection] of parlayProjections.slice(0, 3).entries()) {
+  for (const [index, projection] of parlayProjections.entries()) {
     const formatted = formatRequiredLeagueParlayProjection(projection);
     if (formatted.diagnostic) blockedDiagnostics.push(formatted.diagnostic);
     lines.push(requiredLeagueParlayBlockTitle(projection, index));
@@ -997,7 +999,7 @@ function requiredLeagueParlayDiscordEmbeds(data) {
   const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
   const embeds = [];
   const blockedDiagnostics = [];
-  for (const [index, projection] of parlayProjections.slice(0, 3).entries()) {
+  for (const [index, projection] of parlayProjections.entries()) {
     const formatted = formatRequiredLeagueParlayProjection(projection);
     if (formatted.diagnostic) blockedDiagnostics.push(formatted.diagnostic);
     embeds.push({
@@ -1790,6 +1792,13 @@ function chunk(values, size) {
 
 function paginateDiscordSelectionEmbeds(recommendations, artifact) {
   const requiredLeagueEmbedCount = requiredLeagueDiscordEmbeds(artifact).length;
+  if (requiredLeagueEmbedCount + 1 >= DISCORD_EMBED_LIMIT) {
+    const selectionPages = recommendations.length
+      ? chunk(recommendations, DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE)
+      : [[]];
+    return [...selectionPages, []];
+  }
+  if (!recommendations.length) return [[]];
   const pages = [];
   let index = 0;
   while (index < recommendations.length) {

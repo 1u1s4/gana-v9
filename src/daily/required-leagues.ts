@@ -29,7 +29,14 @@ export interface DailyRequiredLeagueInput {
 export const DAILY_REQUIRED_LEAGUE_DEFAULTS: DailyRequiredLeagueInput[] = [
   { providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 },
 ];
-export const DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER = ['principal', 'resultados', 'mixto-seguro'] as const;
+export const DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER = [
+  'principal',
+  'resultados',
+  'mixto-seguro',
+  'parlay-diamante',
+  'parlay-refinado',
+  'low-variance',
+] as const;
 const REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE = 0.62;
 const REQUIRED_LEAGUE_PARLAY_MIN_AGGREGATE_CONFIDENCE = 0.45;
 const REQUIRED_LEAGUE_SAFETY_DOUBLE_CHANCE_MAX_ODDS = 1.25;
@@ -268,7 +275,7 @@ export function buildRequiredLeagueRecommendations(input: {
         : [`${coveredFixtures} required-league fixture(s) have non-blocked projections`],
     },
     {
-      name: 'three-parlay-approaches',
+      name: 'required-parlay-approaches',
       status: parlayBlocked ? 'blocked' as const : 'passed' as const,
       reasons: parlayBlocked
         ? parlayProjections
@@ -304,7 +311,7 @@ export function buildRequiredLeagueRecommendations(input: {
     atomicProjections,
     parlayProjections,
     goalCheck: {
-      objective: 'required league daily projections and three parlay approaches',
+      objective: 'required league daily projections and required parlay approaches',
       status: goalStatus,
       checks: goalChecks,
       nextActions,
@@ -314,7 +321,7 @@ export function buildRequiredLeagueRecommendations(input: {
       defaultRequiredLeagues: DAILY_REQUIRED_LEAGUE_DEFAULTS,
       parlayProfiles: DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER,
       atomicSelection: 'best non-blocked prediction per required fixture, promotable preferred over review-required',
-      parlaySelection: 'safety-first required-league planner: prefer low-variance double-chance coverage, conservative totals pairs, and best double-chance pairs; allow market-implied safety confidence for low-price blocked double-chance candidates while keeping traceable review-required risk flags',
+      parlaySelection: 'safety-first required-league planner: keep principal/resultados/mixto-seguro plus parlay-diamante/parlay-refinado/low-variance; prefer low-variance double-chance coverage, conservative totals pairs, best double-chance pairs, and daily-focus-style low-odds pairs; allow market-implied safety confidence for low-price blocked double-chance and conservative-total candidates while keeping traceable review-required risk flags',
     },
     analyticalArtifactOnly: true,
     executionCapability: 'none',
@@ -600,7 +607,13 @@ interface RequiredLeagueParlayApproachSpec {
   targetOddsIdeal: number;
   preferredFamilies: readonly RequiredLeagueMarketFamily[];
   preferMixedFamilies?: boolean;
-  strategy?: 'double-chance-coverage' | 'safe-totals-pair' | 'best-double-chance-pair';
+  strategy?:
+    | 'double-chance-coverage'
+    | 'safe-totals-pair'
+    | 'best-double-chance-pair'
+    | 'diamond-low-odds-pair'
+    | 'refined-focus-pair'
+    | 'low-variance-pair';
 }
 
 const REQUIRED_LEAGUE_PARLAY_APPROACH_SPECS: readonly RequiredLeagueParlayApproachSpec[] = [
@@ -630,6 +643,34 @@ const REQUIRED_LEAGUE_PARLAY_APPROACH_SPECS: readonly RequiredLeagueParlayApproa
     targetOddsIdeal: 1.35,
     preferredFamilies: ['result'],
     strategy: 'best-double-chance-pair',
+  },
+  {
+    profile: 'parlay-diamante',
+    intent: 'enfoque obligatorio diamante: par corto de cuota baja cercano a 1.20 usando resultado seguro o total conservador',
+    targetOddsMin: 1.1,
+    targetOddsMax: 1.3,
+    targetOddsIdeal: 1.2,
+    preferredFamilies: ['result', 'totals'],
+    strategy: 'diamond-low-odds-pair',
+  },
+  {
+    profile: 'parlay-refinado',
+    intent: 'enfoque obligatorio refinado: par balanceado con familias de mercado distintas cuando haya suficiente edge',
+    targetOddsMin: 1.3,
+    targetOddsMax: 2.1,
+    targetOddsIdeal: 1.55,
+    preferredFamilies: ['result', 'totals'],
+    preferMixedFamilies: true,
+    strategy: 'refined-focus-pair',
+  },
+  {
+    profile: 'low-variance',
+    intent: 'enfoque obligatorio low-variance: par defensivo de baja varianza con doble oportunidad o total conservador',
+    targetOddsMin: 1.25,
+    targetOddsMax: 2.2,
+    targetOddsIdeal: 1.45,
+    preferredFamilies: ['result', 'totals'],
+    strategy: 'low-variance-pair',
   },
 ];
 
@@ -794,6 +835,30 @@ function selectRequiredLeagueParlayLegs(
     const selected = selectRequiredLeagueBestDoubleChancePair(spec, atomicProjections, context);
     if (selected) return selected;
   }
+  if (spec.strategy === 'diamond-low-odds-pair') {
+    const selected = selectRequiredLeagueDailyFocusPair(spec, atomicProjections, context, {
+      maxLegOdds: 1.35,
+      preferLowOdds: true,
+      preferMixedFamilies: false,
+    });
+    if (selected) return selected;
+  }
+  if (spec.strategy === 'refined-focus-pair') {
+    const selected = selectRequiredLeagueDailyFocusPair(spec, atomicProjections, context, {
+      maxLegOdds: 1.8,
+      preferLowOdds: false,
+      preferMixedFamilies: true,
+    });
+    if (selected) return selected;
+  }
+  if (spec.strategy === 'low-variance-pair') {
+    const selected = selectRequiredLeagueDailyFocusPair(spec, atomicProjections, context, {
+      maxLegOdds: 1.6,
+      preferLowOdds: true,
+      preferMixedFamilies: false,
+    });
+    if (selected) return selected;
+  }
 
   const ordered = [...atomicProjections]
     .sort((a, b) =>
@@ -911,6 +976,41 @@ function selectRequiredLeagueBestDoubleChancePair(
   )[0];
 }
 
+function selectRequiredLeagueDailyFocusPair(
+  spec: RequiredLeagueParlayApproachSpec,
+  atomicProjections: readonly DailyRequiredLeagueAtomicProjection[],
+  context: Parameters<typeof selectRequiredLeagueParlayLegs>[2],
+  options: { maxLegOdds: number; preferLowOdds: boolean; preferMixedFamilies: boolean },
+): RequiredLeagueParlayLegSelection | undefined {
+  const ordered = atomicProjections
+    .filter((projection) => requiredLeagueIsDailyFocusCandidate(projection, options.maxLegOdds))
+    .sort((a, b) =>
+      requiredLeagueDailyFocusProjectionScore(spec, b, options) - requiredLeagueDailyFocusProjectionScore(spec, a, options)
+      || b.confidence - a.confidence
+      || a.odds - b.odds
+      || a.predictionId.localeCompare(b.predictionId)
+    );
+  const combinations: RequiredLeagueParlayLegSelection[] = [];
+  const seenSignatures = new Set<string>();
+  for (let leftIndex = 0; leftIndex < ordered.length; leftIndex += 1) {
+    const left = ordered[leftIndex] as DailyRequiredLeagueAtomicProjection;
+    for (let rightIndex = leftIndex + 1; rightIndex < ordered.length; rightIndex += 1) {
+      const right = ordered[rightIndex] as DailyRequiredLeagueAtomicProjection;
+      if (left.fixtureId === right.fixtureId) continue;
+      const selected = buildRequiredLeagueParlayLegSelection(spec, [left, right], context, { allowBreakEvenSafety: true });
+      if (!selected || seenSignatures.has(selected.signature)) continue;
+      seenSignatures.add(selected.signature);
+      combinations.push(selected);
+    }
+  }
+  return combinations.sort((a, b) =>
+    requiredLeagueDailyFocusCombinationScore(spec, b, options) - requiredLeagueDailyFocusCombinationScore(spec, a, options)
+    || b.aggregateConfidence - a.aggregateConfidence
+    || b.score - a.score
+    || a.signature.localeCompare(b.signature)
+  )[0];
+}
+
 function buildRequiredLeagueParlayLegSelection(
   spec: RequiredLeagueParlayApproachSpec,
   inputLegs: readonly DailyRequiredLeagueAtomicProjection[],
@@ -967,6 +1067,67 @@ function requiredLeagueConservativeTotalScore(projection: DailyRequiredLeagueAto
     + highUnderBonus
     + (projection.status === 'promotable' ? 0.05 : 0)
     - (Math.log2(Math.max(1.01, projection.odds)) * 0.04), 6);
+}
+
+function requiredLeagueIsDailyFocusCandidate(
+  projection: DailyRequiredLeagueAtomicProjection,
+  maxLegOdds: number,
+): boolean {
+  const family = requiredLeagueProjectionMarketFamily(projection);
+  if (family !== 'result' && family !== 'totals') return false;
+  if (projection.odds > maxLegOdds) return false;
+  if (projection.confidence < REQUIRED_LEAGUE_PARLAY_MIN_LEG_CONFIDENCE) return false;
+  if (projection.expectedEdge > 0) return true;
+  return projection.safetyOverride === 'market-implied-double-chance'
+    || projection.safetyOverride === 'market-implied-conservative-total';
+}
+
+function requiredLeagueDailyFocusProjectionScore(
+  spec: RequiredLeagueParlayApproachSpec,
+  projection: DailyRequiredLeagueAtomicProjection,
+  options: { preferLowOdds: boolean; preferMixedFamilies: boolean },
+): number {
+  const family = requiredLeagueProjectionMarketFamily(projection);
+  const lowOddsBoost = projection.odds <= 1.15 ? 0.16 : projection.odds <= 1.3 ? 0.08 : projection.odds <= 1.5 ? 0.03 : 0;
+  const safetyBoost = projection.safetyOverride ? 0.08 : 0;
+  const familyBoost = family === 'result'
+    ? spec.profile === 'low-variance' ? 0.09 : 0.05
+    : family === 'totals'
+      ? 0.06
+      : 0;
+  const edgeScore = Math.max(0, projection.expectedEdge) * 0.18;
+  return round(
+    requiredLeagueAtomicPortfolioProjectionScore(projection)
+      + safetyBoost
+      + familyBoost
+      + (options.preferLowOdds ? lowOddsBoost : lowOddsBoost * 0.45)
+      + edgeScore
+      - requiredLeagueProjectionWeakPenalty(projection),
+    6,
+  );
+}
+
+function requiredLeagueDailyFocusCombinationScore(
+  spec: RequiredLeagueParlayApproachSpec,
+  selection: RequiredLeagueParlayLegSelection,
+  options: { preferLowOdds: boolean; preferMixedFamilies: boolean },
+): number {
+  const families = selection.legs.map(requiredLeagueProjectionMarketFamily);
+  const mixedBonus = options.preferMixedFamilies && new Set(families).size > 1 ? 0.18 : 0;
+  const safetyBonus = selection.legs.filter((projection) => projection.safetyOverride).length * 0.05;
+  const lowOddsBonus = options.preferLowOdds
+    ? selection.legs.reduce((sum, projection) => sum + (projection.odds <= 1.3 ? 0.04 : 0), 0)
+    : 0;
+  return round(
+    selection.score
+      + requiredLeagueTargetOddsScore(spec, selection.combinedOdds)
+      + requiredLeagueMarketFamilyScore(spec, selection.legs)
+      + mixedBonus
+      + safetyBonus
+      + lowOddsBonus
+      + Math.max(0, selection.expectedEdge) * 0.12,
+    6,
+  );
 }
 
 function requiredLeagueTotalsPairShapeScore(legs: readonly DailyRequiredLeagueAtomicProjection[]): number {
@@ -1176,6 +1337,25 @@ function requiredLeagueMarketFamilyScore(
     const hasResult = families.includes('result');
     const hasTotals = families.includes('totals');
     score += hasResult && hasTotals ? 0.2 : 0.02;
+  }
+
+  if (spec.profile === 'parlay-diamante') {
+    score += families.every((family) => family === 'result' || family === 'totals') ? 0.12 : -0.08;
+    if (legs.every((projection) => projection.odds <= 1.35)) score += 0.08;
+  }
+
+  if (spec.profile === 'parlay-refinado') {
+    score += uniqueFamilies.size > 1 ? 0.16 : 0.03;
+    if (families.includes('result') && families.includes('totals')) score += 0.08;
+  }
+
+  if (spec.profile === 'low-variance') {
+    const safeCount = legs.filter((projection) =>
+      projection.safetyOverride === 'market-implied-double-chance'
+      || projection.safetyOverride === 'market-implied-conservative-total'
+      || projection.odds <= 1.35
+    ).length;
+    score += safeCount * 0.07;
   }
 
   return round(score, 6);
