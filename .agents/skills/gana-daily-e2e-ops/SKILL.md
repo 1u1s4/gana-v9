@@ -66,7 +66,7 @@ GANA_DAILY_PROVIDERS=codex,gemini \
 GANA_DAILY_PROVIDER_CONCURRENCY=2 \
 GANA_WEB_MODE=live \
 GANA_PARLAY_PROFILE=portfolio-v2 \
-GANA_DISCORD_MAX_SELECTIONS=3 \
+GANA_DISCORD_MAX_SELECTIONS=25 \
 node scripts/gana-daily-e2e-and-notify.mjs --force
 ```
 

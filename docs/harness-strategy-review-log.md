@@ -1087,3 +1087,46 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Demote low-liquidity h2h favorites at scoring time (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
 - [medium] Preflight parlay profile viability by unique fixtures (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts
 - [medium] Add guarded conservative totals coverage to low-odds discovery (proposed) — src/filters/low-odds-selector.ts, src/parlay/profile-specs.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-06-22 · strategy-2026-06-21
+
+- Run: strategy-review-2026-06-21-07fb545c
+- Dates: 2026-06-21
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-21-07fb545c/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-21-07fb545c/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 39-19 hit 67.2% (71 total)
+- Parlays: 1-1 hit 50.0% (2 total)
+
+### Proposed Modifications
+
+- [high] Block low-liquidity H2H fallback atomics above the short-favorite range (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/eligibility.ts, src/parlay/service.ts
+- [medium] Add totals ladder suppression before atomic and parlay fallback selection (ready-for-implementation) — src/daily/recommendation-policy.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md
+- [high] Tighten BTTS and totals market evidence requirements (ready-for-implementation) — skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/scoring/edge-gate.ts, src/prediction/gates.ts
+- [high] Refresh validation metrics after settlement before strategy review (ready-for-implementation) — src/validation/service.ts, src/metrics/daily.ts, src/daily/e2e.ts, src/strategy-review/daily.ts
+- [medium] Quarantine unknown/default parlay profiles from learning and final selection (ready-for-implementation) — src/parlay/service.ts, src/metrics/daily.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [medium] Add corners void-rate feedback to market coverage policy (proposed) — src/daily/recommendation-policy.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md
+
+## 2026-06-22 · strategy-2026-06-21
+
+- Run: strategy-review-2026-06-21-8f662a4f
+- Dates: 2026-06-21
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-21-8f662a4f/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-21-8f662a4f/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 39-19 hit 67.2% (71 total)
+- Parlays: 1-1 hit 50.0% (2 total)
+
+### Proposed Modifications
+
+- [high] Add per-market validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/daily/recommendation-policy.ts
+- [high] Restore guarded parlay-all-in coverage before atomics-only fallback (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/daily/e2e.ts
+- [medium] Create explicit low-odds-safe atomic profile (proposed) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts
+- [high] Tighten corners promotion on void-rate and settlement evidence (ready-for-implementation) — skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts
+- [medium] Add BTTS and totals-specific evidence throttles (proposed) — skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/prediction/gates.ts
+- [medium] Track fixture-level correlated loss clusters (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
+- [medium] Delay broad confidence retuning until multi-day calibration exists (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md

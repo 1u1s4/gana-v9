@@ -373,7 +373,7 @@ function coverageFixtureFromPipelineResults(
     const scoring = (result?.scoring ?? []).filter((item) => scoringMatchesFixture(item, fixture));
     const predictions = scoring.flatMap((item) => item.predictions);
     return [provider, {
-      runId: result?.runId ?? null,
+      runId: uniqueStrings(scoring.map((item) => item.runId).filter(Boolean)).join(',') || result?.runId || null,
       fixtureSelected: displayFixturesFromPipelineResult(result).some((item) => sameFixture(item, fixture)),
       predictionCount: predictions.length,
       promotableCount: predictions.filter((prediction) => prediction.status === 'promotable').length,
@@ -441,7 +441,7 @@ function buildRequiredLeagueAtomicProjectionDrafts(input: {
         const candidate: AtomicPredictionCandidate = {
           provider,
           model: prediction.model ?? providerModel,
-          runId: result.runId,
+          runId: scoring.runId ?? result.runId,
           prediction,
           fixture: requiredFixture.fixture,
           display,

@@ -10,6 +10,7 @@ import { countPublishableSelections, readCurrentRecommendationArtifact } from '.
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
 const ARTIFACT_ROOT = '.artifacts/gana-v9';
+const DEFAULT_DISCORD_MAX_SELECTIONS = 25;
 
 const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(1);
@@ -162,7 +163,7 @@ try {
       '--artifact', recommendationsPath,
       '--transport', 'discord-native',
       '--gateway-target', discordTargets.recommendations,
-      '--max', String(args.max ?? 3),
+      '--max', String(args.max ?? DEFAULT_DISCORD_MAX_SELECTIONS),
     ], {
       cwd: REPO_ROOT,
       env,

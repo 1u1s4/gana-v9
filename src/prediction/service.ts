@@ -351,7 +351,7 @@ export async function runFixtureScoring(
         research.evidenceItems,
         research.sources,
       ), evidenceGate, research.evidenceItems);
-      const canonicalOutput = canonicalizePicksFromOddsQuotes(repairedOutput, quoteById);
+      const canonicalOutput = canonicalizePicksFromOddsQuotes(repairedOutput, quoteById, promptOddsQuotes);
       const topPickIssues = validateTopPicks(canonicalOutput, quoteById, evidenceGate, research.claims, promptOddsQuotes, research.evidenceItems);
       if (topPickIssues.length) {
         scoringError = `Prediction LLM output failed validation: ${topPickIssues.join('; ')}`;
@@ -1047,13 +1047,17 @@ function uniqueStrings(values: string[]): string[] {
 function canonicalizePicksFromOddsQuotes(
   picks: ParsedTopPick[],
   quoteById: Map<string, OddsQuoteRecord>,
+  promptOddsQuotes: OddsQuoteRecord[] = [],
 ): ParsedTopPick[] {
   return picks.map((pick) => {
-    const quote = quoteById.get(pick.oddsQuoteId);
+    const originalOddsQuoteId = pick.oddsQuoteId;
+    const matchedQuote = quoteById.get(pick.oddsQuoteId) ?? unambiguousPromptQuoteMatch(pick, promptOddsQuotes);
+    const quote = matchedQuote;
     if (!quote) return pick;
     const canonicalLine = numberOrUndefined(quote.line);
     const canonicalOdds = numberValue(quote.price);
     const changes: string[] = [];
+    if (originalOddsQuoteId !== quote.id) changes.push(`oddsQuoteId ${originalOddsQuoteId}->${quote.id}`);
     if (pick.market !== quote.marketKey) changes.push(`market ${pick.market}->${quote.marketKey}`);
     if (pick.selection !== quote.selectionKey) changes.push(`selection ${pick.selection}->${quote.selectionKey}`);
     if (!sameOptionalNumber(pick.line, canonicalLine)) changes.push(`line ${pick.line ?? 'null'}->${canonicalLine ?? 'null'}`);
@@ -1061,6 +1065,7 @@ function canonicalizePicksFromOddsQuotes(
     if (!changes.length) return pick;
     return {
       ...pick,
+      oddsQuoteId: quote.id,
       market: quote.marketKey,
       selection: quote.selectionKey,
       line: canonicalLine,
@@ -1071,6 +1076,19 @@ function canonicalizePicksFromOddsQuotes(
       ]),
     };
   });
+}
+
+function unambiguousPromptQuoteMatch(
+  pick: ParsedTopPick,
+  promptOddsQuotes: OddsQuoteRecord[],
+): OddsQuoteRecord | undefined {
+  const matches = promptOddsQuotes.filter((quote) =>
+    pick.market === quote.marketKey
+    && pick.selection === quote.selectionKey
+    && sameOptionalNumber(pick.line, numberOrUndefined(quote.line))
+    && sameNumber(pick.odds, numberValue(quote.price)),
+  );
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 function validateTopPicks(

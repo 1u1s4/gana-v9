@@ -18,7 +18,7 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Transport: native Discord embeds via Hermes gateway config by default (`--transport discord-native`), plain Hermes gateway text with `--transport hermes-gateway`, or webhook with `--transport webhook`
 - Gateway target: the Gana Discord channel by default, or a specific target from Hermes such as `discord:#general`
 - Discord webhook: `DISCORD_WEBHOOK_URL` or `--webhook-url` only when using `--transport webhook`
-- Optional max selections: `--max N` defaults to 14. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs the compact selections into one native Discord message.
+- Optional max selections: `--max N` defaults to 25. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs the compact selections into one native Discord message.
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
 - Strategy review artifact: `strategy-review.json`, produced by `pnpm gana strategy-review`, for technical Harness change notifications.
@@ -118,8 +118,8 @@ Useful commands:
 
 ```bash
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --dry-run
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 3
-node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 14 --single-message
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 25
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json --max 25 --single-message
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --latest --transport discord-native
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --dry-run
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs --date YYYY-MM-DD --test-label "Esto es una prueba"

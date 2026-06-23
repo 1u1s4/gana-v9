@@ -99,7 +99,7 @@ Preview sin enviar:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --latest \
   --dry-run \
-  --max 3
+  --max 25
 ```
 
 Envio real con embeds nativos:
@@ -108,7 +108,7 @@ Envio real con embeds nativos:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --latest \
   --transport discord-native \
-  --max 3
+  --max 25
 ```
 
 Envio de un artifact especifico:
@@ -117,7 +117,7 @@ Envio de un artifact especifico:
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs \
   --artifact .artifacts/gana-v9/runs/daily-YYYY-MM-DD/daily-parlay-recommendations.json \
   --transport discord-native \
-  --max 3
+  --max 25
 ```
 
 ## Validaciones y estadisticas

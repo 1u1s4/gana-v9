@@ -957,9 +957,9 @@ describe('runFixtureScoring', () => {
             predictions: [{
               oddsQuoteId: attempts === 1 ? 'missing-quote' : 'odds-quote-1',
               market: 'h2h',
-              selection: 'home',
+              selection: attempts === 1 ? 'away' : 'home',
               line: null,
-              odds: 2.1,
+              odds: attempts === 1 ? 3.2 : 2.1,
               probability: 0.56,
               confidence: 0.75,
               evidenceIds: ['evidence-1'],
@@ -984,6 +984,52 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].oddsQuoteId, 'odds-quote-1');
   });
 
+  it('canonicalizes an unknown oddsQuoteId when the pick exactly matches one allowed quote', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    let persisted: any[] = [];
+
+    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+      now: () => now,
+      repositories: repositories(),
+      writeArtifact: () => '/tmp/predictions.json',
+      agentRunner: async () => {
+        attempts += 1;
+        return {
+          text: JSON.stringify({
+            predictions: [{
+              oddsQuoteId: 'hallucinated-quote-id',
+              market: 'h2h',
+              selection: 'home',
+              line: null,
+              odds: 2.1,
+              probability: 0.56,
+              confidence: 0.75,
+              evidenceIds: ['evidence-1'],
+              claimIds: ['claim-1'],
+              rationale: 'Home selection is supported by the supplied evidence.',
+              warnings: [],
+            }],
+          }),
+          usage: {},
+          output: '',
+        };
+      },
+      persistPredictions: async (records: any[]) => {
+        persisted = records;
+        return records;
+      },
+    });
+
+    assert.equal(attempts, 1);
+    assert.equal(result.ok, true);
+    assert.equal(result.gateResult.verdict, 'review-required');
+    assert.equal(result.predictions.length, 1);
+    assert.equal(persisted[0].oddsQuoteId, 'odds-quote-1');
+    assert.equal(persisted[0].warnings.some((warning: string) => warning.includes('oddsQuoteId hallucinated-quote-id->odds-quote-1')), true);
+  });
+
   it('blocks invalid LLM picks that reference quotes outside the persisted odds snapshot', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -998,9 +1044,9 @@ describe('runFixtureScoring', () => {
           predictions: [{
             oddsQuoteId: 'missing-quote',
             market: 'h2h',
-            selection: 'home',
+            selection: 'away',
             line: null,
-            odds: 2.1,
+            odds: 3.2,
             probability: 0.56,
             confidence: 0.75,
             evidenceIds: ['evidence-1'],

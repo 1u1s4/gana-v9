@@ -91,7 +91,7 @@ Variables utiles:
 - `GANA_PARLAY_PROFILE`: default `portfolio-v2`; genera `parlay-diamante`, `parlay-refinado`, `parlay-all-in`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`; la publicacion diaria prioriza `parlay-diamante`, `parlay-refinado` y `low-variance`.
 - `AGENT_CODEX_FALLBACK_MODELS`: default cron `gpt-5.4-mini`.
 - `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
-- `GANA_DISCORD_MAX_SELECTIONS`: default `3` para publicar los 3 enfoques diarios de parlays.
+- `GANA_DISCORD_MAX_SELECTIONS`: default `25` para publicar todas las recomendaciones diarias disponibles en el artifact normal; el notifier pagina mensajes nativos cuando hace falta.
 - `GANA_METRICS_PERSIST`: default `true`.
 - `GANA_STRATEGY_REVIEW_DATE`: fuerza fecha para strategy review diario.
 - `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-5.5`.

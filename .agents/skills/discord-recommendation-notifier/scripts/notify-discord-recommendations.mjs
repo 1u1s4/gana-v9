@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { resolveDiscordTarget } from './discord-targets.mjs';
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
-const DEFAULT_MAX_SELECTIONS = 14;
+const DEFAULT_MAX_SELECTIONS = 25;
 const DEFAULT_TRANSPORT = 'discord-native';
 const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin/python3';
 const DISCORD_FIELD_LIMIT = 1024;
@@ -1840,11 +1840,11 @@ function chunkLinesByLimit(lines, limit) {
 function usage() {
   return [
     'Usage:',
-    '  notify-discord-recommendations.mjs --artifact PATH [--max 14] [--single-message] [--gateway-target discord] [--dry-run]',
+    '  notify-discord-recommendations.mjs --artifact PATH [--max 25] [--single-message] [--gateway-target discord] [--dry-run]',
     '  notify-discord-recommendations.mjs --artifact PATH --transport discord-native --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --artifact PATH --transport hermes-gateway --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --latest [--artifact-root .artifacts/gana-v9/runs] [--dry-run]',
-    '  notify-discord-recommendations.mjs --artifact PATH --transport webhook [--max 14]',
+    '  notify-discord-recommendations.mjs --artifact PATH --transport webhook [--max 25]',
     '',
     'Environment:',
     '  HERMES_GATEWAY_PYTHON may override the Python used for Hermes gateway delivery.',
