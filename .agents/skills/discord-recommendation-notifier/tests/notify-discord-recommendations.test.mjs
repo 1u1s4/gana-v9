@@ -158,6 +158,38 @@ describe('discord recommendation notifier', () => {
     assert.match(message, /🌍 Obligatorio World Cup: 🟡 review-required · 1\/2 fixtures/);
   });
 
+  it('adds a compact council summary with daily and required-league highlights to the final block', () => {
+    const artifact = {
+      ...sampleArtifactWithRequiredLeague(),
+      council: {
+        status: 'review-required',
+        approvedCount: 1,
+        reviewCount: 1,
+        rejectedCount: 1,
+        reviews: [
+          { decision: 'approve' },
+          { decision: 'review' },
+          { decision: 'reject' },
+        ],
+      },
+    };
+
+    const payload = buildDiscordPayload(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+    const closing = payload.embeds.at(-1)?.description ?? '';
+
+    assert.match(closing, /🧠 Council · Resumen final/);
+    assert.match(closing, /Estado: requiere revisión manual · publicar\/revisar 2 · bloquear 1/);
+    assert.match(closing, /🎛️ Diario clave: ⚖️ balanced @ 2\.1 \(74%\)/);
+    assert.match(closing, /🌍 World Cup: 1 predicción obligatoria · 1\/3 parlays/);
+    assert.match(closing, /⭐ Fuertes: Canada vs Bosnia & Herzegovina 1\/1 · USA vs Paraguay 0\/0/);
+    assert.match(closing, /📌 Obligatorias: Canada vs Bosnia & Herzegovina: Canada gana @ 1\.87 \(63%\)/);
+    assert.match(closing, /🎫 Parlays obligatorios: 💎 principal @ 1\.22 \(63%\)/);
+    assert.match(closing, /🛡️ Revisión manual requerida antes de promoción/);
+    assert.match(message, /🧠 Council · Resumen final/);
+    assert.match(message, /📌 Obligatorias: Canada vs Bosnia & Herzegovina: Canada gana @ 1\.87 \(63%\)/);
+  });
+
   it('prints every required parlay leg up to the native compact limit', () => {
     const artifact = sampleArtifactWithRequiredLeague();
     const principal = artifact.requiredLeagueRecommendations.parlayProjections[0];

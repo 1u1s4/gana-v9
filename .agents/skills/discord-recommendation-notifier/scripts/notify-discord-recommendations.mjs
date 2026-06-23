@@ -147,7 +147,7 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
 
   embeds.push(...requiredLeagueDiscordEmbeds(artifact));
   embeds.push({
-    description: '🛡️ Revisión manual requerida antes de promoción.',
+    description: formatClosingDescription(artifact),
     color: 0x56ccf2,
   });
 
@@ -195,7 +195,7 @@ function buildDiscordPayloadPage(recommendations, options = {}) {
 
   if (includeClosing) {
     embeds.push({
-      description: '🛡️ Revisión manual requerida antes de promoción.',
+      description: formatClosingDescription(options.artifact),
       color: 0x56ccf2,
     });
   }
@@ -222,6 +222,112 @@ function formatHeaderDescription(artifact, dailyCounts, artifactDate) {
   if (date) lines.push(date);
   lines.push(...formatParlayApproachLines(artifact?.parlayApproaches, required ? '🎛️ Enfoques diarios' : '🎛️ Enfoques'));
   return lines.filter(Boolean).join('\n');
+}
+
+function formatClosingDescription(artifact) {
+  const councilLines = formatCouncilSummaryLines(artifact);
+  if (!councilLines.length) return '🛡️ Revisión manual requerida antes de promoción.';
+  return truncate([
+    ...councilLines,
+    '',
+    '🛡️ Revisión manual requerida antes de promoción.',
+  ].join('\n'), DISCORD_DESCRIPTION_LIMIT);
+}
+
+function formatCouncilSummaryLines(artifact) {
+  const council = recordOrEmpty(artifact?.council);
+  const reviews = Array.isArray(council.reviews) ? council.reviews : [];
+  if (!Object.keys(council).length && !reviews.length) return [];
+
+  const approved = finiteOrDerived(council.approvedCount ?? council.approved, reviews.filter((review) => review?.decision === 'approve').length);
+  const reviewRequired = finiteOrDerived(council.reviewCount ?? council.reviewRequired, reviews.filter((review) => review?.decision === 'review').length);
+  const rejected = finiteOrDerived(council.rejectedCount ?? council.rejected, reviews.filter((review) => review?.decision === 'reject').length);
+  const kept = approved + reviewRequired;
+  const lines = [
+    '🧠 Council · Resumen final',
+    `✅ Estado: ${friendlyCouncilStatus(council.status)} · publicar/revisar ${kept} · bloquear ${rejected}`,
+  ];
+
+  const dailyFocus = formatCouncilDailyFocusLine(artifact);
+  if (dailyFocus) lines.push(dailyFocus);
+  lines.push(...formatCouncilRequiredLeagueSummaryLines(artifact));
+  return lines;
+}
+
+function formatCouncilDailyFocusLine(artifact) {
+  const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact));
+  const focus = recommendations.filter((recommendation) => recommendationKind(recommendation) === 'parlay').slice(0, 3);
+  const fallback = focus.length ? focus : recommendations.slice(0, 3);
+  if (!fallback.length) return '';
+  return truncate(`🎛️ Diario clave: ${fallback.map(formatCouncilRecommendationChip).join(' · ')}`, 900);
+}
+
+function formatCouncilRecommendationChip(recommendation) {
+  const confidence = recommendationMetricConfidence(recommendation);
+  const confidencePart = Number.isFinite(confidence) ? ` (${formatPercent(confidence)})` : '';
+  const oddsPart = Number.isFinite(recommendation?.combinedOdds) ? ` @ ${formatMetricNumber(recommendation.combinedOdds, 2)}` : '';
+  if (recommendationKind(recommendation) === 'atomic-prediction') {
+    const leg = Array.isArray(recommendation?.legs) ? recommendation.legs[0] : undefined;
+    return `${recommendationTypePrefix(recommendation)}${displayFixtureNameWithOptions(leg ?? {}, { includeKickoff: false })}${oddsPart}${confidencePart}`;
+  }
+  const profile = stringOrFallback(recommendation?.profile, 'parlay');
+  return `${parlayProfileEmoji(profile)} ${profile}${oddsPart}${confidencePart}`;
+}
+
+function formatCouncilRequiredLeagueSummaryLines(artifact) {
+  const data = requiredLeagueData(artifact);
+  if (!data) return [];
+  const title = requiredLeagueTitle(data);
+  const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
+  const parlays = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  const selectedParlays = parlays.filter((projection) => projection?.status === 'selected');
+  const lines = [
+    `🌍 ${title}: ${atomic.length} ${atomic.length === 1 ? 'predicción obligatoria' : 'predicciones obligatorias'} · ${selectedParlays.length}/${parlays.length} parlays`,
+  ];
+
+  const strongProjectionLine = formatCouncilStrongProjectionLine(data);
+  if (strongProjectionLine) lines.push(strongProjectionLine);
+
+  const atomicLine = formatCouncilRequiredAtomicLine(atomic);
+  if (atomicLine) lines.push(atomicLine);
+
+  const parlayLine = formatCouncilRequiredParlayLine(selectedParlays);
+  if (parlayLine) lines.push(parlayLine);
+  return lines;
+}
+
+function formatCouncilStrongProjectionLine(data) {
+  const fixtures = Array.isArray(data?.coverage?.fixtures) ? data.coverage.fixtures : [];
+  const items = fixtures.slice(0, 4).map((fixture) => {
+    const promotable = Number.isFinite(fixture?.promotableCount) ? fixture.promotableCount : 0;
+    const predictions = Number.isFinite(fixture?.predictionCount) ? fixture.predictionCount : 0;
+    return `${requiredLeagueFixtureLabel(fixture)} ${promotable}/${predictions}`;
+  });
+  return items.length ? truncate(`⭐ Fuertes: ${items.join(' · ')}`, 900) : '';
+}
+
+function formatCouncilRequiredAtomicLine(atomic) {
+  const items = atomic.slice(0, 4).map((projection) => {
+    const confidence = Number.isFinite(projection?.confidence) ? ` (${formatPercent(projection.confidence)})` : '';
+    return `${requiredLeagueFixtureLabel(projection)}: ${formatRequiredPick(projection)} @ ${formatMetricNumber(projection?.odds, 2)}${confidence}`;
+  });
+  return items.length ? truncate(`📌 Obligatorias: ${items.join(' · ')}`, 1100) : '';
+}
+
+function formatCouncilRequiredParlayLine(parlays) {
+  const items = parlays.slice(0, 6).map((projection) => {
+    const profile = stringOrFallback(projection?.profile, 'parlay');
+    const odds = Number.isFinite(projection?.combinedOdds) ? ` @ ${formatMetricNumber(projection.combinedOdds, 2)}` : '';
+    const confidence = Number.isFinite(projection?.aggregateConfidence) ? ` (${formatPercent(projection.aggregateConfidence)})` : '';
+    return `${parlayProfileEmoji(profile)} ${profile}${odds}${confidence}`;
+  });
+  return items.length ? truncate(`🎫 Parlays obligatorios: ${items.join(' · ')}`, 900) : '';
+}
+
+function friendlyCouncilStatus(status) {
+  if (status === 'approved') return 'aprobado';
+  if (status === 'blocked') return 'bloqueado';
+  return 'requiere revisión manual';
 }
 
 function formatGatewayHeaderLines(artifact, dailyCounts) {
@@ -272,6 +378,8 @@ export function buildGatewayMessage(artifact, options = {}) {
     if (requiredDetails.length) lines.push(...requiredDetails);
   }
 
+  const councilSummary = formatCouncilSummaryLines(artifact);
+  if (councilSummary.length) lines.push(...councilSummary, '');
   lines.push('━━━━━━━━━━━━━━━━━━', '', '🛡️ Revisión manual requerida antes de promoción.');
   return lines.join('\n');
 }
@@ -1717,8 +1825,17 @@ function numberOrFallback(value, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function finiteOrDerived(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 function stringOrFallback(value, fallback) {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function recordOrEmpty(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
 function uniqueStrings(values) {

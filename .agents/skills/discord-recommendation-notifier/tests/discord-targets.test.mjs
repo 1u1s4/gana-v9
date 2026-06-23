@@ -78,15 +78,12 @@ describe('discord target routing', () => {
     const targets = resolveDiscordTargets({
       gatewayTarget: 'discord:fallback',
       env: {
-        GANA_DISCORD_COUNCIL_TARGET: 'discord:council',
-        GANA_DISCORD_FEEDBACK_TARGET: 'discord:feedback',
+        GANA_DISCORD_RECOMMENDATIONS_TARGET: 'discord:recommendations',
       },
     });
 
-    assert.equal(targets.recommendations, 'discord:fallback');
-    assert.equal(targets.council, 'discord:council');
+    assert.equal(targets.recommendations, 'discord:recommendations');
     assert.equal(targets.validation, 'discord:fallback');
-    assert.equal(targets.feedback, 'discord:feedback');
     assert.equal(targets.strategy, 'discord:fallback');
     assert.equal(targets.alerts, 'discord:fallback');
   });

@@ -175,21 +175,6 @@ try {
     if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
     sentRecommendations = true;
     const recommendationNotify = parseJsonObject(notify.stdout);
-    const councilNotify = spawnSync('node', [
-      'scripts/gana-council-review-notify.mjs',
-      '--artifact', recommendationsPath,
-      '--transport', 'discord-native',
-      '--gateway-target', discordTargets.council,
-    ], {
-      cwd: REPO_ROOT,
-      env,
-      encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    writeLogLine(logFd, councilNotify.stdout.trim());
-    if (councilNotify.stderr.trim()) writeLogLine(logFd, councilNotify.stderr.trim());
-    if (councilNotify.status !== 0) throw new Error(`council notification failed with exit ${councilNotify.status}`);
-    const councilNotifyResult = parseJsonObject(councilNotify.stdout);
     emitCronRichSummary({
       title: 'Gana v9 · Daily E2E publicado',
       status: 'ok',
@@ -202,9 +187,6 @@ try {
         `Run: exit ${result.status ?? 'unknown'} · ${durationBetween(startedAt, completedAt)}`,
         recommendationNotify?.discordResult?.message_id || recommendationNotify?.discordResults?.length
           ? `Discord recomendaciones: ${recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')}`
-          : undefined,
-        councilNotifyResult?.discordResult?.message_id
-          ? `Discord council: ${councilNotifyResult.discordResult.message_id}`
           : undefined,
         `Recommendations: ${compactPath(recommendationsPath)}`,
         `Log: ${compactPath(logPath)}`,
@@ -238,7 +220,6 @@ try {
       counts: publishableCounts,
       notifications: {
         recommendations: recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean),
-        council: councilNotifyResult?.discordResult?.message_id,
       },
       artifacts: [
         { label: 'recommendations', path: recommendationsPath },

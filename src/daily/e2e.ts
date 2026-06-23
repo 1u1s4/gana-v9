@@ -827,7 +827,6 @@ export async function runDailyE2E(
         reviewAt: council.policy.reviewAt,
         keepDecisions: council.policy.keepDecisions,
         qualityGate: council.policy.qualityGate,
-        feedbackLoopArtifact: council.feedbackLoop.outcomeArtifact,
       },
       requiredLeagueAddendum: {
         enabled: true,

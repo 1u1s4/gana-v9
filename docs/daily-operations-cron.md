@@ -24,7 +24,6 @@ Este script:
 3. Ejecuta `pnpm gana validate --date YYYY-MM-DD --recommendation-artifact PATH`.
 4. Ejecuta `pnpm gana metrics daily --date YYYY-MM-DD --scope daily-YYYY-MM-DD --recommendation-artifact PATH`.
 5. Envia `daily-metrics.json` y el mirror validado al canal de validaciones con embeds nativos usando Hermes gateway.
-6. Genera `council-feedback.json` y lo envia al canal de feedback para retroalimentar el gate del siguiente ciclo.
 
 Daily E2E y recomendaciones del dia:
 
@@ -43,7 +42,7 @@ Este script:
 7. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
 8. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
 9. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
-10. Envia `daily-parlay-recommendations.json` al canal de recomendaciones y el resumen accionable del council al canal de council con embeds nativos usando Hermes gateway.
+10. Envia `daily-parlay-recommendations.json` al canal de recomendaciones en el formato canonico de embeds nativos y deja el resumen accionable del council al final.
 
 Strategy review del dia anterior:
 
@@ -69,9 +68,7 @@ Variables utiles:
 
 - `GANA_DISCORD_TARGET`: target Discord global. Default final: `discord:1494071165453467721`.
 - `GANA_DISCORD_RECOMMENDATIONS_TARGET`: canal para recomendaciones diarias.
-- `GANA_DISCORD_COUNCIL_TARGET`: canal para decision/resumen del council.
 - `GANA_DISCORD_VALIDATION_TARGET`: canal para validaciones y mirror validado.
-- `GANA_DISCORD_FEEDBACK_TARGET`: canal para feedback post-validacion del council.
 - `GANA_DISCORD_STRATEGY_TARGET`: canal para strategy review tecnico.
 - `GANA_DISCORD_ALERTS_TARGET`: canal para fallos/alertas operativas.
 - Precedencia de targets: variable especifica del flujo, luego `--gateway-target`, luego `GANA_DISCORD_TARGET`, luego el canal historico.

@@ -14,7 +14,6 @@ Do not use it for one-off fixture research or scoring unless the user is trying 
 - Cron guide: `docs/daily-operations-cron.md`
 - Daily wrapper: `scripts/gana-daily-e2e-and-notify.mjs`
 - Shell wrapper: `scripts/gana-daily-e2e-notify.sh`
-- Council notifier: `scripts/gana-council-review-notify.mjs`
 - Discord skill/scripts: `.agents/skills/discord-recommendation-notifier/`
 - Artifacts root: `.artifacts/gana-v9/runs`
 - Logs: `.artifacts/gana-v9/cron/cron-daily-e2e.log`
@@ -27,7 +26,7 @@ Do not use it for one-off fixture research or scoring unless the user is trying 
 - Clean only artifacts and locks for the exact bad `daily-YYYY-MM-DD...` batch being replaced. Do not delete other dates or unrelated runs.
 - Long provider phases can be normal. Check processes, task files, and artifact timestamps before declaring a run stuck.
 - A run can be `review-required` and still have useful recommendations. Verify the JSON artifact, not just the CLI summary line.
-- Before resending to Discord, always dry-run the recommendation and council notifiers and scan for `Fixture ...` placeholders or UUID-looking team labels.
+- Before resending to Discord, always dry-run the recommendation notifier and scan for `Fixture ...` placeholders or UUID-looking team labels. Council highlights are included in that recommendation payload when the artifact has `council`.
 
 ## Triage Checklist
 
@@ -80,9 +79,7 @@ Before calling the work done:
 pnpm typecheck
 pnpm test
 node --check scripts/gana-daily-e2e-and-notify.mjs
-node --check scripts/gana-council-review-notify.mjs
 node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact PATH --dry-run
-node scripts/gana-council-review-notify.mjs --artifact PATH --dry-run
 ```
 
 Use focused tests when the change is narrow, then run the full suite if cron/notifier/shared recommendation behavior changed.
@@ -92,7 +89,7 @@ Verify the final recommendation artifact:
 - `summary.counts.recommendations` matches parlays plus atomic predictions.
 - `daily-parlay-recommendations.json` has non-empty selections when the user expects a publishable or reviewable output.
 - No visible fixture label is a raw UUID or `Fixture abc...` when metadata exists.
-- Discord sends return message IDs for recommendations and council when delivery is requested.
+- Discord sends return message IDs for recommendations when delivery is requested.
 
 ## Final Report Shape
 

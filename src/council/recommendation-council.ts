@@ -80,11 +80,6 @@ export interface RecommendationCouncilResult {
   reviewCount: number;
   rejectedCount: number;
   reviews: CouncilRecommendationReview[];
-  feedbackLoop: {
-    validationTarget: 'published-recommendations-only';
-    outcomeArtifact: 'council-feedback.json';
-    learningSignals: string[];
-  };
 }
 
 const PANEL = ['feynman', 'kahneman', 'taleb', 'meadows', 'torvalds'] as const;
@@ -152,17 +147,6 @@ export function runRecommendationCouncil(input: RecommendationCouncilInput): Rec
     reviewCount,
     rejectedCount,
     reviews,
-    feedbackLoop: {
-      validationTarget: 'published-recommendations-only',
-      outcomeArtifact: 'council-feedback.json',
-      learningSignals: [
-        'settled outcome by council score bucket',
-        'low-odds hit rate',
-        'women/youth fixture hit rate',
-        'rejected-risk false negatives',
-        'review-required promotion misses',
-      ],
-    },
   };
 }
 

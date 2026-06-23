@@ -14,15 +14,14 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Daily recommendations artifact: `daily-parlay-recommendations.json`
 - Recommendation types: ranked parlays plus `atomic-prediction` entries, which are high-confidence single-selection recommendations shaped like one-leg parlays.
 - Council review artifact: `recommendation-council.json`, embedded into the final recommendations artifact as `council`.
-- Council feedback artifact: `council-feedback.json`, generated after validation from the published recommendations and validation artifacts.
 - Transport: native Discord embeds via Hermes gateway config by default (`--transport discord-native`), plain Hermes gateway text with `--transport hermes-gateway`, or webhook with `--transport webhook`
 - Gateway target: the Gana Discord channel by default, or a specific target from Hermes such as `discord:#general`
 - Discord webhook: `DISCORD_WEBHOOK_URL` or `--webhook-url` only when using `--transport webhook`
-- Optional max selections: `--max N` defaults to 25. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs the compact selections into one native Discord message.
+- Optional max selections: `--max N` defaults to 25. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs compact selections into one native Discord message.
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
 - Strategy review artifact: `strategy-review.json`, produced by `pnpm gana strategy-review`, for technical Harness change notifications.
-- Optional channel routing by flow: `GANA_DISCORD_RECOMMENDATIONS_TARGET`, `GANA_DISCORD_COUNCIL_TARGET`, `GANA_DISCORD_VALIDATION_TARGET`, `GANA_DISCORD_FEEDBACK_TARGET`, `GANA_DISCORD_STRATEGY_TARGET`, and `GANA_DISCORD_ALERTS_TARGET`. Each falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, then the default Gana channel.
+- Optional channel routing by flow: `GANA_DISCORD_RECOMMENDATIONS_TARGET`, `GANA_DISCORD_VALIDATION_TARGET`, `GANA_DISCORD_STRATEGY_TARGET`, and `GANA_DISCORD_ALERTS_TARGET`. Each falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, then the default Gana channel.
 
 ## Workflow
 
@@ -94,7 +93,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 - Do not include payment links, bookmaker instructions, auto-execution language, or monetary execution claims.
 - Validation stat notifications must use native embeds, but keep the aggregate summary sober: no repeated chart/shield sections, one concise metrics box, and plain labels such as `ganadas`, `perdidas`, `pendientes`, and `sin validar`.
 - Validation notifications should include the recommendation-style mirror unless `--no-recommendation-mirror` is explicitly provided. The mirror should show each sent selection with validation overlays and `Real:` result lines. Include required-league addendum sections when present, and split native Discord mirror payloads if the added embeds exceed Discord's per-message embed limit. Use `--test-label "Esto es una prueba"` for retrospective/test sends so Discord clearly marks them.
-- Council notifications must be decision-useful and easy to read: show a short summary, picks to publish/review, and picks to block with a brief Spanish reason. A bare list of scores is not acceptable.
+- When the artifact includes `council`, the final recommendation control embed must include a compact `🧠 Council · Resumen final` section: status/counts, daily highlights, required-league strong projection counts, required predictions with confidence, and selected required parlays. Do not send a separate council Discord message.
 
 ## Style Persistence
 
@@ -108,8 +107,8 @@ Use `scripts/notify-discord-daily-stats.mjs` for validation/day-after statistics
 
 Repo-level cron wrappers:
 
-- `scripts/gana-daily-e2e-and-notify.mjs`: runs full daily E2E for tomorrow's Guatemala date, applies the recommendation council gate, sends recommendations, and sends the council result.
-- `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date scoped to the published recommendations artifact, builds daily metrics scoped to those same published targets, sends stats, and sends council feedback.
+- `scripts/gana-daily-e2e-and-notify.mjs`: runs full daily E2E for tomorrow's Guatemala date, applies the recommendation council gate, and sends recommendations with the council summary included in the final control embed.
+- `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date scoped to the published recommendations artifact, builds daily metrics scoped to those same published targets, and sends stats.
 - `scripts/install-gana-hermes-cron.sh`: installs Hermes cron jobs at 7am/10am America/Guatemala.
 - `scripts/install-gana-cron.mjs`: installs a system crontab fallback at 7am/10am America/Guatemala.
 - `.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs`: centralizes flow-specific Discord target resolution for notifiers and repo-level cron wrappers.

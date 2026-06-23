@@ -81,25 +81,6 @@ try {
     if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
     if (notify.status !== 0) throw new Error(`validation notification failed with exit ${notify.status}`);
     const notifyResult = parseJsonObject(notify.stdout);
-    let feedbackResult;
-    if (recommendationArtifact && validationsArtifact) {
-      const feedback = spawnSync('node', [
-        'scripts/gana-council-feedback.mjs',
-        '--recommendation-artifact', recommendationArtifact,
-        '--validation-artifact', validationsArtifact,
-        '--transport', 'discord-native',
-        '--gateway-target', discordTargets.feedback,
-      ], {
-        cwd: REPO_ROOT,
-        env,
-        encoding: 'utf8',
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      writeLogLine(logFd, feedback.stdout.trim());
-      if (feedback.stderr.trim()) writeLogLine(logFd, feedback.stderr.trim());
-      if (feedback.status !== 0) throw new Error(`council feedback failed with exit ${feedback.status}`);
-      feedbackResult = parseJsonObject(feedback.stdout);
-    }
     emitCronRichSummary({
       title: 'Gana v9 · Validación publicada',
       status: validation.status === 0 ? 'ok' : 'review',
@@ -110,9 +91,6 @@ try {
         `Metrics exit: ${metrics.status ?? 'unknown'}`,
         notifyResult?.discordResult?.message_id || notifyResult?.message_id
           ? `Discord stats: ${notifyResult?.discordResult?.message_id ?? notifyResult?.message_id}`
-          : undefined,
-        feedbackResult?.discordResult?.message_id
-          ? `Discord feedback: ${feedbackResult.discordResult.message_id}`
           : undefined,
         recommendationArtifact ? `Recommendations: ${compactPath(recommendationArtifact)}` : undefined,
         validationsArtifact ? `Validations: ${compactPath(validationsArtifact)}` : undefined,
@@ -134,7 +112,6 @@ try {
       artifacts: [recommendationArtifact, validationsArtifact, metricsArtifact, logPath].filter(Boolean),
       notifications: {
         stats: notifyResult?.discordResult?.message_id ?? notifyResult?.message_id,
-        feedback: feedbackResult?.discordResult?.message_id,
       },
     });
     process.exitCode = validation.status === 0 ? 0 : validation.status ?? 1;
@@ -299,7 +276,6 @@ function buildValidationSkipBullets({ message, lock, lockPath }) {
     Number.isFinite(lock?.validationExit) ? `Validate exit: ${lock.validationExit}` : undefined,
     Number.isFinite(lock?.metricsExit) ? `Metrics exit: ${lock.metricsExit}` : undefined,
     lock?.notifications?.stats ? `Discord stats: ${lock.notifications.stats}` : undefined,
-    lock?.notifications?.feedback ? `Discord feedback: ${lock.notifications.feedback}` : undefined,
     `Path: ${compactPath(lockPath)}`,
   ].filter(Boolean);
 }
