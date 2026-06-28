@@ -43,7 +43,7 @@ import {
   selectLowOddsHitFixtures,
   uniqueFixtureCount,
 } from './low-odds.js';
-import { claimNextPersistedTask } from './dispatcher.js';
+import { claimNextPersistedTask, type PersistedQueueTask } from './dispatcher.js';
 import { completeTaskLease, failTaskLease, renewTaskLease } from './worker.js';
 import { enqueuePersistedRunTasks, scheduleRunTasks, type CanonicalTaskType, type DurableTask } from './scheduler.js';
 
@@ -989,26 +989,34 @@ async function initializeDurableTasks(
   const taskPath = pipelineTaskPath(config, runId);
   const existing = readJsonIfExists(taskPath);
   const existingTasks = Array.isArray(existing) ? existing as DurableTask[] : [];
-  const tasks = scheduleRunTasks(runId, input, existingTasks);
-  const knownIds = new Set(existingTasks.map((task) => task.taskId));
-  for (const task of tasks) {
-    if (knownIds.has(task.taskId)) continue;
-    const record = await repositories.harnessTasks?.enqueue?.({
-      type: task.type,
-      status: task.status,
-      priority: task.priority,
-      runId,
-      attempts: task.attempts,
-      maxAttempts: task.maxAttempts,
-      payload: toJsonValue({
-        taskId: task.taskId,
-        idempotencyKey: task.idempotencyKey,
-        inputHash: task.inputHash,
-      }),
-    }).catch(() => null);
-    const id = record && typeof record === 'object' && 'id' in record ? String((record as { id: unknown }).id) : task.taskId;
-    task.taskId = id;
+  const enqueue = repositories.harnessTasks?.enqueue;
+  if (enqueue) {
+    const persisted = await enqueuePersistedRunTasks({
+      async enqueue(input) {
+        const record = await enqueue({
+          type: input.type,
+          status: input.status,
+          priority: input.priority,
+          runId: input.runId,
+          scheduledFor: input.scheduledFor,
+          leaseExpiresAt: input.leaseExpiresAt,
+          attempts: input.attempts,
+          maxAttempts: input.maxAttempts,
+          payload: input.payload as JsonValue | undefined,
+          lastErrorRedacted: input.lastErrorRedacted,
+        });
+        if (record && typeof record === 'object' && 'id' in record) {
+          return { id: String((record as { id: unknown }).id) };
+        }
+        throw new Error('persisted harness task enqueue did not return an id');
+      },
+    }, runId, input, existingTasks.map((task) => task.type));
+    const tasks = [...existingTasks, ...persisted];
+    writeDurableTasks(config, runId, tasks);
+    return tasks;
   }
+
+  const tasks = scheduleRunTasks(runId, input, existingTasks);
   writeDurableTasks(config, runId, tasks);
   return tasks;
 }
@@ -1034,18 +1042,42 @@ function createPipelineTaskRunner(
     }
 
     const previousTaskId = runtime.taskId;
+    const leaseExpiresAt = new Date(Date.now() + 15 * 60_000);
+    const listRunnable = repositories.harnessTasks?.listRunnable;
+    const updatePersistedStatus = repositories.harnessTasks?.updateStatus;
+    const leaseStore = updatePersistedStatus ? { updateStatus: updatePersistedStatus } : undefined;
+    const persistedQueue = listRunnable && updatePersistedStatus
+      ? {
+          listRunnable,
+          async updateStatus(id: string, update: Parameters<typeof updatePersistedStatus>[1]): Promise<PersistedQueueTask> {
+            const record = await updatePersistedStatus(id, update);
+            if (record && typeof record === 'object' && 'id' in record && 'type' in record && 'attempts' in record) {
+              return record as PersistedQueueTask;
+            }
+            throw new Error('persisted harness task status update did not return a queue task');
+          },
+        }
+      : undefined;
+    if (persistedQueue) {
+      const claimed = await claimNextPersistedTask(persistedQueue, new Date(), 15 * 60_000);
+      if (!claimed) throw new Error(`no persisted queued task available for ${type}`);
+      if (claimed.id !== task.taskId || claimed.type !== type) {
+        throw new Error(`dispatcher claimed ${claimed.type}:${claimed.id} while worker expected ${type}:${task.taskId}`);
+      }
+      task.status = 'running';
+      task.attempts = claimed.attempts;
+      task.leaseExpiresAt = claimed.leaseExpiresAt?.toISOString() ?? leaseExpiresAt.toISOString();
+    } else {
+      task.status = 'running';
+      task.attempts += 1;
+      task.leaseExpiresAt = leaseExpiresAt.toISOString();
+    }
     runtime.taskId = task.taskId;
-    task.status = 'running';
-    task.attempts += 1;
-    task.leaseExpiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
     task.lastErrorRedacted = undefined;
     writeDurableTasks(config, runId, tasks);
-    await repositories.harnessTasks?.updateStatus?.(task.taskId, {
-      status: 'running',
-      attempts: task.attempts,
-      leaseExpiresAt: new Date(task.leaseExpiresAt),
-      lastErrorRedacted: null,
-    }).catch(() => undefined);
+    if (!persistedQueue && leaseStore) {
+      await renewTaskLease(leaseStore, task.taskId, leaseExpiresAt, 0).catch(() => undefined);
+    }
 
     try {
       const output = await handler();
@@ -1054,12 +1086,9 @@ function createPipelineTaskRunner(
       task.gateResult = { verdict: 'promotable' };
       task.outputArtifactId = checkpointPath;
       writeDurableTasks(config, runId, tasks);
-      await repositories.harnessTasks?.updateStatus?.(task.taskId, {
-        status: 'succeeded',
-        leaseExpiresAt: null,
-        attempts: task.attempts,
-        lastErrorRedacted: null,
-      }).catch(() => undefined);
+      await (leaseStore
+        ? completeTaskLease(leaseStore, task.taskId, task.attempts)
+        : Promise.resolve()).catch(() => undefined);
       return output;
     } catch (err) {
       const message = errorMessage(err);
@@ -1069,12 +1098,9 @@ function createPipelineTaskRunner(
       task.gateResult = { verdict: 'blocked', reason: message };
       writeArtifact(config, runId, `${type}-failed.json`, { runId, taskId: task.taskId, type, error: message });
       writeDurableTasks(config, runId, tasks);
-      await repositories.harnessTasks?.updateStatus?.(task.taskId, {
-        status: task.status === 'queued' ? 'queued' : 'failed',
-        leaseExpiresAt: null,
-        attempts: task.attempts,
-        lastErrorRedacted: message,
-      }).catch(() => undefined);
+      await (leaseStore
+        ? failTaskLease(leaseStore, { id: task.taskId, attempts: task.attempts, maxAttempts: task.maxAttempts }, message)
+        : Promise.resolve()).catch(() => undefined);
       throw err;
     } finally {
       runtime.taskId = previousTaskId;
