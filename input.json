@@ -83,8 +83,8 @@
         "The fixture is in the future. All analysis is based on historical head-to-head data and may not reflect future performance."
       ]
     },
-    "providerAgentic": "gemini",
-    "model": "gemini-2.5-pro",
+    "providerAgentic": "codex",
+    "model": "gpt-5.5",
     "promptVersion": "research-fixture-v2",
     "warnings": [
       "market corners_over_under skipped/review-required: missing odds quotes for requested market",
@@ -131,7 +131,7 @@
       ],
       "webSearchCoverage": {
         "mode": "live",
-        "provider": "gemini",
+        "provider": "codex",
         "nativeSupported": true,
         "nativeToolUsed": true,
         "browserFallbackUsed": false,

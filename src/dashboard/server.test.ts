@@ -184,28 +184,26 @@ const DAILY_METRIC = {
 const DAILY_RUN = {
   ...RUN,
   id: 'daily-2026-05-01',
-  providerAgentic: 'codex,gemini',
-  model: 'gpt-5.5,gemini-2.5-pro',
+  providerAgentic: 'codex',
+  model: 'gpt-5.5',
   metadata: {
     dailyBatchId: 'daily-2026-05-01',
     dailyRole: 'batch',
     date: '2026-05-01',
-    providers: [{ provider: 'codex', ok: true }, { provider: 'gemini', ok: true }],
-    parlays: [{ family: 'codex-only', ok: true }, { family: 'consensus-mixed', ok: true }],
+    providers: [{ provider: 'codex', ok: true }],
+    parlays: [{ family: 'codex-only', ok: true }],
     providerComparison: {
       summary: {
         sameSelection: 2,
         sameMarketDifferentSelection: 1,
         onlyCodex: 1,
-        onlyGemini: 0,
         agreementRate: 0.6667,
       },
     },
-    providerConsensus: { consensusPredictions: 2, providers: ['codex', 'gemini'] },
+    providerConsensus: { consensusPredictions: 2, providers: ['codex'] },
     counts: {
       parlayFamilies: {
         'codex-only': { persistedParlays: 1 },
-        'consensus-mixed': { persistedParlays: 1 },
       },
       recommendations: 1,
     },

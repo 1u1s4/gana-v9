@@ -149,7 +149,7 @@ describe('discord recommendation notifier', () => {
     assert.match(requiredEmbed.description, /📌 1 predicción obligatoria · 🎛️ 1\/3 parlays seleccionados/);
     assert.match(predictionEmbed.description, /✅ Canada vs Bosnia & Herzegovina/);
     assert.match(predictionEmbed.description, /Canada gana @ 1.87/);
-    assert.doesNotMatch(predictionEmbed.description, /Edge|codex|gemini/);
+    assert.doesNotMatch(predictionEmbed.description, /Edge|codex|secondary/);
     assert.doesNotMatch(principalEmbed.description, /✅ 💎 principal · 1 selección/);
     assert.match(principalEmbed.description, /⚽ Canada vs Bosnia & Herzegovina: Canada gana @ 1.87/);
     assert.match(principalEmbed.description, /📊 Odds 1.22 · 🍀 Conf 63%/);
@@ -236,7 +236,7 @@ describe('discord recommendation notifier', () => {
         odds: 1.87,
         confidence: 0.7,
         expectedEdge: 0.06,
-        provider: 'gemini',
+        provider: 'secondary',
         status: 'promotable',
       },
       {
@@ -271,7 +271,7 @@ describe('discord recommendation notifier', () => {
         odds: 2.4,
         confidence: 0.55,
         expectedEdge: 0.02,
-        provider: 'gemini',
+        provider: 'secondary',
         status: 'review-required',
       },
       {
@@ -327,7 +327,7 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(generalEmbed.description, /Doble oportunidad:/);
     assert.doesNotMatch(generalEmbed.description, /Conf 63-70%/);
     assert.doesNotMatch(generalEmbed.description, /Edge/);
-    assert.doesNotMatch(generalEmbed.description, /codex|gemini/);
+    assert.doesNotMatch(generalEmbed.description, /codex|secondary/);
     assert.doesNotMatch(generalEmbed.description, /Ambos anotan: Ambos anotan/);
     assert.match(message, /📋 Predicciones generales · World Cup/);
     assert.match(message, /\t✅ ⚽ Canada gana @ 1\.87 · Conf 67%/);
@@ -802,7 +802,7 @@ function sampleArtifact() {
   return {
     date: '2026-05-15',
     dailyBatchId: 'daily-2026-05-15',
-    sourceRunIds: ['codex-run', 'gemini-run'],
+    sourceRunIds: ['codex-run', 'secondary-run'],
     recommendations: [{
       rank: 1,
       parlayId: 'parlay-1',
@@ -1038,7 +1038,7 @@ function sampleRequiredLeagueRecommendationsPassed() {
         confidence: 0.655,
         expectedEdge: 0.040964,
         status: 'promotable',
-        providers: ['gemini', 'codex'],
+        providers: ['secondary', 'codex'],
         display: {
           fixtureLabel: 'USA vs Paraguay',
           homeTeamName: 'USA',
@@ -1055,7 +1055,7 @@ function sampleRequiredLeagueRecommendationsPassed() {
         confidence: 0.575,
         expectedEdge: 0.058,
         status: 'promotable',
-        providers: ['codex', 'gemini'],
+        providers: ['codex', 'secondary'],
         display: {
           fixtureLabel: 'Canada vs Bosnia & Herzegovina',
           homeTeamName: 'Canada',

@@ -307,10 +307,10 @@ describe('headless run command', () => {
 });
 
 describe('headless daily-e2e command', () => {
-  it('requires --date before running the dual-provider pipeline', async () => {
+  it('requires --date before running the daily pipeline', async () => {
     let result: Awaited<ReturnType<typeof dispatchHeadless>> | undefined;
     await captureConsole(async () => {
-      result = await dispatchHeadless(['daily-e2e', '--providers', 'codex,gemini'], context());
+      result = await dispatchHeadless(['daily-e2e', '--providers', 'codex'], context());
     });
 
     assert.equal(result?.ok, false);
@@ -326,7 +326,7 @@ describe('headless daily-e2e command', () => {
 
     assert.equal(result?.ok, false);
     assert.equal(result?.exitCode, 1);
-    assert.match(result?.message ?? '', /--providers must be a comma-separated list using codex,gemini/);
+    assert.match(result?.message ?? '', /--providers must be codex/);
   });
 
   it('prints daily-e2e usage and registers the slash command', async () => {
@@ -334,7 +334,7 @@ describe('headless daily-e2e command', () => {
     const names = listCommands().map((command) => command.name);
 
     assert.ok(names.includes('/daily-e2e'));
-    assert.match(output, /pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-3.1-pro/);
+    assert.match(output, /pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.5/);
   });
 });
 

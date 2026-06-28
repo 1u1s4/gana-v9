@@ -1,4 +1,4 @@
-# Daily E2E comparativo Codex/Gemini
+# Daily E2E comparativo Codex/deprecated provider
 
 Origen: `docs/planes/por_hacer/goal.md`
 
@@ -6,7 +6,7 @@ Origen: `docs/planes/por_hacer/goal.md`
 
 - Daily E2E usa `providerAgentic = providers.join(',')` en artifacts, `run.json` y `HarnessRun`.
 - El criterio `ok/verdict` ya no exige `consensus-mixed`: si hay runs validos, alguna familia de parlay valida, analysis ok y metrics ok, el batch queda ok; si no hay consenso mixto queda `review-required`.
-- Se agrego comparacion explicita Codex/Gemini:
+- Se agrego comparacion explicita Codex/deprecated provider:
   - `src/daily/comparison.ts`
   - `daily-provider-comparison.json`
   - `daily-provider-consensus.json`
@@ -36,7 +36,7 @@ Origen: `docs/planes/por_hacer/goal.md`
 
 ## Smoke live con `.env`
 
-Se ejecuto un Daily E2E real pequeno con web live y providers Codex/Gemini:
+Se ejecuto un Daily E2E real pequeno con web live y providers Codex/deprecated provider:
 
 ```bash
 GANA_PROFILE=full-permissions \
@@ -45,7 +45,7 @@ GANA_MAX_FIXTURES_PER_RUN=1 \
 GANA_LOW_ODDS_THRESHOLD=1.20 \
 npm run gana -- daily-e2e \
   --date 2026-05-15 \
-  --providers codex,gemini \
+  --providers codex,deprecated-provider \
   --web live \
   --max-fixtures 1 \
   --threshold 1.20 \
@@ -58,11 +58,11 @@ Resultado:
 - Batch: `daily-2026-05-15-v2`
 - Artifact: `.artifacts/gana-v9/runs/daily-2026-05-15-v2`
 - Codex run: `d71ca351-4ad1-4d70-819a-07ae5df2f95b`, `review-required`, 5 predicciones.
-- Gemini run: `ea1eb25c-53e6-468a-8078-b64e50aec505`, `review-required`, 5 predicciones.
+- deprecated provider run: `ea1eb25c-53e6-468a-8078-b64e50aec505`, `review-required`, 5 predicciones.
 - Comparacion: 10 predicciones comparables, 4 grupos, 3 mismas selecciones, 1 misma market con seleccion distinta, agreement rate `0.75`.
-- Consenso: 3 predicciones, providers `codex,gemini`, confianza media `0.5933`, edge medio `0.0393`.
+- Consenso: 3 predicciones, providers `codex,deprecated-provider`, confianza media `0.5933`, edge medio `0.0393`.
 - Metrics: `daily-2026-05-15-v2-metrics`, persistido `1`.
-- Parlays: familias `codex-only`, `gemini-only` y `consensus-mixed` quedaron `blocked` porque el smoke uso `--max-fixtures 1` y no habia suficientes legs para construir parlays validos.
+- Parlays: familias `codex-only`, `deprecated-provider-only` y `consensus-mixed` quedaron `blocked` porque el smoke uso `--max-fixtures 1` y no habia suficientes legs para construir parlays validos.
 - Dashboard: `GET /api/overview?tab=daily&dailyBatchId=daily-2026-05-15-v2&take=5` devuelve el batch, providers, parlays bloqueados, comparacion, consenso y metrics.
 
 Durante el primer intento live se encontro un bug productivo: ids derivados como `daily-2026-05-15-smoke-codex-balanced` excedian `HarnessRun.id CHAR(36)`. Se corrigio con ids diarios acotados y hash estable.

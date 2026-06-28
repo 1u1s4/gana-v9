@@ -1027,7 +1027,7 @@ final_output = {
         },
         "webSearchCoverage": {
             "mode": input_data["webMode"],
-            "provider": "gemini",
+            "provider": "codex",
             "required": True,
             "nativeToolUsed": True,
             "nativeSupported": True,

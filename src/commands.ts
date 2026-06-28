@@ -105,11 +105,10 @@ type ModelInfo = {
 
 type Provider = AgentProviderCompat;
 
-const PROVIDERS: Provider[] = ['codex', 'gemini', 'openrouter'];
+const PROVIDERS: Provider[] = ['codex', 'openrouter'];
 
 const PROVIDER_DEFAULT_MODELS: Record<Provider, string[]> = {
   codex: [...AGENT_PROVIDER_DEFAULT_MODELS.codex],
-  gemini: [...AGENT_PROVIDER_DEFAULT_MODELS.gemini],
   openrouter: [...AGENT_PROVIDER_DEFAULT_MODELS.openrouter],
 };
 
@@ -178,50 +177,8 @@ function loadCodexModels(ctx: CommandContext): ModelInfo[] {
     .filter((model) => model.id);
 }
 
-function loadGeminiModels(ctx: CommandContext): { id: string; name: string }[] {
-  const settingsPath = join(ctx.config.geminiHome, 'settings.json');
-  const settings = existsSync(settingsPath)
-    ? JSON.parse(readFileSync(settingsPath, 'utf-8'))
-    : {};
-  const repoListPath = resolve(ctx.config.geminiModelListPath);
-  const repoList = existsSync(repoListPath)
-    ? JSON.parse(readFileSync(repoListPath, 'utf-8'))?.models
-    : [];
-
-  const configured = settings?.model?.name;
-
-  const models = [
-    ...(Array.isArray(repoList) ? repoList : []).map((model: any) => typeof model === 'string' ? model : model?.id ?? model?.name),
-    ...Object.keys(settings?.modelConfigs?.modelDefinitions ?? {}),
-    ...Object.keys(settings?.modelConfigs?.customAliases ?? {}),
-    'gemini-3.1-pro',
-    'gemini-3-pro',
-    'gemini-3-pro-preview',
-    'gemini-3-flash',
-    'gemini-3-flash-preview',
-    'gemini-2.5-pro',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-  ];
-
-  if (configured && !models.includes(configured)) {
-    models.unshift(configured);
-  }
-
-  const names = new Map<string, string>();
-  for (const model of Array.isArray(repoList) ? repoList : []) {
-    if (typeof model === 'string') names.set(model, model);
-    else if (model?.id) names.set(model.id, model.name ?? model.id);
-  }
-
-  return [...new Set(models.filter(Boolean))]
-    .map((id) => ({ id, name: names.get(id) ?? id }));
-}
-
 function loadProviderModels(ctx: CommandContext): ModelInfo[] {
   if (ctx.config.provider === 'codex') return loadCodexModels(ctx);
-  if (ctx.config.provider === 'gemini') return loadGeminiModels(ctx);
   return [];
 }
 
@@ -240,7 +197,6 @@ function saveAgentCommandEvent(ctx: CommandContext, type: string, payload: Recor
     model: ctx.config.model,
     sessionPath: ctx.sessionPath,
     codexThreadId: redactProviderSessionId(ctx.config.codexThreadId) ?? null,
-    geminiSessionId: redactProviderSessionId(ctx.config.geminiSessionId) ?? null,
     payload,
   };
   saveSessionEvent(ctx.sessionPath, event);
@@ -250,9 +206,6 @@ function saveAgentCommandEvent(ctx: CommandContext, type: string, payload: Recor
 function providerCatalogHint(ctx: CommandContext): { path?: string; script?: string } {
   if (ctx.config.provider === 'codex') {
     return { path: resolve(ctx.config.codexModelListPath), script: 'npm run update:codex-models' };
-  }
-  if (ctx.config.provider === 'gemini') {
-    return { path: resolve(ctx.config.geminiModelListPath), script: 'npm run update:gemini-models' };
   }
   return {};
 }
@@ -374,8 +327,6 @@ function printSessionStatus(ctx: CommandContext): void {
   const providerState = buildAgentProviderState(ctx.config, {
     codexAuthPath: resolve(ctx.config.codexHome, 'auth.json'),
     codexAuthConfigured: existsSync(resolve(ctx.config.codexHome, 'auth.json')),
-    geminiAuthPath: resolve(ctx.config.geminiHome, 'oauth_creds.json'),
-    geminiAuthConfigured: existsSync(resolve(ctx.config.geminiHome, 'oauth_creds.json')),
     openrouterConfigured: Boolean(ctx.config.apiKey || process.env.OPENROUTER_API_KEY),
   });
   printKeyValue('sessionPath', ctx.sessionPath);
@@ -385,7 +336,6 @@ function printSessionStatus(ctx: CommandContext): void {
   printKeyValue('authStatus', providerState.auth.configured ? 'ready' : 'missing');
   printKeyValue('model', ctx.config.model);
   printKeyValue('codexThreadId', redactProviderSessionId(ctx.config.codexThreadId) ?? 'none');
-  printKeyValue('geminiSessionId', redactProviderSessionId(ctx.config.geminiSessionId) ?? 'none');
   printKeyValue('nativeWebSearch', ctx.config.nativeWebSearch ? `${ctx.config.nativeWebSearchMode} available` : 'off');
   printKeyValue('profile', ctx.config.profile);
   printKeyValue('approvalMode', ctx.config.approvalMode);
@@ -490,7 +440,6 @@ function applyProfile(profile: AgentConfig['profile'], ctx: Pick<CommandContext,
 
 function providerReady(ctx: CommandContext, provider: Provider): boolean {
   if (provider === 'codex') return existsSync(resolve(ctx.config.codexHome, 'auth.json'));
-  if (provider === 'gemini') return existsSync(resolve(ctx.config.geminiHome, 'oauth_creds.json'));
   return Boolean(ctx.config.apiKey || process.env.OPENROUTER_API_KEY);
 }
 
@@ -510,7 +459,6 @@ function defaultModelForProvider(ctx: CommandContext, provider: Provider): strin
 function resetProviderSession(ctx: CommandContext): void {
   ctx.messages.length = 0;
   ctx.config.codexThreadId = undefined;
-  ctx.config.geminiSessionId = undefined;
   ctx.config.fastMode = false;
   ctx.config.reasoningEffort = undefined;
   ctx.sessionPath = ctx.resetSession();
@@ -525,7 +473,7 @@ async function loadOpenRouterModels() {
 
 commands.push({
   name: '/provider',
-  description: 'Switch provider: codex, gemini, openrouter',
+  description: 'Switch provider: codex, openrouter',
   execute: async (args, ctx) => {
     const next = args.trim().toLowerCase() as Provider | '';
 
@@ -535,12 +483,12 @@ commands.push({
         const ready = providerReady(ctx, provider) ? 'ready' : 'not configured';
         console.log(`  ${DIM}${marker}${RESET} ${CYAN}${provider.padEnd(10)}${RESET}${DIM}${providerLabel(provider)} · ${ready}${RESET}`);
       }
-      console.log(`\n  ${DIM}Usage:${RESET} ${CYAN}/provider codex|gemini|openrouter${RESET}`);
+      console.log(`\n  ${DIM}Usage:${RESET} ${CYAN}/provider codex|openrouter${RESET}`);
       return;
     }
 
     if (!PROVIDERS.includes(next)) {
-      console.log(`  ${YELLOW}!${RESET} ${DIM}Unknown provider "${next}". Use codex, gemini, or openrouter.${RESET}`);
+      console.log(`  ${YELLOW}!${RESET} ${DIM}Unknown provider "${next}". Use codex or openrouter.${RESET}`);
       return;
     }
 
@@ -918,7 +866,7 @@ commands.push({
 
 commands.push({
   name: '/daily-e2e',
-  description: 'Run daily Codex vs Gemini comparative pipeline',
+  description: 'Run daily Codex pipeline',
   execute: async (args, ctx) => {
     const flags = parseFlags(args.split(' ').filter(Boolean));
     const result = await runDailyE2ECommand(ctx, flags);
@@ -1398,7 +1346,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2 --gemini-model gemini-3.1-pro --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.5 --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

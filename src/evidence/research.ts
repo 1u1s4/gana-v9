@@ -803,7 +803,7 @@ function evaluateResearchWebCoverage(
   }
   if (web === 'live' && !nativeRequirement.supported && !trace.browserFallbackUsed) {
     warnings.push(
-      `web live requested for provider ${config.provider}, which has no native web-search tool in this harness. Use OpenRouter/browser fallback with BROWSER_USE_API_KEY or switch to codex/gemini native web before promoting research.`,
+      `web live requested for provider ${config.provider}, which has no native web-search tool in this harness. Use OpenRouter/browser fallback with BROWSER_USE_API_KEY or switch to codex native web before promoting research.`,
     );
   }
   if (!hasRealWebSearchSignal) {

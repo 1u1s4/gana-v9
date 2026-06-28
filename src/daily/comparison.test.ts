@@ -5,7 +5,7 @@ import type { PredictionRecordView } from '../prediction/types.js';
 import type { RunPipelineResult } from '../runtime/run-service.js';
 
 describe('daily provider comparison', () => {
-  it('classifies same selection, disagreement, and provider-only predictions', () => {
+  it('summarizes Codex-only provider predictions', () => {
     const { comparison, consensus } = buildDailyProviderComparison({
       dailyBatchId: 'daily-2026-05-14',
       date: '2026-05-14',
@@ -20,36 +20,29 @@ describe('daily provider comparison', () => {
             prediction({ id: 'c-3', fixtureId: 'fixture-c', providerFixtureId: '102', market: 'h2h', selection: 'away', confidence: 0.65, edge: 0.01 }),
           ]),
         },
-        {
-          provider: 'gemini',
-          model: 'gemini-2.5-pro',
-          runId: 'gemini-run',
-          result: pipelineResult('gemini-run', [
-            prediction({ id: 'g-1', fixtureId: 'fixture-a', providerFixtureId: '100', market: 'h2h', selection: 'home', confidence: 0.74, edge: 0.02 }),
-            prediction({ id: 'g-2', fixtureId: 'fixture-b', providerFixtureId: '101', market: 'btts', selection: 'no', confidence: 0.66, edge: -0.01 }),
-            prediction({ id: 'g-3', fixtureId: 'fixture-d', providerFixtureId: '103', market: 'double_chance', selection: 'home_or_draw', confidence: 0.82, edge: 0.05 }),
-          ]),
-        },
       ],
     });
 
-    assert.equal(comparison.summary.comparablePredictions, 6);
-    assert.equal(comparison.summary.sameSelection, 1);
-    assert.equal(comparison.summary.sameMarketDifferentSelection, 1);
-    assert.equal(comparison.summary.onlyCodex, 1);
-    assert.equal(comparison.summary.onlyGemini, 1);
-    assert.equal(comparison.summary.agreementRate, 0.5);
+    assert.equal(comparison.summary.comparablePredictions, 3);
+    assert.equal(comparison.summary.sameSelection, 0);
+    assert.equal(comparison.summary.sameMarketDifferentSelection, 0);
+    assert.equal(comparison.summary.onlyCodex, 3);
+    assert.equal(comparison.summary.agreementRate, null);
     assert.equal(comparison.providerSummaries[0]?.totalPredictions, 3);
     assert.equal(comparison.items.find((item) => item.fixtureId === 'fixture-a')?.providers[0]?.modelProbability, 0.59);
     assert.equal(comparison.items.find((item) => item.fixtureId === 'fixture-a')?.providers[0]?.probability, 0.58);
     assert.equal(comparison.analyticalArtifactOnly, true);
     assert.equal(comparison.executionCapability, 'none');
-    assert.equal(consensus.summary.consensusPredictions, 1);
-    assert.deepEqual(consensus.summary.providers, ['codex', 'gemini']);
-    assert.equal(consensus.items[0]?.classification, 'same-selection');
+    assert.equal(consensus.summary.consensusPredictions, 0);
+    assert.deepEqual(consensus.summary.providers, []);
+    assert.deepEqual(comparison.items.map((item) => item.classification), [
+      'only-provider',
+      'only-provider',
+      'only-provider',
+    ]);
   });
 
-  it('keeps same-market line disagreements together for LLM review', () => {
+  it('keeps one-provider line records as provider-only items', () => {
     const { comparison, consensus } = buildDailyProviderComparison({
       dailyBatchId: 'daily-2026-05-14',
       date: '2026-05-14',
@@ -63,31 +56,21 @@ describe('daily provider comparison', () => {
             prediction({ id: 'c-2', fixtureId: 'fixture-b', providerFixtureId: '101', market: 'goals_over_under', selection: 'under', line: 2.5 }),
           ]),
         },
-        {
-          provider: 'gemini',
-          model: 'gemini-2.5-pro',
-          runId: 'gemini-run',
-          result: pipelineResult('gemini-run', [
-            prediction({ id: 'g-1', fixtureId: 'fixture-a', providerFixtureId: '100', market: 'goals_over_under', selection: 'over', line: 2.5 }),
-            prediction({ id: 'g-2', fixtureId: 'fixture-b', providerFixtureId: '101', market: 'goals_over_under', selection: 'under', line: 1.5 }),
-          ]),
-        },
       ],
     });
 
-    assert.equal(comparison.summary.matchedGroups, 2);
+    assert.equal(comparison.summary.matchedGroups, 0);
     assert.equal(comparison.summary.sameSelection, 0);
-    assert.equal(comparison.summary.sameMarketDifferentSelection, 1);
-    assert.equal(comparison.summary.sameSelectionDifferentLine, 1);
-    assert.equal(comparison.summary.materialDisagreements, 2);
-    assert.equal(comparison.summary.disagreementRate, 1);
+    assert.equal(comparison.summary.sameMarketDifferentSelection, 0);
+    assert.equal(comparison.summary.sameSelectionDifferentLine, 0);
+    assert.equal(comparison.summary.materialDisagreements, 0);
+    assert.equal(comparison.summary.disagreementRate, null);
     assert.deepEqual(comparison.items.map((item) => item.classification), [
-      'same-selection-different-line',
-      'same-market-different-selection',
+      'only-provider',
+      'only-provider',
     ]);
     assert.deepEqual(comparison.items[0]?.providers.map((provider) => `${provider.provider}:${provider.selection}:${provider.line}`), [
       'codex:under:2.5',
-      'gemini:under:1.5',
     ]);
     assert.equal(consensus.summary.consensusPredictions, 0);
   });

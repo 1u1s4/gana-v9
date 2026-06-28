@@ -252,8 +252,8 @@ input_data = json.loads("""
       "verdict": "promotable",
       "warnings": []
     },
-    "providerAgentic": "gemini",
-    "model": "gemini-2.5-flash",
+    "providerAgentic": "codex",
+    "model": "gpt-5.5",
     "promptVersion": "research-fixture-v2",
     "warnings": [],
     "metadata": {
@@ -291,7 +291,7 @@ input_data = json.loads("""
       },
       "webSearchCoverage": {
         "mode": "live",
-        "provider": "gemini",
+        "provider": "codex",
         "required": true,
         "nativeToolUsed": true,
         "nativeSupported": true,

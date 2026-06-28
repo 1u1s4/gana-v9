@@ -14,7 +14,7 @@ La redaccion, profile basico y audit events minimos empiezan en `01-runtime-conf
 
 ## Contexto actual
 
-`src/tools/*` puede leer, escribir, editar y ejecutar shell en el backend OpenRouter, pero no hay metadata de permisos ni audit log. Los proveedores CLI externos tambien pueden ejecutar herramientas propias. El repo ya usa `codexSandbox`, `geminiApprovalMode` y `cursorForce`, pero no los modela como policy del producto.
+`src/tools/*` puede leer, escribir, editar y ejecutar shell en el backend OpenRouter, pero no hay metadata de permisos ni audit log. Los proveedores CLI externos tambien pueden ejecutar herramientas propias. El repo ya usa `codexSandbox`, `deprecated-providerApprovalMode` y `cursorForce`, pero no los modela como policy del producto.
 
 No se debe esperar a este plan para ocultar `DATABASE_URL`, `API_FOOTBALL_KEY` o headers de auth; esos controles son baseline del Corte 1.
 
@@ -73,7 +73,7 @@ Debe:
 - mantener redaccion;
 - mantener timeouts y limite de output;
 - permitir kill switch de sesion;
-- permitir `danger-full-access`, `gemini yolo`, `cursor --trust --force` solo si config lo especifica.
+- permitir `danger-full-access`, `deprecated-provider yolo`, `cursor --trust --force` solo si config lo especifica.
 
 No debe:
 

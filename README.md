@@ -6,7 +6,7 @@
 
 Gana v9 is an analytical terminal agent and operations harness for football/soccer research, odds review, prediction scoring, parlay construction, validation, dashboards, and Discord reporting. It is designed for human review workflows and explicitly does not execute monetary actions.
 
-The default agent backend is local Codex authentication through `codex exec`. Gemini CLI and OpenRouter are available as optional providers.
+The default agent backend is local Codex authentication through `codex exec`. OpenRouter is available as an optional compatibility provider.
 
 ## What It Does
 
@@ -28,7 +28,7 @@ Keep real credentials only in `.env` or your local provider authentication store
 ## Requirements
 
 - Node.js with npm or pnpm.
-- Codex CLI login for the default provider, or Gemini CLI / OpenRouter credentials for alternate providers.
+- Codex CLI login for the default provider, or OpenRouter credentials for the optional provider.
 - `DATABASE_URL` for persisted operations.
 - `API_FOOTBALL_KEY` for live football data.
 - Prisma migrations applied to the target database.
@@ -49,7 +49,7 @@ Create local configuration:
 cp .env.example .env
 ```
 
-For the default Codex backend, no API key is needed if you have already run `codex login`. For Gemini, authenticate with the Gemini CLI. If you use OpenRouter, set `AGENT_PROVIDER=openrouter` and provide `OPENROUTER_API_KEY`.
+For the default Codex backend, no API key is needed if you have already run `codex login`. If you use OpenRouter, set `AGENT_PROVIDER=openrouter` and provide `OPENROUTER_API_KEY`.
 
 Build and start the TUI:
 
@@ -119,7 +119,6 @@ Most runtime settings can be adjusted in `agent.config.json` and `.env`.
 Core provider options:
 
 - `codex`: default provider, using models such as `gpt-5.5`.
-- `gemini`: Gemini CLI provider, using models such as `gemini-2.5-flash`.
 - `openrouter`: OpenRouter provider, requiring `OPENROUTER_API_KEY`.
 
 Browser Use fallback:
@@ -139,7 +138,7 @@ Operational run limits:
 
 - `/help`: list commands.
 - `/dashboard`: serve the local web dashboard.
-- `/provider`: list or switch between `codex`, `gemini`, and `openrouter`.
+- `/provider`: list or switch between `codex` and `openrouter`.
 - `/model`: list, search, and switch models for the active provider.
 - `/fast`: toggle fast mode when supported.
 - `/think low|medium|high|xhigh`: adjust Codex reasoning effort when supported.
@@ -163,22 +162,6 @@ Update the Codex model list:
 ```bash
 npm run update:codex-models
 ```
-
-### Gemini CLI
-
-- Runs `gemini --prompt --output-format stream-json` as a subprocess.
-- Reads local authentication from `~/.gemini/oauth_creds.json`.
-- Forces native `google_web_search` when enabled.
-- Resumes the Gemini session across turns until `/new`.
-- Reads model metadata from `config/gemini-models.json`, then falls back to known Gemini CLI models.
-
-Update the Gemini model list:
-
-```bash
-npm run update:gemini-models
-```
-
-If `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set, the update script also attempts to query the Gemini API and merge those results.
 
 ### OpenRouter
 

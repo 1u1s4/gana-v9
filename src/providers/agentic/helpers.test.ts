@@ -17,11 +17,9 @@ import {
 describe('agentic provider helpers', () => {
   it('labels providers and exposes expected native web tool names', () => {
     assert.equal(providerLabel('codex'), 'Codex');
-    assert.equal(providerLabel('gemini'), 'Gemini CLI');
     assert.equal(providerLabel('openrouter'), 'OpenRouter');
 
     assert.equal(expectedNativeWebToolName('codex'), 'web_search');
-    assert.equal(expectedNativeWebToolName('gemini'), 'google_web_search');
     assert.equal(expectedNativeWebToolName('openrouter'), undefined);
   });
 
@@ -86,53 +84,40 @@ describe('agentic provider helpers', () => {
     assert.equal(state.nativeWebSearch.expectedToolName, undefined);
   });
 
-  it('redacts provider thread and session IDs without leaking middle content', () => {
+  it('redacts provider thread IDs without leaking middle content', () => {
     assert.equal(redactProviderSessionId(undefined), undefined);
     assert.equal(redactProviderSessionId('abc123'), '******');
     assert.equal(redactProviderSessionId('12345678'), '********');
     assert.equal(redactProviderSessionId('session_abcdef0123456789'), 'sess...6789');
-
-    const state = buildAgentProviderState(
-      {
-        provider: 'gemini',
-        model: 'gemini-2.5-pro',
-        geminiSessionId: 'gemini-session-abcdef',
-      },
-      {
-        geminiAuthConfigured: true,
-      },
-    );
-
-    assert.equal(state.session?.redactedId, 'gemi...cdef');
   });
 
   it('derives native web-search requirements only for native providers', () => {
     assert.deepEqual(deriveNativeWebSearchRequirement({
-      provider: 'gemini',
+      provider: 'codex',
       nativeWebSearch: true,
       nativeWebSearchMode: 'cached',
     }, { required: true, reason: 'research' }), {
-      provider: 'gemini',
+      provider: 'codex',
       required: true,
       enforce: true,
       supported: true,
-      expectedToolName: 'google_web_search',
-      displayToolName: 'Gemini google_web_search',
+      expectedToolName: 'web_search',
+      displayToolName: 'Codex web_search',
       mode: 'cached',
       reason: 'research',
     });
 
     assert.deepEqual(deriveNativeWebSearchRequirement({
-      provider: 'gemini',
+      provider: 'codex',
       nativeWebSearch: true,
       nativeWebSearchMode: 'cached',
     }), {
-      provider: 'gemini',
+      provider: 'codex',
       required: false,
       enforce: false,
       supported: true,
-      expectedToolName: 'google_web_search',
-      displayToolName: 'Gemini google_web_search',
+      expectedToolName: 'web_search',
+      displayToolName: 'Codex web_search',
       mode: 'cached',
       reason: undefined,
     });
@@ -174,10 +159,6 @@ describe('agentic provider helpers', () => {
       nativeWebSearch: true,
       nativeWebSearchMode: 'live',
     }, { required: true, reason: 'research' });
-    const gemini = deriveNativeWebSearchRequirement({
-      provider: 'gemini',
-      nativeWebSearch: true,
-    }, { required: true });
     const openrouter = deriveNativeWebSearchRequirement({
       provider: 'openrouter',
       nativeWebSearch: true,
@@ -186,8 +167,6 @@ describe('agentic provider helpers', () => {
     assert.match(formatNativeWebSearchEnforcementError(codex), /Codex web_search/);
     assert.match(formatNativeWebSearchEnforcementError(codex), /provider codex mode=live/);
     assert.match(formatNativeWebSearchEnforcementError(codex), /Reason: research/);
-    assert.match(formatNativeWebSearchEnforcementError(gemini), /Gemini google_web_search/);
-    assert.match(createNativeWebSearchEnforcementError(gemini)?.message ?? '', /Action: retry with \/web live/);
     assert.equal(createNativeWebSearchEnforcementError(openrouter), undefined);
     assert.equal(
       formatNativeWebSearchEnforcementError(openrouter),
@@ -201,11 +180,11 @@ describe('agentic provider helpers', () => {
     }
   });
 
-  it('defaults Gemini to the newest Pro models before older fallbacks', () => {
+  it('defaults Codex to newest configured models before older fallbacks', () => {
     assert.deepEqual(
-      AGENT_PROVIDER_DEFAULT_MODELS.gemini.slice(0, 3),
-      ['gemini-3.1-pro', 'gemini-3-pro', 'gemini-2.5-pro'],
+      AGENT_PROVIDER_DEFAULT_MODELS.codex.slice(0, 3),
+      ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
     );
-    assert.equal(selectDefaultModelForProvider('gemini'), 'gemini-3.1-pro');
+    assert.equal(selectDefaultModelForProvider('codex'), 'gpt-5.5');
   });
 });

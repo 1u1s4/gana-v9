@@ -3,19 +3,19 @@
 Sí, con ese contexto extra, el siguiente paso está bastante claro. Yo priorizaría **cuatro mejoras en este orden**:
 
 ```text
-1. Paralelismo Codex + Gemini en daily-e2e.
+1. Paralelismo Codex + deprecated provider en daily-e2e.
 2. Progreso observable por provider para Codex/Hermes/operador.
 3. Arreglar Discord para mostrar nombres reales de equipos, no UUIDs.
 4. Parlay Portfolio V2: variedad de 1, 2, 3 y 4 patas, más cobertura de corners.
 ```
 
-Actualmente `runDailyE2E` sigue ejecutando los providers con un `for (const provider of providers)` y un `await runner(...)` dentro del loop. Eso significa que Codex corre primero y Gemini después, o viceversa, pero **no en paralelo**. 
+Actualmente `runDailyE2E` sigue ejecutando los providers con un `for (const provider of providers)` y un `await runner(...)` dentro del loop. Eso significa que Codex corre primero y deprecated provider después, o viceversa, pero **no en paralelo**. 
 
-Además, la corrida real que muestras confirma el problema operativo: Gemini produjo 412 predicciones y 228 promotable, mientras Codex terminó blocked con 0 predicciones válidas. Aun así, el flujo siguió y generó recomendaciones, pero el tiempo total fue largo y la observabilidad dependió demasiado de revisar logs/artifacts manualmente. 
+Además, la corrida real que muestras confirma el problema operativo: deprecated provider produjo 412 predicciones y 228 promotable, mientras Codex terminó blocked con 0 predicciones válidas. Aun así, el flujo siguió y generó recomendaciones, pero el tiempo total fue largo y la observabilidad dependió demasiado de revisar logs/artifacts manualmente. 
 
 ---
 
-# 1. Paralelismo Codex + Gemini
+# 1. Paralelismo Codex + deprecated provider
 
 ## Qué cambiar
 
@@ -44,7 +44,7 @@ Tu código ya crea `sharedDeps` antes de ejecutar providers:
 const sharedDeps = deps.sharedPipelineDeps ?? createSharedPipelineDeps(effectiveConfig, input);
 ```
 
-Eso es bueno porque permite que Codex y Gemini usen el mismo universo de fixtures/odds. 
+Eso es bueno porque permite que Codex y deprecated provider usen el mismo universo de fixtures/odds. 
 
 El riesgo es que, si ambos providers entran al mismo tiempo y `sharedDeps` no tiene memoización por promesa, podrían disparar consultas duplicadas. Por eso yo haría esto:
 
@@ -57,11 +57,11 @@ Fase A: preparar slate compartido
 
 Fase B: correr providers en paralelo
   - Codex pipeline
-  - Gemini pipeline
+  - deprecated provider pipeline
 
 Fase C: construir parlays
   - Codex-only
-  - Gemini-only
+  - deprecated provider-only
   - consensus-mixed
 
 Fase D: recommendations + metrics + Discord
@@ -132,7 +132,7 @@ GANA_DAILY_PROVIDER_CONCURRENCY=2
 Default:
 
 ```text
-2 para codex,gemini
+2 para codex,deprecated-provider
 1 si quieres modo seguro/debug
 ```
 
@@ -142,11 +142,11 @@ Así puedes volver a serial si algo falla.
 
 # 2. Progreso observable por provider
 
-Paralelismo sin progreso puede confundir más, porque ahora Codex y Gemini estarán trabajando al mismo tiempo. Necesitas que el progreso diga claramente:
+Paralelismo sin progreso puede confundir más, porque ahora Codex y deprecated provider estarán trabajando al mismo tiempo. Necesitas que el progreso diga claramente:
 
 ```text
 Codex: running / scoring / completed / blocked
-Gemini: running / scoring / completed / review-required
+deprecated provider: running / scoring / completed / review-required
 ```
 
 Yo haría que `daily-progress.json` tenga sección por provider:
@@ -164,7 +164,7 @@ Yo haría que `daily-progress.json` tenga sección por provider:
       "promotable": 0,
       "updatedAt": "..."
     },
-    "gemini": {
+    "deprecated-provider": {
       "status": "running",
       "phase": "scoring",
       "predictions": 340,
@@ -178,10 +178,10 @@ Yo haría que `daily-progress.json` tenga sección por provider:
 También en stdout:
 
 ```text
-[daily-e2e] providers.parallel started codex,gemini
+[daily-e2e] providers.parallel started codex,deprecated-provider
 [daily-e2e] codex running phase=research elapsed=04:12
-[daily-e2e] gemini running phase=scoring predictions=169 promotable=90
-[daily-e2e] gemini completed predictions=412 promotable=228 verdict=review-required
+[daily-e2e] deprecated-provider running phase=scoring predictions=169 promotable=90
+[daily-e2e] deprecated-provider completed predictions=412 promotable=228 verdict=review-required
 [daily-e2e] codex completed verdict=blocked predictions=0
 ```
 
@@ -421,7 +421,7 @@ Generar por separado:
 
 ```text
 codex-only
-gemini-only
+deprecated-provider-only
 consensus-mixed
 ```
 
@@ -519,7 +519,7 @@ Promotable:
 Review-required:
   - datos parciales
   - línea disponible pero poca evidencia
-  - discrepancia Codex/Gemini
+  - discrepancia Codex/deprecated provider
 
 Blocked:
   - no hay stats de corners
@@ -542,16 +542,16 @@ Así evitas que todos los parlays dependan de un mercado más frágil.
 
 # 6. Ajuste importante: Codex blocked no debe romper todo
 
-En la corrida real, Codex terminó blocked y Gemini produjo muchas predicciones. 
+En la corrida real, Codex terminó blocked y deprecated provider produjo muchas predicciones. 
 
 Eso significa que el Daily E2E debe manejar tres escenarios:
 
 ```text
-Codex + Gemini ok:
-  generar codex-only, gemini-only, consensus-mixed.
+Codex + deprecated provider ok:
+  generar codex-only, deprecated-provider-only, consensus-mixed.
 
-Solo Gemini ok:
-  generar gemini-only + simples + review-required por falta de consenso.
+Solo deprecated provider ok:
+  generar deprecated-provider-only + simples + review-required por falta de consenso.
 
 Solo Codex ok:
   generar codex-only + simples + review-required por falta de consenso.
@@ -564,7 +564,7 @@ No deberías exigir siempre consensus-mixed para que haya salida útil. El siste
 
 ```text
 No hubo consenso mixto porque Codex quedó blocked.
-Se generaron recomendaciones Gemini-only en revisión.
+Se generaron recomendaciones deprecated provider-only en revisión.
 ```
 
 Eso sería más claro para Discord y Dashboard.
@@ -578,7 +578,7 @@ Ejemplo mejorado:
 ```text
 🏆 Gana v9 · Recomendaciones analíticas
 📦 6 parlays · 🎯 8 simples · 🟡 Revisión requerida
-🤖 Codex: blocked · Gemini: 412 predictions / 228 promotable
+🤖 Codex: blocked · deprecated provider: 412 predictions / 228 promotable
 ⚠️ Sin ejecución monetaria · Sin garantía
 
 1️⃣ Parlay 2-leg · Consensus/Mixto · Riesgo medio
@@ -605,7 +605,7 @@ Claves:
 
 ```text
 - Mostrar equipo real.
-- Mostrar familia: codex-only / gemini-only / consensus-mixed.
+- Mostrar familia: codex-only / deprecated-provider-only / consensus-mixed.
 - Mostrar tipo: simple / 2-leg / 3-leg / 4-leg / corners-watchlist.
 - Mostrar warnings.
 - Mantener disclaimer analítico.
@@ -630,14 +630,14 @@ src/commands.ts
 Entregar:
 
 ```bash
-pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,gemini --provider-concurrency 2
+pnpm gana daily-e2e --date YYYY-MM-DD --providers codex,deprecated-provider --provider-concurrency 2
 pnpm gana progress --latest
 ```
 
 Criterios:
 
 ```text
-Codex y Gemini corren en paralelo.
+Codex y deprecated provider corren en paralelo.
 No se duplican fixtures/odds.
 Se escribe daily-progress.json.
 Se puede ver estado de cada provider.
@@ -704,7 +704,7 @@ Tests:
 - respeta maxItems por bucket.
 - no repite demasiado fixture/mercado.
 - limita corners por parlay.
-- separa codex-only, gemini-only y consensus-mixed.
+- separa codex-only, deprecated-provider-only y consensus-mixed.
 ```
 
 ---
@@ -774,4 +774,4 @@ Luego haría **Parlay Portfolio V2**, porque ahí está el salto de calidad: má
 
 En una frase:
 
-> Corre Codex y Gemini en paralelo sobre el mismo slate, muestra progreso por provider, hidrata nombres antes de Discord, y convierte el parlay builder en una cartera diaria con simples, 2-leg, 3-leg, 4-leg, corners y consenso.
+> Corre Codex y deprecated provider en paralelo sobre el mismo slate, muestra progreso por provider, hidrata nombres antes de Discord, y convierte el parlay builder en una cartera diaria con simples, 2-leg, 3-leg, 4-leg, corners y consenso.

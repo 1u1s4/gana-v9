@@ -13,38 +13,30 @@ export interface AgentConfigLike {
   nativeWebSearchMode?: 'cached' | 'live';
   codexHome?: string;
   codexThreadId?: string;
-  geminiHome?: string;
-  geminiSessionId?: string;
 }
 
 export interface AgentProviderStateOptions {
   codexAuthPath?: string;
   codexAuthConfigured?: boolean;
-  geminiAuthPath?: string;
-  geminiAuthConfigured?: boolean;
   openrouterConfigured?: boolean;
 }
 
 export const AGENT_PROVIDER_LABELS: Record<AgentProviderCompat, string> = {
   codex: 'Codex',
-  gemini: 'Gemini CLI',
   openrouter: 'OpenRouter',
 };
 
 export const AGENT_PROVIDER_DEFAULT_MODELS: Record<AgentProviderCompat, readonly string[]> = {
   codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
-  gemini: ['gemini-3.1-pro', 'gemini-3-pro', 'gemini-2.5-pro'],
   openrouter: ['anthropic/claude-sonnet-4.5', 'anthropic/claude-haiku-4.5'],
 };
 
 const NATIVE_WEB_TOOL_NAMES: Record<AgentProvider, string> = {
   codex: 'web_search',
-  gemini: 'google_web_search',
 };
 
 const NATIVE_WEB_DISPLAY_TOOL_NAMES: Record<AgentProvider, string> = {
   codex: 'Codex web_search',
-  gemini: 'Gemini google_web_search',
 };
 
 export function providerLabel(provider: AgentProviderCompat): string {
@@ -52,7 +44,7 @@ export function providerLabel(provider: AgentProviderCompat): string {
 }
 
 export function isNativeAgentProvider(provider: AgentProviderCompat): provider is AgentProvider {
-  return provider === 'codex' || provider === 'gemini';
+  return provider === 'codex';
 }
 
 export function expectedNativeWebToolName(provider: AgentProviderCompat): string | undefined {
@@ -152,14 +144,6 @@ function providerAuthState(
     };
   }
 
-  if (config.provider === 'gemini') {
-    return {
-      label: 'local gemini auth',
-      configured: options.geminiAuthConfigured ?? false,
-      path: options.geminiAuthPath,
-    };
-  }
-
   return {
     label: 'openrouter',
     configured: options.openrouterConfigured ?? Boolean(config.apiKey),
@@ -171,13 +155,6 @@ function providerSessionState(config: AgentConfigLike): AgentProviderState['sess
     return {
       label: 'thread',
       redactedId: redactProviderSessionId(config.codexThreadId) ?? '',
-    };
-  }
-
-  if (config.provider === 'gemini' && config.geminiSessionId) {
-    return {
-      label: 'session',
-      redactedId: redactProviderSessionId(config.geminiSessionId) ?? '',
     };
   }
 

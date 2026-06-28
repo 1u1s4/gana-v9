@@ -806,7 +806,7 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Suppress same-fixture contradictory selections before ranking (ready-for-implementation) — src/parlay/correlation.ts, src/parlay/service.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/parlay/service.test.ts, src/daily/e2e.test.ts
 - [medium] Add market/profile-specific validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts, src/strategy-review/daily.ts, src/daily/e2e.test.ts
 - [medium] Move corners to daily watchlist-only unless explicitly requested (proposed) — src/daily/e2e.ts, src/domain/markets.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/parlay/eligibility.ts
-- [medium] Demote gemini-2.5-flash for parlay construction only (needs-more-data) — src/daily/recommendation-policy.ts, src/parlay/service.ts, src/daily/e2e.ts, src/daily/e2e.test.ts
+- [medium] Demote deprecated fast model for parlay construction only (needs-more-data) — src/daily/recommendation-policy.ts, src/parlay/service.ts, src/daily/e2e.ts, src/daily/e2e.test.ts
 
 ## 2026-06-14 · strategy-2026-06-13
 
@@ -1130,3 +1130,208 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Add BTTS and totals-specific evidence throttles (proposed) — skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/prediction/gates.ts
 - [medium] Track fixture-level correlated loss clusters (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
 - [medium] Delay broad confidence retuning until multi-day calibration exists (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-23 · strategy-2026-06-22
+
+- Run: strategy-review-2026-06-22-a2d45db9
+- Dates: 2026-06-22
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-22-a2d45db9/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-22-a2d45db9/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 71-29 hit 71.0% (125 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Run conservative default parlay profiles when parlayProfile is absent (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/parlay/profile-specs.ts, src/metrics/daily.ts
+- [high] Harden h2h and 1.50-1.99 odds promotion gates (ready-for-implementation) — src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+- [high] Block low-liquidity analytical-fallback parlays from final publication (ready-for-implementation) — src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, src/parlay/eligibility.ts
+- [high] Add market-level validation freshness and void-rate gates (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [medium] Raise low-price double_chance value requirements (ready-for-implementation) — src/scoring/edge-gate.ts, src/prediction/service.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [medium] Rebalance low-odds discovery toward guarded totals and BTTS, away from h2h-first selection (proposed) — src/filters/low-odds-selector.ts, src/parlay/profile-specs.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Add sample-size guarded validation feedback to prompts and ranking (needs-more-data) — src/strategy-review/daily.ts, src/parlay/ranker.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-23 · strategy-2026-06-22
+
+- Run: strategy-review-2026-06-22-88c50ca6
+- Dates: 2026-06-22
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-22-88c50ca6/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-22-88c50ca6/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 71-29 hit 71.0% (125 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Demote mid-odds H2H from automatic promotion (ready-for-implementation) — src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md
+- [high] Validate published recommendation artifacts when DB parlays are empty (ready-for-implementation) — src/strategy-review/daily.ts, src/validation/service.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts
+- [high] Add bucket-level freshness and void-rate gates (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/strategy-review/daily.ts, src/daily/recommendation-policy.ts
+- [high] Separate synthetic fallback profiles from strict parlay profiles (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/parlay/analysis.ts, src/strategy-review/daily.ts
+- [medium] Rebalance low-odds discovery toward guarded conservative totals (proposed) — src/filters/low-odds-selector.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Collapse same-fixture correlated total ladders before final learning (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/strategy-review/daily.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-24 · strategy-2026-06-23
+
+- Run: strategy-review-2026-06-23-15b81494
+- Dates: 2026-06-23
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-23-15b81494/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-23-15b81494/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 48-19 hit 71.6% (75 total)
+- Parlays: 1-0 hit 100.0% (1 total)
+
+### Proposed Modifications
+
+- [high] Hard-filter analytical fallback final legs (ready-for-implementation) — src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, src/daily/e2e.test.ts, src/daily/recommendation-policy.test.ts
+- [high] Add market-aware promotion floors for h2h and totals (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md, src/prediction/service.test.ts, src/harness-production-grade.test.ts
+- [high] Block fragile low-priced total overs from safety fallback (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/parlay/service.test.ts, src/daily/recommendation-policy.test.ts
+- [high] Make fair-probability-capped double_chance a hard final risk (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/parlay/service.test.ts, src/prediction/service.test.ts
+- [high] Validate synthetic recommendation artifacts (ready-for-implementation) — src/strategy-review/daily.ts, src/validation/service.ts, src/metrics/daily.ts, src/daily/e2e.ts, src/daily/e2e.test.ts, src/metrics/daily.test.ts
+- [medium] Add market-level freshness and void-rate gates (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts, src/metrics/daily.test.ts
+- [medium] Rebalance low-odds discovery away from h2h-first exposure (proposed) — src/filters/low-odds-selector.ts, src/parlay/profile-specs.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/filters/low-odds-selector.test.ts
+
+## 2026-06-24 · strategy-2026-06-23
+
+- Run: strategy-review-2026-06-23-bbdd280e
+- Dates: 2026-06-23
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-23-bbdd280e/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-23-bbdd280e/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 48-19 hit 71.6% (75 total)
+- Parlays: 1-0 hit 100.0% (1 total)
+
+### Proposed Modifications
+
+- [high] Recompute published-recommendation validation after writing the recommendation artifact (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/recommendations/artifact.ts, src/daily/e2e.test.ts, src/metrics/daily.test.ts
+- [high] Add market-specific promotion floors for h2h and totals-over (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md, skills/research-fixture-v2/prompt.md
+- [high] Make analytical fallback hard-risk aware before daily focus parlay composition (ready-for-implementation) — src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.test.ts, src/council/recommendation-council.test.ts
+- [medium] Treat low-price double chance as safety coverage, not value, when edge is capped or negative (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Rebalance market coverage toward verified BTTS and away from weak h2h/totals volume (needs-more-data) — src/parlay/profile-specs.ts, src/daily/recommendation-policy.ts, src/filters/low-odds-selector.ts, skills/score-prediction-v2/prompt.md
+- [medium] Keep corners and 2.00+ odds out of automatic promotion until bucket settlement improves (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, src/parlay/analysis.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-06-25 · strategy-2026-06-24
+
+- Run: strategy-review-2026-06-24-144b5593
+- Dates: 2026-06-24
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-24-144b5593/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-24-144b5593/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 43-30 hit 58.9% (95 total)
+- Parlays: 2-0 hit 100.0% (2 total)
+
+### Proposed Modifications
+
+- [high] Add market-level validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts
+- [high] Quarantine corners from default daily promotion (ready-for-implementation) — src/domain/markets.ts, src/prediction/service.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Tighten mid-odds promotion gates (proposed) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [medium] Use effective confidence for atomic safety picks (ready-for-implementation) — src/daily/recommendation-policy.ts
+- [medium] Trim portfolio-v2 to final-eligible profiles (proposed) — src/daily/e2e.ts, src/parlay/service.ts, src/metrics/daily.ts
+- [medium] Add validation-history cooldowns for weak market and odds buckets (needs-more-data) — src/prediction/service.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-25 · strategy-2026-06-24
+
+- Run: strategy-review-2026-06-24-cfd2ca08
+- Dates: 2026-06-24
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-24-cfd2ca08/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-24-cfd2ca08/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: blocked
+- Predictions: 43-30 hit 58.9% (95 total)
+- Parlays: 2-0 hit 100.0% (2 total)
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-06-26 · strategy-2026-06-25
+
+- Run: strategy-review-2026-06-25-8d34b760
+- Dates: 2026-06-25
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-25-8d34b760/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-25-8d34b760/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: blocked
+- Predictions: 58-41 hit 58.6% (125 total)
+- Parlays: 1-1 hit 50.0% (2 total)
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-06-26 · strategy-2026-06-25
+
+- Run: strategy-review-2026-06-25-bd6c4622
+- Dates: 2026-06-25
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-25-bd6c4622/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-25-bd6c4622/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 58-41 hit 58.6% (125 total)
+- Parlays: 1-1 hit 50.0% (2 total)
+
+### Proposed Modifications
+
+- [high] Add market-level validation freshness and sample guards (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/strategy-review/daily.ts
+- [high] Demote h2h away and low-liquidity h2h fallback selections (ready-for-implementation) — src/daily/recommendation-policy.ts, src/prediction/service.ts, skills/score-prediction-v2/prompt.md
+- [high] Cap parlay-all-in final promotion and quarantine unknown high-odds profiles (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/parlay/service.ts, src/parlay/analysis.ts
+- [medium] Stop all-in safe mode from overriding hard research warnings (ready-for-implementation) — src/parlay/service.ts, src/parlay/eligibility.ts, src/parlay/portfolio-risk.ts, skills/research-fixture-v2/prompt.md
+- [medium] Add line-aware conservative totals to low-odds discovery (proposed) — src/filters/low-odds-selector.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Keep BTTS review-only until settled sample improves (needs-more-data) — src/parlay/profile-specs.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-27 · strategy-2026-06-26
+
+- Run: strategy-review-2026-06-26-2d57fd10
+- Dates: 2026-06-26
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-26-2d57fd10/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-26-2d57fd10/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 170-107 hit 61.4% (353 total)
+- Parlays: 0-2 hit 0.0% (2 total)
+
+### Proposed Modifications
+
+- [high] Gate promotion on market-level freshness, settled sample, and void rate (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [high] Remove parlay-all-in and unknown profiles from final promotion (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/parlay/service.ts, src/parlay/analysis.ts, src/council/recommendation-council.ts
+- [high] Demote BTTS and corners from final portfolios until rolling validation recovers (ready-for-implementation) — src/parlay/eligibility.ts, src/parlay/profile-specs.ts, src/parlay/portfolio-risk.ts, src/daily/recommendation-policy.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [high] Raise parlay leg confidence and edge floors for sub-70% candidates (proposed) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/profile-specs.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [medium] Treat youth and development fixture tags as segmented risk, not a selection boost (ready-for-implementation) — src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Add line-aware conservative totals to low-odds discovery (proposed) — src/filters/low-odds-selector.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/runtime/pipeline.test.ts
+- [medium] Feed rolling bucket validation into scoring and ranking calibration (needs-more-data) — src/strategy-review/daily.ts, src/scoring/edge-gate.ts, src/parlay/ranker.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-06-27 · strategy-2026-06-26
+
+- Run: strategy-review-2026-06-26-fcdb2071
+- Dates: 2026-06-26
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-26-fcdb2071/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-06-26-fcdb2071/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 170-107 hit 61.4% (353 total)
+- Parlays: 0-2 hit 0.0% (2 total)
+
+### Proposed Modifications
+
+- [high] Quarantine parlay-all-in from daily final promotion (ready-for-implementation) — src/daily/recommendation-policy.ts, src/council/recommendation-council.ts, src/parlay/profile-specs.ts, src/daily/recommendation-policy.test.ts, src/parlay/service.test.ts
+- [high] Raise final gates for 1.50-1.99 odds selections (ready-for-implementation) — src/daily/recommendation-policy.ts, src/prediction/service.ts, src/daily/recommendation-policy.test.ts, src/prediction/service.test.ts
+- [high] Demote BTTS and corners to watchlist-only unless high-evidence gates pass (ready-for-implementation) — src/parlay/profile-specs.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/parlay/rules.test.ts, src/daily/recommendation-policy.test.ts
+- [high] Add per-market validation freshness guards (ready-for-implementation) — src/metrics/daily.ts, src/daily/e2e.ts, scripts/gana-strategy-review.mjs, src/metrics/daily.test.ts, src/daily/e2e.test.ts
+- [medium] Tighten double-chance safety override to require non-negative service edge (proposed) — src/daily/recommendation-policy.ts, src/prediction/service.ts, skills/score-prediction-v2/prompt.md, src/daily/recommendation-policy.test.ts, src/prediction/service.test.ts
+- [medium] Group same-fixture market-direction alternatives in validation feedback (proposed) — src/metrics/daily.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/metrics/daily.test.ts, src/daily/recommendation-policy.test.ts

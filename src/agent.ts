@@ -113,9 +113,6 @@ export async function runAgent(
   if (config.provider === 'codex') {
     return runCodexAgent(config, input, options);
   }
-  if (config.provider === 'gemini') {
-    return runGeminiAgent(config, input, options);
-  }
 
   const client = new OpenRouter({ apiKey: config.apiKey });
 
@@ -188,27 +185,6 @@ interface CodexJsonEvent {
     status?: string;
     query?: string;
     action?: { type?: string; query?: string; queries?: string[] };
-  };
-}
-
-interface GeminiJsonEvent {
-  type: string;
-  session_id?: string;
-  role?: string;
-  content?: string;
-  delta?: boolean;
-  tool_name?: string;
-  tool_id?: string;
-  parameters?: Record<string, unknown>;
-  output?: string;
-  status?: string;
-  stats?: {
-    total_tokens?: number;
-    input_tokens?: number;
-    output_tokens?: number;
-    cached?: number;
-    duration_ms?: number;
-    tool_calls?: number;
   };
 }
 
@@ -311,51 +287,8 @@ export function codexArgs(
   ];
 }
 
-function inputToGeminiPrompt(config: AgentConfig, input: string | ChatMessage[], requirement: NativeWebSearchRequirement): string {
-  const userPrompt = typeof input === 'string'
-    ? input
-    : input.filter((m) => m.role === 'user').at(-1)?.content ?? '';
-
-  const prompt = withNativeWebSearchRequirement(userPrompt, requirement);
-
-  if (config.geminiSessionId) return prompt;
-
-  return [
-    systemPromptWithGuards(config),
-    '',
-    'User request:',
-    prompt,
-  ].join('\n');
-}
-
-export function geminiArgs(config: AgentConfig, prompt: string): string[] {
-  const args = [
-    '--prompt',
-    prompt,
-    '--output-format',
-    'stream-json',
-    '--model',
-    config.model,
-    '--approval-mode',
-    config.geminiApprovalMode,
-    '--skip-trust',
-  ];
-
-  if (config.geminiSessionId) {
-    args.push('--resume', config.geminiSessionId);
-  }
-
-  return args;
-}
-
 function codexModelAttempts(config: AgentConfig): string[] {
   return [config.model, ...config.codexFallbackModels]
-    .map((model) => model.trim())
-    .filter((model, index, models) => Boolean(model) && models.indexOf(model) === index);
-}
-
-function geminiModelAttempts(config: AgentConfig): string[] {
-  return [config.model, ...config.geminiFallbackModels]
     .map((model) => model.trim())
     .filter((model, index, models) => Boolean(model) && models.indexOf(model) === index);
 }
@@ -363,11 +296,6 @@ function geminiModelAttempts(config: AgentConfig): string[] {
 function isCodexQuotaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /\b(429|quota|rate limit|rate-limit|usage limit|limit exceeded|too many requests|insufficient quota)\b/i.test(message);
-}
-
-function isGeminiFallbackError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /\b(404|429|500|502|503|504|quota|rate limit|rate-limit|usage limit|limit exceeded|too many requests|insufficient quota|not found|not available|unavailable|unsupported model|model .*not.*supported)\b/i.test(message);
 }
 
 async function runCodexAgent(
@@ -554,148 +482,6 @@ async function runCodexAgentAttempt(
   if (!text.trim() && outputLastMessagePath && existsSync(outputLastMessagePath)) {
     const lastMessage = readFileSync(outputLastMessagePath, 'utf8').trim();
     if (lastMessage) text = lastMessage;
-  }
-
-  return { text, usage, output: text };
-}
-
-async function runGeminiAgent(
-  config: AgentConfig,
-  input: string | ChatMessage[],
-  options?: RunAgentOptions,
-) {
-  const originalModel = config.model;
-  const models = geminiModelAttempts(config);
-  let lastError: unknown;
-  for (let index = 0; index < models.length; index += 1) {
-    const model = models[index];
-    config.model = model;
-    try {
-      return await runGeminiAgentAttempt(config, input, options);
-    } catch (error) {
-      lastError = error;
-      const nextModel = models[index + 1];
-      if (!nextModel || !isGeminiFallbackError(error)) {
-        config.model = model;
-        throw error;
-      }
-      config.geminiSessionId = undefined;
-      options?.onEvent?.({
-        type: 'text',
-        delta: `\n[guardrail] Gemini model ${model} failed; retrying with ${nextModel}.\n`,
-      });
-    }
-  }
-  config.model = originalModel;
-  throw lastError;
-}
-
-async function runGeminiAgentAttempt(
-  config: AgentConfig,
-  input: string | ChatMessage[],
-  options?: RunAgentOptions,
-) {
-  const requirement = nativeWebRequirement(config, options);
-  const prompt = inputToGeminiPrompt(config, input, requirement);
-  const child = spawn('gemini', geminiArgs(config, prompt), {
-    cwd: process.cwd(),
-    detached: true,
-    env: {
-      ...process.env,
-      GEMINI_MODEL: config.model,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  let stdoutBuffer = '';
-  let stderr = '';
-  let text = '';
-  let usage: AgentUsage = {};
-  const toolNames = new Map<string, string>();
-  let sawNativeWebSearch = false;
-
-  const handleEvent = (event: GeminiJsonEvent) => {
-    if (event.type === 'init' && event.session_id) {
-      config.geminiSessionId = event.session_id;
-      return;
-    }
-
-    if (event.type === 'tool_use') {
-      const callId = event.tool_id ?? `gemini-${Date.now()}`;
-      toolNames.set(callId, event.tool_name ?? 'tool');
-      if (event.tool_name === 'google_web_search') sawNativeWebSearch = true;
-      options?.onEvent?.({
-        type: 'tool_call',
-        name: event.tool_name ?? 'tool',
-        callId,
-        args: event.parameters ?? {},
-      });
-      return;
-    }
-
-    if (event.type === 'tool_result') {
-      const callId = event.tool_id ?? `gemini-${Date.now()}`;
-      options?.onEvent?.({
-        type: 'tool_result',
-        name: toolNames.get(callId) ?? 'tool',
-        callId,
-        output: event.output ?? event.status ?? '',
-      });
-      return;
-    }
-
-    if (event.type === 'message' && event.role === 'assistant' && event.content) {
-      text += event.content;
-      options?.onEvent?.({ type: 'text', delta: event.content });
-      return;
-    }
-
-    if (event.type === 'result' && event.stats) {
-      usage = {
-        inputTokens: event.stats.input_tokens,
-        outputTokens: event.stats.output_tokens,
-        cachedInputTokens: event.stats.cached,
-      };
-    }
-  };
-
-  child.stdout.setEncoding('utf8');
-  child.stdout.on('data', (chunk: string) => {
-    stdoutBuffer += chunk;
-    const lines = stdoutBuffer.split('\n');
-    stdoutBuffer = lines.pop() ?? '';
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        handleEvent(JSON.parse(line) as GeminiJsonEvent);
-      } catch {
-        text += line + '\n';
-        options?.onEvent?.({ type: 'text', delta: line + '\n' });
-      }
-    }
-  });
-
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', (chunk: string) => {
-    stderr += chunk;
-  });
-
-  const exitCode = await waitForChildClose(child, 'gemini', options?.signal);
-
-  if (stdoutBuffer.trim()) {
-    try {
-      handleEvent(JSON.parse(stdoutBuffer) as GeminiJsonEvent);
-    } catch {
-      text += stdoutBuffer;
-    }
-  }
-
-  if (exitCode !== 0) {
-    throw new Error((stderr.trim() || `gemini exited with code ${exitCode}`).split('\n').slice(-8).join('\n'));
-  }
-  if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
-    throw new Error(formatNativeWebSearchEnforcementError(requirement));
   }
 
   return { text, usage, output: text };

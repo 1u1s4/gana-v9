@@ -164,7 +164,7 @@ El formato canonico de validaciones es:
 Wrappers versionados:
 
 - `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, localiza el artifact publicado para esa fecha, corre `pnpm gana validate --date DATE --recommendation-artifact PATH`, corre `pnpm gana metrics daily --date DATE --scope daily-DATE --recommendation-artifact PATH` y notifica las estadisticas a Discord.
-- `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de manana en `America/Guatemala`, corre E2E completo Codex+Gemini con low-odds threshold `1.20`, pasa recomendaciones por council gate y notifica recomendaciones con resumen council integrado.
+- `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de manana en `America/Guatemala`, corre E2E completo Codex con low-odds threshold `1.20`, pasa recomendaciones por council gate y notifica recomendaciones con resumen council integrado.
 - `scripts/gana-previous-day-validation-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
 - `scripts/gana-daily-e2e-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
 - `scripts/install-gana-hermes-cron.sh`: instala los jobs en Hermes cron.

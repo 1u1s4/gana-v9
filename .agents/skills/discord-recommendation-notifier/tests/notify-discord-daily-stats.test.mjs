@@ -32,7 +32,7 @@ describe('discord daily stats notifier', () => {
     assert.match(payload.embeds[0].description, /Fecha: 2026-05-14 \(America\/Guatemala\)/);
     assert.match(payload.embeds[0].description, /Estado: 12 resueltas, 3 pendientes, 1 sin validar/);
     assert.match(payload.embeds[0].description, /Predicciones: 8 ganadas, 2 perdidas, 3 pendientes, 1 sin validar, total 15, hit 80%, odds 1.72, conf 69%, edge \+5.5%/);
-    assert.match(payload.embeds[0].description, /Providers: codex 8 \(5-1, hit 83.3%\); gemini 7 \(3-1, hit 75%\)/);
+    assert.match(payload.embeds[0].description, /Providers: codex 8 \(5-1, hit 83.3%\); secondary 7 \(3-1, hit 75%\)/);
     assert.match(payload.embeds[0].description, /Parlays: 1 ganadas, 1 perdidas, total 2, hit 50%, odds 2.18, conf 58%/);
     assert.match(payload.embeds[0].description, /Gate: won/);
     assert.doesNotMatch(payload.embeds[0].description, /[📊🎯🧩✅❌⏳⚪]/u);
@@ -352,7 +352,7 @@ function sampleSnapshot(metricDate) {
       avgEdge: 0.055,
       byProvider: [
         { label: 'codex', total: 8, won: 5, lost: 1, hitRate: 83.3 },
-        { label: 'gemini', total: 7, won: 3, lost: 1, hitRate: 75 },
+        { label: 'secondary', total: 7, won: 3, lost: 1, hitRate: 75 },
       ],
     },
     parlayMetrics: {

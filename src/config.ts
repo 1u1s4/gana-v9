@@ -62,7 +62,7 @@ export interface GanaConfigExtension {
 }
 
 export interface AgentConfig extends GanaConfigExtension {
-  provider: 'codex' | 'gemini' | 'openrouter';
+  provider: 'codex' | 'openrouter';
   apiKey: string;
   model: string;
   name: string;
@@ -82,11 +82,6 @@ export interface AgentConfig extends GanaConfigExtension {
   codexSandbox: 'read-only' | 'workspace-write' | 'danger-full-access';
   codexFallbackModels: string[];
   codexThreadId?: string;
-  geminiHome: string;
-  geminiModelListPath: string;
-  geminiFallbackModels: string[];
-  geminiApprovalMode: 'default' | 'auto_edit' | 'yolo' | 'plan';
-  geminiSessionId?: string;
 }
 
 export type AppConfig = AgentConfig;
@@ -128,11 +123,7 @@ function isCodexSandbox(value: unknown): value is AgentConfig['codexSandbox'] {
   return value === 'read-only' || value === 'workspace-write' || value === 'danger-full-access';
 }
 
-function isGeminiApprovalMode(value: unknown): value is AgentConfig['geminiApprovalMode'] {
-  return value === 'default' || value === 'auto_edit' || value === 'yolo' || value === 'plan';
-}
-
-const SUPPORTED_AGENT_PROVIDERS = ['codex', 'gemini', 'openrouter'] as const;
+const SUPPORTED_AGENT_PROVIDERS = ['codex', 'openrouter'] as const;
 
 function parseAgentProvider(value: unknown, source: string): AgentConfig['provider'] | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -289,10 +280,6 @@ const DEFAULTS: AgentConfig = {
   codexModelListPath: 'config/codex-models.json',
   codexSandbox: 'workspace-write',
   codexFallbackModels: ['gpt-5.4-mini'],
-  geminiHome: join(process.env.HOME ?? '', '.gemini'),
-  geminiModelListPath: 'config/gemini-models.json',
-  geminiFallbackModels: ['gemini-3-pro', 'gemini-2.5-pro', 'gemini-2.5-flash'],
-  geminiApprovalMode: 'default',
 };
 
 export function loadConfig(
@@ -382,12 +369,6 @@ export function loadConfig(
   if (process.env.CODEX_MODEL_LIST_PATH) config.codexModelListPath = process.env.CODEX_MODEL_LIST_PATH;
   if (isCodexSandbox(process.env.AGENT_CODEX_SANDBOX)) config.codexSandbox = process.env.AGENT_CODEX_SANDBOX;
   if (process.env.AGENT_CODEX_FALLBACK_MODELS) config.codexFallbackModels = parseStringList(process.env.AGENT_CODEX_FALLBACK_MODELS) ?? [];
-  if (process.env.GEMINI_HOME) config.geminiHome = process.env.GEMINI_HOME;
-  if (process.env.GEMINI_MODEL_LIST_PATH) config.geminiModelListPath = process.env.GEMINI_MODEL_LIST_PATH;
-  if (process.env.AGENT_GEMINI_FALLBACK_MODELS) config.geminiFallbackModels = parseStringList(process.env.AGENT_GEMINI_FALLBACK_MODELS) ?? [];
-  if (isGeminiApprovalMode(process.env.AGENT_GEMINI_APPROVAL_MODE)) {
-    config.geminiApprovalMode = process.env.AGENT_GEMINI_APPROVAL_MODE;
-  }
 
   const envSeason = parseNumber(process.env.GANA_DEFAULT_SEASON);
   const envThreshold = parseNumber(process.env.GANA_LOW_ODDS_THRESHOLD);
@@ -451,9 +432,6 @@ export function loadConfig(
   }
   if (config.provider === 'codex' && validateAgentAuth && !existsSync(resolve(config.codexHome, 'auth.json'))) {
     throw new Error(`Codex auth not found at ${resolve(config.codexHome, 'auth.json')}. Run "codex login" first.`);
-  }
-  if (config.provider === 'gemini' && validateAgentAuth && !existsSync(resolve(config.geminiHome, 'oauth_creds.json'))) {
-    throw new Error(`Gemini auth not found at ${resolve(config.geminiHome, 'oauth_creds.json')}. Run "gemini" and complete login first.`);
   }
   return config;
 }

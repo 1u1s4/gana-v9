@@ -123,7 +123,7 @@ interface DailyProgressSnapshot {
 }
 
 export interface DailyParlayFamilyResult {
-  family: 'codex-only' | 'gemini-only' | 'consensus-mixed';
+  family: 'codex-only';
   profile?: string | null;
   runId?: string;
   sourceRunIds: string[];
@@ -180,7 +180,7 @@ export interface DailyE2EDependencies {
   writeRunJson?: (config: Pick<AgentConfig, 'artifactRoot'>, runId: string, run: unknown) => string;
 }
 
-const DEFAULT_DAILY_PROVIDERS: DailyE2EProvider[] = ['codex', 'gemini'];
+const DEFAULT_DAILY_PROVIDERS: DailyE2EProvider[] = ['codex'];
 interface DailyValidationFreshness {
   status: 'fresh' | 'thin' | 'empty';
   date: string;
@@ -389,7 +389,7 @@ export async function runDailyE2E(
     const runId = providerPipelineResults[provider]?.runId;
     if (!runId || parlayProfiles.length === 0) {
       parlayFamilies.push({
-        family: provider === 'codex' ? 'codex-only' : 'gemini-only',
+        family: 'codex-only',
         profile: null,
         runId,
         sourceRunIds: runId ? [runId] : [],
@@ -410,32 +410,8 @@ export async function runDailyE2E(
         sourceRunId: runId,
         portfolio: parlayProfile,
       }, parlayRuntime);
-      parlayFamilies.push(toParlayFamily(provider === 'codex' ? 'codex-only' : 'gemini-only', [runId], result, parlayProfile));
+      parlayFamilies.push(toParlayFamily('codex-only', [runId], result, parlayProfile));
     }
-  }
-
-  if (usableProviderRunIds.length >= 2) {
-    for (const parlayProfile of (parlayProfiles.length ? parlayProfiles : [undefined])) {
-      const mixedRunId = parlayProfile
-        ? boundedDailyChildRunId(dailyBatchId, 'mixed', parlayProfile)
-        : boundedDailyChildRunId(dailyBatchId, 'mixed');
-      const mixedRuntime = childRuntime(runtime, effectiveConfig, mixedRunId);
-      const mixed = await buildParlay(effectiveConfig, {
-        date: input.date,
-        sourceRunIds: usableProviderRunIds,
-        ...(parlayProfile ? { portfolio: parlayProfile } : {}),
-      } satisfies RunParlayBuildInput, mixedRuntime);
-      parlayFamilies.push(toParlayFamily('consensus-mixed', usableProviderRunIds, mixed, parlayProfile ?? null));
-    }
-  } else {
-    parlayFamilies.push({
-      family: 'consensus-mixed',
-      profile: null,
-      sourceRunIds: usableProviderRunIds,
-      ok: false,
-      verdict: 'blocked',
-      error: 'mixed parlays require usable Codex and Gemini source runs with predictions',
-    });
   }
 
   const parlayAnalysisRunIds = uniqueStrings([
@@ -624,7 +600,6 @@ export async function runDailyE2E(
   });
   const requiredLeagueGoalPassed = requiredLeagueArtifact.goalCheck.status === 'passed';
   const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
-  const hasConsensus = parlayFamilies.some((family) => family.family === 'consensus-mixed' && family.ok);
   const hasAnySuccessfulProvider = providerRuns.some((run) => run.ok);
   const allProvidersSucceeded = providerRuns.every((run) => run.ok);
   const validationFreshEnoughForPromotion = validationFreshness.status === 'fresh';
@@ -633,7 +608,7 @@ export async function runDailyE2E(
     && (hasAnyValidParlayFamily || hasAnalyticalRecommendations)
     && (parlayAnalysis?.ok ?? false)
     && metrics.ok;
-  const verdict = ok && hasConsensus && allProvidersSucceeded && validationFreshEnoughForPromotion && requiredLeagueGoalPassed
+  const verdict = ok && hasAnyValidParlayFamily && allProvidersSucceeded && validationFreshEnoughForPromotion && requiredLeagueGoalPassed
     ? 'promotable'
     : ok
       ? 'review-required'
@@ -1041,8 +1016,8 @@ function validateDailyInput(input: RunDailyE2EInput): void {
 
 function normalizeProviders(providers: DailyE2EProvider[] | undefined): DailyE2EProvider[] {
   const values = providers?.length ? providers : DEFAULT_DAILY_PROVIDERS;
-  const invalid = values.filter((provider) => provider !== 'codex' && provider !== 'gemini');
-  if (invalid.length) throw new Error(`--providers only supports codex,gemini for daily-e2e. Invalid: ${invalid.join(',')}`);
+  const invalid = values.filter((provider) => provider !== 'codex');
+  if (invalid.length) throw new Error(`--providers only supports codex for daily-e2e. Invalid: ${invalid.join(',')}`);
   return Array.from(new Set(values));
 }
 
@@ -1052,7 +1027,7 @@ function normalizeProviderConcurrency(inputConcurrency: number | undefined, prov
   if (parsedEnv !== undefined && (!Number.isInteger(parsedEnv) || parsedEnv < 1)) {
     throw new Error('GANA_DAILY_PROVIDER_CONCURRENCY must be a positive integer.');
   }
-  const requested = inputConcurrency ?? parsedEnv ?? 2;
+  const requested = inputConcurrency ?? parsedEnv ?? 1;
   return Math.min(Math.max(1, requested), Math.max(1, providerCount));
 }
 
@@ -1209,7 +1184,6 @@ function configForProvider(
     provider,
     model: modelForProvider(config, provider, models),
     codexThreadId: undefined,
-    geminiSessionId: undefined,
   };
 }
 

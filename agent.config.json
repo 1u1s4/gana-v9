@@ -11,9 +11,6 @@
   "codexHome": "/Users/luisalvarado/.codex",
   "codexModelListPath": "config/codex-models.json",
   "codexSandbox": "workspace-write",
-  "geminiHome": "/Users/luisalvarado/.gemini",
-  "geminiModelListPath": "config/gemini-models.json",
-  "geminiApprovalMode": "yolo",
   "showBanner": true,
   "display": {
     "inputStyle": "block",

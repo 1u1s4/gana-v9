@@ -87,8 +87,8 @@ input_data = {
         "No qualitative evidence was found for the 'corners_over_under' market. Analysis for this market is based solely on odds."
       ]
     },
-    "providerAgentic": "gemini",
-    "model": "gemini-2.5-pro",
+    "providerAgentic": "codex",
+    "model": "gpt-5.5",
     "promptVersion": "research-fixture-v2",
     "warnings": [
       "mapped conflictStatus \"partial_conflict\" to \"conflict\" on claim \"claim_5\"",      "mapped conflictStatus "partial_conflict" to "conflict" on claim "claim_6"",
@@ -137,7 +137,7 @@ input_data = {
       ],
       "webSearchCoverage": {
         "mode": "live",
-        "provider": "gemini",
+        "provider": "codex",
         "nativeSupported": True,
         "nativeToolUsed": True,
         "browserFallbackUsed": False,

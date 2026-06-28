@@ -280,8 +280,8 @@ if __name__ == "__main__":
                     "market btts skipped/review-required: missing market-specific research evidence"
                 ]
             },
-            "providerAgentic": "gemini",
-            "model": "gemini-2.5-flash",
+            "providerAgentic": "codex",
+            "model": "gpt-5.5",
             "promptVersion": "research-fixture-v2",
             "warnings": [
                 "market double_chance skipped/review-required: missing market-specific research evidence",
@@ -338,7 +338,7 @@ if __name__ == "__main__":
                 ],
                 "webSearchCoverage": {
                     "mode": "live",
-                    "provider": "gemini",
+                    "provider": "codex",
                     "nativeSupported": True,
                     "nativeToolUsed": True,
                     "browserFallbackUsed": False,

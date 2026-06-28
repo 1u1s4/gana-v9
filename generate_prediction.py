@@ -245,8 +245,8 @@ input_json = """
         "No evidence found for 'corners_over_under' market."
         ]
         }
-    "providerAgentic": "gemini",
-    "model": "gemini-2.5-flash",
+    "providerAgentic": "codex",
+    "model": "gpt-5.5",
     "promptVersion": "research-fixture-v2",
     "warnings": [
       "mapped invalid supportLevel \\\\"neutral\\\\" to \\\\"weak\\\\" on claim \\\\"claim_h2h_draw\\\\"",
@@ -296,7 +296,7 @@ input_json = """
       ],
       "webSearchCoverage": {
         "mode": "live",
-        "provider": "gemini",
+        "provider": "codex",
         "required": true,
         "nativeToolUsed": true,
         "nativeSupported": true,

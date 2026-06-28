@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { codexArgs, geminiArgs, runAgent } from './agent.js';
+import { codexArgs, runAgent } from './agent.js';
 import { loadConfig, type AgentConfig } from './config.js';
 import { deriveNativeWebSearchRequirement } from './providers/agentic/helpers.js';
 
@@ -15,7 +15,6 @@ function config(overrides: Partial<AgentConfig>): AgentConfig {
     provider: 'codex',
     model: 'test-model',
     codexSandbox: 'workspace-write',
-    geminiApprovalMode: 'default',
     nativeWebSearch: false,
     ...overrides,
   }, { skipApiKey: true });
@@ -80,28 +79,6 @@ describe('native provider args', () => {
     assert.equal(argValue(args, '--output-last-message'), '/tmp/last-message.json');
     assert.equal(args.at(-2), 'thread-1');
     assert.equal(args.at(-1), '-');
-  });
-
-  it('does not elevate Gemini approval mode from full-permissions profile alone', () => {
-    const cfg = config({
-      provider: 'gemini',
-      profile: 'full-permissions',
-      approvalMode: 'auto-grant',
-      geminiApprovalMode: 'default',
-    });
-
-    assert.equal(argValue(geminiArgs(cfg, 'prompt'), '--approval-mode'), 'default');
-  });
-
-  it('uses Gemini yolo only when explicitly configured', () => {
-    const cfg = config({
-      provider: 'gemini',
-      profile: 'full-permissions',
-      approvalMode: 'auto-grant',
-      geminiApprovalMode: 'yolo',
-    });
-
-    assert.equal(argValue(geminiArgs(cfg, 'prompt'), '--approval-mode'), 'yolo');
   });
 
   it('falls back to gpt-5.4-mini when Codex reports a quota limit for the primary model', async () => {
@@ -175,47 +152,6 @@ console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, o
       assert.equal(cfg.model, 'gpt-5.4-mini');
       const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { model: string });
       assert.deepEqual(calls.map((call) => call.model), ['gpt-5.3-codex-spark', 'gpt-5.4-mini']);
-    } finally {
-      process.env.PATH = originalPath;
-    }
-  });
-
-  it('falls back from Gemini Pro to Flash Lite when Pro and Flash fail', async () => {
-    const originalPath = process.env.PATH;
-    const binDir = mkdtempSync(join(tmpdir(), 'gana-gemini-bin-'));
-    const callsPath = join(binDir, 'calls.jsonl');
-    const geminiPath = join(binDir, 'gemini');
-    writeFileSync(geminiPath, `#!/usr/bin/env node
-const fs = require('fs');
-const args = process.argv.slice(2);
-const model = args[args.indexOf('--model') + 1];
-fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify({ model, args }) + '\\n');
-if (model === 'gemini-2.5-pro') {
-  console.error('404 model not found: gemini-2.5-pro');
-  process.exit(1);
-}
-if (model === 'gemini-2.5-flash') {
-  console.error('503 model unavailable: gemini-2.5-flash');
-  process.exit(1);
-}
-console.log(JSON.stringify({ type: 'message', role: 'assistant', content: 'gemini fallback ok' }));
-console.log(JSON.stringify({ type: 'result', stats: { input_tokens: 3, output_tokens: 4 } }));
-`);
-    chmodSync(geminiPath, 0o755);
-    process.env.PATH = `${binDir}:${originalPath ?? ''}`;
-    try {
-      const cfg = config({
-        provider: 'gemini',
-        model: 'gemini-2.5-pro',
-        geminiFallbackModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'],
-      });
-
-      const result = await runAgent(cfg, 'hello');
-
-      assert.equal(result.text, 'gemini fallback ok');
-      assert.equal(cfg.model, 'gemini-2.5-flash-lite');
-      const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { model: string });
-      assert.deepEqual(calls.map((call) => call.model), ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite']);
     } finally {
       process.env.PATH = originalPath;
     }

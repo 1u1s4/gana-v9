@@ -1607,7 +1607,6 @@ function isolatedAgentConfig(config: AgentConfig): AgentConfig {
   return {
     ...config,
     codexThreadId: undefined,
-    geminiSessionId: undefined,
   };
 }
 

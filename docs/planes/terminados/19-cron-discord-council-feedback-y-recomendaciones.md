@@ -63,7 +63,7 @@ Gana Hermes · Discord native embeds•hoy a las 7:05
 📌 Total 737 · 📈 Hit 66.6% · 🎲 Odds 1.732 · 🧠 Conf 71.58% · 📊 Edge +7.29%
 🤖 Providers:
 • codex: 376 total · 195-95 · hit 67.2%
-• gemini: 361 total · 176-91 · hit 65.9%
+• deprecated-provider: 361 total · 176-91 · hit 65.9%
 🧩 Parlays
 ✅ 30 · ❌ 4 · ➖ 0 · ⏳ 0 · 🚫 0 · ⚪ 0
 📌 Total 34 · 📈 Hit 88.2% · 🎲 Odds 1.765 · 🧠 Conf 81.97%
@@ -119,7 +119,7 @@ Gana Hermes · Discord native embeds•hoy a las 7:06
 📌 Total 737 · 📈 Hit 66.6% · 🎲 Odds 1.732 · 🧠 Conf 71.58% · 📊 Edge +7.29%
 🤖 Providers:
 • codex: 376 total · 195-95 · hit 67.2%
-• gemini: 361 total · 176-91 · hit 65.9%
+• deprecated-provider: 361 total · 176-91 · hit 65.9%
 🧩 Parlays
 ✅ 30 · ❌ 4 · ➖ 0 · ⏳ 0 · 🚫 0 · ⚪ 0
 📌 Total 34 · 📈 Hit 88.2% · 🎲 Odds 1.765 · 🧠 Conf 81.97%

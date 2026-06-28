@@ -42,7 +42,6 @@ export interface DailyProviderComparisonSummary {
   sameMarketDifferentSelectionAndLine: number;
   materialDisagreements: number;
   onlyCodex: number;
-  onlyGemini: number;
   onlyByProvider: Record<string, number>;
   agreementRate: number | null;
   disagreementRate: number | null;
@@ -137,7 +136,6 @@ export function buildDailyProviderComparison(input: {
     sameMarketDifferentSelectionAndLine,
     materialDisagreements,
     onlyCodex: onlyByProvider.codex ?? 0,
-    onlyGemini: onlyByProvider.gemini ?? 0,
     onlyByProvider,
     agreementRate,
     disagreementRate,

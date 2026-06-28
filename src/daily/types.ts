@@ -2,7 +2,7 @@ import type { ParlayAnalysisRecommendation } from '../parlay/analysis.js';
 import type { PredictionRecordView } from '../prediction/types.js';
 import type { AgentProvider } from '../providers/agentic/types.js';
 
-export type DailyE2EProvider = Extract<AgentProvider, 'codex' | 'gemini'>;
+export type DailyE2EProvider = Extract<AgentProvider, 'codex'>;
 
 export type DailyParlayProfile =
   | 'safe-consensus'

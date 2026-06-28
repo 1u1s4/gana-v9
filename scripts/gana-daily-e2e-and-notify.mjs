@@ -16,10 +16,9 @@ const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(1);
 const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
 const discordTargets = resolveDiscordTargets({ gatewayTarget: args.gatewayTarget });
-const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex,gemini';
+const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex';
 const codexModel = args.codexModel ?? process.env.GANA_DAILY_CODEX_MODEL;
-const geminiModel = args.geminiModel ?? process.env.GANA_DAILY_GEMINI_MODEL;
-const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 2);
+const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 1);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
 const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026';
 const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
@@ -115,7 +114,6 @@ const command = [
   '--daily-batch-id', dailyBatchId,
 ];
 if (codexModel) command.push('--codex-model', codexModel);
-if (geminiModel) command.push('--gemini-model', geminiModel);
 
 const env = {
   ...process.env,
@@ -317,7 +315,6 @@ function parseArgs(argv) {
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--providers') parsed.providers = requireValue(argv, ++index, arg);
     else if (arg === '--codex-model') parsed.codexModel = requireValue(argv, ++index, arg);
-    else if (arg === '--gemini-model') parsed.geminiModel = requireValue(argv, ++index, arg);
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--max-fixtures') parsed.maxFixtures = Number(requireValue(argv, ++index, arg));

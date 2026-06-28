@@ -220,9 +220,9 @@ export function optionalDailyProvidersFlag(flags: CommandFlags): DailyE2EProvide
   const value = optionalStringFlag(flags, 'providers');
   if (value === undefined) return undefined;
   const providers = value.split(',').map((provider) => provider.trim()).filter(Boolean);
-  const invalid = providers.filter((provider) => provider !== 'codex' && provider !== 'gemini');
+  const invalid = providers.filter((provider) => provider !== 'codex');
   if (!providers.length || invalid.length) {
-    throw new Error(`--providers must be a comma-separated list using codex,gemini. Invalid: ${invalid.join(',') || value}.`);
+    throw new Error(`--providers must be codex. Invalid: ${invalid.join(',') || value}.`);
   }
   return [...new Set(providers)] as DailyE2EProvider[];
 }
@@ -288,9 +288,7 @@ export function requiredRunId(flags: CommandFlags): string {
 export function optionalDailyProviderModelsFlag(flags: CommandFlags): Partial<Record<DailyE2EProvider, string>> | undefined {
   const models: Partial<Record<DailyE2EProvider, string>> = {};
   const codexModel = optionalStringFlag(flags, 'codex-model')?.trim();
-  const geminiModel = optionalStringFlag(flags, 'gemini-model')?.trim();
   if (codexModel) models.codex = codexModel;
-  if (geminiModel) models.gemini = geminiModel;
   return Object.keys(models).length ? models : undefined;
 }
 

@@ -1087,7 +1087,7 @@ describe('runFixtureScoring', () => {
         openingOdds: 2.3,
         providerPredictions: [
           { provider: 'codex', selection: 'yes', probability: 0.9 },
-          { provider: 'gemini', selection: 'yes', probability: 0.62 },
+          { provider: 'secondary', selection: 'yes', probability: 0.62 },
         ],
       },
     };

@@ -2,7 +2,7 @@
   "name": "llm-parlay-refinado-v1",
   "description": "Selects a single refined analytical soccer parlay from a pool of pre-scored atomic predictions.",
   "engine": "text",
-  "model": "gemini-1.5-pro-latest",
+  "model": "gpt-5.5",
   "temperature": 0.1,
   "max_tokens": 2048,
   "promptSha256": "24c8b1d653d79bf6b657501a6b3be01ec8a8fed3f6a954fd0eba2d917f07a7dc",

@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Formalizar el contrato comun de Codex CLI, Gemini CLI y Cursor Agent que ya existe en `src/agent.ts`, integrarlo con runtime/session/audit, y mantener OpenRouter solo como compatibilidad tecnica.
+Formalizar el contrato comun de Codex CLI, deprecated provider CLI y Cursor Agent que ya existe en `src/agent.ts`, integrarlo con runtime/session/audit, y mantener OpenRouter solo como compatibilidad tecnica.
 
 ## SRS cubierto
 
@@ -16,7 +16,7 @@ Formalizar el contrato comun de Codex CLI, Gemini CLI y Cursor Agent que ya exis
 
 - `AgentEvent` normalizado: `text`, `tool_call`, `tool_result`, `reasoning`.
 - Codex via `codex exec --json`.
-- Gemini via `gemini --prompt --output-format stream-json`.
+- deprecated provider via `deprecated-provider --prompt --output-format stream-json`.
 - Cursor via `cursor-agent --print --output-format stream-json --stream-partial-output`.
 - OpenRouter via `@openrouter/agent`.
 - Enforcement de web search nativo cuando `nativeWebSearch` esta activo.
@@ -37,7 +37,7 @@ Formalizar el contrato comun de Codex CLI, Gemini CLI y Cursor Agent que ya exis
 Crear `src/providers/agentic/types.ts`:
 
 ```ts
-type AgentProvider = 'codex' | 'gemini' | 'cursor';
+type AgentProvider = 'codex' | 'deprecated-provider' | 'cursor';
 
 interface AgentProviderState {
   provider: AgentProvider | 'openrouter';
@@ -63,7 +63,7 @@ Debe mostrar:
 - session JSONL path;
 - provider agentic activo;
 - modelo activo;
-- Codex thread ID / Gemini session ID / Cursor session ID redacted;
+- Codex thread ID / deprecated provider session ID / Cursor session ID redacted;
 - run ID activo si existe;
 - artifact root;
 - usage acumulado;
@@ -83,7 +83,7 @@ Mantener el comportamiento actual de `/provider`, pero agregar eventos:
 Al cambiar de provider:
 
 - limpiar mensajes del provider anterior;
-- limpiar `codexThreadId`, `geminiSessionId`, `cursorSessionId`;
+- limpiar `codexThreadId`, `deprecated-providerSessionId`, `cursorSessionId`;
 - mantener la session JSONL del harness o abrir nueva session segun comportamiento actual de `resetProviderSession`;
 - registrar evento en session y audit si existe run activo.
 
@@ -92,7 +92,7 @@ Al cambiar de provider:
 Mantener los scripts:
 
 - `scripts/update-codex-models.ts`
-- `scripts/update-gemini-models.ts`
+- `scripts/update-deprecated-provider-models.ts`
 - `scripts/update-cursor-models.ts`
 
 `/model` debe seguir leyendo el catalogo del provider activo. No debe mezclar modelos entre providers.
@@ -157,11 +157,11 @@ OpenRouter se mantiene:
 - como fallback no estrategico;
 - sin aparecer como proveedor principal del MVP productivo.
 
-No debe bloquear los planes deportivos. Los nuevos comandos productivos deben preferir `codex`, `gemini` y `cursor`.
+No debe bloquear los planes deportivos. Los nuevos comandos productivos deben preferir `codex`, `deprecated-provider` y `cursor`.
 
 ## Criterios de aceptacion
 
-- `/provider` sigue funcionando para `codex`, `gemini`, `cursor`, `openrouter`.
+- `/provider` sigue funcionando para `codex`, `deprecated-provider`, `cursor`, `openrouter`.
 - `/model` lista solo modelos del provider activo.
 - `/session` muestra estado util sin secretos.
 - `/web live` puede marcar web search como obligatorio para research.
@@ -183,6 +183,6 @@ No debe bloquear los planes deportivos. Los nuevos comandos productivos deben pr
 
 ## Riesgos
 
-- Cursor/Gemini/Codex pueden cambiar JSON events. Mantener parsers defensivos y tests con muestras reales.
+- Cursor/deprecated provider/Codex pueden cambiar JSON events. Mantener parsers defensivos y tests con muestras reales.
 - No guardar prompt completo en audit log sin pasar por redaccion.
 - No tratar OpenRouter como dependencia requerida para comandos deportivos.

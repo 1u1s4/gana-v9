@@ -27,7 +27,7 @@ function context() {
 }
 
 describe('runDailyE2E', () => {
-  it('orchestrates Codex and Gemini runs, mixed parlays, recommendations, metrics, and batch artifacts', async () => {
+  it('orchestrates Codex daily run, parlays, recommendations, metrics, and batch artifacts', async () => {
     const ctx = context();
     const pipelineCalls: any[] = [];
     const parlayCalls: any[] = [];
@@ -36,21 +36,20 @@ describe('runDailyE2E', () => {
 
     const result = await runDailyE2E(ctx.config, {
       date: '2026-05-14',
-      providers: ['codex', 'gemini'],
-      providerConcurrency: 2,
+      providers: ['codex'],
+      providerConcurrency: 1,
       maxFixtures: 12,
       threshold: 1.2,
       web: 'live',
       parlayProfile: 'balanced',
       persistMetrics: true,
       dailyBatchId: 'daily-2026-05-14',
-      models: { gemini: 'gemini-3.1-pro' },
     }, ctx.runtime, {
       repositories: undefined,
       runPipeline: async (config, input, runtime, deps) => {
         pipelineCalls.push({ provider: config.provider, model: config.model, input, runtime, deps });
         const runId = `${config.provider}-run`;
-        const predictions = config.provider === 'codex' ? [highConfidencePrediction(runId)] : [];
+        const predictions = [highConfidencePrediction(runId)];
         return {
           ok: true,
           runId,
@@ -137,19 +136,14 @@ describe('runDailyE2E', () => {
     assert.equal(result.ok, true);
     assert.equal(result.dailyBatchId, 'daily-2026-05-14');
     assert.deepEqual(result.recommendations, { total: 1, parlays: 0, atomic: 1 });
-    assert.deepEqual(pipelineCalls.map((call) => call.provider), ['codex', 'gemini']);
+    assert.deepEqual(pipelineCalls.map((call) => call.provider), ['codex']);
     assert.equal(pipelineCalls[0].model, 'gpt-5.5');
-    assert.equal(pipelineCalls[1].model, 'gemini-3.1-pro');
     assert.equal(pipelineCalls[0].input.metadata.dailyBatchId, 'daily-2026-05-14');
-    assert.equal(pipelineCalls[1].input.metadata.dailyRole, 'gemini');
+    assert.equal(pipelineCalls[0].input.metadata.dailyRole, 'codex');
     assert.equal(pipelineCalls[0].input.markets.length > 0, true);
     assert.equal(pipelineCalls[0].runtime.runId, undefined);
-    assert.equal(pipelineCalls[0].deps, pipelineCalls[1].deps);
-    assert.deepEqual(parlayCalls.map((call) => call.input.sourceRunIds).filter(Boolean), [['codex-run', 'gemini-run']]);
     assert.equal(parlayCalls.some((call) => call.input.sourceRunId === 'codex-run' && call.input.portfolio === 'balanced'), true);
-    assert.equal(parlayCalls.some((call) => call.input.sourceRunId === 'gemini-run' && call.input.portfolio === 'balanced'), true);
     assert.deepEqual(analysisCalls[0].input.runIds.includes('codex-run'), true);
-    assert.deepEqual(analysisCalls[0].input.runIds.includes('gemini-run'), true);
     assert.equal(metricsCalls[0].input.scope, 'daily-2026-05-14');
 
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
@@ -157,7 +151,7 @@ describe('runDailyE2E', () => {
     assert.equal(summary.executionCapability, 'none');
     assert.equal(summary.sharedInputs.maxFixturesPerRun, 12);
     assert.equal(summary.sharedInputs.lowOddsThreshold, 1.2);
-    assert.deepEqual(summary.sharedInputs.providerModels, { codex: 'gpt-5.5', gemini: 'gemini-3.1-pro' });
+    assert.deepEqual(summary.sharedInputs.providerModels, { codex: 'gpt-5.5' });
     assert.equal(summary.counts.recommendations, 1);
     assert.equal(summary.counts.atomicRecommendations, 1);
     assert.equal(summary.providerComparison.summary.comparablePredictions, 1);
@@ -185,7 +179,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.portfolioBuckets.includes('corners-watchlist'), true);
     const progress = JSON.parse(readFileSync(join(result.artifactDir, 'daily-progress.json'), 'utf-8'));
     assert.equal(progress.phase, 'completed');
-    assert.equal(progress.providerConcurrency, 2);
+    assert.equal(progress.providerConcurrency, 1);
     assert.equal(progress.providers.codex.predictions, 1);
     assert.equal(progress.providers.codex.promotable, 1);
     const comparison = JSON.parse(readFileSync(join(result.artifactDir, 'daily-provider-comparison.json'), 'utf-8'));
@@ -884,43 +878,19 @@ describe('runDailyE2E', () => {
     assert.equal(summary.counts.councilRejected >= 1, true);
   });
 
-  it('keeps useful output when one parallel provider throws', async () => {
+  it('marks the daily run blocked when the Codex provider throws', async () => {
     const ctx = context();
 
     const result = await runDailyE2E(ctx.config, {
       date: '2026-05-14',
-      providers: ['codex', 'gemini'],
-      providerConcurrency: 2,
+      providers: ['codex'],
+      providerConcurrency: 1,
       persistMetrics: false,
       dailyBatchId: 'daily-partial-provider',
     }, ctx.runtime, {
       repositories: undefined,
-      runPipeline: async (config, input) => {
-        if (config.provider === 'codex') throw new Error('codex provider blocked');
-        return {
-          ok: true,
-          runId: `${config.provider}-run`,
-          date: input.date,
-          status: 'succeeded',
-          verdict: 'promotable',
-          artifactDir: join(ctx.config.artifactRoot, 'runs', `${config.provider}-run`),
-          artifactPath: join(ctx.config.artifactRoot, 'runs', `${config.provider}-run`),
-          evidencePackPath: '/tmp/evidence.json',
-          handoffPath: '/tmp/handoff.md',
-          steps: [],
-          fixtures: [],
-          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
-          oddsSnapshots: [],
-          research: [],
-          scoring: [],
-          parlay: {
-            ok: true,
-            runId: `${config.provider}-run`,
-            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
-            build: { parlay: { legs: [] } },
-            persistedParlayIds: ['gemini-parlay'],
-          },
-        } as any;
+      runPipeline: async () => {
+        throw new Error('codex provider blocked');
       },
       analyzeParlays: async (_config, input, runtime) => ({
         ok: true,
@@ -942,24 +912,21 @@ describe('runDailyE2E', () => {
       }),
     });
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
     assert.equal(result.providers.find((provider) => provider.provider === 'codex')?.ok, false);
-    assert.equal(result.providers.find((provider) => provider.provider === 'gemini')?.ok, true);
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
-    assert.equal(summary.verdict, 'review-required');
-    assert.equal(summary.parlays.some((family: any) => family.family === 'gemini-only' && family.ok), true);
+    assert.equal(summary.verdict, 'blocked');
     const progress = JSON.parse(readFileSync(join(result.artifactDir, 'daily-progress.json'), 'utf-8'));
     assert.equal(progress.providers.codex.status, 'blocked');
-    assert.equal(progress.providers.gemini.status, 'completed');
   });
 
-  it('uses blocked provider runs for mixed parlays when scoring produced predictions', async () => {
+  it('uses blocked Codex runs for parlays when scoring produced predictions', async () => {
     const ctx = context();
     const parlayCalls: any[] = [];
 
     const result = await runDailyE2E(ctx.config, {
       date: '2026-05-18',
-      providers: ['codex', 'gemini'],
+      providers: ['codex'],
       parlayProfile: 'balanced',
       persistMetrics: false,
       dailyBatchId: 'daily-usable-blocked-provider',
@@ -968,11 +935,11 @@ describe('runDailyE2E', () => {
       runPipeline: async (config, input) => {
         const runId = `${config.provider}-run`;
         return {
-          ok: config.provider !== 'codex',
+          ok: false,
           runId,
           date: input.date,
-          status: config.provider === 'codex' ? 'failed' : 'succeeded',
-          verdict: config.provider === 'codex' ? 'blocked' : 'promotable',
+          status: 'failed',
+          verdict: 'blocked',
           artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
           artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
           evidencePackPath: '/tmp/evidence.json',
@@ -1030,14 +997,14 @@ describe('runDailyE2E', () => {
       }),
     });
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
     assert.equal(result.providers.find((provider) => provider.provider === 'codex')?.ok, false);
     assert.equal(parlayCalls.some((call) =>
-      call.input.sourceRunIds?.includes('codex-run') && call.input.sourceRunIds?.includes('gemini-run')
+      call.input.sourceRunId === 'codex-run'
     ), true);
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.parlays.some((family: any) =>
-      family.family === 'consensus-mixed' && family.sourceRunIds.includes('codex-run') && family.sourceRunIds.includes('gemini-run')
+      family.family === 'codex-only' && family.sourceRunIds.includes('codex-run')
     ), true);
   });
 
@@ -1106,7 +1073,7 @@ describe('runDailyE2E', () => {
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.verdict, 'review-required');
     assert.equal(summary.providers[0].provider, 'codex');
-    assert.equal(summary.parlays.some((family: any) => family.family === 'consensus-mixed' && family.ok === false), true);
+    assert.equal(summary.parlays.some((family: any) => family.family === 'codex-only' && family.ok), true);
     const runJson = JSON.parse(readFileSync(join(result.artifactDir, 'run.json'), 'utf-8'));
     assert.equal(runJson.providerAgentic, 'codex');
   });
@@ -1199,7 +1166,7 @@ describe('runDailyE2E', () => {
 
     const result = await runDailyE2E(ctx.config, {
       date: '2026-05-14',
-      providers: ['codex', 'gemini'],
+      providers: ['codex'],
       parlayProfile: 'balanced',
       persistMetrics: false,
       dailyBatchId: 'daily-2026-05-15-smoke-with-long-name',
@@ -1267,7 +1234,7 @@ describe('runDailyE2E', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(parlayRuntimeIds.length, 5);
+    assert.equal(parlayRuntimeIds.length, 3);
     assert.equal(parlayRuntimeIds.every((id) => id.length <= 36), true);
     assert.equal(new Set(parlayRuntimeIds).size, parlayRuntimeIds.length);
   });
@@ -1298,8 +1265,8 @@ describe('runDailyE2E', () => {
 
     const result = await runDailyE2E(ctx.config, {
       date: '2026-06-12',
-      providers: ['codex', 'gemini'],
-      providerConcurrency: 2,
+      providers: ['codex'],
+      providerConcurrency: 1,
       parlayProfile: 'portfolio-v2',
       persistMetrics: false,
       dailyBatchId: 'daily-world-cup-required-coverage',
@@ -1392,9 +1359,8 @@ describe('runDailyE2E', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(pipelineInputs.length, 2);
+    assert.equal(pipelineInputs.length, 1);
     assert.deepEqual(pipelineInputs.map((input) => input.priorityLeagues), [
-      [{ providerCompetitionId: '1', name: 'World Cup', season: 2026 }],
       [{ providerCompetitionId: '1', name: 'World Cup', season: 2026 }],
     ]);
     assert.equal(result.requiredLeagueRecommendations?.status, 'review-required');
@@ -1406,7 +1372,7 @@ describe('runDailyE2E', () => {
     assert.equal(required.coverage.fixtures.find((item: any) => item.providerFixtureId === '1539000').status, 'missing-predictions');
     assert.equal(required.atomicProjections.length, 1);
     assert.equal(required.atomicProjections[0].fixture, 'USA vs Paraguay');
-    assert.deepEqual(required.atomicProjections[0].providers, ['codex', 'gemini']);
+    assert.deepEqual(required.atomicProjections[0].providers, ['codex']);
     assert.equal(required.parlayProjections.length, 6);
     assert.equal(required.parlayProjections.every((item: any) => item.status === 'blocked'), true);
     assert.equal(required.goalCheck.status, 'review-required');
@@ -1923,7 +1889,7 @@ describe('runDailyE2E', () => {
           throw new Error('should not run');
         },
       }),
-      /codex,gemini/,
+      /only supports codex/,
     );
   });
 });

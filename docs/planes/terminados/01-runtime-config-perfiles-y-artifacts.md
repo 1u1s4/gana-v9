@@ -14,7 +14,7 @@ Este plan debe implementar la seguridad basica temprano: redaccion, profile, app
 
 ## Contexto actual
 
-- `src/config.ts` carga `agent.config.json`, variables `AGENT_*`, auth local de Codex/Gemini/Cursor y display.
+- `src/config.ts` carga `agent.config.json`, variables `AGENT_*`, auth local de Codex/deprecated provider/Cursor y display.
 - `src/cli.ts` crea una sesion JSONL simple y pasa `CommandContext` a `src/commands.ts`.
 - `src/session.ts` solo persiste mensajes `{ timestamp, message }`.
 - No hay `runtime`, `profile`, `approvalMode`, `apiFootball`, `databaseUrl`, `artifactRoot`, `runId`, `taskId`, `audit log` ni redaccion centralizada.
@@ -134,7 +134,7 @@ interface RuntimeContext {
   artifactRoot: string;
   profile: GanaProfile;
   approvalMode: ApprovalMode;
-  providerAgentic: 'codex' | 'gemini' | 'cursor' | 'openrouter';
+  providerAgentic: 'codex' | 'deprecated-provider' | 'cursor' | 'openrouter';
   providerSports: 'api-football';
   model: string;
 }
@@ -264,13 +264,13 @@ Eventos minimos:
 
 `loadConfig()` debe devolver una configuracion extendida compatible con los campos actuales. Ningun consumidor existente debe romperse por falta de nuevos env vars excepto comandos productivos que requieran DB/API.
 
-Abrir la TUI no debe requerir auth agentic, `API_FOOTBALL_KEY` ni `DATABASE_URL`. Si falta auth de Codex/Gemini/Cursor, el harness debe abrir y mostrar estado `missing` o `not configured`; solo los comandos o turnos que usen ese provider deben fallar con error accionable.
+Abrir la TUI no debe requerir auth agentic, `API_FOOTBALL_KEY` ni `DATABASE_URL`. Si falta auth de Codex/deprecated provider/Cursor, el harness debe abrir y mostrar estado `missing` o `not configured`; solo los comandos o turnos que usen ese provider deben fallar con error accionable.
 
 `full-permissions` debe setear defaults coherentes:
 
 - `approvalMode = auto-grant`
 - `codexSandbox = danger-full-access` solo si config/env lo pide explicitamente
-- `geminiApprovalMode = yolo`
+- `deprecated-providerApprovalMode = yolo`
 - `cursorForce = true`
 
 `standard` debe mantener aprobaciones manuales para mutaciones sensibles.

@@ -41,7 +41,7 @@ Comandos ejecutados antes de aplicar cambios:
 
 4. `.env.example` portable y alineado al estado actual
    - Problema: tenia rutas locales absolutas de usuario y una variable heredada de Cursor, aunque Cursor ya fue removido como provider.
-   - Cambio: `CODEX_HOME` y `GEMINI_HOME` quedan vacios para usar defaults; se elimina `CURSOR_MODEL_LIST_PATH`; se agregan limites operativos faltantes para requests y research agentic.
+   - Cambio: `CODEX_HOME` y `DEPRECATED_PROVIDER_HOME` quedan vacios para usar defaults; se elimina `CURSOR_MODEL_LIST_PATH`; se agregan limites operativos faltantes para requests y research agentic.
 
 ## Backlog priorizado
 

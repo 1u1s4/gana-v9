@@ -24,7 +24,7 @@ Completado y archivado en `docs/planes/terminados`. Este roadmap queda como regi
 El repo actual es una TUI compacta TypeScript/Node:
 
 - `src/cli.ts`: entrada interactiva, lectura de input, dispatch de slash commands, sesiones y renderer.
-- `src/agent.ts`: router de proveedores `codex`, `gemini`, `cursor` y compatibilidad `openrouter`.
+- `src/agent.ts`: router de proveedores `codex`, `deprecated-provider`, `cursor` y compatibilidad `openrouter`.
 - `src/commands.ts`: slash commands actuales `/provider`, `/model`, `/fast`, `/think`, `/web`, `/new`, `/help`.
 - `src/config.ts`: configuracion de provider/modelo/display/sesiones/web search/sandbox/auth local.
 - `src/renderer.ts`: render de eventos agentic y tools.
@@ -61,7 +61,7 @@ No existe todavia DB, API-Football, runtime deportivo, artifacts de runs, reposi
    - Usa `MarketKey`, `Fixture` y `OddsQuote` del dominio; no crea tipos paralelos.
 
 7. `02-provider-agentic-y-sesiones.md`
-   - Consolidar el contrato Codex/Gemini/Cursor que ya existe en `src/agent.ts`.
+   - Consolidar el contrato Codex/deprecated provider/Cursor que ya existe en `src/agent.ts`.
    - Agregar estado de sesion, web search requerido, profile awareness y eventos normalizados.
 
 8. `07-research-scoring-y-predictions.md`
@@ -156,7 +156,7 @@ Incluido:
 - TUI local y CLI headless.
 - API-Football como unico proveedor deportivo inicial.
 - DigitalOcean MySQL durable para el RC actual; PostgreSQL queda como migracion futura explicita.
-- Codex CLI, Gemini CLI y Cursor Agent.
+- Codex CLI, deprecated provider CLI y Cursor Agent.
 - Runs, events, snapshots, evidence packs y handoff.
 - Filtros por ligas, equipos, mercados, fecha, ventana y odds `<= 1.20`.
 - Predicciones y parlays analiticos.

@@ -2074,7 +2074,7 @@ export const DASHBOARD_CLIENT_SCRIPT_BLOCK = String.raw`  <script>
             return '<tr data-kind="run" data-id="' + esc(row.id) + '"><td>' + fmtDate(row.createdAt) + '</td><td>' + badge(row.status) +
               '</td><td>' + esc(row.verdict || '—') + '</td><td>' + fmtDate(row.startedAt) + '</td><td>' + fmtDate(row.completedAt) +
               '</td><td><div>' + esc(row.date || '—') + '</div><div class="sub">' + esc(row.providerAgentic || '—') + '</div></td><td>' +
-              esc((comparison.sameSelection ?? 0) + ' same · ' + (comparison.materialDisagreements ?? comparison.sameMarketDifferentSelection ?? 0) + ' discrep · ' + (comparison.onlyCodex ?? 0) + '/' + (comparison.onlyGemini ?? 0) + ' solo') +
+              esc((comparison.sameSelection ?? 0) + ' same · ' + (comparison.materialDisagreements ?? comparison.sameMarketDifferentSelection ?? 0) + ' discrep · ' + (comparison.onlyCodex ?? 0) + ' solo') +
               '</td></tr>';
           }).join('') + '</tbody></table></div>';
       }

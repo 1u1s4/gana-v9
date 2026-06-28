@@ -87,8 +87,8 @@ input_json_str = """
         "market corners_over_under skipped/review-required: missing market-specific research evidence"
       ]
     },
-    "providerAgentic": "gemini",
-    "model": "gemini-2.5-pro",
+    "providerAgentic": "codex",
+    "model": "gpt-5.5",
     "promptVersion": "research-fixture-v2",
     "warnings": [
       "market corners_over_under skipped/review-required: missing market-specific research evidence"
@@ -137,7 +137,7 @@ input_json_str = """
       ],
       "webSearchCoverage": {
         "mode": "live",
-        "provider": "gemini",
+        "provider": "codex",
         "required": true,
         "nativeToolUsed": true,
         "nativeSupported": true,

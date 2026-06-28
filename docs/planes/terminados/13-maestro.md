@@ -61,9 +61,9 @@ Runs reales con providers:
   - artifacts: `predictions.json`, `parlay-result.json`, `parlays-blocked.json`, evidence pack y handoff exportados.
   - nota: parlay bloqueado por piernas insuficientes con `maxFixtures=1`, esperado para corrida de cuota baja.
 
-- Gemini:
+- deprecated provider:
   - intento inicial con modelo por defecto: bloqueado por 404 del provider/modelo.
-  - reintento con `AGENT_MODEL=gemini-2.5-flash`.
+  - reintento con `AGENT_MODEL=deprecated-provider-2.5-flash`.
   - runId: `08420f4e-d479-4a22-8285-8659fbe85378`
   - resultado: `review-required`
   - artifacts: evidence pack y handoff exportados.

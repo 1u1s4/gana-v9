@@ -6,7 +6,7 @@
 
 Gana v9 es una TUI de agentes y un harness operativo para investigacion de futbol, revision de cuotas, scoring de predicciones, construccion de parlays, validacion, dashboards y reportes a Discord. Esta diseñado para flujos de revision humana y no ejecuta acciones monetarias.
 
-El backend por defecto usa autenticacion local de Codex mediante `codex exec`. Gemini CLI y OpenRouter quedan disponibles como providers opcionales.
+El backend por defecto usa autenticacion local de Codex mediante `codex exec`. OpenRouter queda disponible como provider opcional de compatibilidad.
 
 ## Que Hace
 
@@ -28,7 +28,7 @@ Mantén credenciales reales solo en `.env` o en los almacenes locales de autenti
 ## Requisitos
 
 - Node.js con npm o pnpm.
-- Login de Codex CLI para el provider por defecto, o Gemini CLI / credenciales de OpenRouter para providers alternos.
+- Login de Codex CLI para el provider por defecto, o credenciales de OpenRouter para el provider opcional.
 - `DATABASE_URL` para operaciones persistidas.
 - `API_FOOTBALL_KEY` para datos live de futbol.
 - Migraciones Prisma aplicadas a la base de datos destino.
@@ -49,7 +49,7 @@ Crea configuracion local:
 cp .env.example .env
 ```
 
-Para el backend Codex por defecto no necesitas API key si ya ejecutaste `codex login`. Para Gemini, autentica con Gemini CLI. Si usas OpenRouter, define `AGENT_PROVIDER=openrouter` y agrega `OPENROUTER_API_KEY`.
+Para el backend Codex por defecto no necesitas API key si ya ejecutaste `codex login`. Si usas OpenRouter, define `AGENT_PROVIDER=openrouter` y agrega `OPENROUTER_API_KEY`.
 
 Compila y ejecuta la TUI:
 
@@ -119,7 +119,6 @@ La mayoria de ajustes runtime se controla desde `agent.config.json` y `.env`.
 Providers principales:
 
 - `codex`: provider por defecto, con modelos como `gpt-5.5`.
-- `gemini`: provider Gemini CLI, con modelos como `gemini-2.5-flash`.
 - `openrouter`: provider OpenRouter, requiere `OPENROUTER_API_KEY`.
 
 Browser Use fallback:
@@ -139,7 +138,7 @@ Limites operativos por run:
 
 - `/help`: lista comandos.
 - `/dashboard`: sirve el dashboard web local.
-- `/provider`: lista o cambia entre `codex`, `gemini` y `openrouter`.
+- `/provider`: lista o cambia entre `codex` y `openrouter`.
 - `/model`: lista, busca y cambia modelos del provider activo.
 - `/fast`: alterna modo rapido cuando el modelo/provider lo soporta.
 - `/think low|medium|high|xhigh`: ajusta razonamiento de Codex cuando esta soportado.
@@ -163,22 +162,6 @@ Actualiza el listado de modelos Codex:
 ```bash
 npm run update:codex-models
 ```
-
-### Gemini CLI
-
-- Ejecuta `gemini --prompt --output-format stream-json` como subprocess.
-- Lee autenticacion local desde `~/.gemini/oauth_creds.json`.
-- Fuerza `google_web_search` nativo cuando esta activo.
-- Reanuda la sesion Gemini entre turnos hasta usar `/new`.
-- Lee metadata desde `config/gemini-models.json` y luego agrega modelos conocidos del CLI como fallback.
-
-Actualiza el listado de modelos Gemini:
-
-```bash
-npm run update:gemini-models
-```
-
-Si `GEMINI_API_KEY` o `GOOGLE_API_KEY` esta definido, el script tambien intenta consultar la API de Gemini y fusionar esos resultados.
 
 ### OpenRouter
 

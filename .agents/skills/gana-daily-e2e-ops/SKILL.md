@@ -1,6 +1,6 @@
 ---
 name: gana-daily-e2e-ops
-description: Use when operating, rerunning, debugging, or verifying the Gana v9 daily E2E cron flow, including bad or early cron runs, missing/empty recommendation artifacts, long Codex/Gemini provider runs, fixture-label/UUID regressions, and Discord resend verification.
+description: Use when operating, rerunning, debugging, or verifying the Gana v9 daily E2E cron flow, including bad or early cron runs, missing/empty recommendation artifacts, long Codex provider runs, fixture-label/UUID regressions, and Discord resend verification.
 ---
 
 # Gana Daily E2E Ops
@@ -47,7 +47,7 @@ Do not use it for one-off fixture research or scoring unless the user is trying 
 4. Check live processes before interrupting:
 
    ```bash
-   ps -axo pid,ppid,stat,etime,command | grep -E 'gana daily-e2e|tsx src/cli|codex exec|gemini' | grep -v grep
+   ps -axo pid,ppid,stat,etime,command | grep -E 'gana daily-e2e|tsx src/cli|codex exec' | grep -v grep
    ```
 
 5. Read progress from `daily-progress.json`, provider `tasks.json`, provider `research-bundle.json`, `predictions.json`, and `daily-e2e-summary.json` when present.
@@ -61,8 +61,8 @@ For a guarded manual rerun:
 
 ```bash
 GANA_DAILY_DATE=YYYY-MM-DD \
-GANA_DAILY_PROVIDERS=codex,gemini \
-GANA_DAILY_PROVIDER_CONCURRENCY=2 \
+GANA_DAILY_PROVIDERS=codex \
+GANA_DAILY_PROVIDER_CONCURRENCY=1 \
 GANA_WEB_MODE=live \
 GANA_PARLAY_PROFILE=portfolio-v2 \
 GANA_DISCORD_MAX_SELECTIONS=25 \

@@ -37,7 +37,6 @@ export const CLAIM_CONFLICT_STATUSES = [
 
 export const AGENT_PROVIDER_COMPAT_VALUES = [
   'codex',
-  'gemini',
   'openrouter',
 ] as const;
 

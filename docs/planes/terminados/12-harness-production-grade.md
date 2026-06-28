@@ -10,7 +10,7 @@ Cerrar la brecha entre el MVP harness-first actual y un harness production-grade
 
 Este plan formaliza approval real, tool registry unico, runtime durable, trace/span, eval harness, evidence pack v2, retrieval formal, Skills y la capa de calidad analitica de predictions y parlays, manteniendo la restriccion explicita de no automatizacion monetaria.
 
-El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance: Gana v9 es TUI-first, single-user y local; los proveedores agentic (Codex, Gemini, Cursor) ya traen su propio aislamiento. La defensa se basa en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy, no en aislamiento por proceso/tarea.
+El sandbox fuerte tipo Firecracker/gVisor queda explicitamente fuera de alcance: Gana v9 es TUI-first, single-user y local; los proveedores agentic (Codex, deprecated provider, Cursor) ya traen su propio aislamiento. La defensa se basa en tool registry, approval real, redaccion, allowlist de comandos y reglas de filesystem/egress como policy, no en aislamiento por proceso/tarea.
 
 La calidad analitica no se trata como un problema de prompt: se trata como una capa de modulos deterministicos sobre el harness (devig, fair price, edge gate, calibracion, correlacion, parlay candidate generator, validation analytics, leaderboard) y como gates duros que el modelo no puede saltar.
 
@@ -44,7 +44,7 @@ Nota de coherencia productiva: `ci-certification` es certificacion deterministic
 - Pipeline canonico `executeRunPipeline` con artifacts canonicos, evidence pack y handoff.
 - Plan de permisos con metadata por herramienta, perfiles `standard` y `full-permissions`, approval mode, redaccion, audit log y restriccion monetaria.
 - Tools locales envueltas con `evaluateAction` que registra audit y redacta resultados.
-- Plan de provider agentic que reconoce Codex/Gemini/Cursor y propone OpenRouter solo como compatibilidad tecnica.
+- Plan de provider agentic que reconoce Codex/deprecated provider/Cursor y propone OpenRouter solo como compatibilidad tecnica.
 
 ## Brechas frente a la guia
 
@@ -196,7 +196,7 @@ listTools(): RegisteredTool[];
 ```ts
 type ResearchSearchTool = {
   mode: 'disabled' | 'cached' | 'live';
-  provider: 'codex-native' | 'gemini-native' | 'certification-fixture';
+  provider: 'codex-native' | 'deprecated-provider-native' | 'certification-fixture';
   required: boolean;
 };
 ```
@@ -722,7 +722,7 @@ type Prediction = {
 
 ### Reglas
 
-- Toda skill critica (`research-fixture`, `score-prediction`) puede correrse con dos proveedores agentic distintos (Codex + Gemini, por ejemplo).
+- Toda skill critica (`research-fixture`, `score-prediction`) puede correrse con dos proveedores agentic distintos (Codex + deprecated provider, por ejemplo).
 - Combinador con pesos por performance historica (mantenido por `analytics/leaderboard`).
 - Acuerdo en selection -> `confidenceBand` no degrada.
 - Desacuerdo en selection -> `confidenceBand` degrada un nivel.

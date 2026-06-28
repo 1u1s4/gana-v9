@@ -39,8 +39,8 @@ describe('daily metrics service', () => {
           },
           {
             marketKey: 'h2h',
-            providerAgentic: 'gemini',
-            model: 'gemini-2.5-pro',
+            providerAgentic: 'codex-alt',
+            model: 'gpt-5.4',
             odds: 2.1,
             confidence: 0.61,
             edge: -0.02,
@@ -71,7 +71,7 @@ describe('daily metrics service', () => {
             combinedOdds: 2.35,
             aggregateConfidence: 0.58,
             metadata: { profile: 'balanced' },
-            run: { providerAgentic: 'gemini', model: 'gemini-2.5-pro' },
+            run: { providerAgentic: 'codex-alt', model: 'gpt-5.4' },
             validationArtifacts: [{ status: 'lost' }],
             legs: [{ marketKey: 'h2h' }],
           },
@@ -116,8 +116,8 @@ describe('daily metrics service', () => {
     assert.equal(snapshot?.parlayMetrics.total, 2);
     assert.equal(snapshot?.parlayMetrics.hitRate, 50);
     assert.equal(snapshot?.parlayMetrics.byProfile?.some((item) => item.key === 'low-odds-top'), true);
-    assert.equal(snapshot?.parlayMetrics.byProvider?.some((item) => item.key === 'gemini' && item.total === 1), true);
-    assert.equal(snapshot?.parlayMetrics.byModel?.some((item) => item.key === 'gemini-2.5-pro' && item.total === 1), true);
+    assert.equal(snapshot?.parlayMetrics.byProvider?.some((item) => item.key === 'codex-alt' && item.total === 1), true);
+    assert.equal(snapshot?.parlayMetrics.byModel?.some((item) => item.key === 'gpt-5.4' && item.total === 1), true);
     assert.equal(snapshot?.chartMetrics.parlayHitRateByProfile.length, 2);
 
     const payload = writes[0]?.payload as any;

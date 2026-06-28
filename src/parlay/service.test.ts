@@ -157,7 +157,7 @@ describe('runParlayBuild', () => {
     let fixtureDateQuery: any;
     let fixtureDate: any;
 
-    const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunIds: ['codex-run', 'gemini-run'] }, runtime, {
+    const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunIds: ['codex-run', 'alt-run'] }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/parlays.json',
       repositories: {
@@ -170,7 +170,7 @@ describe('runParlayBuild', () => {
             fixtureDateQuery = query;
             return [
               prediction({ id: 'codex-pick', runId: 'codex-run', fixtureId: 'fixture-1', odds: 1.6, confidence: 0.8 }),
-              prediction({ id: 'gemini-pick', runId: 'gemini-run', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.78 }),
+              prediction({ id: 'alt-pick', runId: 'alt-run', fixtureId: 'fixture-2', odds: 1.5, confidence: 0.78 }),
             ] as any[];
           },
         },
@@ -183,13 +183,13 @@ describe('runParlayBuild', () => {
     assert.equal(result.ok, true);
     assert.equal(fixtureDate, '2026-04-25');
     assert.deepEqual(fixtureDateQuery, {
-      runIds: ['codex-run', 'gemini-run'],
+      runIds: ['codex-run', 'alt-run'],
       status: ['candidate', 'promotable'],
       take: 500,
       timezone: 'America/Guatemala',
     });
-    assert.equal(result.build.parlay.sourceRunId, 'codex-run,gemini-run');
-    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['codex-pick', 'gemini-pick']);
+    assert.equal(result.build.parlay.sourceRunId, 'codex-run,alt-run');
+    assert.deepEqual(result.build.parlay.legs.map((leg) => leg.predictionId), ['codex-pick', 'alt-pick']);
   });
 
   it('keeps hard research warning predictions out of the main parlay build', async () => {
@@ -1424,7 +1424,7 @@ describe('runParlayBuild', () => {
 
     const result = await runParlayBuild(cfg, {
       date: '2026-05-17',
-      sourceRunIds: ['source-run-codex', 'source-run-gemini'],
+      sourceRunIds: ['source-run-codex', 'source-run-alt'],
       portfolio: 'parlay-all-in',
     }, runtime, {
       now: () => now,
@@ -1448,7 +1448,7 @@ describe('runParlayBuild', () => {
       repositories: {
         predictions: {
           list: async (query) => {
-            assert.deepEqual(query.runIds, ['source-run-codex', 'source-run-gemini']);
+            assert.deepEqual(query.runIds, ['source-run-codex', 'source-run-alt']);
             return [
               ...Array.from({ length: 10 }, (_, index) => prediction({
                 id: `safe-${index + 1}`,
@@ -1464,7 +1464,7 @@ describe('runParlayBuild', () => {
               })),
               prediction({
                 id: 'duplicate-safer-odds',
-                runId: 'source-run-gemini',
+                runId: 'source-run-alt',
                 fixtureId: 'fixture-safe-1',
                 marketKey: 'double_chance',
                 selectionKey: 'home_or_draw',
@@ -1476,7 +1476,7 @@ describe('runParlayBuild', () => {
               }),
               prediction({
                 id: 'review-low-odds-1',
-                runId: 'source-run-gemini',
+                runId: 'source-run-alt',
                 fixtureId: 'fixture-review-1',
                 marketKey: 'goals_over_under',
                 selectionKey: 'over',
@@ -1491,7 +1491,7 @@ describe('runParlayBuild', () => {
               }),
               prediction({
                 id: 'review-low-odds-2',
-                runId: 'source-run-gemini',
+                runId: 'source-run-alt',
                 fixtureId: 'fixture-review-2',
                 marketKey: 'h2h',
                 selectionKey: 'home',
@@ -1505,7 +1505,7 @@ describe('runParlayBuild', () => {
               }),
               prediction({
                 id: 'review-low-odds-3',
-                runId: 'source-run-gemini',
+                runId: 'source-run-alt',
                 fixtureId: 'fixture-review-3',
                 marketKey: 'h2h',
                 selectionKey: 'home',

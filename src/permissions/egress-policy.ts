@@ -17,7 +17,6 @@ export interface EgressPolicyResult {
 
 const PROVIDER_HOSTS: Record<string, string[]> = {
   codex: ['chatgpt.com', 'api.openai.com'],
-  gemini: ['generativelanguage.googleapis.com', 'aiplatform.googleapis.com'],
   openrouter: ['openrouter.ai'],
 };
 

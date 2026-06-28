@@ -58,7 +58,7 @@ describe('permission policy', () => {
     const cases = [
       'cat .env.local',
       'sed -n "1,5p" ~/.codex/auth.json',
-      'grep token .gemini/oauth_creds.json',
+      'grep token ~/.config/oauth_creds.json',
       'cat ~/.aws/credentials',
       'cat service-account.json',
       'cat id_ed25519',
