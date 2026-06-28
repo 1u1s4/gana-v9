@@ -97,7 +97,7 @@ export function createHarnessTaskRepository(db: Pick<StoragePrismaClient, 'harne
           status: 'queued',
           OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }],
         },
-        orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
         ...takeArg(query.take),
       });
     },

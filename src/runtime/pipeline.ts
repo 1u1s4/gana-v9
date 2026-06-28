@@ -43,7 +43,9 @@ import {
   selectLowOddsHitFixtures,
   uniqueFixtureCount,
 } from './low-odds.js';
-import { scheduleRunTasks, type CanonicalTaskType, type DurableTask } from './scheduler.js';
+import { claimNextPersistedTask } from './dispatcher.js';
+import { completeTaskLease, failTaskLease, renewTaskLease } from './worker.js';
+import { enqueuePersistedRunTasks, scheduleRunTasks, type CanonicalTaskType, type DurableTask } from './scheduler.js';
 
 export type PipelineVerdict = 'promotable' | 'review-required' | 'blocked';
 export type PipelineStatus = 'succeeded' | 'failed';
@@ -162,6 +164,19 @@ export interface PipelineRepositories {
       payload?: JsonValue | null;
       lastErrorRedacted?: string | null;
     }): Promise<{ id: string } | unknown>;
+    listRunnable?(query?: { now?: Date; take?: number }): Promise<Array<{
+      id: string;
+      runId: string | null;
+      type: string;
+      status: string;
+      priority: number;
+      scheduledFor: Date | null;
+      leaseExpiresAt: Date | null;
+      attempts: number;
+      maxAttempts: number;
+      payload?: JsonValue | null;
+      lastErrorRedacted?: string | null;
+    }>>;
     updateStatus?(id: string, update: {
       status: string;
       leaseExpiresAt?: Date | null;
