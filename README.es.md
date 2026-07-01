@@ -217,6 +217,8 @@ gitleaks detect --source . --redact=100 --no-banner
 Documentacion de skills:
 
 - [Guia de skills del repo](docs/skills.md) documenta los runbooks operativos en `.agents/skills` y los contratos de prompts del harness en `skills/`.
+- [Indice canonico de docs](docs/README.md) enlaza el indice operativo de ingenieria, el runbook de repo/publicacion/seguridad, operacion diaria y estado de migracion desde Notion.
+- [Arquitectura tecnica](docs/architecture/README.md) es el punto de entrada de arquitectura migrado desde Notion y mantenido en el repo.
 
 ## Licencia
 

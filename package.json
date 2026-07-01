@@ -19,7 +19,8 @@
     "db:status": "tsx src/cli.ts db status",
     "dashboard": "tsx src/cli.ts dashboard",
     "assets:backfill": "tsx scripts/backfill-api-football-assets.ts",
-    "update:codex-models": "tsx scripts/update-codex-models.ts"
+    "update:codex-models": "tsx scripts/update-codex-models.ts",
+    "docs:check-notion-source": "node scripts/check-notion-operational-source.mjs"
   },
   "keywords": [
     "agent",
