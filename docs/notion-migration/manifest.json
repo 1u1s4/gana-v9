@@ -244,7 +244,15 @@
     "url": "https://app.notion.com/p/api-picks-email-349bea9e47368105b91fce42df180b1c",
     "file": "docs/notion-migration/exported/api-picks-email--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8194-8b04-e721c8fa8c34",
@@ -253,7 +261,15 @@
     "url": "https://app.notion.com/p/api-sb-type-broadcast-349bea9e473681948b04e721c8fa8c34",
     "file": "docs/notion-migration/exported/api-sb-type-broadcast--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81d3-883a-dce4ffba2b7d",
@@ -262,7 +278,15 @@
     "url": "https://app.notion.com/p/api-sb-type-ranking-349bea9e473681d3883adce4ffba2b7d",
     "file": "docs/notion-migration/exported/api-sb-type-ranking--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-818e-8022-d5b7900c3d0f",
@@ -271,7 +295,15 @@
     "url": "https://app.notion.com/p/api-sb-type-stats-349bea9e4736818e8022d5b7900c3d0f",
     "file": "docs/notion-migration/exported/api-sb-type-stats--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-8062-a452-f49fa910adfb",
@@ -280,7 +312,11 @@
     "url": "https://app.notion.com/p/3C-31abea9e47368062a452f49fa910adfb",
     "file": "docs/notion-migration/exported/3c--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81af-8bcd-d8c2d930fd5c",
@@ -289,7 +325,11 @@
     "url": "https://app.notion.com/p/Affiliate-Monetization-Surface-349bea9e473681af8bcdd8c2d930fd5c",
     "file": "docs/notion-migration/exported/affiliate-monetization-surface--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "obsolete_stub",
+    "canonicalPath": "docs/growth/free-to-paid-funnel.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Export vacio/stub; monetizacion integrada en funnel canonico."
   },
   {
     "id": "349bea9e-4736-81f6-9a2d-dadf53b9f289",
@@ -298,7 +338,17 @@
     "url": "https://app.notion.com/p/AI-Training-Restriction-Signal-349bea9e473681f69a2ddadf53b9f289",
     "file": "docs/notion-migration/exported/ai-training-restriction-signal--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81cb-82a7-e46f767ebc3c",
@@ -307,7 +357,17 @@
     "url": "https://app.notion.com/p/Alert-Bot-Or-Notifications-349bea9e473681cb82a7e46f767ebc3c",
     "file": "docs/notion-migration/exported/alert-bot-or-notifications--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-81ba-a850-ff608e0ee860",
@@ -316,7 +376,11 @@
     "url": "https://app.notion.com/p/Alimentaci-n-31abea9e473681baa850ff608e0ee860",
     "file": "docs/notion-migration/exported/alimentacion--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-816d-b20a-d29cb9ccaf9e",
@@ -325,7 +389,15 @@
     "url": "https://app.notion.com/p/Auth-y-registro-349bea9e4736816db20ad29cb9ccaf9e",
     "file": "docs/notion-migration/exported/auth-y-registro--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8188-a00e-d56fe7883bf3",
@@ -334,7 +406,17 @@
     "url": "https://app.notion.com/p/Bankroll-Tooling-349bea9e47368188a00ed56fe7883bf3",
     "file": "docs/notion-migration/exported/bankroll-tooling--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8180-8572-d000f1b8ef00",
@@ -343,7 +425,17 @@
     "url": "https://app.notion.com/p/Bankroll-Utility-Hook-349bea9e473681808572d000f1b8ef00",
     "file": "docs/notion-migration/exported/bankroll-utility-hook--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81a0-9279-df4d4e0c50e4",
@@ -352,7 +444,15 @@
     "url": "https://app.notion.com/p/Blog-349bea9e473681a09279df4d4e0c50e4",
     "file": "docs/notion-migration/exported/blog--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-81eb-81ed-e1591f62330f",
@@ -361,7 +461,15 @@
     "url": "https://app.notion.com/p/Bonos-390bea9e473681eb81ede1591f62330f",
     "file": "docs/notion-migration/exported/bonos--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-81ec-ae70-f3cf4a5717b8",
@@ -370,7 +478,11 @@
     "url": "https://app.notion.com/p/Brand-Sheet-31abea9e473681ecae70f3cf4a5717b8",
     "file": "docs/notion-migration/exported/brand-sheet--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-813a-8c06-e99dbe499658",
@@ -379,7 +491,11 @@
     "url": "https://app.notion.com/p/Cena-con-Raquel-31abea9e4736813a8c06e99dbe499658",
     "file": "docs/notion-migration/exported/cena-con-raquel--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81c1-9b2e-e61a498584df",
@@ -391,8 +507,15 @@
     "migrationIssue": "J-105",
     "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Checklist operativo normalizado en el runbook J-105.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Checklist operativo normalizado en el runbook de repo/publicacion/seguridad.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "34cbea9e-4736-8159-a430-f5a8d6adca3c",
@@ -401,7 +524,17 @@
     "url": "https://app.notion.com/p/Choose-the-first-external-shipping-wedge-public-web-funnel-or-channel-distribution-first-34cbea9e47368159a430f5a8d6adca3c",
     "file": "docs/notion-migration/exported/choose-the-first-external-shipping-wedge-public-web-funnel-or-channel-distribution-first--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81c8-aac1-c67feee2b4fe",
@@ -410,7 +543,17 @@
     "url": "https://app.notion.com/p/Choose-the-primary-execution-stack-and-review-lane-for-v7-to-v8-work-34cbea9e473681c8aac1c67feee2b4fe",
     "file": "docs/notion-migration/exported/choose-the-primary-execution-stack-and-review-lane-for-v7-to-v8-work--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "38dbea9e-4736-8189-b47d-ec3aad27681b",
@@ -452,8 +595,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "390bea9e-4736-814b-aff8-f89ed219cc64",
@@ -462,7 +613,15 @@
     "url": "https://app.notion.com/p/Como-funciona-390bea9e4736814baff8f89ed219cc64",
     "file": "docs/notion-migration/exported/como-funciona--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8156-9413-d015ce8aadbf",
@@ -471,7 +630,15 @@
     "url": "https://app.notion.com/p/Competitive-scraping-operating-layer-into-gana-v8-34cbea9e473681569413d015ce8aadbf",
     "file": "docs/notion-migration/exported/competitive-scraping-operating-layer-into-gana-v8--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8148-b53d-cc90d2bdbd8c",
@@ -480,7 +647,11 @@
     "url": "https://app.notion.com/p/Content-And-SEO-Layer-349bea9e47368148b53dcc90d2bdbd8c",
     "file": "docs/notion-migration/exported/content-and-seo-layer--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "obsolete_stub",
+    "canonicalPath": "docs/growth/editorial-seo-gtm.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Export vacio/stub; reemplazado por editorial/SEO/GTM canonico."
   },
   {
     "id": "34cbea9e-4736-816b-9fe1-de123d12fa8a",
@@ -489,7 +660,17 @@
     "url": "https://app.notion.com/p/CTO-34cbea9e4736816b9fe1de123d12fa8a",
     "file": "docs/notion-migration/exported/cto--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-816a-8d9a-fa90afc696af",
@@ -498,7 +679,17 @@
     "url": "https://app.notion.com/p/D1-Apertura-diaria-pick-fuerte-CTA-simple-34cbea9e4736816a8d9afa90afc696af",
     "file": "docs/notion-migration/exported/d1-apertura-diaria-pick-fuerte-cta-simple--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8126-bffc-ff9a5143e59b",
@@ -507,7 +698,17 @@
     "url": "https://app.notion.com/p/D10-Underdog-value-para-reforzar-diferenciacion-34cbea9e47368126bffcff9a5143e59b",
     "file": "docs/notion-migration/exported/d10-underdog-value-para-reforzar-diferenciacion--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-811c-adcf-d303a10ab1f8",
@@ -516,7 +717,17 @@
     "url": "https://app.notion.com/p/D11-Noticia-o-lesion-reaccion-rapida-con-criterio-34cbea9e4736811cadcfd303a10ab1f8",
     "file": "docs/notion-migration/exported/d11-noticia-o-lesion-reaccion-rapida-con-criterio--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8137-8380-cbc13a7b60b9",
@@ -525,7 +736,17 @@
     "url": "https://app.notion.com/p/D12-Sabado-Domingo-de-alto-volumen-seleccionar-no-saturar-34cbea9e473681378380cbc13a7b60b9",
     "file": "docs/notion-migration/exported/d12-sabado-domingo-de-alto-volumen-seleccionar-no-saturar--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-814d-99d0-ce6be2f36374",
@@ -534,7 +755,17 @@
     "url": "https://app.notion.com/p/D13-Prueba-social-ligera-DMs-seguimiento-y-constancia-34cbea9e4736814d99d0ce6be2f36374",
     "file": "docs/notion-migration/exported/d13-prueba-social-ligera-dms-seguimiento-y-constancia--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81bd-9972-e90dcf387560",
@@ -543,7 +774,17 @@
     "url": "https://app.notion.com/p/D14-Cierre-de-sprint-que-formato-se-queda-y-cual-se-corta-34cbea9e473681bd9972e90dcf387560",
     "file": "docs/notion-migration/exported/d14-cierre-de-sprint-que-formato-se-queda-y-cual-se-corta--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8142-a3e5-f9d8de427e86",
@@ -552,7 +793,17 @@
     "url": "https://app.notion.com/p/D2-Pick-contrarian-para-diferenciar-criterio-34cbea9e47368142a3e5f9d8de427e86",
     "file": "docs/notion-migration/exported/d2-pick-contrarian-para-diferenciar-criterio--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8162-98a7-d1d01bbba757",
@@ -561,7 +812,15 @@
     "url": "https://app.notion.com/p/D3-Thread-de-3-partidos-y-ranking-de-confianza-34cbea9e4736816298a7d1d01bbba757",
     "file": "docs/notion-migration/exported/d3-thread-de-3-partidos-y-ranking-de-confianza--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-819b-9aaa-cc523755c1f1",
@@ -570,7 +829,17 @@
     "url": "https://app.notion.com/p/D4-Accountability-publica-que-salio-bien-y-que-corregimos-34cbea9e4736819b9aaacc523755c1f1",
     "file": "docs/notion-migration/exported/d4-accountability-publica-que-salio-bien-y-que-corregimos--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8132-a3d9-f01483f8fd00",
@@ -579,7 +848,17 @@
     "url": "https://app.notion.com/p/D5-Jornada-grande-con-urgencia-y-pick-destacado-34cbea9e47368132a3d9f01483f8fd00",
     "file": "docs/notion-migration/exported/d5-jornada-grande-con-urgencia-y-pick-destacado--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81fd-8735-cf2062d54832",
@@ -588,7 +867,17 @@
     "url": "https://app.notion.com/p/D6-Educacion-rapida-como-leer-un-pick-sin-caer-en-humo-34cbea9e473681fd8735cf2062d54832",
     "file": "docs/notion-migration/exported/d6-educacion-rapida-como-leer-un-pick-sin-caer-en-humo--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8181-97a7-d5f1ef6fa027",
@@ -597,7 +886,17 @@
     "url": "https://app.notion.com/p/D7-Card-de-fin-de-semana-empaquetado-por-tiers-34cbea9e4736818197a7d5f1ef6fa027",
     "file": "docs/notion-migration/exported/d7-card-de-fin-de-semana-empaquetado-por-tiers--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8100-835b-dec25a979899",
@@ -606,7 +905,17 @@
     "url": "https://app.notion.com/p/D8-Recap-de-confianza-lo-que-aprendimos-del-fin-de-semana-34cbea9e47368100835bdec25a979899",
     "file": "docs/notion-migration/exported/d8-recap-de-confianza-lo-que-aprendimos-del-fin-de-semana--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81be-9620-fcdaf611c9c7",
@@ -615,7 +924,17 @@
     "url": "https://app.notion.com/p/D9-Rivalidad-o-partido-grande-como-motor-de-atencion-34cbea9e473681be9620fcdaf611c9c7",
     "file": "docs/notion-migration/exported/d9-rivalidad-o-partido-grande-como-motor-de-atencion--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8131-b2e4-ff975aab0e2d",
@@ -624,7 +943,17 @@
     "url": "https://app.notion.com/p/Define-the-minimum-measurement-contract-for-free-to-paid-funnel-learning-34cbea9e47368131b2e4ff975aab0e2d",
     "file": "docs/notion-migration/exported/define-the-minimum-measurement-contract-for-free-to-paid-funnel-learning--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-811d-ab87-c6a68959be4b",
@@ -633,7 +962,11 @@
     "url": "https://app.notion.com/p/Dinero-de-cumplea-os-31abea9e4736811dab87c6a68959be4b",
     "file": "docs/notion-migration/exported/dinero-de-cumpleanos--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81f0-9787-f32b582a22e7",
@@ -642,7 +975,17 @@
     "url": "https://app.notion.com/p/Engineering-Execution-Log-34cbea9e473681f09787f32b582a22e7",
     "file": "docs/notion-migration/exported/engineering-execution-log--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81b3-a7f9-d9b0e2a20ab0",
@@ -651,7 +994,15 @@
     "url": "https://app.notion.com/p/Executive-system-initialized-2026-04-23-34cbea9e473681b3a7f9d9b0e2a20ab0",
     "file": "docs/notion-migration/exported/executive-system-initialized-2026-04-23--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/operations/p0-workstreams-map.md",
+      "docs/notion-migration/j-108-migration-decisions.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo P0 workstreams map and migration decision index. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-8131-b5d9-f400bdf83fde",
@@ -660,7 +1011,15 @@
     "url": "https://app.notion.com/p/Familia-de-articulos-de-previa-390bea9e47368131b5d9f400bdf83fde",
     "file": "docs/notion-migration/exported/familia-de-articulos-de-previa--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "historical_export_not_operational",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/README.md",
+      "docs/operations/p0-workstreams-map.md"
+    ],
+    "migrationDecision": "No active operational source remains in Notion. Retained as historical export; future use requires a new scoped repo/Paperclip issue.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81c7-acb8-ea9e1bdc72c9",
@@ -669,7 +1028,15 @@
     "url": "https://app.notion.com/p/First-external-wedge-still-needs-explicit-prioritization-34cbea9e473681c7acb8ea9e1bdc72c9",
     "file": "docs/notion-migration/exported/first-external-wedge-still-needs-explicit-prioritization--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "historical_export_not_operational",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/README.md",
+      "docs/operations/p0-workstreams-map.md"
+    ],
+    "migrationDecision": "No active operational source remains in Notion. Retained as historical export; future use requires a new scoped repo/Paperclip issue.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-8153-b9ec-d75f30a13bfb",
@@ -678,7 +1045,15 @@
     "url": "https://app.notion.com/p/Foro-390bea9e47368153b9ecd75f30a13bfb",
     "file": "docs/notion-migration/exported/foro--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81ae-8e4d-d5b36a4929a4",
@@ -687,7 +1062,17 @@
     "url": "https://app.notion.com/p/Founding-Engineer-34cbea9e473681ae8e4dd5b36a4929a4",
     "file": "docs/notion-migration/exported/founding-engineer--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8144-83a7-e7bbe0acc6d1",
@@ -696,7 +1081,11 @@
     "url": "https://app.notion.com/p/Free-Daily-Picks-Surface-349bea9e4736814483a7e7bbe0acc6d1",
     "file": "docs/notion-migration/exported/free-daily-picks-surface--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "obsolete_stub",
+    "canonicalPath": "docs/growth/free-to-paid-funnel.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Export vacio/stub; superficie free picks integrada en funnel canonico."
   },
   {
     "id": "349bea9e-4736-8101-b1b8-f15b5dfbbbaf",
@@ -705,7 +1094,15 @@
     "url": "https://app.notion.com/p/Gambeta-Manual-Baseline-01-349bea9e47368101b1b8f15b5dfbbbaf",
     "file": "docs/notion-migration/exported/gambeta-manual-baseline-01--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81ea-bccb-ed5985970d4a",
@@ -752,7 +1149,15 @@
     "url": "https://app.notion.com/p/Gambeta-Sandbox-Discovery-01-349bea9e473681f8993ad2d0f50c1db3",
     "file": "docs/notion-migration/exported/gambeta-sandbox-discovery-01--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8101-83d8-fe2de46cd14b",
@@ -761,7 +1166,15 @@
     "url": "https://app.notion.com/p/Gambeta-Scheduled-Monitor-Draft-349bea9e4736810183d8fe2de46cd14b",
     "file": "docs/notion-migration/exported/gambeta-scheduled-monitor-draft--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-810c-89b3-dc462151615a",
@@ -770,7 +1183,15 @@
     "url": "https://app.notion.com/p/Gambeta-Gana-goal-principal-34cbea9e4736810c89b3dc462151615a",
     "file": "docs/notion-migration/exported/gambeta-gana-goal-principal--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/operations/p0-workstreams-map.md",
+      "docs/notion-migration/j-108-migration-decisions.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo P0 workstreams map and migration decision index. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "38dbea9e-4736-81a5-9fc5-c9664b6782a9",
@@ -779,7 +1200,11 @@
     "url": "https://app.notion.com/p/Gana-v9-02-Growth-y-contenido-Indice-operativo-38dbea9e473681a59fc5c9664b6782a9",
     "file": "docs/notion-migration/exported/gana-v9-02-growth-y-contenido-indice-operativo--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/README.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Indice operativo Growth fusionado en README y workflow canonico."
   },
   {
     "id": "390bea9e-4736-81dd-9128-c7da48584dba",
@@ -788,7 +1213,15 @@
     "url": "https://app.notion.com/p/Gana-v9-Mapa-operativo-P0-Notion-390bea9e473681dd9128c7da48584dba",
     "file": "docs/notion-migration/exported/gana-v9-mapa-operativo-p0-notion--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/operations/p0-workstreams-map.md",
+      "docs/notion-migration/j-108-migration-decisions.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo P0 workstreams map and migration decision index. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "38dbea9e-4736-813a-bedd-fc901d9ac8cb",
@@ -797,7 +1230,18 @@
     "url": "https://app.notion.com/p/Gana-v9-Notion-Documentation-Operating-Standard-J-60-38dbea9e4736813abeddfc901d9ac8cb",
     "file": "docs/notion-migration/exported/gana-v9-notion-documentation-operating-standard-j-60--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "fused_to_canonical_docs",
+    "migrationIssues": [
+      "J-104"
+    ],
+    "migrationIssue": "J-104",
+    "canonicalPaths": [
+      "docs/README.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/notion-migration/DECISIONS.md"
+    ],
+    "migrationNote": "Reemplazado por regla de fuente de verdad versionada en repo e indice de decisiones J-104.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-8195-aaa9-d35d33543deb",
@@ -806,7 +1250,15 @@
     "url": "https://app.notion.com/p/Gana-Gambeta-Sistema-ejecutivo-34cbea9e47368195aaa9d35d33543deb",
     "file": "docs/notion-migration/exported/gana-gambeta-sistema-ejecutivo--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/operations/p0-workstreams-map.md",
+      "docs/notion-migration/j-108-migration-decisions.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo P0 workstreams map and migration decision index. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8158-988c-d2a27beb9757",
@@ -815,7 +1267,11 @@
     "url": "https://app.notion.com/p/Growth-content-tracking-and-approved-picks-feed-34cbea9e47368158988cd2a27beb9757",
     "file": "docs/notion-migration/exported/growth-content-tracking-and-approved-picks-feed--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "obsolete_stub",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Export vacio/stub; reemplazado por workflow y scorecard canonicos."
   },
   {
     "id": "34cbea9e-4736-810d-b80e-e2f77292f812",
@@ -827,8 +1283,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "390bea9e-4736-8187-8560-eb259c447727",
@@ -837,7 +1301,15 @@
     "url": "https://app.notion.com/p/Herramientas-390bea9e473681878560eb259c447727",
     "file": "docs/notion-migration/exported/herramientas--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8190-97e5-eff4478a3aa5",
@@ -846,7 +1318,17 @@
     "url": "https://app.notion.com/p/HIBRI2-Proyecto-operativo-34cbea9e4736819097e5eff4478a3aa5",
     "file": "docs/notion-migration/exported/hibri2-proyecto-operativo--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-8125-be37-f30618f961c2",
@@ -855,7 +1337,17 @@
     "url": "https://app.notion.com/p/Historico-J-88-Marketing-Growth-Operating-Index-reemplazado-en-espanol-390bea9e47368125be37f30618f961c2",
     "file": "docs/notion-migration/exported/historico-j-88-marketing-growth-operating-index-reemplazado-en-espanol--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-814e-9967-f7fab0b7e7d2",
@@ -864,7 +1356,15 @@
     "url": "https://app.notion.com/p/Hub-Mundial-2026-390bea9e4736814e9967f7fab0b7e7d2",
     "file": "docs/notion-migration/exported/hub-mundial-2026--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-8185-af6e-fc7c66154330",
@@ -873,7 +1373,15 @@
     "url": "https://app.notion.com/p/Indice-de-previas-390bea9e47368185af6efc7c66154330",
     "file": "docs/notion-migration/exported/indice-de-previas--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81c5-bfd5-fc68f56a2fa2",
@@ -882,7 +1390,15 @@
     "url": "https://app.notion.com/p/Inicio-349bea9e473681c5bfd5fc68f56a2fa2",
     "file": "docs/notion-migration/exported/inicio--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "historical_export_not_operational",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/README.md",
+      "docs/operations/p0-workstreams-map.md"
+    ],
+    "migrationDecision": "No active operational source remains in Notion. Retained as historical export; future use requires a new scoped repo/Paperclip issue.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-812b-a549-fcbb32009efa",
@@ -891,7 +1407,15 @@
     "url": "https://app.notion.com/p/Inventario-publico-expandido-por-sitemaps-390bea9e4736812ba549fcbb32009efa",
     "file": "docs/notion-migration/exported/inventario-publico-expandido-por-sitemaps--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-819e-a23b-eec8b2f5eb89",
@@ -900,7 +1424,17 @@
     "url": "https://app.notion.com/p/J-21-Crear-proyecto-en-Notion-349bea9e4736819ea23beec8b2f5eb89",
     "file": "docs/notion-migration/exported/j-21-crear-proyecto-en-notion--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81ae-84d8-d05434c61a73",
@@ -909,7 +1443,17 @@
     "url": "https://app.notion.com/p/J-22-Poblar-NOTION-349bea9e473681ae84d8d05434c61a73",
     "file": "docs/notion-migration/exported/j-22-poblar-notion--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/architecture/README.md",
+      "docs/architecture/system-architecture.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo architecture and operations docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8199-9e1a-caf50a471551",
@@ -921,7 +1465,7 @@
     "migrationIssue": "J-105",
     "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Roadmap tecnico J-33 fusionado en el runbook J-105; Paperclip conserva estado vivo.",
+    "migrationNote": "Roadmap tecnico J-33 fusionado en el runbook canonico J-105; Paperclip conserva estado vivo.",
     "migrationUpdated": "2026-07-01"
   },
   {
@@ -934,7 +1478,7 @@
     "migrationIssue": "J-105",
     "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Bitacora/checklist J-34 fusionada en el runbook J-105; Notion deja de ser destino operativo.",
+    "migrationNote": "Bitacora/checklist J-34 fusionada en el runbook canonico J-105; Notion deja de ser destino operativo.",
     "migrationUpdated": "2026-07-01"
   },
   {
@@ -982,7 +1526,11 @@
     "url": "https://app.notion.com/p/J-36-Calendario-X-TikTok-free-to-paid-funnel-34cbea9e47368112bc4ad0221e29b872",
     "file": "docs/notion-migration/exported/j-36-calendario-x-tiktok-free-to-paid-funnel--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Calendario X/TikTok normalizado como workflow diario."
   },
   {
     "id": "38dbea9e-4736-81e1-846a-fb8acba701f2",
@@ -991,7 +1539,11 @@
     "url": "https://app.notion.com/p/J-40-D1-Reinicio-2-picks-claros-CTA-unica-38dbea9e473681e1846afb8acba701f2",
     "file": "docs/notion-migration/exported/j-40-d1-reinicio-2-picks-claros-cta-unica--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Fila J-40 D1 fusionada en workflow diario."
   },
   {
     "id": "38dbea9e-4736-814c-b2ea-fd584edbd4fa",
@@ -1000,7 +1552,11 @@
     "url": "https://app.notion.com/p/J-40-D2-Pick-contrarian-con-tesis-corta-38dbea9e4736814cb2eafd584edbd4fa",
     "file": "docs/notion-migration/exported/j-40-d2-pick-contrarian-con-tesis-corta--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Fila J-40 D2 fusionada en workflow diario."
   },
   {
     "id": "38dbea9e-4736-81b6-9c2d-df5f7ccde1bb",
@@ -1009,7 +1565,11 @@
     "url": "https://app.notion.com/p/J-40-D3-Accountability-publica-y-ajuste-visible-38dbea9e473681b69c2ddf5f7ccde1bb",
     "file": "docs/notion-migration/exported/j-40-d3-accountability-publica-y-ajuste-visible--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Fila J-40 D3 fusionada en workflow diario y stop conditions."
   },
   {
     "id": "38dbea9e-4736-81a1-9dcc-c00867bb6fb6",
@@ -1018,7 +1578,11 @@
     "url": "https://app.notion.com/p/J-40-D4-Jornada-fuerte-con-urgencia-y-orden-de-confianza-38dbea9e473681a19dccc00867bb6fb6",
     "file": "docs/notion-migration/exported/j-40-d4-jornada-fuerte-con-urgencia-y-orden-de-confianza--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Fila J-40 D4 fusionada en workflow diario."
   },
   {
     "id": "38dbea9e-4736-811e-9905-fac3db037b15",
@@ -1027,7 +1591,11 @@
     "url": "https://app.notion.com/p/J-40-D5-Cierre-con-prueba-social-y-decision-de-capacidad-38dbea9e4736811e9905fac3db037b15",
     "file": "docs/notion-migration/exported/j-40-d5-cierre-con-prueba-social-y-decision-de-capacidad--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Fila J-40 D5 fusionada en workflow diario."
   },
   {
     "id": "38dbea9e-4736-81ef-9afc-c606d0d98776",
@@ -1036,7 +1604,11 @@
     "url": "https://app.notion.com/p/J-54-Gana-v9-public-picks-funnel-blueprint-38dbea9e473681ef9afcc606d0d98776",
     "file": "docs/notion-migration/exported/j-54-gana-v9-public-picks-funnel-blueprint--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/free-to-paid-funnel.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Blueprint funnel normalizado en funnel y editorial/GTM canonicos."
   },
   {
     "id": "38dbea9e-4736-81d3-898d-e0bb31e10c5b",
@@ -1045,7 +1617,17 @@
     "url": "https://app.notion.com/p/J-56-Public-Picks-Contract-gana-v9-38dbea9e473681d3898de0bb31e10c5b",
     "file": "docs/notion-migration/exported/j-56-public-picks-contract-gana-v9--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "38dbea9e-4736-8153-936d-e3b5e8d08d4b",
@@ -1054,7 +1636,17 @@
     "url": "https://app.notion.com/p/J-57-Public-Results-History-and-Trust-Layer-Spec-gana-v9-38dbea9e47368153936de3b5e8d08d4b",
     "file": "docs/notion-migration/exported/j-57-public-results-history-and-trust-layer-spec-gana-v9--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "38dbea9e-4736-8159-9bc1-d0560b5d9cb1",
@@ -1063,7 +1655,11 @@
     "url": "https://app.notion.com/p/J-64-CMO-review-differentiation-originality-and-18-language-38dbea9e473681599bc1d0560b5d9cb1",
     "file": "docs/notion-migration/exported/j-64-cmo-review-differentiation-originality-and-18-language--38dbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "migrated_fused",
+    "canonicalPath": "docs/growth/free-to-paid-funnel.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Review CMO de originalidad y +18 fusionado en compliance comercial."
   },
   {
     "id": "390bea9e-4736-819b-9e90-cd9614bf2df1",
@@ -1076,13 +1672,17 @@
       "390bea9e-4736-819b-9e90-cd9614bf2df1",
       "390bea9e-4736-8124-91bd-db3c6383c77c"
     ],
-    "migrationStatus": "duplicate_export_review",
+    "migrationStatus": "migrated_reference",
     "migrationDecision": "Duplicate title detected in export. Keep one canonical repo document and treat the others as historical/source variants after content comparison.",
     "sharedExportFileIds": [
       "390bea9e-4736-819b-9e90-cd9614bf2df1",
       "390bea9e-4736-8124-91bd-db3c6383c77c"
     ],
-    "auditNotes": "El mismo archivo exportado aparece asociado a varios ids; revisar como duplicado/colisión de export. Título duplicado en manifest; elegir un canónico antes de enlazar desde índices."
+    "auditNotes": "El mismo archivo exportado aparece asociado a varios ids; revisar como duplicado/colisión de export. Título duplicado en manifest; elegir un canónico antes de enlazar desde índices.",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Duplicado de handoff J-89 tratado como referencia historica."
   },
   {
     "id": "390bea9e-4736-8124-91bd-db3c6383c77c",
@@ -1095,13 +1695,17 @@
       "390bea9e-4736-819b-9e90-cd9614bf2df1",
       "390bea9e-4736-8124-91bd-db3c6383c77c"
     ],
-    "migrationStatus": "duplicate_export_review",
+    "migrationStatus": "migrated_reference",
     "migrationDecision": "Duplicate title detected in export. Keep one canonical repo document and treat the others as historical/source variants after content comparison.",
     "sharedExportFileIds": [
       "390bea9e-4736-819b-9e90-cd9614bf2df1",
       "390bea9e-4736-8124-91bd-db3c6383c77c"
     ],
-    "auditNotes": "El mismo archivo exportado aparece asociado a varios ids; revisar como duplicado/colisión de export. Título duplicado en manifest; elegir un canónico antes de enlazar desde índices."
+    "auditNotes": "El mismo archivo exportado aparece asociado a varios ids; revisar como duplicado/colisión de export. Título duplicado en manifest; elegir un canónico antes de enlazar desde índices.",
+    "canonicalPath": "docs/growth/x-tiktok-daily-picks-sprint.md",
+    "migrationIssue": "J-107",
+    "migrationUpdated": "2026-07-01",
+    "migrationNote": "Handoff J-89 era referencia de estado; contenido util fusionado en workflow."
   },
   {
     "id": "390bea9e-4736-8122-ba6b-eea956f63b9d",
@@ -1112,8 +1716,17 @@
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
     "migrationStatus": "fused_to_canonical_docs",
-    "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Indice tecnico J-90 fusionado en el runbook J-105; Notion queda historico.",
+    "migrationNote": "Migrado/fusionado como indice operativo de ingenieria y arquitectura tecnica canonica del repo.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md",
+      "docs/architecture/system-architecture.md"
+    ],
     "migrationUpdated": "2026-07-01"
   },
   {
@@ -1125,8 +1738,17 @@
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
     "migrationStatus": "fused_to_canonical_docs",
-    "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Repo/publicacion/seguridad J-91 fusionado en el runbook J-105 sin secretos.",
+    "migrationNote": "Migrado/fusionado como runbook de repo/publicacion/seguridad y fronteras de seguridad de arquitectura.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/repo-publication-security.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/architecture/system-architecture.md"
+    ],
     "migrationUpdated": "2026-07-01"
   },
   {
@@ -1136,7 +1758,15 @@
     "url": "https://app.notion.com/p/J-92-Rebuild-del-indice-Competitive-Intelligence-Gambeta-390bea9e4736819ab3f6f73afafafe0c",
     "file": "docs/notion-migration/exported/j-92-rebuild-del-indice-competitive-intelligence-gambeta--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-816e-84dd-feb2e737b733",
@@ -1145,9 +1775,16 @@
     "url": "https://app.notion.com/p/J-93-Inventario-de-scraping-y-frontera-p-blica-390bea9e4736816e84ddfeb2e737b733",
     "file": "docs/notion-migration/exported/j-93-inventario-de-scraping-y-frontera-publica--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_repo_docs",
     "canonicalFile": "docs/competitive-intelligence/gambeta-public-scraping-boundary.md",
-    "migrationDecision": "Documento J-93 normalizado como frontera publica canonica de scraping competitivo de Gambeta."
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-81ef-a721-edee78ce3f71",
@@ -1156,7 +1793,15 @@
     "url": "https://app.notion.com/p/J-95-Mapa-maestro-de-workstreams-P0-390bea9e473681efa721edee78ce3f71",
     "file": "docs/notion-migration/exported/j-95-mapa-maestro-de-workstreams-p0--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/operations/p0-workstreams-map.md",
+      "docs/notion-migration/j-108-migration-decisions.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo P0 workstreams map and migration decision index. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-8110-ba33-d36eb3b96c0d",
@@ -1165,7 +1810,15 @@
     "url": "https://app.notion.com/p/J-97-Cierre-de-idioma-P0-Notion-390bea9e47368110ba33d36eb3b96c0d",
     "file": "docs/notion-migration/exported/j-97-cierre-de-idioma-p0-notion--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/operations/p0-workstreams-map.md",
+      "docs/notion-migration/j-108-migration-decisions.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo P0 workstreams map and migration decision index. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-80c3-bb1f-d653c32dbb12",
@@ -1174,7 +1827,11 @@
     "url": "https://app.notion.com/p/Jo-31abea9e473680c3bb1fd653c32dbb12",
     "file": "docs/notion-migration/exported/jo--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8137-aef7-cd020a1c7178",
@@ -1184,10 +1841,17 @@
     "file": "docs/notion-migration/exported/legacy-repo-secret-rotation-and-history-rewrite--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
+    "migrationStatus": "covered_by_canonical_docs_empty_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido util; reglas de no force-push/rewrite quedan en el runbook J-105.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "El export no contiene contenido util; la regla de no force-push/rewrite sin autorizacion queda en repo-publication-security.md.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "34cbea9e-4736-819c-9227-c2da68ff33a3",
@@ -1199,8 +1863,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "34cbea9e-4736-8185-bf02-c9815fe8dd7c",
@@ -1209,7 +1881,15 @@
     "url": "https://app.notion.com/p/Lock-the-integration-boundary-for-competitive-scraping-inside-gana-v8-34cbea9e47368185bf02c9815fe8dd7c",
     "file": "docs/notion-migration/exported/lock-the-integration-boundary-for-competitive-scraping-inside-gana-v8--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-8150-bb2b-e3adc1421de2",
@@ -1221,8 +1901,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "34dbea9e-4736-8016-81dd-d98dc024feb2",
@@ -1243,7 +1931,17 @@
     "url": "https://app.notion.com/p/Oferta-afiliada-o-bono-349bea9e473681028e24c7b0239b91ad",
     "file": "docs/notion-migration/exported/oferta-afiliada-o-bono--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-818b-85da-d75b0c1c2a00",
@@ -1252,7 +1950,17 @@
     "url": "https://app.notion.com/p/Oferta-Bot-Alerta-349bea9e4736818b85dad75b0c1c2a00",
     "file": "docs/notion-migration/exported/oferta-bot-alerta--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-81b4-9870-c9bfc38d911f",
@@ -1261,7 +1969,15 @@
     "url": "https://app.notion.com/p/Pausa-de-ranking-por-drift-de-politica-publica-390bea9e473681b49870c9bfc38d911f",
     "file": "docs/notion-migration/exported/pausa-de-ranking-por-drift-de-politica-publica--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-8180-b5b7-e27860459d8b",
@@ -1270,7 +1986,11 @@
     "url": "https://app.notion.com/p/Presupuesto-mensual-31abea9e47368180b5b7e27860459d8b",
     "file": "docs/notion-migration/exported/presupuesto-mensual--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-80df-a93e-db3e6cd19265",
@@ -1279,7 +1999,11 @@
     "url": "https://app.notion.com/p/Programa-3C-31abea9e473680dfa93edb3e6cd19265",
     "file": "docs/notion-migration/exported/programa-3c--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-818d-aa63-fd4104b43e18",
@@ -1288,7 +2012,11 @@
     "url": "https://app.notion.com/p/Proyecto-web-31abea9e4736818daa63fd4104b43e18",
     "file": "docs/notion-migration/exported/proyecto-web--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81b8-be47-e279174b295f",
@@ -1297,7 +2025,17 @@
     "url": "https://app.notion.com/p/Public-picks-and-results-funnel-MVP-34cbea9e473681b8be47e279174b295f",
     "file": "docs/notion-migration/exported/public-picks-and-results-funnel-mvp--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-812c-adeb-e36ba7042aa6",
@@ -1309,8 +2047,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "349bea9e-4736-8109-82ab-e05dc4904122",
@@ -1319,7 +2065,17 @@
     "url": "https://app.notion.com/p/Public-Results-Proof-349bea9e4736810982abe05dc4904122",
     "file": "docs/notion-migration/exported/public-results-proof--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/growth/README.md",
+      "docs/growth/free-to-paid-funnel.md",
+      "docs/growth/x-tiktok-daily-picks-sprint.md",
+      "docs/growth/editorial-seo-gtm.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo Growth/GTM docs. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81b7-af6b-dc53085041a1",
@@ -1331,8 +2087,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "34cbea9e-4736-816d-a053-ffd4ba906afa",
@@ -1344,8 +2108,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "34cbea9e-4736-81c3-ac53-e219126b9793",
@@ -1357,8 +2129,16 @@
     "migrationIssue": "J-105",
     "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
-    "migrationUpdated": "2026-07-01"
+    "migrationNote": "Export vacio o superado por docs canonicos de J-104/J-105; mantener solo como fuente historica.",
+    "migrationIssues": [
+      "J-105",
+      "J-104"
+    ],
+    "canonicalPaths": [
+      "docs/planes/22-implementacion-harness-y-publicacion.md",
+      "docs/operations/engineering-operating-index.md",
+      "docs/operations/repo-publication-security.md"
+    ]
   },
   {
     "id": "349bea9e-4736-81c3-a27c-c8b915359a1c",
@@ -1367,7 +2147,15 @@
     "url": "https://app.notion.com/p/push-subscription-routes-349bea9e473681c3a27cc8b915359a1c",
     "file": "docs/notion-migration/exported/push-subscription-routes--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81bc-b42d-c34bd47962fc",
@@ -1376,7 +2164,15 @@
     "url": "https://app.notion.com/p/Ranking-349bea9e473681bcb42dc34bd47962fc",
     "file": "docs/notion-migration/exported/ranking--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-81ea-ad46-d6efa3a2531e",
@@ -1385,7 +2181,15 @@
     "url": "https://app.notion.com/p/Ranking-As-Trust-Loop-349bea9e473681eaad46d6efa3a2531e",
     "file": "docs/notion-migration/exported/ranking-as-trust-loop--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-8197-8902-d05dca6e40a5",
@@ -1394,7 +2198,11 @@
     "url": "https://app.notion.com/p/Renta-31abea9e473681978902d05dca6e40a5",
     "file": "docs/notion-migration/exported/renta--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-8110-8d2d-c9465e42ab7a",
@@ -1403,7 +2211,15 @@
     "url": "https://app.notion.com/p/Revision-frontera-publica-Gambeta-J-93-390bea9e473681108d2dc9465e42ab7a",
     "file": "docs/notion-migration/exported/revision-frontera-publica-gambeta-j-93--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "349bea9e-4736-8166-bb7b-d029ca6b87fd",
@@ -1412,7 +2228,15 @@
     "url": "https://app.notion.com/p/Robots-349bea9e47368166bb7bd029ca6b87fd",
     "file": "docs/notion-migration/exported/robots--349bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-8135-80e8-c47dbd10b7f9",
@@ -1421,7 +2245,11 @@
     "url": "https://app.notion.com/p/Salario-31abea9e4736813580e8c47dbd10b7f9",
     "file": "docs/notion-migration/exported/salario--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-81e5-aa55-f8b49c2da20f",
@@ -1430,7 +2258,15 @@
     "url": "https://app.notion.com/p/Sitemap-de-previas-390bea9e473681e5aa55f8b49c2da20f",
     "file": "docs/notion-migration/exported/sitemap-de-previas--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "390bea9e-4736-81af-81ce-f46f599070cf",
@@ -1439,7 +2275,15 @@
     "url": "https://app.notion.com/p/Sitemap-principal-390bea9e473681af81cef46f599070cf",
     "file": "docs/notion-migration/exported/sitemap-principal--390bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "31abea9e-4736-81e6-9e00-eaa50a898090",
@@ -1448,7 +2292,11 @@
     "url": "https://app.notion.com/p/Trabajo-extra-31abea9e473681e69e00eaa50a898090",
     "file": "docs/notion-migration/exported/trabajo-extra--31abea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "excluded_non_operational_historical_export",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "migrationDecision": "Retained only as a historical Notion export. It is personal, business-adjacent, or otherwise outside the operational Gana v9 repo documentation set.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-812e-9ea3-c8853d8a8ef7",
@@ -1457,7 +2305,15 @@
     "url": "https://app.notion.com/p/Webscraper-34cbea9e4736812e9ea3c8853d8a8ef7",
     "file": "docs/notion-migration/exported/webscraper--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "34cbea9e-4736-81b3-9f6e-e398d2f8168f",
@@ -1466,7 +2322,15 @@
     "url": "https://app.notion.com/p/Webscraper-role-still-unfilled-34cbea9e473681b39f6ee398d2f8168f",
     "file": "docs/notion-migration/exported/webscraper-role-still-unfilled--34cbea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   },
   {
     "id": "358bea9e-4736-8023-9499-cc5c6347de4d",
@@ -1475,6 +2339,14 @@
     "url": "https://app.notion.com/p/WS-de-API-FB-358bea9e473680239499cc5c6347de4d",
     "file": "docs/notion-migration/exported/ws-de-api-fb--358bea9e.md",
     "exportStatus": "exported_markdown",
-    "migrationStatus": "pending_canonical_review"
+    "migrationStatus": "covered_by_canonical_repo_docs",
+    "migrationIssue": "J-111",
+    "migrationUpdated": "2026-07-01",
+    "canonicalPaths": [
+      "docs/competitive-intelligence/README.md",
+      "docs/competitive-intelligence/public-scraping-boundary.md"
+    ],
+    "migrationDecision": "Operational use is covered by the repo competitive-intelligence docs and public scraping boundary. The Notion export remains historical evidence only.",
+    "auditNotes": "J-111 closeout: removed pending canonical review state; Notion is not an operational source for this item."
   }
 ]

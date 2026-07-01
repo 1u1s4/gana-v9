@@ -1,8 +1,12 @@
 # Auditoría J-110 — export Notion, manifest e índice final
 
-Estado: listo para cierre de auditoría.
+Estado: listo para cierre de auditoría; supersedido por cierre operativo J-111.
 Fecha: 2026-07-01.
 Repo fuente de verdad: `/Users/luisalvarado/Documents/GitHub/gana-v9`.
+
+## Nota J-111
+
+J-111 cerró la migración operativa: `manifest.json` ya no tiene entradas `pending_canonical_review`, y Notion queda retirado como fuente operativa. El cierre vigente está en [`status/j-111-closeout.md`](status/j-111-closeout.md).
 
 ## Resumen ejecutivo
 
@@ -35,15 +39,15 @@ Repo fuente de verdad: `/Users/luisalvarado/Documents/GitHub/gana-v9`.
 
 ## Índice final propuesto
 
-Usar estas rutas canónicas cuando los subtasks terminen de fusionar contenido. Notion queda sólo como fuente histórica en frontmatter o sección `Fuente Notion`.
+Usar estas rutas canónicas para lectura operativa. Notion queda sólo como fuente histórica en frontmatter o sección `Fuente Notion`.
 
 | Área | Ruta canónica propuesta | Fuentes Notion/export relacionadas | Estado J-110 |
 | --- | --- | --- | --- |
-| Mapa operativo P0 | `docs/operations/gana-v9-mapa-operativo-p0.md` | `exported/gana-v9-mapa-operativo-p0-notion--390bea9e.md` | pendiente de normalización por subtask |
-| Growth y contenido | `docs/growth/indice-operativo.md` | `exported/gana-v9-02-growth-y-contenido-indice-operativo--38dbea9e.md`, `exported/j-89-handoff-de-notion-sprint-de-picks-diarios-flujo-x-tiktok-y-metricas-del-embudo--390bea9e.md` | pendiente de fusión final |
-| Ingeniería / Técnica | `docs/operations/ingenieria-tecnica-indice.md` | `exported/j-90-indice-operativo-de-ingenieria-tecnica--390bea9e.md`, `exported/j-91-repo-publicacion-y-seguridad-para-indice-cto--390bea9e.md` | pendiente de normalización |
-| Competitive Intelligence / Gambeta | `docs/competitive-intelligence/indice-operativo.md` | `exported/j-92-rebuild-del-indice-competitive-intelligence-gambeta--390bea9e.md`, `exported/j-93-inventario-de-scraping-y-frontera-publica--390bea9e.md`, `exported/revision-frontera-publica-gambeta-j-93--390bea9e.md` | pendiente de fusión |
-| Public picks/results | `docs/growth/public-picks-results-funnel.md` | `exported/j-54-gana-v9-public-picks-funnel-blueprint--38dbea9e.md`, `exported/j-56-public-picks-contract-gana-v9--38dbea9e.md`, `exported/j-57-public-results-history-and-trust-layer-spec-gana-v9--38dbea9e.md` | pendiente de fusión |
+| Mapa operativo P0 | `docs/operations/p0-workstreams-map.md` | `exported/gana-v9-mapa-operativo-p0-notion--390bea9e.md`, `exported/j-95-mapa-maestro-de-workstreams-p0--390bea9e.md` | migrado/fusionado por J-108; mirror Notion retirado por J-111 |
+| Growth y contenido | `docs/growth/README.md`, `docs/growth/public-picks-funnel.md`, `docs/growth/daily-picks-social-workstream.md` | `exported/gana-v9-02-growth-y-contenido-indice-operativo--38dbea9e.md`, `exported/j-89-handoff-de-notion-sprint-de-picks-diarios-flujo-x-tiktok-y-metricas-del-embudo--390bea9e.md` | migrado por J-107/J-108 |
+| Ingeniería / Técnica | `docs/operations/engineering-operating-index.md`, `docs/architecture/README.md` | `exported/j-90-indice-operativo-de-ingenieria-tecnica--390bea9e.md`, `exported/j-91-repo-publicacion-y-seguridad-para-indice-cto--390bea9e.md` | cerrado en repo |
+| Competitive Intelligence / Gambeta | `docs/competitive-intelligence/README.md`, `docs/competitive-intelligence/gambeta-public-boundary.md`, `docs/competitive-intelligence/public-scraping-boundary.md` | `exported/j-92-rebuild-del-indice-competitive-intelligence-gambeta--390bea9e.md`, `exported/j-93-inventario-de-scraping-y-frontera-publica--390bea9e.md`, `exported/revision-frontera-publica-gambeta-j-93--390bea9e.md` | migrado/fusionado por J-106/J-108 |
+| Public picks/results | `docs/growth/public-picks-funnel.md` | `exported/j-54-gana-v9-public-picks-funnel-blueprint--38dbea9e.md`, `exported/j-56-public-picks-contract-gana-v9--38dbea9e.md`, `exported/j-57-public-results-history-and-trust-layer-spec-gana-v9--38dbea9e.md` | migrado/fusionado por J-108 |
 | Seguridad/secretos | no migrar secretos; sólo políticas redacted en docs canónicos | `exported/mis-api-keys--34dbea9e.md` | redacted, no migrar |
 
 ## Reglas de cierre para subtasks
@@ -52,4 +56,4 @@ Usar estas rutas canónicas cuando los subtasks terminen de fusionar contenido. 
 - Los links operativos deben apuntar a rutas del repo o a issues Paperclip (`/J/issues/...`); links Notion sólo en `Fuente Notion` o frontmatter histórico.
 - No copiar credenciales, tokens, IDs privados sensibles ni URLs privadas a docs canónicos.
 - Si un export está vacío, duplicado o es snapshot de data source, marcarlo como histórico/obsoleto en vez de promoverlo.
-- Antes de cerrar el epic de migración, correr `git diff --check` y revisar que no queden secretos con un scanner dedicado si se agregan más exports.
+- Para cambios futuros en la migración, correr `git diff --check`, `npm run docs:check-notion-source` y revisar secretos con un scanner dedicado si se agregan más exports.

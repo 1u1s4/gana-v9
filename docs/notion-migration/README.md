@@ -1,14 +1,48 @@
 # Migración Notion → Markdown en repo
 
-Este directorio es la nueva zona de aterrizaje para migrar la documentación de Notion al repo.
+Este directorio es el archivo historico de la migracion Notion -> Markdown. Desde J-111, Notion no es fuente operativa para Gana v9.
 
 Export inicial: 136 items descubiertos por la integración de Notion.
+
+## Cierre J-111
+
+- Estado: migracion operativa cerrada el 2026-07-01.
+- Regla vigente: repo para documentacion canonica; Paperclip para estado vivo de issues, blockers y owners; Notion solo como export historico.
+- Manifest: 136 items con decision explicita; 0 entradas `pending_canonical_review`.
+- Verificacion: `npm run docs:check-notion-source`.
+
+### Entradas canonicas
+
+- Documentacion general: [`docs/README.md`](../README.md).
+- Arquitectura tecnica: [`docs/architecture/README.md`](../architecture/README.md).
+- Operaciones: [`docs/operations/README.md`](../operations/README.md).
+- Growth/GTM: [`docs/growth/README.md`](../growth/README.md).
+- Competitive intelligence: [`docs/competitive-intelligence/README.md`](../competitive-intelligence/README.md).
+- Cierre durable: [`status/j-111-closeout.md`](status/j-111-closeout.md).
+
+## Subsets migrados
+
+- `J-107` Marketing/Growth, funnel y GTM: migrado a [`docs/growth/`](../growth/README.md).
+  - Canonicos: [`free-to-paid-funnel.md`](../growth/free-to-paid-funnel.md), [`x-tiktok-daily-picks-sprint.md`](../growth/x-tiktok-daily-picks-sprint.md), [`editorial-seo-gtm.md`](../growth/editorial-seo-gtm.md), [`free-to-paid-measurement-contract.md`](../growth/free-to-paid-measurement-contract.md).
+  - Ledger de decisiones: [`docs/growth/migration-status.md`](../growth/migration-status.md).
+  - Estado: las paginas Notion del subset quedan como fuente historica; el repo es la fuente operativa.
+- `J-108` Sistema Gambeta-style y workstreams P0: migrado a rutas repo canonicas.
+  - Canonicos: [`public-picks-funnel.md`](../growth/public-picks-funnel.md), [`daily-picks-social-workstream.md`](../growth/daily-picks-social-workstream.md), [`gambeta-public-boundary.md`](../competitive-intelligence/gambeta-public-boundary.md), [`p0-workstreams-map.md`](../operations/p0-workstreams-map.md).
+  - Ledger de decisiones: [`j-108-migration-decisions.md`](j-108-migration-decisions.md).
+  - Estado: las paginas Notion del subset quedan como fuente historica; el repo es la fuente operativa.
+- `J-109` Growth + Content Ops, calendario/distribucion/metricas: fusionado en [`x-tiktok-daily-picks-sprint.md`](../growth/x-tiktok-daily-picks-sprint.md), [`daily-picks-social-workstream.md`](../growth/daily-picks-social-workstream.md) y [`free-to-paid-measurement-contract.md`](../growth/free-to-paid-measurement-contract.md).
+  - Estado del subset: [`status/growth-content-ops-j-109.md`](status/growth-content-ops-j-109.md).
+  - Decisiones tambien reflejadas en [`docs/growth/migration-status.md`](../growth/migration-status.md).
+- `J-106` Competitive Intelligence y scraping Gambeta: migrado a [`docs/competitive-intelligence/`](../competitive-intelligence/README.md).
+  - Canonicos: [`README.md`](../competitive-intelligence/README.md), [`public-scraping-boundary.md`](../competitive-intelligence/public-scraping-boundary.md).
+  - Ledger de decisiones: [`competitive-intelligence-decisions.md`](competitive-intelligence-decisions.md).
+  - Estado: J-22/J-35 quedan historicos; J-92/J-93 quedan reemplazados por la fuente canonica en repo.
 
 ## Convención
 
 - `exported/`: export crudo desde Notion, con frontmatter de origen.
 - Después de revisar, mover/normalizar documentos canónicos a `docs/` o `docs/planes/` según corresponda.
-- No volver a usar Notion como fuente de verdad; Notion queda como referencia histórica mientras se completa la migración.
+- No volver a usar Notion como fuente de verdad; Notion queda como referencia histórica.
 
 ## Estado de migración J-105
 
@@ -26,6 +60,24 @@ Decisiones registradas en `manifest.json`:
 - Migrado/fusionado: J-90, J-91, Checklist de publicación y release, J-33, J-34.
 - Obsoleto por export vacío/cubierto por docs canónicos: Code execution model, Hermes control-plane hardening, publication governance/channel hardening, public-proof guard, legacy repo secret rotation, live publication lineage, lower-risk hardening y publication trust incomplete.
 
+## Estado de migración J-104
+
+Subset trabajado: documentación técnica/arquitectura, seguridad, repo/publicación y runbooks de ingeniería.
+
+Destinos canónicos:
+
+- `docs/README.md`
+- `docs/architecture/README.md`
+- `docs/architecture/system-architecture.md`
+- `docs/operations/engineering-operating-index.md`
+- `docs/operations/repo-publication-security.md`
+- `docs/notion-migration/DECISIONS.md`
+
+Decisiones registradas en `manifest.json`:
+
+- Migrado/fusionado: J-90, J-91, J-60, Checklist de publicación y release, Legacy repo secret rotation and history rewrite.
+- Obsoleto/cubierto: exports vacíos de publication governance, channel hardening, live publication lineage y páginas similares sin contenido útil.
+- Fuente sensible: `Mis api keys` queda como tombstone sin secretos y no debe migrarse.
 
 ## Estado de auditoría J-110
 
@@ -148,7 +200,7 @@ Auditoría completada en [`AUDIT.md`](AUDIT.md).
 - exported_markdown: [Live publication lineage guard](exported/live-publication-lineage-guard--34cbea9e.md) — page — 34cbea9e-4736-819c-9227-c2da68ff33a3
 - exported_markdown: [Lock the integration boundary for competitive scraping inside gana-v8](exported/lock-the-integration-boundary-for-competitive-scraping-inside-gana-v8--34cbea9e.md) — page — 34cbea9e-4736-8185-bf02-c9815fe8dd7c
 - exported_markdown: [Lower-risk repo public hardening](exported/lower-risk-repo-public-hardening--34cbea9e.md) — page — 34cbea9e-4736-8150-bb2b-e3adc1421de2
-- exported_markdown: [Mis api keys](exported/mis-api-keys--34dbea9e.md) — page — 34dbea9e-4736-8016-81dd-d98dc024feb2
+- redacted_secret_source_do_not_migrate: [Mis api keys](exported/mis-api-keys--34dbea9e.md) — page — 34dbea9e-4736-8016-81dd-d98dc024feb2
 - exported_markdown: [Oferta afiliada o bono](exported/oferta-afiliada-o-bono--349bea9e.md) — page — 349bea9e-4736-8102-8e24-c7b0239b91ad
 - exported_markdown: [Oferta Bot Alerta](exported/oferta-bot-alerta--349bea9e.md) — page — 349bea9e-4736-818b-85da-d75b0c1c2a00
 - exported_markdown: [Pausa de ranking por drift de politica publica](exported/pausa-de-ranking-por-drift-de-politica-publica--390bea9e.md) — page — 390bea9e-4736-81b4-9870-c9bfc38d911f
@@ -182,7 +234,7 @@ Estado del export al cierre de J-110:
 - Manifest auditado: 136 items, sin IDs duplicados y sin archivos faltantes.
 - Archivos exportados `.md`: 123, todos referenciados por `manifest.json`.
 - Duplicados de alto valor detectados para fusión: `CMO`, `Gambeta Notion Refresh 2026-04-23`, `J-35 - Plan y avances scraping competitivo`, `J-89 Handoff de Notion: sprint de picks diarios, flujo X/TikTok y metricas del embudo`.
-- `Mis api keys` quedó `excluded_redacted` por contener credenciales/tokens; no debe migrarse ni restaurarse.
+- `Mis api keys` quedó `redacted_secret_source_do_not_migrate` por contener credenciales/tokens; no debe migrarse ni restaurarse.
 - Links del índice corregidos a rutas relativas del repo (`exported/...`) para no depender de Notion.
 
 Índice final recomendado:
@@ -191,6 +243,6 @@ Estado del export al cierre de J-110:
 2. Promover a canónico sólo documentos vigentes bajo `docs/operations/`, `docs/growth/`, `docs/competitive-intelligence/`, `docs/plans/` o el área que corresponda.
 3. Para cada promoción, dejar `canonicalFile` y `migrationStatus` en `manifest.json`.
 4. Fusionar duplicados por contenido antes de crear un `.md` canónico; no copiar enlaces operativos hacia Notion salvo en una sección histórica `Fuente Notion`.
-5. Excluir documentos personales, credenciales o material obsoleto con `migrationStatus: excluded_redacted` u `obsolete`.
+5. Excluir documentos personales, credenciales o material obsoleto con `migrationStatus: redacted_secret_source_do_not_migrate`, `excluded_redacted` u `obsolete`.
 
 Ver detalle de cierre en [`AUDIT.md`](AUDIT.md).

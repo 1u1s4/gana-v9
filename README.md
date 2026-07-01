@@ -25,6 +25,15 @@ Gana v9 is analytical software. It does not place bets, move money, trade assets
 
 Keep real credentials only in `.env` or your local provider authentication stores. The repository is configured to ignore `.env`, `.artifacts/`, `.sessions/`, `node_modules/`, `dist/`, and `tmp/`.
 
+## Public Picks Strategy Docs
+
+The migrated public-picks funnel and P0 documentation live in versioned repo docs:
+
+- [Public picks funnel](docs/growth/public-picks-funnel.md)
+- [Daily picks social workstream](docs/growth/daily-picks-social-workstream.md)
+- [Gambeta public strategy and collection boundary](docs/competitive-intelligence/gambeta-public-boundary.md)
+- [P0 workstreams map](docs/operations/p0-workstreams-map.md)
+
 ## Requirements
 
 - Node.js with npm or pnpm.
@@ -217,6 +226,8 @@ gitleaks detect --source . --redact=100 --no-banner
 Skill documentation:
 
 - [Repo skills guide](docs/skills.md) documents `.agents/skills` operational runbooks and `skills/` harness prompt contracts.
+- [Canonical docs index](docs/README.md) links the engineering operating index, repo/publication/security runbook, daily operations, and the closed Notion migration archive.
+- [Technical architecture](docs/architecture/README.md) is the repo-owned architecture entry point migrated from Notion.
 
 ## License
 

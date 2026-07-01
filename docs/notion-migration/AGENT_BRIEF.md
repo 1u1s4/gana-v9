@@ -1,4 +1,4 @@
-# Brief para migración Notion → Markdown
+# Brief para imports legacy Notion -> Markdown
 
 Fuente de verdad nueva: este repo (`/Users/luisalvarado/Documents/GitHub/gana-v9`).
 
@@ -6,7 +6,7 @@ Fuente de verdad nueva: este repo (`/Users/luisalvarado/Documents/GitHub/gana-v9
 
 - Notion deja de ser la fuente de verdad para gana-v9.
 - Toda documentación canónica debe vivir como `.md` versionado en GitHub.
-- Notion queda como referencia histórica hasta completar la migración.
+- Notion queda únicamente como referencia histórica exportada.
 - No copiar secretos, tokens, URLs privadas sensibles ni credenciales a Markdown.
 
 ## Export inicial
@@ -15,7 +15,7 @@ Fuente de verdad nueva: este repo (`/Users/luisalvarado/Documents/GitHub/gana-v9
 - Manifest: `docs/notion-migration/manifest.json`
 - Índice: `docs/notion-migration/README.md`
 
-## Flujo esperado por agente
+## Flujo esperado por agente si aparece material legacy
 
 1. Revisar el subset asignado en Paperclip.
 2. Leer el export crudo relevante desde `docs/notion-migration/exported/`.
@@ -30,5 +30,5 @@ Fuente de verdad nueva: este repo (`/Users/luisalvarado/Documents/GitHub/gana-v9
 - Cada documento relevante de Notion tiene una decisión: migrado, fusionado, obsoleto o pendiente con razón.
 - Las decisiones quedan reflejadas en `docs/notion-migration/manifest.json` o en un índice derivado.
 - README/índices del repo apuntan a los nuevos `.md`.
-- No quedan dependencias operativas de Notion como fuente principal.
+- No quedan dependencias operativas de Notion.
 - `git diff --check` pasa antes de cerrar tareas.
