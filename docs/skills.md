@@ -7,6 +7,8 @@ Este repo tiene dos familias de skills. No son intercambiables:
 
 Todas las skills son analiticas. No deben ejecutar apuestas, mover dinero, crear automatizacion monetaria ni prometer resultados.
 
+Documento operativo relacionado: `docs/planes/22-implementacion-harness-y-publicacion.md` consolida el subset J-105 migrado desde Notion para implementacion, harness, publicacion y seguridad.
+
 ## Codex And Hermes Skills
 
 Estas skills viven en `.agents/skills/` y se usan para guiar trabajo operativo. Pueden incluir scripts, tests y referencias adicionales.

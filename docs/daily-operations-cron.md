@@ -2,6 +2,12 @@
 
 Esta guia deja el flujo diario de Gana v9 programable en Hermes cron, en hora Guatemala (`America/Guatemala`, UTC-06).
 
+## Documentacion canonica relacionada
+
+- `docs/planes/22-implementacion-harness-y-publicacion.md`: indice tecnico migrado desde Notion para implementacion, harness, publicacion y seguridad.
+- `docs/skills.md`: inventario de skills operativas y contratos del harness que respaldan este cron.
+- `docs/harness-strategy-review-log.md`: bitacora de propuestas y cambios derivados del strategy review.
+
 ## Horarios
 
 - `07:00` Guatemala: validar el dia anterior contra el artifact de recomendaciones publicado, recalcular daily metrics solo de picks publicados y notificar estadisticas a Discord.
