@@ -3,6 +3,7 @@ import { URL } from 'node:url';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { fixtureDateRange, redactText } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
+import { readPublicRecommendations, type PublicRecommendationsDb } from '../public-recommendations/service.js';
 import type { AgentConfig } from '../config.js';
 import { dashboardHtml } from './page.js';
 import {
@@ -111,6 +112,19 @@ export async function startDashboardServer(
 
       if (url.pathname === '/api/metadata') {
         return sendJson(res, 200, await readMetadata(db));
+      }
+
+      if (url.pathname === '/api/public/recommendations' || url.pathname === '/api/public-picks/feed') {
+        const date = url.searchParams.get('date') ?? undefined;
+        if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return sendJson(res, 400, { error: 'invalid_date', message: 'date must use YYYY-MM-DD.' });
+        }
+        return sendJson(res, 200, await readPublicRecommendations(db as unknown as PublicRecommendationsDb, {
+          date,
+          timezone: url.searchParams.get('timezone') ?? undefined,
+        }, {
+          defaultTimezone: config.apiFootball.timezone,
+        }));
       }
 
       if (url.pathname === '/api/overview') {

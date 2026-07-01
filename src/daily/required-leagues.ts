@@ -122,6 +122,10 @@ export interface DailyRequiredLeagueParlayProjection {
   legs: ParlayAnalysisRecommendation['legs'];
   reasons: string[];
   riskFlags: string[];
+  persistence?: {
+    status: 'persisted' | 'failed' | 'skipped';
+    reason?: string;
+  };
 }
 
 export interface DailyRequiredLeagueArtifact {
@@ -154,6 +158,14 @@ export interface DailyRequiredLeagueArtifact {
     parlayProfiles: readonly DailyRequiredLeagueParlayApproach[];
     atomicSelection: string;
     parlaySelection: string;
+  };
+  persistenceLedger?: {
+    status: 'not-needed' | 'persisted' | 'partial' | 'skipped';
+    store: 'parlays';
+    expectedParlayCount: number;
+    persistedParlayIds: string[];
+    failedParlayIds: string[];
+    reason?: string;
   };
   analyticalArtifactOnly: true;
   executionCapability: 'none';

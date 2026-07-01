@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import {
   countPublishableSelections,
   readCurrentRecommendationArtifact,
+  validatePublicationLedgerAlignment,
 } from '../lib/daily-e2e-wrapper-state.mjs';
 
 describe('daily E2E wrapper state helpers', () => {
@@ -67,5 +68,52 @@ describe('daily E2E wrapper state helpers', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('accepts render selections that are present in the DB publication ledger targets', () => {
+    const result = validatePublicationLedgerAlignment({
+      persistencePolicy: { finalOperationalStore: 'database-ledger' },
+      publishedTargets: {
+        parlayIds: ['11111111-1111-5111-8111-111111111111'],
+        predictionIds: ['prediction-1', 'prediction-2'],
+      },
+      recommendations: [{
+        kind: 'atomic-prediction',
+        predictionId: 'prediction-1',
+      }],
+      requiredLeagueRecommendations: {
+        atomicProjections: [{ predictionId: 'prediction-2' }],
+        parlayProjections: [{
+          status: 'selected',
+          profile: 'parlay-diamante',
+          parlayId: '11111111-1111-5111-8111-111111111111',
+        }],
+      },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.reason, 'ledger-aligned');
+  });
+
+  it('rejects selected required parlays that only have synthetic render ids', () => {
+    const result = validatePublicationLedgerAlignment({
+      persistencePolicy: { finalOperationalStore: 'database-ledger' },
+      publishedTargets: {
+        parlayIds: [],
+        predictionIds: ['prediction-1'],
+      },
+      recommendations: [],
+      requiredLeagueRecommendations: {
+        atomicProjections: [{ predictionId: 'prediction-1' }],
+        parlayProjections: [{
+          status: 'selected',
+          profile: 'parlay-diamante',
+          parlayId: 'required-parlay-diamante-deadbeef',
+        }],
+      },
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /rendered-selection-missing-from-ledger/);
   });
 });

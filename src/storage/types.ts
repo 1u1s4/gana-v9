@@ -17,6 +17,7 @@ export type PredictionStatus = 'draft' | 'candidate' | 'review-required' | 'prom
 export type ParlayStatus = 'draft' | 'candidate' | 'review-required' | 'promotable' | 'blocked' | string;
 export type ParlayLegStatus = 'pending' | 'won' | 'lost' | 'push' | 'voided' | 'error' | 'blocked' | string;
 export type ValidationArtifactStatus = 'pending' | 'won' | 'lost' | 'push' | 'voided' | 'error' | 'blocked' | string;
+export type PublicRecommendationPublicationStatus = 'published' | 'corrected' | 'retracted' | string;
 
 export interface PrismaBatchPayload {
   count: number;
@@ -63,6 +64,7 @@ export interface StoragePrismaClient {
   parlay: PrismaModelDelegate<ParlayRecord>;
   parlayLeg: PrismaModelDelegate<ParlayLegRecord>;
   validationArtifact: PrismaModelDelegate<ValidationArtifactRecord>;
+  publicRecommendationPublication: PrismaModelDelegate<PublicRecommendationPublicationRecord>;
   leaderboardEntry: PrismaModelDelegate<LeaderboardEntryRecord>;
 }
 
@@ -846,6 +848,51 @@ export interface ValidationArtifactInput {
   resultInput?: JsonValue | null;
   outcome?: JsonValue | null;
   evidenceIds?: string[] | JsonValue | null;
+  metadata?: JsonValue | null;
+}
+
+export interface PublicRecommendationPublicationRecord {
+  id: string;
+  dailyBatchId: string;
+  runId: string | null;
+  slateDate: DbDate;
+  channel: string;
+  target: string;
+  targetType: string;
+  targetId: string;
+  predictionId: string | null;
+  parlayId: string | null;
+  status: PublicRecommendationPublicationStatus;
+  discordTarget: string | null;
+  discordMessageId: string | null;
+  discordMessageIds: JsonValue | null;
+  artifactPath: string | null;
+  payloadPath: string | null;
+  payloadSha256: string | null;
+  publishedAt: DbDate;
+  metadata: JsonValue | null;
+  createdAt: DbDate;
+}
+
+export interface PublicRecommendationPublicationInput {
+  id?: string;
+  dailyBatchId: string;
+  runId?: string | null;
+  slateDate: Date;
+  channel?: string;
+  target?: string;
+  targetType: string;
+  targetId: string;
+  predictionId?: string | null;
+  parlayId?: string | null;
+  status?: PublicRecommendationPublicationStatus;
+  discordTarget?: string | null;
+  discordMessageId?: string | null;
+  discordMessageIds?: string[] | JsonValue | null;
+  artifactPath?: string | null;
+  payloadPath?: string | null;
+  payloadSha256?: string | null;
+  publishedAt?: Date;
   metadata?: JsonValue | null;
 }
 

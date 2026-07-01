@@ -2,10 +2,16 @@
 import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 import { buildCronOutcome, compactPath, durationBetween, emitCronRichSummary, parseJsonObject } from './gana-telegram-rich-output.mjs';
-import { countPublishableSelections, readCurrentRecommendationArtifact } from './lib/daily-e2e-wrapper-state.mjs';
+import {
+  collectPublicationLedgerTargetIds,
+  countPublishableSelections,
+  readCurrentRecommendationArtifact,
+  validatePublicationLedgerAlignment,
+} from './lib/daily-e2e-wrapper-state.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -158,7 +164,13 @@ try {
     requiredSelectedParlays: 0,
   };
   const selectionCount = publishableCounts.total;
-  if (artifactState.ok && selectionCount > 0) {
+  const ledgerAlignment = artifactState.ok
+    ? validatePublicationLedgerAlignment(artifactState.artifact)
+    : { ok: false, reason: artifactState.reason };
+  const dbLedger = artifactState.ok && selectionCount > 0 && ledgerAlignment.ok
+    ? await verifyDbPersistenceLedger(artifactState.artifact)
+    : { ok: false, reason: selectionCount > 0 ? ledgerAlignment.reason : 'no-publishable-selections' };
+  if (artifactState.ok && selectionCount > 0 && ledgerAlignment.ok && dbLedger.ok) {
     const notify = spawnSync('node', [
       '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs',
       '--artifact', recommendationsPath,
@@ -176,6 +188,85 @@ try {
     if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
     sentRecommendations = true;
     const recommendationNotify = parseJsonObject(notify.stdout);
+    const publicationLedger = await persistDiscordPublicationLedger(artifactState.artifact, {
+      artifactPath: recommendationsPath,
+      completedAt,
+      dailyBatchId,
+      date,
+      discordTarget: discordTargets.recommendations,
+      notification: recommendationNotify,
+    });
+    if (!publicationLedger.ok) {
+      writeLogLine(logFd, `Discord notification sent but publication ledger persistence failed: ${publicationLedger.reason}`);
+      await sendStatus(discordTargets.alerts, {
+        title: '⚠️ Gana v9 · Daily E2E publicó sin ledger persistido',
+        description: [
+          `📅 ${date} · ${TIMEZONE}`,
+          `🧪 batch ${dailyBatchId}`,
+          `🗃️ publication ledger: ${publicationLedger.reason}`,
+          `📣 Discord recomendaciones: ${discordMessageIds(recommendationNotify).join(', ') || 'message id unavailable'}`,
+          `📦 artifact ${recommendationsPath}`,
+          '🛡️ No reenviar sin revisar duplicados; Discord ya recibió la publicación.',
+        ].join('\n'),
+        color: 0xeb5757,
+      });
+      emitCronRichSummary({
+        title: 'Gana v9 · Daily E2E publicó sin ledger persistido',
+        status: 'warning',
+        date,
+        timezone: TIMEZONE,
+        bullets: [
+          `Batch: ${dailyBatchId}`,
+          `Publication ledger: ${publicationLedger.reason}`,
+          `Discord recomendaciones: ${discordMessageIds(recommendationNotify).join(', ') || 'message id unavailable'}`,
+          `Recommendations: ${compactPath(recommendationsPath)}`,
+          `Log: ${compactPath(logPath)}`,
+          `Outcome: ${compactPath(outcomePath)}`,
+        ],
+        footer: '⚠️ Discord ya recibió la publicación; revisar ledger antes de cualquier rerun.',
+      });
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: 'publication-ledger-error',
+        selectionCount,
+        recommendationCount: publishableCounts.recommendations,
+        requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
+        ledger: dbLedger,
+        publicationLedger,
+        messageId: discordMessageIds(recommendationNotify)[0] ?? null,
+        messageIds: discordMessageIds(recommendationNotify),
+        completedAt: completedAt.toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      writeOutcome(buildCronOutcome({
+        flow: 'daily-e2e',
+        status: 'review-required',
+        date,
+        timezone: TIMEZONE,
+        batchId: dailyBatchId,
+        startedAt,
+        completedAt,
+        command,
+        exitStatus: result.status,
+        signal: result.signal,
+        reason: publicationLedger.reason,
+        counts: publishableCounts,
+        ledger: dbLedger,
+        publicationLedger,
+        notifications: {
+          alerts: discordTargets.alerts,
+          recommendations: discordMessageIds(recommendationNotify),
+        },
+        artifacts: [
+          { label: 'recommendations', path: recommendationsPath },
+          { label: 'log', path: logPath },
+          { label: 'outcome', path: outcomePath },
+        ],
+      }));
+      process.exitCode = 1;
+      handled = true;
+    } else {
     emitCronRichSummary({
       title: 'Gana v9 · Daily E2E publicado',
       status: 'ok',
@@ -185,6 +276,8 @@ try {
         `Batch: ${dailyBatchId}`,
         `Publicación: ${selectionCount} selections · ${publishableCounts.recommendations} recommendations`,
         `Obligatorias: ${publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays}`,
+        `Ledger DB: ${dbLedger.reason}`,
+        `Publication ledger: ${publicationLedger.reason}`,
         `Run: exit ${result.status ?? 'unknown'} · ${durationBetween(startedAt, completedAt)}`,
         recommendationNotify?.discordResult?.message_id || recommendationNotify?.discordResults?.length
           ? `Discord recomendaciones: ${recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')}`
@@ -202,6 +295,10 @@ try {
       selectionCount,
       recommendationCount: publishableCounts.recommendations,
       requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
+      ledger: dbLedger,
+      publicationLedger,
+      messageId: publicationLedger.discordMessageIds[0] ?? null,
+      messageIds: publicationLedger.discordMessageIds,
       completedAt: completedAt.toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -217,8 +314,10 @@ try {
       exitStatus: result.status,
       signal: result.signal,
       counts: publishableCounts,
+      ledger: dbLedger,
+      publicationLedger,
       notifications: {
-        recommendations: recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean),
+        recommendations: publicationLedger.discordMessageIds,
       },
       artifacts: [
         { label: 'recommendations', path: recommendationsPath },
@@ -231,9 +330,16 @@ try {
     }
     process.exitCode = 0;
     handled = true;
+    }
   }
   if (artifactState.ok && selectionCount === 0) {
     writeLogLine(logFd, `recommendations artifact contains zero publishable selections; sending operational alert instead of empty Discord recommendations: ${recommendationsPath}`);
+  }
+  if (artifactState.ok && selectionCount > 0 && !ledgerAlignment.ok) {
+    writeLogLine(logFd, `recommendations artifact failed publication ledger alignment: ${ledgerAlignment.reason}`);
+  }
+  if (artifactState.ok && selectionCount > 0 && ledgerAlignment.ok && !dbLedger.ok) {
+    writeLogLine(logFd, `recommendations artifact failed DB ledger verification: ${dbLedger.reason}`);
   }
   if (!artifactState.ok) {
     writeLogLine(logFd, `recommendations artifact is not publishable for this run: ${artifactState.reason}`);
@@ -247,9 +353,10 @@ try {
         `📅 ${date} · ${TIMEZONE}`,
         `🧪 batch ${dailyBatchId}`,
         `🧾 exit ${result.status ?? 'unknown'} · signal ${result.signal ?? 'none'}`,
+        artifactState.ok && selectionCount > 0 ? `🗃️ ledger ${ledgerAlignment.ok ? dbLedger.reason : ledgerAlignment.reason}` : undefined,
         latest ? `📦 artifact ${latest}` : '📦 sin artifact de recomendaciones',
         '🛡️ Revisar logs antes de promoción.',
-      ].join('\n'),
+      ].filter(Boolean).join('\n'),
       color: 0xf2994a,
     });
     emitCronRichSummary({
@@ -261,6 +368,7 @@ try {
         `Batch: ${dailyBatchId}`,
         `Run: exit ${result.status ?? 'unknown'} · signal ${result.signal ?? 'none'} · ${durationBetween(startedAt, completedAt)}`,
         `Artifact gate: ${artifactState.reason}`,
+        artifactState.ok && selectionCount > 0 ? `Ledger gate: ${ledgerAlignment.ok ? dbLedger.reason : ledgerAlignment.reason}` : undefined,
         `Publicables: ${selectionCount}`,
         `Discord alertas: ${discordTargets.alerts}`,
         latest ? `Latest: ${compactPath(latest)}` : undefined,
@@ -280,8 +388,11 @@ try {
       command,
       exitStatus: result.status,
       signal: result.signal,
-      reason: artifactState.reason,
+      reason: artifactState.ok && selectionCount > 0
+        ? (ledgerAlignment.ok ? dbLedger.reason : ledgerAlignment.reason)
+        : artifactState.reason,
       counts: publishableCounts,
+      ledger: artifactState.ok && selectionCount > 0 ? (ledgerAlignment.ok ? dbLedger : ledgerAlignment) : undefined,
       notifications: { alerts: discordTargets.alerts },
       artifacts: [
         ...(latest ? [{ label: 'latest', path: latest }] : []),
@@ -530,6 +641,208 @@ function collect(dir, matches, date) {
       matches.push({ path, mtimeMs: statSync(path).mtimeMs });
     }
   }
+}
+
+async function verifyDbPersistenceLedger(artifact) {
+  const targets = collectPublicationLedgerTargetIds(artifact);
+  const parlayIds = targets.parlayIds;
+  const predictionIds = targets.predictionIds;
+  if (parlayIds.length + predictionIds.length === 0) {
+    return { ok: false, reason: 'empty-ledger-targets', parlayIds, predictionIds };
+  }
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, reason: 'missing-database-url', parlayIds, predictionIds };
+  }
+
+  let prisma;
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    prisma = new PrismaClient();
+    const [parlays, predictions] = await Promise.all([
+      parlayIds.length
+        ? prisma.parlay.findMany({ where: { id: { in: parlayIds } }, select: { id: true } })
+        : Promise.resolve([]),
+      predictionIds.length
+        ? prisma.prediction.findMany({ where: { id: { in: predictionIds } }, select: { id: true } })
+        : Promise.resolve([]),
+    ]);
+    const foundParlays = new Set(parlays.map((item) => item.id));
+    const foundPredictions = new Set(predictions.map((item) => item.id));
+    const missingParlayIds = parlayIds.filter((id) => !foundParlays.has(id));
+    const missingPredictionIds = predictionIds.filter((id) => !foundPredictions.has(id));
+    if (missingParlayIds.length || missingPredictionIds.length) {
+      return {
+        ok: false,
+        reason: `missing-db-ledger-targets:p=${missingParlayIds.length},pred=${missingPredictionIds.length}`,
+        parlayIds,
+        predictionIds,
+        missingParlayIds,
+        missingPredictionIds,
+      };
+    }
+    return {
+      ok: true,
+      reason: `verified-db-ledger:p=${parlayIds.length},pred=${predictionIds.length}`,
+      parlayIds,
+      predictionIds,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: `db-ledger-check-failed:${safeErrorMessage(err)}`,
+      parlayIds,
+      predictionIds,
+    };
+  } finally {
+    if (prisma) await prisma.$disconnect().catch(() => undefined);
+  }
+}
+
+async function persistDiscordPublicationLedger(artifact, {
+  artifactPath,
+  completedAt,
+  dailyBatchId,
+  date,
+  discordTarget,
+  notification,
+}) {
+  const targets = collectPublicationLedgerTargetIds(artifact);
+  const targetRows = [
+    ...targets.parlayIds.map((id) => ({
+      targetType: 'parlay',
+      targetId: id,
+      parlayId: uuidOrNull(id),
+      predictionId: null,
+    })),
+    ...targets.predictionIds.map((id) => ({
+      targetType: 'prediction',
+      targetId: id,
+      parlayId: null,
+      predictionId: uuidOrNull(id),
+    })),
+  ];
+  const messageIds = discordMessageIds(notification);
+  const payloadPath = stringOrNull(notification?.payloadPath ?? notification?.payload_path);
+  const payloadSha256 = stringOrNull(notification?.payloadSha256 ?? notification?.payload_sha256);
+  if (!targetRows.length) {
+    return { ok: false, reason: 'empty-publication-ledger-targets', inserted: 0, discordMessageIds: messageIds, payloadPath, payloadSha256 };
+  }
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, reason: 'missing-database-url', inserted: 0, discordMessageIds: messageIds, payloadPath, payloadSha256 };
+  }
+
+  let prisma;
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    prisma = new PrismaClient();
+    const publishedAt = completedAt instanceof Date ? completedAt : new Date(completedAt);
+    const run = await prisma.harnessRun.findUnique({ where: { id: dailyBatchId }, select: { id: true } });
+    const result = await prisma.publicRecommendationPublication.createMany({
+      data: targetRows.map((row) => ({
+        id: randomUUID(),
+        dailyBatchId,
+        runId: run?.id ?? null,
+        slateDate: new Date(`${date}T00:00:00.000Z`),
+        channel: 'discord',
+        target: 'recommendations',
+        status: 'published',
+        targetType: row.targetType,
+        targetId: row.targetId,
+        predictionId: row.predictionId,
+        parlayId: row.parlayId,
+        discordTarget,
+        discordMessageId: messageIds[0] ?? null,
+        discordMessageIds: messageIds,
+        artifactPath,
+        payloadPath,
+        payloadSha256,
+        publishedAt,
+        metadata: {
+          transport: stringOrNull(notification?.transport),
+          selectionCount: finiteOrNull(notification?.selectionCount),
+          gatewayTarget: stringOrNull(notification?.gatewayTarget),
+        },
+      })),
+      skipDuplicates: true,
+    });
+
+    const found = await prisma.publicRecommendationPublication.findMany({
+      where: {
+        dailyBatchId,
+        channel: 'discord',
+        target: 'recommendations',
+        OR: targetRows.map((row) => ({ targetType: row.targetType, targetId: row.targetId })),
+      },
+      select: { targetType: true, targetId: true, discordMessageId: true },
+    });
+    const foundKeys = new Set(found.map((row) => `${row.targetType}:${row.targetId}`));
+    const missing = targetRows.filter((row) => !foundKeys.has(`${row.targetType}:${row.targetId}`));
+    if (missing.length) {
+      return {
+        ok: false,
+        reason: `missing-publication-ledger-rows:${missing.length}`,
+        inserted: result.count,
+        expected: targetRows.length,
+        missing,
+        discordMessageIds: messageIds,
+        payloadPath,
+        payloadSha256,
+      };
+    }
+    return {
+      ok: true,
+      reason: `persisted-publication-ledger:${found.length}/${targetRows.length}`,
+      inserted: result.count,
+      expected: targetRows.length,
+      discordMessageIds: messageIds,
+      payloadPath,
+      payloadSha256,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: `publication-ledger-persist-failed:${safeErrorMessage(err)}`,
+      inserted: 0,
+      expected: targetRows.length,
+      discordMessageIds: messageIds,
+      payloadPath,
+      payloadSha256,
+    };
+  } finally {
+    if (prisma) await prisma.$disconnect().catch(() => undefined);
+  }
+}
+
+function discordMessageIds(notification) {
+  const values = [
+    notification?.discordResult?.message_id,
+    ...(Array.isArray(notification?.discordResults)
+      ? notification.discordResults.map((item) => item?.message_id)
+      : []),
+  ];
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim()))];
+}
+
+function stringOrNull(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function uuidOrNull(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)
+    ? trimmed
+    : null;
+}
+
+function finiteOrNull(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function safeErrorMessage(err) {
+  const raw = err instanceof Error ? err.message : String(err);
+  const databaseUrl = process.env.DATABASE_URL;
+  return databaseUrl ? raw.replaceAll(databaseUrl, '[REDACTED_DATABASE_URL]') : raw;
 }
 
 async function sendStatus(target, embed) {

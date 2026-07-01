@@ -17,8 +17,9 @@ Esta carpeta es la fuente canonica del repo para Growth/Marketing de gana-v9. No
 3. [Editorial, SEO y GTM](editorial-seo-gtm.md): clusters de contenido, packaging editorial, GTM inicial y reuse social.
 4. [Contrato de medicion free-to-paid](free-to-paid-measurement-contract.md): tablero, metricas, CRM manual y reglas de calidad de datos.
 5. [Public picks funnel](public-picks-funnel.md): refinamiento J-108 para la primera pantalla publica, contrato de pick card, resultados/history y metricas de confianza.
-6. [Daily picks social workstream](daily-picks-social-workstream.md): refinamiento J-108 para gate diario, stop conditions, canales y backfill de metricas.
-7. [Estado de migracion](migration-status.md): decisiones de migracion/fusion/obsolescencia para las paginas Notion de los subsets J-107/J-109.
+6. [Public picks realtime UX](public-picks-realtime-ux.md): especificacion J-113 para hero, daily summary, feed realtime, parlay stack, Mundial, copy system y conversion.
+7. [Daily picks social workstream](daily-picks-social-workstream.md): refinamiento J-108 para gate diario, stop conditions, canales y backfill de metricas.
+8. [Estado de migracion](migration-status.md): decisiones de migracion/fusion/obsolescencia para las paginas Notion de los subsets J-107/J-109.
 
 ## Principios
 

@@ -20,7 +20,7 @@ import { buildDailyProviderComparison, type DailyProviderComparison, type DailyP
 import { applyCouncilDecisions, runRecommendationCouncil } from '../council/recommendation-council.js';
 import { recommendationArtifactTargets } from '../recommendations/artifact.js';
 import { DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER, buildRequiredLeagueRecommendations, normalizeRequiredLeagues } from './required-leagues.js';
-import type { DailyRequiredLeagueGoalStatus, DailyRequiredLeagueInput } from './required-leagues.js';
+import type { DailyRequiredLeagueArtifact, DailyRequiredLeagueGoalStatus, DailyRequiredLeagueInput, DailyRequiredLeagueParlayProjection } from './required-leagues.js';
 import {
   ATOMIC_BLOCKED_RISK_FLAGS,
   ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR,
@@ -207,6 +207,7 @@ interface DailyRunDiagnostics {
   totalProviderPredictions: number;
   totalProviderPromotablePredictions: number;
   persistedParlays: number;
+  persistedRequiredLeagueParlays: number;
   analyzedParlays: number;
   recommendations: number;
   providerPredictionCounts: Record<string, { predictions: number; promotable: number }>;
@@ -579,7 +580,6 @@ export async function runDailyE2E(
     analysisTop: parlayAnalysis?.top ?? [],
     rejected: (parlayAnalysis?.diagnostics as any)?.rejected ?? [],
   });
-  const publishedTargets = recommendationArtifactTargets({ recommendations: finalRecommendations });
   const offDateLegs = recommendationLegsOutsideRequestedDate(
     finalRecommendations,
     input.date,
@@ -588,7 +588,7 @@ export async function runDailyE2E(
   if (offDateLegs.length) {
     throw new Error(`daily recommendations include fixture legs outside requested date ${input.date}: ${offDateLegs.slice(0, 5).join('; ')}`);
   }
-  const requiredLeagueArtifact = buildRequiredLeagueRecommendations({
+  let requiredLeagueArtifact = buildRequiredLeagueRecommendations({
     dailyBatchId,
     date: input.date,
     generatedAt: completedAt.toISOString(),
@@ -598,7 +598,20 @@ export async function runDailyE2E(
     resolveModel: (provider) => modelForProvider(effectiveConfig, provider, input.models),
     requiredLeagues,
   });
+  requiredLeagueArtifact = await persistRequiredLeagueParlayProjections({
+    repositories,
+    artifact: requiredLeagueArtifact,
+    dailyBatchId,
+    date: input.date,
+    generatedAt: completedAt,
+  });
+  const publishedTargets = recommendationArtifactTargets({
+    recommendations: finalRecommendations,
+    requiredLeagueRecommendations: requiredLeagueArtifact,
+  });
   const requiredLeagueGoalPassed = requiredLeagueArtifact.goalCheck.status === 'passed';
+  const requiredLeaguePersistenceReady = requiredLeagueArtifact.persistenceLedger?.status === 'persisted'
+    || requiredLeagueArtifact.persistenceLedger?.status === 'not-needed';
   const hasAnyValidParlayFamily = parlayFamilies.some((family) => family.ok);
   const hasAnySuccessfulProvider = providerRuns.some((run) => run.ok);
   const allProvidersSucceeded = providerRuns.every((run) => run.ok);
@@ -607,8 +620,9 @@ export async function runDailyE2E(
   const ok = hasAnySuccessfulProvider
     && (hasAnyValidParlayFamily || hasAnalyticalRecommendations)
     && (parlayAnalysis?.ok ?? false)
-    && metrics.ok;
-  const verdict = ok && hasAnyValidParlayFamily && allProvidersSucceeded && validationFreshEnoughForPromotion && requiredLeagueGoalPassed
+    && metrics.ok
+    && requiredLeaguePersistenceReady;
+  const verdict = ok && hasAnyValidParlayFamily && allProvidersSucceeded && validationFreshEnoughForPromotion && requiredLeagueGoalPassed && requiredLeaguePersistenceReady
     ? 'promotable'
     : ok
       ? 'review-required'
@@ -634,6 +648,7 @@ export async function runDailyE2E(
     providerRuns,
     providerPipelineResults,
     parlayFamilies,
+    requiredLeagueArtifact,
     parlayAnalysis,
     metrics,
     validationFreshness,
@@ -688,6 +703,7 @@ export async function runDailyE2E(
     requiredLeagueRecommendationsPath,
     requiredLeagueCoverage: requiredLeagueArtifact.coverage,
     requiredLeagueGoalCheck: requiredLeagueArtifact.goalCheck,
+    requiredLeaguePersistenceLedger: requiredLeagueArtifact.persistenceLedger,
     sharedInputs: {
       pairedProviders,
       providerModels: Object.fromEntries(providers.map((provider) => [
@@ -722,6 +738,7 @@ export async function runDailyE2E(
       requiredLeagueAtomicProjections: requiredLeagueArtifact.atomicProjections.length,
       requiredLeagueParlayApproaches: requiredLeagueArtifact.parlayProjections.length,
       requiredLeagueSelectedParlayApproaches: requiredLeagueArtifact.parlayProjections.filter((item) => item.status === 'selected').length,
+      requiredLeaguePersistedParlayApproaches: requiredLeagueArtifact.persistenceLedger?.persistedParlayIds.length ?? 0,
     },
     council: {
       version: council.councilVersion,
@@ -752,6 +769,7 @@ export async function runDailyE2E(
     requiredLeagueRecommendationsPath,
     requiredLeagueCoverage: requiredLeagueArtifact.coverage,
     requiredLeagueGoalCheck: requiredLeagueArtifact.goalCheck,
+    requiredLeaguePersistenceLedger: requiredLeagueArtifact.persistenceLedger,
     recommendationPolicy: {
       parlayRecommendationLimit: DAILY_PARLAY_RECOMMENDATION_LIMIT,
       parlayAnalysisTop: DAILY_PARLAY_ANALYSIS_TOP,
@@ -841,7 +859,9 @@ export async function runDailyE2E(
     council,
     publishedTargets,
     persistencePolicy: {
-      finalOperationalStore: 'daily-parlay-recommendations.json',
+      finalOperationalStore: 'database-ledger',
+      renderSnapshot: 'daily-parlay-recommendations.json',
+      publicationGate: 'Discord publication must match persisted prediction/parlay IDs in publishedTargets and the live database before sending.',
       validationAndMetricsScope: 'published-recommendations-only',
       predictionIds: publishedTargets.predictionIds,
       parlayIds: publishedTargets.parlayIds,
@@ -916,6 +936,167 @@ export async function runDailyE2E(
     reportPath,
     error: ok ? undefined : firstError(providerRuns, parlayFamilies, parlayAnalysis, metrics),
   };
+}
+
+async function persistRequiredLeagueParlayProjections(input: {
+  repositories: ReturnType<typeof createStorageRepositories> | undefined;
+  artifact: DailyRequiredLeagueArtifact;
+  dailyBatchId: string;
+  date: string;
+  generatedAt: Date;
+}): Promise<DailyRequiredLeagueArtifact> {
+  const selected = input.artifact.parlayProjections.filter((projection) => projection.status === 'selected');
+  const emptyLedger = {
+    store: 'parlays' as const,
+    expectedParlayCount: selected.length,
+    persistedParlayIds: [] as string[],
+    failedParlayIds: [] as string[],
+  };
+  if (!selected.length) {
+    return {
+      ...input.artifact,
+      persistenceLedger: {
+        status: 'not-needed',
+        ...emptyLedger,
+      },
+    };
+  }
+  if (!input.repositories?.parlays?.createWithLegs) {
+    return {
+      ...input.artifact,
+      parlayProjections: input.artifact.parlayProjections.map((projection) =>
+        projection.status === 'selected'
+          ? { ...projection, persistence: { status: 'skipped', reason: 'database repository unavailable' } }
+          : projection
+      ),
+      persistenceLedger: {
+        status: 'skipped',
+        ...emptyLedger,
+        reason: 'database repository unavailable',
+      },
+    };
+  }
+
+  const persistedParlayIds: string[] = [];
+  const failedParlayIds: string[] = [];
+  const parlayProjections: DailyRequiredLeagueParlayProjection[] = [];
+  for (const projection of input.artifact.parlayProjections) {
+    if (projection.status !== 'selected') {
+      parlayProjections.push(projection);
+      continue;
+    }
+
+    const id = requiredLeagueParlayPersistenceId(input.dailyBatchId, input.date, projection);
+    try {
+      const existing = typeof input.repositories.parlays.findById === 'function'
+        ? await input.repositories.parlays.findById(id)
+        : null;
+      const record = existing ?? await input.repositories.parlays.createWithLegs({
+        parlay: {
+          id,
+          runId: input.dailyBatchId.length <= 36 ? input.dailyBatchId : null,
+          combinedOdds: projection.combinedOdds,
+          aggregateConfidence: clampPersistenceMetric(projection.aggregateConfidence),
+          aggregateQuality: clampPersistenceMetric(projection.adjustedProbability ?? projection.aggregateConfidence),
+          rationaleRedacted: projection.reasons.join('; ') || `required-league ${projection.profile} addendum`,
+          warnings: projection.riskFlags,
+          status: 'review-required',
+          generatedAt: input.generatedAt,
+          metadata: jsonValue({
+            dailyBatchId: input.dailyBatchId,
+            date: input.date,
+            requiredLeagueAddendum: true,
+            originalProjectionId: projection.parlayId,
+            profile: projection.profile,
+            portfolioProfile: projection.profile,
+            league: projection.league,
+            sourceRunIds: projection.sourceRunIds,
+            providers: projection.providers,
+            expectedEdge: projection.expectedEdge,
+            riskFlags: projection.riskFlags,
+          }),
+        },
+        legs: projection.legs.map((leg, index) => ({
+          predictionId: leg.predictionId,
+          fixtureId: leg.fixtureId,
+          marketKey: leg.market,
+          selectionKey: leg.selection,
+          line: leg.line,
+          odds: leg.odds,
+          status: 'pending',
+          legIndex: index,
+          inclusionReason: `required-league ${projection.profile} addendum`,
+          metadata: jsonValue({
+            fixture: leg.fixture,
+            display: leg.display,
+            confidence: leg.confidence,
+            validationStatus: leg.validationStatus,
+            warnings: leg.warnings,
+            banker: leg.banker,
+            bankerReason: leg.bankerReason,
+          }),
+        })),
+      });
+      persistedParlayIds.push(record.id);
+      parlayProjections.push({
+        ...projection,
+        parlayId: record.id,
+        persistence: { status: 'persisted' },
+      });
+    } catch (err) {
+      failedParlayIds.push(projection.parlayId ?? id);
+      parlayProjections.push({
+        ...projection,
+        persistence: { status: 'failed', reason: errorMessage(err) },
+      });
+    }
+  }
+
+  return {
+    ...input.artifact,
+    parlayProjections,
+    persistenceLedger: {
+      status: failedParlayIds.length ? 'partial' : 'persisted',
+      store: 'parlays',
+      expectedParlayCount: selected.length,
+      persistedParlayIds,
+      failedParlayIds,
+      ...(failedParlayIds.length ? { reason: 'one or more required-league parlays failed to persist' } : {}),
+    },
+  };
+}
+
+function requiredLeagueParlayPersistenceId(
+  dailyBatchId: string,
+  date: string,
+  projection: DailyRequiredLeagueParlayProjection,
+): string {
+  return deterministicUuid([
+    'required-league-parlay',
+    dailyBatchId,
+    date,
+    projection.profile,
+    ...projection.legs.map((leg) => [
+      leg.predictionId,
+      leg.fixtureId,
+      leg.market,
+      leg.selection,
+      leg.line ?? '',
+    ].join(':')),
+  ].join('|'));
+}
+
+function deterministicUuid(seed: string): string {
+  const chars = createHash('sha256').update(seed).digest('hex').slice(0, 32).split('');
+  chars[12] = '5';
+  chars[16] = ((Number.parseInt(chars[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
+  const hex = chars.join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function clampPersistenceMetric(value: number | null | undefined): number {
+  if (!Number.isFinite(value)) return 0;
+  return round(Math.min(Math.max(Number(value), 0), 0.9999), 4);
 }
 
 export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDailyE2EInput, 'date'>): RunPipelineDependencies {
@@ -1117,6 +1298,7 @@ function dailyRunDiagnostics(input: {
   providerRuns: readonly DailyProviderRunResult[];
   providerPipelineResults: Partial<Record<DailyE2EProvider, RunPipelineResult>>;
   parlayFamilies: readonly DailyParlayFamilyResult[];
+  requiredLeagueArtifact: DailyRequiredLeagueArtifact;
   parlayAnalysis: ParlayAnalysisRunResult | undefined;
   metrics: DailyMetricsRunResult | undefined;
   validationFreshness: DailyValidationFreshness;
@@ -1131,6 +1313,7 @@ function dailyRunDiagnostics(input: {
   const totalProviderPromotablePredictions = Object.values(providerPredictionCountsByProvider)
     .reduce((sum, counts) => sum + counts.promotable, 0);
   const persistedParlays = input.parlayFamilies.reduce((sum, family) => sum + (family.persistedParlayIds?.length ?? 0), 0);
+  const persistedRequiredLeagueParlays = input.requiredLeagueArtifact.persistenceLedger?.persistedParlayIds.length ?? 0;
   const analyzedParlays = input.parlayAnalysis?.analyzed ?? 0;
   const recommendations = input.recommendations.length;
   const reasons: string[] = [];
@@ -1141,6 +1324,13 @@ function dailyRunDiagnostics(input: {
     if (!run.ok) reasons.push(`${run.provider} provider blocked${run.error ? `: ${run.error}` : ''}`);
   }
   if (!persistedParlays) reasons.push('no persisted parlay candidates were produced');
+  if (input.requiredLeagueArtifact.persistenceLedger?.status === 'partial') {
+    reasons.push('required-league addendum parlay persistence was partial');
+  }
+  if (input.requiredLeagueArtifact.persistenceLedger?.status === 'skipped'
+    && input.requiredLeagueArtifact.persistenceLedger.expectedParlayCount > 0) {
+    reasons.push(`required-league addendum parlay persistence skipped: ${input.requiredLeagueArtifact.persistenceLedger.reason ?? 'database unavailable'}`);
+  }
   if (!input.parlayAnalysis) reasons.push('parlay analysis was skipped because no usable source run ids were available');
   else if (!analyzedParlays) reasons.push('parlay analysis found zero candidates');
   if (!input.metrics?.ok) reasons.push(`daily metrics unavailable${input.metrics?.error ? `: ${input.metrics.error}` : ''}`);
@@ -1153,6 +1343,7 @@ function dailyRunDiagnostics(input: {
     totalProviderPredictions,
     totalProviderPromotablePredictions,
     persistedParlays,
+    persistedRequiredLeagueParlays,
     analyzedParlays,
     recommendations,
     providerPredictionCounts: providerPredictionCountsByProvider,

@@ -71,7 +71,12 @@ export function recommendationArtifactTargets(artifact: unknown, sourcePath?: st
   }
 
   for (const projection of Array.isArray(requiredLeague.parlayProjections) ? requiredLeague.parlayProjections : []) {
-    for (const leg of Array.isArray(objectRecord(projection).legs) ? objectRecord(projection).legs as unknown[] : []) {
+    const item = objectRecord(projection);
+    const projectionParlayId = stringValue(item.parlayId);
+    if (stringValue(item.status) === 'selected' && projectionParlayId && !isSyntheticRecommendationId(projectionParlayId)) {
+      parlayIds.add(projectionParlayId);
+    }
+    for (const leg of Array.isArray(item.legs) ? item.legs as unknown[] : []) {
       const legPredictionId = stringValue(objectRecord(leg).predictionId);
       if (legPredictionId && !isSyntheticRecommendationId(legPredictionId)) predictionIds.add(legPredictionId);
     }
@@ -248,7 +253,7 @@ function artifactSelectionFromRequiredGeneralPrediction(value: unknown): Recomme
 }
 
 function isSyntheticRecommendationId(value: string): boolean {
-  return value.startsWith('atomic-') || value.startsWith('analytical-fallback-');
+  return value.startsWith('atomic-') || value.startsWith('analytical-fallback-') || value.startsWith('required-');
 }
 
 function objectRecord(value: unknown): Record<string, unknown> {

@@ -283,6 +283,26 @@ function createDashboardDb() {
       ],
       count: async () => 1,
     },
+    publicRecommendationPublication: {
+      findMany: async () => [
+        {
+          id: 'publication-parlay-1',
+          dailyBatchId: 'daily-2026-05-01',
+          channel: 'discord',
+          target: 'recommendations',
+          targetType: 'parlay',
+          targetId: 'parlay-1',
+          predictionId: null,
+          parlayId: 'parlay-1',
+          status: 'published',
+          discordTarget: 'recommendations',
+          discordMessageId: 'discord-message-1',
+          discordMessageIds: ['discord-message-1'],
+          publishedAt: new Date('2026-05-01T12:10:00.000Z'),
+          createdAt: new Date('2026-05-01T12:10:00.000Z'),
+        },
+      ],
+    },
     validationArtifact: {
       findMany: async () => [VALIDATION],
       findUnique: async ({ where }: { where: { id?: string } }) => {
@@ -295,6 +315,11 @@ function createDashboardDb() {
       count: async () => 5,
     },
     harnessRun: {
+      findFirst: async (args?: any) => {
+        const where = JSON.stringify(args?.where ?? {});
+        if (where.includes('2026-05-01')) return DAILY_RUN;
+        return DAILY_RUN;
+      },
       findMany: async (args?: any) => {
         const where = JSON.stringify(args?.where ?? {});
         return where.includes('daily') ? [DAILY_RUN] : [RUN];
@@ -645,6 +670,15 @@ describe('dashboard endpoints', () => {
       const payload = await metadata.json();
       assert.equal(payload.statuses.predictions.includes('candidate'), true);
       assert.equal(payload.teams.length, 2);
+
+      const publicRecommendations = await fetch(`${base}/api/public/recommendations?date=2026-05-01`);
+      const publicRecommendationsBody = await publicRecommendations.text();
+      assert.equal(publicRecommendations.status, 200, publicRecommendationsBody);
+      const recommendationsPayload = JSON.parse(publicRecommendationsBody);
+      assert.equal(recommendationsPayload.contractVersion, 'gana-v9.public-recommendations.v1');
+      assert.equal(recommendationsPayload.stale, false);
+      assert.equal(recommendationsPayload.dailySummary.parlays, 1);
+      assert.equal(recommendationsPayload.parlays[0].parlayId, 'parlay-1');
     });
   });
 

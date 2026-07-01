@@ -1386,6 +1386,158 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.recommendationPolicy.requiredLeagueAddendum.missingPredictionFixtures, 1);
   });
 
+  it('persists selected required-league parlay projections before publishing targets', async () => {
+    const ctx = context();
+    const persistedParlays: any[] = [];
+    const persistedById = new Map<string, any>();
+    const canadaBosnia = {
+      ...fixture('2026-06-12T19:00:00.000Z'),
+      id: 'fixture-canada-bosnia',
+      providerFixtureId: '1539000',
+      leagueId: 1,
+      season: 2026,
+      competitionName: 'World Cup',
+      homeTeamName: 'Canada',
+      awayTeamName: 'Bosnia & Herzegovina',
+    };
+    const usaParaguay = {
+      ...fixture('2026-06-13T01:00:00.000Z'),
+      id: 'fixture-usa-paraguay',
+      providerFixtureId: '1489370',
+      leagueId: 1,
+      season: 2026,
+      competitionName: 'World Cup',
+      homeTeamName: 'USA',
+      awayTeamName: 'Paraguay',
+    };
+
+    const result = await runDailyE2E(ctx.config, {
+      date: '2026-06-12',
+      providers: ['codex'],
+      persistMetrics: false,
+      dailyBatchId: 'daily-required-ledger',
+      requiredLeagues: [{ providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 }],
+    }, ctx.runtime, {
+      repositories: {
+        harnessRuns: { upsertForRun: async () => ({}) },
+        parlays: {
+          findById: async (id: string) => persistedById.get(id) ?? null,
+          createWithLegs: async (input: any) => {
+            persistedParlays.push(input);
+            const record = { id: input.parlay.id };
+            persistedById.set(record.id, record);
+            return record;
+          },
+        },
+      } as any,
+      runPipeline: async (config, input) => {
+        const runId = `${config.provider}-required-ledger-run`;
+        return {
+          ok: true,
+          runId,
+          date: input.date,
+          status: 'succeeded',
+          verdict: 'review-required',
+          artifactDir: join(ctx.config.artifactRoot, 'runs', runId),
+          artifactPath: join(ctx.config.artifactRoot, 'runs', runId),
+          evidencePackPath: '/tmp/evidence.json',
+          handoffPath: '/tmp/handoff.md',
+          steps: [],
+          fixtures: [canadaBosnia, usaParaguay],
+          lowOddsScan: { date: input.date, threshold: 1.2, fixtureCount: 0, hitCount: 0, hits: [], fixtureEvaluations: [] },
+          oddsSnapshots: [],
+          research: [],
+          scoring: [
+            {
+              ok: true,
+              runId,
+              fixtureId: canadaBosnia.id,
+              providerFixtureId: canadaBosnia.providerFixtureId,
+              gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+              predictions: [
+                requiredPrediction(runId, 'canada-under-25', canadaBosnia.id, canadaBosnia.providerFixtureId, 'goals_over_under', 'under', 2.5, 1.67, 0.72, 0.0261),
+                requiredPrediction(runId, 'canada-home', canadaBosnia.id, canadaBosnia.providerFixtureId, 'h2h', 'home', null, 1.85, 0.7, 0.034),
+                requiredPrediction(runId, 'canada-btts-no', canadaBosnia.id, canadaBosnia.providerFixtureId, 'btts', 'no', null, 1.8, 0.68, 0.025),
+              ],
+            },
+            {
+              ok: true,
+              runId,
+              fixtureId: usaParaguay.id,
+              providerFixtureId: usaParaguay.providerFixtureId,
+              gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+              predictions: [
+                requiredPrediction(runId, 'usa-home', usaParaguay.id, usaParaguay.providerFixtureId, 'h2h', 'home', null, 2.09, 0.68, 0.0255),
+                requiredPrediction(runId, 'usa-under-25', usaParaguay.id, usaParaguay.providerFixtureId, 'goals_over_under', 'under', 2.5, 1.7, 0.7, 0.03),
+                requiredPrediction(runId, 'usa-double-chance', usaParaguay.id, usaParaguay.providerFixtureId, 'double_chance', 'home_or_draw', null, 1.35, 0.72, 0.015),
+              ],
+            },
+          ],
+          parlay: {
+            ok: true,
+            runId,
+            gateResult: { verdict: 'promotable', reasons: [], warnings: [] },
+            build: { parlay: { legs: [] } },
+            persistedParlayIds: ['base-parlay'],
+          },
+        } as any;
+      },
+      buildParlay: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'parlay-run',
+        date: input.date,
+        gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
+        build: { parlay: { legs: [] } },
+        persistedParlayIds: ['profile-parlay'],
+      } as any),
+      analyzeParlays: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'analysis-run',
+        date: input.date,
+        analyzed: 0,
+        top: [],
+        diagnostics: {
+          generatedAt: '2026-06-12T13:30:00.000Z',
+          analyticalArtifactOnly: true,
+          executionCapability: 'none',
+          profileScope: 'all',
+          rawAnalyzed: 0,
+          profileScopedAnalyzed: 0,
+          exposurePolicy: { analyticalUnits: 100, maxPortfolioExposure: 0.08, maxParlayExposure: 0.025, unitLabel: 'analytical-units' },
+          bankrollPolicy: { bankrollUnits: 100, maxPortfolioStake: 0.08, maxParlayStake: 0.025, unitLabel: 'analytical-units' },
+          universe: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null },
+          selected: { won: 0, lost: 0, voided: 0, pending: 0, unvalidated: 0, settled: 0, hitRate: null, totalStakeUnits: 0, totalStakePercentOfBankroll: 0, totalExposureUnits: 0, totalExposurePercent: 0 },
+          rejected: [],
+        },
+      } as any),
+      buildDailyMetrics: async (_config, input, runtime) => ({
+        ok: true,
+        runId: runtime.runId ?? 'metrics-run',
+        date: input.date,
+        days: input.days ?? 1,
+        scope: input.scope ?? 'global',
+        metrics: [],
+        persisted: 0,
+        artifactPath: `/tmp/${runtime.runId}/daily-metrics.json`,
+      }),
+    });
+
+    const required = JSON.parse(readFileSync(join(result.artifactDir, 'daily-required-league-recommendations.json'), 'utf-8'));
+    const selected = required.parlayProjections.filter((projection: any) => projection.status === 'selected');
+    assert.equal(selected.length > 0, true);
+    assert.equal(required.persistenceLedger.status, 'persisted');
+    assert.equal(required.persistenceLedger.persistedParlayIds.length, selected.length);
+    assert.equal(selected.every((projection: any) => projection.persistence.status === 'persisted'), true);
+    assert.equal(selected.every((projection: any) => !String(projection.parlayId).startsWith('required-')), true);
+    assert.equal(persistedParlays.length, selected.length);
+    assert.equal(persistedParlays.every((input) => input.parlay.metadata.requiredLeagueAddendum === true), true);
+    const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    for (const parlayId of required.persistenceLedger.persistedParlayIds) {
+      assert.equal(recommendations.publishedTargets.parlayIds.includes(parlayId), true);
+    }
+    assert.equal(recommendations.persistencePolicy.finalOperationalStore, 'database-ledger');
+  });
+
   it('builds distinct required-league atomic portfolio approaches from alternate fixture projections', () => {
     const canadaBosnia = {
       ...fixture('2026-06-12T19:00:00.000Z'),
@@ -1958,6 +2110,37 @@ function fallbackPrediction(runId: string, id: string, fixtureId: string, overri
     blockers: [],
     parlayEligible: true,
     ...overrides,
+  };
+}
+
+function requiredPrediction(
+  runId: string,
+  id: string,
+  fixtureId: string,
+  providerFixtureId: string,
+  market: string,
+  selection: string,
+  line: number | null,
+  odds: number,
+  confidence: number,
+  edge: number,
+) {
+  return {
+    ...highConfidencePrediction(runId),
+    id,
+    fixtureId,
+    providerFixtureId,
+    market,
+    selection,
+    line,
+    odds,
+    impliedProbability: 1 / odds,
+    marketFairProbability: 1 / odds,
+    modelProbability: confidence,
+    confidence,
+    edge,
+    status: 'review-required',
+    warnings: ['manual review required before promotion'],
   };
 }
 

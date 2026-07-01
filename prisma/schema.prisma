@@ -219,6 +219,7 @@ model HarnessRun {
   validationArtifacts ValidationArtifact[]
   approvalRequests  ApprovalRequest[]
   leaderboardEntries LeaderboardEntry[]
+  publicRecommendationPublications PublicRecommendationPublication[]
 
   @@index([status, createdAt], map: "harness_runs_status_created_at_idx")
   @@index([filterPresetId], map: "harness_runs_filter_preset_id_idx")
@@ -630,6 +631,7 @@ model Prediction {
   artifact       Artifact?       @relation(fields: [artifactId], references: [id], onDelete: SetNull)
   parlayLegs     ParlayLeg[]
   validationArtifacts ValidationArtifact[]
+  publicRecommendationPublications PublicRecommendationPublication[]
 
   @@index([fixtureId, status, generatedAt], map: "predictions_fixture_status_generated_at_idx")
   @@index([runId, generatedAt], map: "predictions_run_generated_at_idx")
@@ -660,6 +662,7 @@ model Parlay {
   artifact Artifact?   @relation(fields: [artifactId], references: [id], onDelete: SetNull)
   legs     ParlayLeg[]
   validationArtifacts ValidationArtifact[]
+  publicRecommendationPublications PublicRecommendationPublication[]
 
   @@index([runId, generatedAt], map: "parlays_run_generated_at_idx")
   @@index([status, generatedAt], map: "parlays_status_generated_at_idx")
@@ -729,6 +732,41 @@ model ValidationArtifact {
   @@index([artifactId], map: "validation_artifacts_artifact_id_idx")
   @@index([status, evaluatedAt], map: "validation_artifacts_status_evaluated_at_idx")
   @@map("validation_artifacts")
+}
+
+model PublicRecommendationPublication {
+  id                String   @id @default(uuid()) @db.Char(36)
+  dailyBatchId      String   @map("daily_batch_id") @db.VarChar(120)
+  runId             String?  @map("run_id") @db.Char(36)
+  slateDate         DateTime @map("slate_date") @db.Date
+  channel           String   @default("discord") @db.VarChar(80)
+  target            String   @default("recommendations") @db.VarChar(120)
+  targetType        String   @map("target_type") @db.VarChar(40)
+  targetId          String   @map("target_id") @db.VarChar(120)
+  predictionId      String?  @map("prediction_id") @db.Char(36)
+  parlayId          String?  @map("parlay_id") @db.Char(36)
+  status            String   @default("published") @db.VarChar(40)
+  discordTarget     String?  @map("discord_target") @db.VarChar(160)
+  discordMessageId  String?  @map("discord_message_id") @db.VarChar(120)
+  discordMessageIds Json?    @map("discord_message_ids")
+  artifactPath      String?  @map("artifact_path") @db.Text
+  payloadPath       String?  @map("payload_path") @db.Text
+  payloadSha256     String?  @map("payload_sha256") @db.Char(64)
+  publishedAt       DateTime @map("published_at") @db.DateTime(3)
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  run        HarnessRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  prediction Prediction? @relation(fields: [predictionId], references: [id], onDelete: SetNull)
+  parlay     Parlay?     @relation(fields: [parlayId], references: [id], onDelete: SetNull)
+
+  @@unique([dailyBatchId, channel, target, targetType, targetId], map: "public_rec_publications_target_key")
+  @@index([dailyBatchId, channel, publishedAt], map: "public_rec_publications_batch_channel_idx")
+  @@index([runId, publishedAt], map: "public_rec_publications_run_published_at_idx")
+  @@index([predictionId], map: "public_rec_publications_prediction_id_idx")
+  @@index([parlayId], map: "public_rec_publications_parlay_id_idx")
+  @@index([status, publishedAt], map: "public_rec_publications_status_published_at_idx")
+  @@map("public_recommendation_publications")
 }
 
 model LeaderboardEntry {

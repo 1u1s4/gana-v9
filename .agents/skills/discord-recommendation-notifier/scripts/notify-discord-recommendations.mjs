@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -1954,6 +1955,26 @@ function chunkLinesByLimit(lines, limit) {
   return chunks;
 }
 
+function writeDiscordPayloadArtifact(artifactPath, artifact, options, payloads) {
+  const payloadJson = JSON.stringify(payloads);
+  const sha256 = createHash('sha256').update(payloadJson).digest('hex');
+  const payloadPath = join(dirname(artifactPath), `discord-recommendations-payload-${sha256.slice(0, 16)}.json`);
+  if (!existsSync(payloadPath)) {
+    mkdirSync(dirname(payloadPath), { recursive: true });
+    writeFileSync(payloadPath, `${JSON.stringify({
+      schemaVersion: 1,
+      kind: 'gana-v9.discord-recommendations-payload',
+      dailyBatchId: artifact?.dailyBatchId ?? null,
+      date: artifact?.date ?? null,
+      transport: options.transport,
+      gatewayTarget: options.gatewayTarget,
+      payloadSha256: sha256,
+      payloads,
+    }, null, 2)}\n`);
+  }
+  return { path: payloadPath, sha256 };
+}
+
 function usage() {
   return [
     'Usage:',
@@ -1981,10 +2002,13 @@ async function main() {
   const payload = options.singleMessage ? buildDiscordSinglePayload(artifact, options) : buildDiscordPayload(artifact, options);
   const payloads = options.singleMessage ? [payload] : buildDiscordPayloads(artifact, options);
   const gatewayMessage = buildGatewayMessage(artifact, options);
+  const payloadArtifact = writeDiscordPayloadArtifact(artifactPath, artifact, options, payloads);
 
   if (options.dryRun) {
     console.log(JSON.stringify({
       artifactPath,
+      payloadPath: payloadArtifact.path,
+      payloadSha256: payloadArtifact.sha256,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
@@ -2000,6 +2024,8 @@ async function main() {
     const result = sendHermesGatewayMessage(options.gatewayTarget, gatewayMessage, { hermesPython: options.hermesPython });
     console.log(JSON.stringify({
       artifactPath,
+      payloadPath: payloadArtifact.path,
+      payloadSha256: payloadArtifact.sha256,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
@@ -2012,6 +2038,8 @@ async function main() {
     const results = payloads.map((item) => sendDiscordNativePayload(options.gatewayTarget, item, { hermesPython: options.hermesPython }));
     console.log(JSON.stringify({
       artifactPath,
+      payloadPath: payloadArtifact.path,
+      payloadSha256: payloadArtifact.sha256,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
@@ -2027,6 +2055,8 @@ async function main() {
   }
   console.log(JSON.stringify({
     artifactPath,
+    payloadPath: payloadArtifact.path,
+    payloadSha256: payloadArtifact.sha256,
     selectionCount: recommendations.length,
     transport: options.transport,
     discordStatus: results[0]?.status,
