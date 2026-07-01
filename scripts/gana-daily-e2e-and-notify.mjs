@@ -101,7 +101,10 @@ if (!args.force && !acquiredRunLock) {
 }
 const startedAt = new Date();
 const command = [
-  'gana',
+  'node',
+  '--import',
+  'tsx',
+  'src/cli.ts',
   'daily-e2e',
   '--date', date,
   '--providers', providers,
@@ -138,7 +141,7 @@ let sentRecommendations = false;
 try {
   let handled = false;
   writeLogLine(logFd, `started ${startedAt.toISOString()} ${command.join(' ')}`);
-  const result = spawnSync('pnpm', command, {
+  const result = spawnSync(command[0], command.slice(1), {
     cwd: REPO_ROOT,
     env,
     stdio: ['ignore', logFd, logFd],
@@ -192,18 +195,16 @@ try {
       ].filter(Boolean),
       footer: '🛡️ Revisión manual requerida antes de promoción · sin ejecución monetaria',
     });
-    if (acquiredRunLock) {
-      writeLock(lockPath, {
-        date,
-        dailyBatchId,
-        status: 'published',
-        selectionCount,
-        recommendationCount: publishableCounts.recommendations,
-        requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
-        completedAt: completedAt.toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    }
+    writeLock(lockPath, {
+      date,
+      dailyBatchId,
+      status: 'published',
+      selectionCount,
+      recommendationCount: publishableCounts.recommendations,
+      requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
+      completedAt: completedAt.toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     writeOutcome(buildCronOutcome({
       flow: 'daily-e2e',
       status: 'published',

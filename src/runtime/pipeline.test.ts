@@ -799,6 +799,93 @@ describe('executeRunPipeline', () => {
     assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay', 'fixtures']);
   });
 
+  it('creates the HarnessRun before persisted tasks and runs exact task ids when stale tasks exist', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const calls: string[] = [];
+    const events: string[] = [];
+    const persistedTasks = new Map<string, Record<string, unknown>>();
+    let runCreated = false;
+    let listRunnableCalls = 0;
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, {
+      ...successfulPipelineDeps({
+        target,
+        calls,
+        runId: 'run-persisted-exact-task',
+        date: '2026-04-29',
+      }),
+      repositories: {
+        harnessRuns: {
+          upsertForRun: async () => {
+            events.push('run.upsert');
+            runCreated = true;
+            return {};
+          },
+        },
+        harnessTasks: {
+          enqueue: async (input) => {
+            assert.equal(runCreated, true);
+            events.push(`task.enqueue:${input.type}`);
+            const id = `task-${input.type}`;
+            persistedTasks.set(id, {
+              id,
+              runId: input.runId,
+              type: input.type,
+              status: input.status ?? 'queued',
+              priority: input.priority ?? 0,
+              scheduledFor: input.scheduledFor ?? null,
+              leaseExpiresAt: input.leaseExpiresAt ?? null,
+              attempts: input.attempts ?? 0,
+              maxAttempts: input.maxAttempts ?? 3,
+              payload: input.payload ?? null,
+              lastErrorRedacted: input.lastErrorRedacted ?? null,
+            });
+            return { id };
+          },
+          listRunnable: async () => {
+            listRunnableCalls += 1;
+            return [{
+              id: 'stale-task',
+              runId: 'old-run',
+              type: 'odds.fetch',
+              status: 'queued',
+              priority: -1,
+              scheduledFor: null,
+              leaseExpiresAt: null,
+              attempts: 0,
+              maxAttempts: 3,
+              payload: null,
+              lastErrorRedacted: null,
+            }];
+          },
+          updateStatus: async (id, update) => {
+            assert.notEqual(id, 'stale-task');
+            const existing = persistedTasks.get(id);
+            assert.ok(existing, `missing persisted task ${id}`);
+            const next = { ...existing, ...update };
+            persistedTasks.set(id, next);
+            return next;
+          },
+        },
+      },
+    });
+
+    assert.equal(result.runId, 'run-persisted-exact-task');
+    assert.equal(listRunnableCalls, 0);
+    assert.equal(events[0], 'run.upsert');
+    assert.equal(events[1], 'task.enqueue:fixtures.fetch');
+
+    const tasks = JSON.parse(readFileSync(join(result.artifactDir, 'tasks.json'), 'utf-8'));
+    assert.equal(tasks.find((task: { type: string }) => task.type === 'fixtures.fetch').attempts, 1);
+    assert.equal(persistedTasks.get('task-fixtures.fetch')?.status, 'succeeded');
+    assert.equal(persistedTasks.get('task-odds.fetch')?.status, 'succeeded');
+  });
+
   it('scans low odds across the full date slate instead of only default league fixtures', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');

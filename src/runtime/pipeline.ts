@@ -43,8 +43,7 @@ import {
   selectLowOddsHitFixtures,
   uniqueFixtureCount,
 } from './low-odds.js';
-import { claimNextPersistedTask, type PersistedQueueTask } from './dispatcher.js';
-import { completeTaskLease, failTaskLease, renewTaskLease } from './worker.js';
+import { completeTaskLease, failTaskLease } from './worker.js';
 import { enqueuePersistedRunTasks, scheduleRunTasks, type CanonicalTaskType, type DurableTask } from './scheduler.js';
 
 export type PipelineVerdict = 'promotable' | 'review-required' | 'blocked';
@@ -253,13 +252,6 @@ export async function executeRunPipeline(
   const lowOddsSelectorMarkets = lowOddsSelectorMarketScope(marketScope);
   const lowOddsOddsConfig = lowOddsScanProviderConfig(config);
   const steps: PipelineStepResult[] = [];
-  const durableTasks = await initializeDurableTasks(config, runId, {
-    date: input.date,
-    web: input.web ?? defaultWebMode(config),
-    validate: input.validate ?? 'auto',
-    markets: marketScope,
-  }, repositories);
-  const runDurableTask = createPipelineTaskRunner(config, runtime, runId, durableTasks, repositories);
 
   await repositories.harnessRuns?.upsertForRun?.({
     id: runId,
@@ -274,6 +266,14 @@ export async function executeRunPipeline(
     startedAt,
     metadata: toJsonValue({ date: input.date, validate: input.validate ?? 'auto', marketScope, ...(input.metadata ?? {}) }),
   }).catch(() => undefined);
+
+  const durableTasks = await initializeDurableTasks(config, runId, {
+    date: input.date,
+    web: input.web ?? defaultWebMode(config),
+    validate: input.validate ?? 'auto',
+    markets: marketScope,
+  }, repositories);
+  const runDurableTask = createPipelineTaskRunner(config, runtime, runId, durableTasks, repositories);
 
   writeRun(config, runId, {
     id: runId,
@@ -1043,30 +1043,23 @@ function createPipelineTaskRunner(
 
     const previousTaskId = runtime.taskId;
     const leaseExpiresAt = new Date(Date.now() + 15 * 60_000);
-    const listRunnable = repositories.harnessTasks?.listRunnable;
     const updatePersistedStatus = repositories.harnessTasks?.updateStatus;
     const leaseStore = updatePersistedStatus ? { updateStatus: updatePersistedStatus } : undefined;
-    const persistedQueue = listRunnable && updatePersistedStatus
-      ? {
-          listRunnable,
-          async updateStatus(id: string, update: Parameters<typeof updatePersistedStatus>[1]): Promise<PersistedQueueTask> {
-            const record = await updatePersistedStatus(id, update);
-            if (record && typeof record === 'object' && 'id' in record && 'type' in record && 'attempts' in record) {
-              return record as PersistedQueueTask;
-            }
-            throw new Error('persisted harness task status update did not return a queue task');
-          },
-        }
-      : undefined;
-    if (persistedQueue) {
-      const claimed = await claimNextPersistedTask(persistedQueue, new Date(), 15 * 60_000);
-      if (!claimed) throw new Error(`no persisted queued task available for ${type}`);
-      if (claimed.id !== task.taskId || claimed.type !== type) {
-        throw new Error(`dispatcher claimed ${claimed.type}:${claimed.id} while worker expected ${type}:${task.taskId}`);
-      }
+    if (updatePersistedStatus) {
+      const nextAttempts = task.attempts + 1;
+      const claimed = await updatePersistedStatus(task.taskId, {
+        status: 'running',
+        leaseExpiresAt,
+        attempts: nextAttempts,
+        lastErrorRedacted: null,
+      });
       task.status = 'running';
-      task.attempts = claimed.attempts;
-      task.leaseExpiresAt = claimed.leaseExpiresAt?.toISOString() ?? leaseExpiresAt.toISOString();
+      task.attempts = claimed && typeof claimed === 'object' && 'attempts' in claimed && typeof claimed.attempts === 'number'
+        ? claimed.attempts
+        : nextAttempts;
+      task.leaseExpiresAt = claimed && typeof claimed === 'object' && 'leaseExpiresAt' in claimed && claimed.leaseExpiresAt instanceof Date
+        ? claimed.leaseExpiresAt.toISOString()
+        : leaseExpiresAt.toISOString();
     } else {
       task.status = 'running';
       task.attempts += 1;
@@ -1075,9 +1068,6 @@ function createPipelineTaskRunner(
     runtime.taskId = task.taskId;
     task.lastErrorRedacted = undefined;
     writeDurableTasks(config, runId, tasks);
-    if (!persistedQueue && leaseStore) {
-      await renewTaskLease(leaseStore, task.taskId, leaseExpiresAt, 0).catch(() => undefined);
-    }
 
     try {
       const output = await handler();
