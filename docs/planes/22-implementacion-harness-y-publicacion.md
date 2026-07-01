@@ -56,6 +56,23 @@ Este documento es el destino canonico del subset J-105 de migracion desde Notion
 - Para cambios del harness, actualizar docs de skills/contratos y correr la verificacion focal indicada en `docs/skills.md`.
 - Para cambios de cron/Discord, ejecutar dry-run antes de envio real.
 
+## Verificacion Focal
+
+| Tipo de cambio | Verificacion minima |
+|---|---|
+| Markdown/docs | `git diff --check` y lectura de links editados. |
+| Shell | `bash -n path/to/script.sh`. |
+| Node/MJS | `node --check path/to/script.mjs`. |
+| TypeScript runtime/harness | Test focalizado del modulo; `pnpm typecheck` si cambia contrato compartido. |
+| Prisma/storage | Validacion Prisma o test focalizado de repository cuando aplique. |
+| Dashboard/UI | Test focalizado y browser local si cambia layout o interaccion. |
+| Discord/Telegram | Dry-run o artifact local; envio real solo con target confirmado. |
+| Seguridad/publicacion | `gitleaks detect --source . --redact=100 --no-banner` antes de publicar o abrir rama publica. |
+
+No correr todo el workspace por defecto para cambios documentales. Escalar a
+typecheck/test completo cuando el blast radius cruza runtime compartido,
+persistencia, notificaciones reales o UX publica.
+
 ## Estado de Seguridad y Repos Legacy
 
 J-18 saneo los arboles actuales de cinco repos legacy de alto riesgo mediante PRs de sanitizacion. El estado publicable sigue bloqueado hasta que J-77/J-83 confirmen rotacion/revocacion externa y aprueben la estrategia de rewrite/remocion de historia. No hacer force-push, borrado remoto ni publicacion amplia de esos repos sin esa confirmacion.
@@ -78,6 +95,15 @@ Repos de alto riesgo en esta regla:
 | J-33 Roadmap tecnico, blockers y ownership | Historico/fusionado | Reemplazado por Paperclip para estado vivo; este doc conserva reglas operativas. |
 | J-34 Persistir avances y checklist en Notion | Historico/fusionado | Notion deja de ser destino principal; repo y Paperclip conservan evidencia. |
 | Paginas exportadas vacias de publication/hermes/public-proof | Obsoleto como contenido | Se documentan como cubiertas por este indice y docs canonicos existentes. |
+| Mis api keys | Excluido/redacted | Pagina de credenciales; el export fue reemplazado por stub y no debe migrarse. |
+
+## Material Excluido
+
+Las paginas personales de credenciales, tokens o llaves no son documentacion de
+implementacion. Si aparecen en exports de Notion, se reemplazan por un stub
+redacted, se marcan en `docs/notion-migration/manifest.json` como
+`redacted_secret_source_do_not_migrate`, y cualquier rotacion/revocacion queda
+fuera del repo con el owner humano correspondiente.
 
 ## Fuente Notion
 

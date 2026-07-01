@@ -389,9 +389,10 @@
     "file": "docs/notion-migration/exported/checklist-de-publicacion-y-release--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Subset implementacion/harness/publicacion fusionado al indice tecnico canonico del repo. Notion queda como fuente historica."
+    "migrationNote": "Checklist operativo normalizado en el runbook J-105.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-8159-a430-f5a8d6adca3c",
@@ -449,9 +450,10 @@
     "file": "docs/notion-migration/exported/code-execution-model-for-v7-to-v8-delivery--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "390bea9e-4736-814b-aff8-f89ed219cc64",
@@ -823,9 +825,10 @@
     "file": "docs/notion-migration/exported/hermes-control-plane-hardening--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "390bea9e-4736-8187-8560-eb259c447727",
@@ -916,9 +919,10 @@
     "file": "docs/notion-migration/exported/j-33-roadmap-tecnico-blockers-y-ownership-de-entrega--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Subset implementacion/harness/publicacion fusionado al indice tecnico canonico del repo. Notion queda como fuente historica."
+    "migrationNote": "Roadmap tecnico J-33 fusionado en el runbook J-105; Paperclip conserva estado vivo.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-81ef-b2b4-e773d769d4b5",
@@ -928,9 +932,10 @@
     "file": "docs/notion-migration/exported/j-34-persistir-avances-de-implementacion-y-checklist-de-publicacion-en-notion--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Subset implementacion/harness/publicacion fusionado al indice tecnico canonico del repo. Notion queda como fuente historica."
+    "migrationNote": "Bitacora/checklist J-34 fusionada en el runbook J-105; Notion deja de ser destino operativo.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-819f-a51c-dd2d24045071",
@@ -1106,9 +1111,10 @@
     "file": "docs/notion-migration/exported/j-90-indice-operativo-de-ingenieria-tecnica--390bea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Subset implementacion/harness/publicacion fusionado al indice tecnico canonico del repo. Notion queda como fuente historica."
+    "migrationNote": "Indice tecnico J-90 fusionado en el runbook J-105; Notion queda historico.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "390bea9e-4736-81ed-9a79-ebc677c8e705",
@@ -1118,9 +1124,10 @@
     "file": "docs/notion-migration/exported/j-91-repo-publicacion-y-seguridad-para-indice-cto--390bea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "fused_to_canonical_docs",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Subset implementacion/harness/publicacion fusionado al indice tecnico canonico del repo. Notion queda como fuente historica."
+    "migrationNote": "Repo/publicacion/seguridad J-91 fusionado en el runbook J-105 sin secretos.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "390bea9e-4736-819a-b3f6-f73afafafe0c",
@@ -1177,9 +1184,10 @@
     "file": "docs/notion-migration/exported/legacy-repo-secret-rotation-and-history-rewrite--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export sin contenido util; reglas de no force-push/rewrite quedan en el runbook J-105.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-819c-9227-c2da68ff33a3",
@@ -1189,9 +1197,10 @@
     "file": "docs/notion-migration/exported/live-publication-lineage-guard--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-8185-bf02-c9815fe8dd7c",
@@ -1210,9 +1219,10 @@
     "file": "docs/notion-migration/exported/lower-risk-repo-public-hardening--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34dbea9e-4736-8016-81dd-d98dc024feb2",
@@ -1297,9 +1307,10 @@
     "file": "docs/notion-migration/exported/public-proof-contract-guard-in-public-api--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "349bea9e-4736-8109-82ab-e05dc4904122",
@@ -1318,9 +1329,10 @@
     "file": "docs/notion-migration/exported/publication-and-channel-distribution-hardening--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-816d-a053-ffd4ba906afa",
@@ -1330,9 +1342,10 @@
     "file": "docs/notion-migration/exported/publication-governance-and-environment-isolation--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "34cbea9e-4736-81c3-ac53-e219126b9793",
@@ -1342,9 +1355,10 @@
     "file": "docs/notion-migration/exported/publication-trust-and-hardening-remain-incomplete--34cbea9e.md",
     "exportStatus": "exported_markdown",
     "migrationIssue": "J-105",
-    "migrationStatus": "pending_canonical_review",
+    "migrationStatus": "covered_by_canonical_docs_empty_or_superseded_export",
     "canonicalPath": "docs/planes/22-implementacion-harness-y-publicacion.md",
-    "migrationNote": "Export sin contenido operativo adicional o ya cubierto por docs canonicos existentes."
+    "migrationNote": "Export vacio o superado por docs canonicos J-105; mantener solo como fuente historica.",
+    "migrationUpdated": "2026-07-01"
   },
   {
     "id": "349bea9e-4736-81c3-a27c-c8b915359a1c",
