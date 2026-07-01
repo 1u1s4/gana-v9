@@ -39,6 +39,12 @@ Notion is not a source of truth, execution system, review gate or required mirro
 - Sensitive `Mis api keys` export remains `redacted_secret_source_do_not_migrate`.
 - Personal, duplicate, empty, obsolete and non-operational exports are retained only as historical evidence.
 
+## Obsolete Access Tickets
+
+- J-76 is cancelled by obsolescence: scoped Notion write access is no longer required for the J-61 public picks funnel backfill.
+- J-100 is cancelled by the same decision: do not provision, paste, restore, or migrate Notion tokens for this workstream.
+- The J-61 operating source is repo Markdown, with Paperclip retaining live issue history.
+
 ## Guard
 
 Use:
