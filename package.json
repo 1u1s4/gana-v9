@@ -20,7 +20,8 @@
     "dashboard": "tsx src/cli.ts dashboard",
     "assets:backfill": "tsx scripts/backfill-api-football-assets.ts",
     "update:codex-models": "tsx scripts/update-codex-models.ts",
-    "docs:check-notion-source": "node scripts/check-notion-operational-source.mjs"
+    "docs:check-notion-source": "node scripts/check-notion-operational-source.mjs",
+    "public:ledger": "node scripts/check-public-recommendation-ledger.mjs"
   },
   "keywords": [
     "agent",
