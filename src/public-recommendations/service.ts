@@ -595,9 +595,10 @@ function mapPublicationLedger(
     };
   }
 
+  const status = context.analyticalArtifactOnly ? 'artifact-only' : 'missing';
   return {
-    status: context.analyticalArtifactOnly ? 'artifact-only' : context.hasDailyRun ? 'missing' : 'missing',
-    migrationRequired: true,
+    status,
+    migrationRequired: false,
     proposedTable,
     publicationCount: 0,
     publishedAt: null,
@@ -608,7 +609,9 @@ function mapPublicationLedger(
     payloadSha256: null,
     predictionIds: [],
     parlayIds: [],
-    note: 'Current daily Discord/publication flow writes recommendation artifacts but has no persisted public publication ledger rows for this batch.',
+    note: status === 'artifact-only'
+      ? 'This batch predates the Discord publication ledger write path; recommendations are available from audited artifacts, but no Discord message id was backfilled.'
+      : 'No persisted public publication ledger rows exist for this batch yet. The migration is installed; the next Discord publish should write rows automatically.',
   };
 }
 

@@ -116,7 +116,8 @@ describe('readPublicRecommendations', () => {
       assert.equal(response.requiredLeague.atomicProjections.length, 1);
       assert.equal(response.requiredLeague.selectedParlayApproaches.length, 1);
       assert.equal(response.source.publicationLedger.status, 'artifact-only');
-      assert.equal(response.source.publicationLedger.migrationRequired, true);
+      assert.equal(response.source.publicationLedger.migrationRequired, false);
+      assert.match(response.source.publicationLedger.note, /predates the Discord publication ledger write path/);
       assert.doesNotMatch(JSON.stringify(response), /rationale|Rationale|prompt/i);
     } finally {
       rmSync(root, { recursive: true, force: true });
