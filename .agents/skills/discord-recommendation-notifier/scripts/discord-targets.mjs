@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-export const DEFAULT_DISCORD_TARGET = 'discord:1494071165453467721';
+export const DEFAULT_DISCORD_TARGET = 'discord:1510041125614915756';
 
 export const DISCORD_TARGET_ENV = {
   recommendations: 'GANA_DISCORD_RECOMMENDATIONS_TARGET',

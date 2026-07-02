@@ -197,16 +197,16 @@ discord:1494071165453467721
 
 Evitar depender del home channel si Hermes reporta `Unknown Channel`; usar el ID numerico del canal.
 
-Los wrappers operativos pueden enrutar cada flujo a un canal distinto:
+Los wrappers operativos enrutan por defecto todos los mensajes de gana-v9 a `#gana-alertas`:
 
 ```env
-GANA_DISCORD_RECOMMENDATIONS_TARGET=discord:1510040973218939022
-GANA_DISCORD_VALIDATION_TARGET=discord:1510041050255855616
-GANA_DISCORD_STRATEGY_TARGET=discord:1510041100570591262
+GANA_DISCORD_RECOMMENDATIONS_TARGET=discord:1510041125614915756
+GANA_DISCORD_VALIDATION_TARGET=discord:1510041125614915756
+GANA_DISCORD_STRATEGY_TARGET=discord:1510041125614915756
 GANA_DISCORD_ALERTS_TARGET=discord:1510041125614915756
 ```
 
-Precedencia: target especifico del flujo, luego `--gateway-target`, luego `GANA_DISCORD_TARGET`, y finalmente `discord:1494071165453467721`. Los targets pueden usar `discord:CHANNEL_ID`, `discord:CHANNEL_ID:THREAD_ID` o alias resuelto por Hermes.
+Precedencia: target especifico del flujo, luego `--gateway-target`, luego `GANA_DISCORD_TARGET`, y finalmente `discord:1510041125614915756`. Los targets pueden usar `discord:CHANNEL_ID`, `discord:CHANNEL_ID:THREAD_ID` o alias resuelto por Hermes.
 
 El runtime Python estable para el gateway es:
 

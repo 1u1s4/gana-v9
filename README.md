@@ -117,7 +117,7 @@ Optional per-flow Discord targets:
 - `GANA_DISCORD_STRATEGY_TARGET`
 - `GANA_DISCORD_ALERTS_TARGET`
 
-Each target falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, and finally the configured operational channel.
+Each target falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, and finally `discord:1510041125614915756` (`#gana-alertas`).
 
 See [Discord recommendation notifications](docs/discord-recommendation-notifications.md).
 

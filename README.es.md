@@ -108,7 +108,7 @@ Targets opcionales por flujo:
 - `GANA_DISCORD_STRATEGY_TARGET`
 - `GANA_DISCORD_ALERTS_TARGET`
 
-Cada target cae a `--gateway-target`, luego a `GANA_DISCORD_TARGET` y finalmente al canal operativo configurado.
+Cada target cae a `--gateway-target`, luego a `GANA_DISCORD_TARGET` y finalmente a `discord:1510041125614915756` (`#gana-alertas`).
 
 Consulta [notificaciones de recomendaciones a Discord](docs/discord-recommendation-notifications.md).
 
