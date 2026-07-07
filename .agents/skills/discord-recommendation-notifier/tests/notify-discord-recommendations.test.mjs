@@ -470,6 +470,45 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(message, /Sin selecciones/);
   });
 
+  it('renders World Cup and K League 1 as separate mandatory addendum sections', () => {
+    const requiredLeagueRecommendations = sampleMultiRequiredLeagueRecommendations();
+    const requiredLeagueGeneralPredictions = requiredLeagueRecommendations.generalPredictions;
+    delete requiredLeagueRecommendations.generalPredictions;
+    const artifact = {
+      date: '2026-07-04',
+      dailyBatchId: 'daily-required-two-leagues',
+      recommendations: [],
+      requiredLeagueRecommendations,
+      requiredLeagueGeneralPredictions,
+      council: { status: 'review-required', approvedCount: 12, reviewCount: 4, rejectedCount: 0 },
+    };
+
+    const payloads = buildDiscordPayloads(artifact, { max: 1 });
+    const message = buildGatewayMessage(artifact, { max: 1 });
+    const titles = payloads.flatMap((payload) => payload.embeds.map((embed) => embed.title ?? ''));
+    const embeds = payloads.flatMap((payload) => payload.embeds);
+    const worldCupGeneral = embeds.find((embed) => embed.title === '📋 Predicciones generales · World Cup');
+    const header = payloads[0].embeds[0].description;
+    const closing = payloads.at(-1).embeds.at(-1).description;
+
+    assert.equal(payloads.every((payload) => payload.embeds.length <= 10), true);
+    assert.match(header, /🌍 Obligatorio World Cup: ✅ 📦 6 parlays · 📌 2 predicciones/);
+    assert.match(header, /🌍 Obligatorio K League 1: ✅ 📦 6 parlays · 📌 2 predicciones/);
+    assert.match(header, /📊 Total enviado: 📦 12 parlays · 📌 4 predicciones/);
+    assert.ok(titles.includes('🌍 Obligatorio · World Cup'));
+    assert.ok(titles.includes('📌 Predicciones obligatorias · World Cup'));
+    assert.ok(titles.includes('📋 Predicciones generales · World Cup'));
+    assert.ok(titles.includes('🌍 Obligatorio · K League 1'));
+    assert.ok(titles.includes('📌 Predicciones obligatorias · K League 1'));
+    assert.equal(titles.includes('📋 Predicciones generales · K League 1'), false);
+    assert.match(worldCupGeneral.description, /USA vs Paraguay/);
+    assert.doesNotMatch(worldCupGeneral.description, /Jeonbuk Motors|Ulsan HD/);
+    assert.match(message, /🌍 Obligatorio K League 1: ✅ passed · 2\/2 fixtures/);
+    assert.doesNotMatch(message, /📋 Predicciones generales · K League 1/);
+    assert.match(closing, /🌍 World Cup: 2 predicciones obligatorias · 6\/6 parlays/);
+    assert.match(closing, /🌍 K League 1: 2 predicciones obligatorias · 6\/6 parlays/);
+  });
+
   it('explains blocked duplicate required parlays in user-facing Spanish', () => {
     const requiredLeagueRecommendations = sampleRequiredLeagueRecommendationsPassed();
     for (const projection of requiredLeagueRecommendations.parlayProjections.slice(1)) {
@@ -1107,5 +1146,112 @@ function sampleRequiredLeagueRecommendationsPassed() {
         },
       ],
     })),
+  };
+}
+
+function sampleMultiRequiredLeagueRecommendations() {
+  const worldCup = sampleRequiredLeagueRecommendationsPassed();
+  const kLeague = relabelRequiredLeagueRecommendations(worldCup, {
+    league: { name: 'K League 1', country: 'South-Korea', providerCompetitionId: '292', season: 2026 },
+    replacements: [
+      {
+        from: 'USA vs Paraguay',
+        to: 'Jeonbuk Motors vs Gangwon FC',
+        providerFixtureId: '292001',
+        homeTeamName: 'Jeonbuk Motors',
+        awayTeamName: 'Gangwon FC',
+      },
+      {
+        from: 'Canada vs Bosnia & Herzegovina',
+        to: 'Ulsan HD vs Pohang Steelers',
+        providerFixtureId: '292002',
+        homeTeamName: 'Ulsan HD',
+        awayTeamName: 'Pohang Steelers',
+      },
+    ],
+  });
+  return {
+    ...worldCup,
+    requiredLeagues: [
+      { name: 'World Cup', country: 'World', providerCompetitionId: '1', season: 2026 },
+      { name: 'K League 1', country: 'South-Korea', providerCompetitionId: '292', season: 2026 },
+    ],
+    coverage: {
+      ...worldCup.coverage,
+      fixtureCount: 4,
+      coveredFixtures: 4,
+      missingPredictionFixtures: 0,
+      fixtures: [
+        ...worldCup.coverage.fixtures,
+        ...kLeague.coverage.fixtures,
+      ],
+    },
+    atomicProjections: [
+      ...worldCup.atomicProjections,
+      ...kLeague.atomicProjections,
+    ],
+    generalPredictions: [
+      generalRequiredPrediction('USA vs Paraguay', '1489370', 'World Cup', 'h2h', 'home', null, 1.96, 0.655),
+      generalRequiredPrediction('Canada vs Bosnia & Herzegovina', '1539000', 'World Cup', 'goals_over_under', 'under', 3.5, 1.22, 0.79),
+      generalRequiredPrediction('Jeonbuk Motors vs Gangwon FC', '292001', 'K League 1', 'goals_over_under', 'under', 3.5, 1.2, 0.78),
+      generalRequiredPrediction('Ulsan HD vs Pohang Steelers', '292002', 'K League 1', 'double_chance', 'home_or_draw', null, 1.18, 0.81),
+    ],
+    parlayProjections: [
+      ...worldCup.parlayProjections,
+      ...kLeague.parlayProjections,
+    ],
+  };
+}
+
+function relabelRequiredLeagueRecommendations(source, options) {
+  const copy = JSON.parse(JSON.stringify(source));
+  visitObjects(copy, (item) => {
+    for (const replacement of options.replacements) {
+      for (const [key, current] of Object.entries(item)) {
+        if (current === replacement.from) item[key] = replacement.to;
+        if (current === '1489370' || current === '1539000') item[key] = replacement.providerFixtureId;
+      }
+      if (item.fixture === replacement.to || item.display?.fixtureLabel === replacement.to) {
+        item.providerFixtureId = replacement.providerFixtureId;
+        if (item.display) {
+          item.display.fixtureLabel = replacement.to;
+          item.display.homeTeamName = replacement.homeTeamName;
+          item.display.awayTeamName = replacement.awayTeamName;
+        }
+      }
+    }
+    if (item.league) item.league = { ...options.league };
+    if (item.display?.leagueName) item.display.leagueName = options.league.name;
+  });
+  return copy;
+}
+
+function visitObjects(value, callback) {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const item of value) visitObjects(item, callback);
+    return;
+  }
+  callback(value);
+  for (const child of Object.values(value)) visitObjects(child, callback);
+}
+
+function generalRequiredPrediction(fixture, providerFixtureId, leagueName, market, selection, line, odds, confidence) {
+  const [homeTeamName, awayTeamName] = fixture.split(' vs ');
+  return {
+    fixture,
+    providerFixtureId,
+    market,
+    selection,
+    line,
+    odds,
+    confidence,
+    status: 'promotable',
+    display: {
+      fixtureLabel: fixture,
+      homeTeamName,
+      awayTeamName,
+      leagueName,
+    },
   };
 }

@@ -100,6 +100,10 @@ export function buildDiscordPayload(artifact, options = {}) {
 export function buildDiscordPayloads(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
+  const requiredLeagueEmbeds = requiredLeagueDiscordEmbeds(artifact);
+  if (requiredLeagueEmbeds.length + 1 >= DISCORD_EMBED_LIMIT) {
+    return buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, { ...options, artifact, artifactDate: artifact?.date });
+  }
   const pages = paginateDiscordSelectionEmbeds(recommendations, artifact);
   return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
     ...options,
@@ -109,6 +113,80 @@ export function buildDiscordPayloads(artifact, options = {}) {
     pageCount: pages.length,
     totalRecommendations: recommendations,
   }));
+}
+
+function buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, options = {}) {
+  const payloads = [];
+  const totalCounts = recommendationCounts(recommendations);
+  let firstPage = true;
+
+  for (const pageRecommendations of chunk(recommendations, DISCORD_EMBED_LIMIT - 1)) {
+    const embeds = [];
+    if (firstPage) embeds.push(headerEmbed(options.artifact, totalCounts, options.artifactDate, options.username));
+    embeds.push(...pageRecommendations.map((recommendation, index) => recommendationEmbed(recommendation, index)));
+    payloads.push(discordPayloadFromEmbeds(embeds, options));
+    firstPage = false;
+  }
+
+  if (!recommendations.length && !hasRequiredLeagueSelections(options.artifact) && !requiredLeagueEmbeds.length) {
+    payloads.push(discordPayloadFromEmbeds([
+      headerEmbed(options.artifact, totalCounts, options.artifactDate, options.username),
+      {
+        title: 'Sin selecciones',
+        description: '> El artifact no contiene selecciones para notificar.',
+        color: 0x828282,
+      },
+      closingEmbed(options.artifact),
+    ], options));
+    return payloads;
+  }
+
+  let index = 0;
+  while (index < requiredLeagueEmbeds.length) {
+    const embeds = [];
+    const headerSlots = firstPage ? 1 : 0;
+    const remaining = requiredLeagueEmbeds.length - index;
+    const includeClosing = remaining <= DISCORD_EMBED_LIMIT - headerSlots - 1;
+    const capacity = Math.max(1, DISCORD_EMBED_LIMIT - headerSlots - (includeClosing ? 1 : 0));
+    if (firstPage) embeds.push(headerEmbed(options.artifact, totalCounts, options.artifactDate, options.username));
+    embeds.push(...requiredLeagueEmbeds.slice(index, index + capacity));
+    index += capacity;
+    if (index >= requiredLeagueEmbeds.length) embeds.push(closingEmbed(options.artifact));
+    payloads.push(discordPayloadFromEmbeds(embeds, options));
+    firstPage = false;
+  }
+
+  if (!requiredLeagueEmbeds.length && payloads.length) {
+    payloads[payloads.length - 1].embeds.push(closingEmbed(options.artifact));
+  }
+
+  return payloads;
+}
+
+function headerEmbed(artifact, counts, artifactDate) {
+  return {
+    title: '🏆 Gana v9 · Recomendaciones',
+    description: formatHeaderDescription(artifact, counts, artifactDate),
+    color: 0x2f80ed,
+    footer: { text: 'Gana Hermes · Discord native embeds' },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function closingEmbed(artifact) {
+  return {
+    description: formatClosingDescription(artifact),
+    color: 0x56ccf2,
+  };
+}
+
+function discordPayloadFromEmbeds(embeds, options = {}) {
+  return {
+    username: stringOrFallback(options.username, 'Gana Hermes'),
+    allowed_mentions: { parse: [] },
+    content: '',
+    embeds,
+  };
 }
 
 export function buildDiscordSinglePayload(artifact, options = {}) {
@@ -215,7 +293,9 @@ function formatHeaderDescription(artifact, dailyCounts, artifactDate) {
   const lines = [];
   if (required) {
     lines.push(`📅 Diario: ${recommendationCountLine(dailyCounts)}`);
-    lines.push(`🌍 Obligatorio ${required.title}: ${required.statusIcon} 📦 ${required.selectedParlays} ${required.selectedParlays === 1 ? 'parlay' : 'parlays'} · 📌 ${required.atomic} ${required.atomic === 1 ? 'predicción' : 'predicciones'}`);
+    for (const section of required.sections) {
+      lines.push(`🌍 Obligatorio ${section.title}: ${section.statusIcon} 📦 ${section.selectedParlays} ${section.selectedParlays === 1 ? 'parlay' : 'parlays'} · 📌 ${section.atomic} ${section.atomic === 1 ? 'predicción' : 'predicciones'}`);
+    }
     lines.push(`📊 Total enviado: 📦 ${dailyCounts.parlay + required.selectedParlays} ${(dailyCounts.parlay + required.selectedParlays) === 1 ? 'parlay' : 'parlays'} · 📌 ${dailyCounts.atomic + required.atomic} ${(dailyCounts.atomic + required.atomic) === 1 ? 'predicción' : 'predicciones'}`);
   } else {
     lines.push(recommendationCountLine(dailyCounts));
@@ -278,6 +358,10 @@ function formatCouncilRecommendationChip(recommendation) {
 function formatCouncilRequiredLeagueSummaryLines(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return [];
+  return requiredLeagueSections(data).flatMap(formatCouncilRequiredLeagueSectionSummaryLines);
+}
+
+function formatCouncilRequiredLeagueSectionSummaryLines(data) {
   const title = requiredLeagueTitle(data);
   const atomic = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
   const parlays = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
@@ -336,7 +420,7 @@ function formatGatewayHeaderLines(artifact, dailyCounts) {
   if (!required) return [recommendationCountLine(dailyCounts)];
   return [
     `📅 Diario: ${recommendationCountLine(dailyCounts)}`,
-    `🌍 Obligatorio ${required.title}: ${required.statusIcon} 📦 ${required.selectedParlays} ${required.selectedParlays === 1 ? 'parlay' : 'parlays'} · 📌 ${required.atomic} ${required.atomic === 1 ? 'predicción' : 'predicciones'}`,
+    ...required.sections.map((section) => `🌍 Obligatorio ${section.title}: ${section.statusIcon} 📦 ${section.selectedParlays} ${section.selectedParlays === 1 ? 'parlay' : 'parlays'} · 📌 ${section.atomic} ${section.atomic === 1 ? 'predicción' : 'predicciones'}`),
     `📊 Total enviado: 📦 ${dailyCounts.parlay + required.selectedParlays} ${(dailyCounts.parlay + required.selectedParlays) === 1 ? 'parlay' : 'parlays'} · 📌 ${dailyCounts.atomic + required.atomic} ${(dailyCounts.atomic + required.atomic) === 1 ? 'predicción' : 'predicciones'}`,
   ];
 }
@@ -671,33 +755,198 @@ function formatParlayApproachLines(approaches, label = '🎛️ Enfoques') {
 
 export function requiredLeagueData(artifact) {
   const embedded = artifact?.requiredLeagueRecommendations;
-  if (embedded && typeof embedded === 'object') return embedded;
+  if (embedded && typeof embedded === 'object') {
+    return {
+      ...embedded,
+      generalPredictions: Array.isArray(embedded.generalPredictions)
+        ? embedded.generalPredictions
+        : artifactLevelRequiredLeagueGeneralPredictions(artifact),
+    };
+  }
   if (artifact?.requiredLeagueCoverage || artifact?.requiredLeagueGoalCheck) {
     return {
       coverage: artifact.requiredLeagueCoverage,
       goalCheck: artifact.requiredLeagueGoalCheck,
       parlayProjections: artifact.requiredLeagueParlayProjections,
       atomicProjections: artifact.requiredLeagueAtomicProjections,
+      generalPredictions: artifactLevelRequiredLeagueGeneralPredictions(artifact),
     };
   }
   return undefined;
 }
 
+function artifactLevelRequiredLeagueGeneralPredictions(artifact) {
+  return Array.isArray(artifact?.requiredLeagueGeneralPredictions) ? artifact.requiredLeagueGeneralPredictions : [];
+}
+
 function requiredLeagueCounts(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return undefined;
-  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
-  const atomicProjections = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
-  const selectedParlays = parlayProjections.filter((projection) => projection?.status === 'selected').length;
-  const status = requiredLeagueStatus(data);
+  const sections = requiredLeagueSections(data).map((sectionData) => {
+    const parlayProjections = Array.isArray(sectionData.parlayProjections) ? sectionData.parlayProjections : [];
+    const atomicProjections = Array.isArray(sectionData.atomicProjections) ? sectionData.atomicProjections : [];
+    const selectedParlays = parlayProjections.filter((projection) => projection?.status === 'selected').length;
+    const status = requiredLeagueStatus(sectionData);
+    return {
+      title: requiredLeagueTitle(sectionData),
+      status,
+      statusIcon: status === 'passed' ? '✅' : status === 'blocked' ? '🚫' : '🟡',
+      atomic: atomicProjections.length,
+      parlays: parlayProjections.length,
+      selectedParlays,
+    };
+  });
+  if (!sections.length) return undefined;
+  const selectedParlays = sections.reduce((sum, section) => sum + section.selectedParlays, 0);
+  const atomic = sections.reduce((sum, section) => sum + section.atomic, 0);
+  const parlays = sections.reduce((sum, section) => sum + section.parlays, 0);
+  const status = sections.some((section) => section.status === 'blocked')
+    ? 'blocked'
+    : sections.some((section) => section.status !== 'passed')
+      ? 'review-required'
+      : 'passed';
   return {
-    title: requiredLeagueTitle(data),
+    title: sections.map((section) => section.title).join(' + '),
     status,
     statusIcon: status === 'passed' ? '✅' : status === 'blocked' ? '🚫' : '🟡',
-    atomic: atomicProjections.length,
-    parlays: parlayProjections.length,
+    atomic,
+    parlays,
     selectedParlays,
+    sections,
   };
+}
+
+function requiredLeagueSections(data) {
+  if (!data || typeof data !== 'object') return [];
+  const requiredLeagues = Array.isArray(data.requiredLeagues) ? data.requiredLeagues : [];
+  const coverage = data.coverage && typeof data.coverage === 'object' ? data.coverage : {};
+  const fixtures = Array.isArray(coverage.fixtures) ? coverage.fixtures : [];
+  const atomicProjections = Array.isArray(data.atomicProjections) ? data.atomicProjections : [];
+  const parlayProjections = Array.isArray(data.parlayProjections) ? data.parlayProjections : [];
+  const generalPredictions = Array.isArray(data.generalPredictions) ? data.generalPredictions : [];
+  const leagueDefinitions = requiredLeagues.length
+    ? requiredLeagues
+    : uniqueRequiredLeagueDefinitions(fixtures.length ? fixtures : [...atomicProjections, ...parlayProjections, ...generalPredictions]);
+  if (leagueDefinitions.length <= 1) return [data];
+
+  return leagueDefinitions.map((league) => {
+    const sectionFixtures = fixtures.filter((fixture) => sameRequiredLeagueItem(fixture, league));
+    const fixtureKeys = new Set(sectionFixtures.flatMap(requiredLeagueFixtureKeys));
+    const sectionAtomic = atomicProjections.filter((projection) => itemBelongsToRequiredLeagueSection(projection, league, fixtureKeys));
+    const sectionParlays = parlayProjections.filter((projection) => itemBelongsToRequiredLeagueSection(projection, league, fixtureKeys));
+    const sectionGeneral = generalPredictions.filter((prediction) =>
+      itemBelongsToRequiredLeagueSection(prediction, league, fixtureKeys)
+    );
+    const missingPredictionFixtures = sectionFixtures.filter((fixture) => fixture?.status === 'missing-predictions').length;
+    const coveredFixtures = sectionFixtures.length - missingPredictionFixtures;
+    const sectionStatus = sectionGoalStatus(data, sectionFixtures, sectionParlays);
+    return {
+      ...data,
+      requiredLeagues: [league],
+      coverage: {
+        ...coverage,
+        fixtures: sectionFixtures,
+        fixtureCount: sectionFixtures.length,
+        coveredFixtures,
+        missingPredictionFixtures,
+        status: sectionFixtures.length
+          ? missingPredictionFixtures || sectionParlays.some((projection) => projection?.status === 'blocked')
+            ? 'review-required'
+            : 'complete'
+          : 'not-scheduled',
+      },
+      atomicProjections: sectionAtomic,
+      parlayProjections: sectionParlays,
+      generalPredictions: sectionGeneral,
+      goalCheck: {
+        ...(data.goalCheck && typeof data.goalCheck === 'object' ? data.goalCheck : {}),
+        status: sectionStatus,
+        nextActions: requiredLeagueSectionNextActions(data.goalCheck?.nextActions, sectionFixtures, league),
+      },
+    };
+  });
+}
+
+function requiredLeagueSectionNextActions(nextActions, fixtures, league) {
+  const actions = Array.isArray(nextActions) ? nextActions : [];
+  if (!actions.length) return [];
+  const fixtureTokens = new Set((Array.isArray(fixtures) ? fixtures : []).flatMap((fixture) => [
+    ...requiredLeagueFixtureKeys(fixture),
+    fixture?.display?.homeTeamName,
+    fixture?.display?.awayTeamName,
+  ].filter(Boolean).map((value) => String(value).toLowerCase())));
+  const leagueTitle = requiredLeagueTitle({ requiredLeagues: [league] }).toLowerCase();
+  return actions.filter((action) => {
+    const text = String(action ?? '').toLowerCase();
+    if (!text) return false;
+    if (leagueTitle && text.includes(leagueTitle)) return true;
+    return [...fixtureTokens].some((token) => token && text.includes(token));
+  });
+}
+
+function sectionGoalStatus(data, fixtures, parlays) {
+  if (!fixtures.length) return 'review-required';
+  if (fixtures.some((fixture) => fixture?.status === 'missing-predictions')) return 'review-required';
+  if (parlays.some((projection) => projection?.status === 'blocked')) return 'review-required';
+  return requiredLeagueStatus(data) === 'blocked' ? 'review-required' : 'passed';
+}
+
+function uniqueRequiredLeagueDefinitions(items) {
+  const seen = new Set();
+  const seenTitles = new Set();
+  const leagues = [];
+  for (const item of items) {
+    const league = requiredLeagueDefinitionFromItem(item);
+    const key = requiredLeagueDefinitionKey(league);
+    const title = stringOrFallback(league?.name, '').toLowerCase();
+    if (!key || seen.has(key) || (title && seenTitles.has(title))) continue;
+    seen.add(key);
+    if (title) seenTitles.add(title);
+    leagues.push(league);
+  }
+  return leagues;
+}
+
+function itemBelongsToRequiredLeagueSection(item, league, fixtureKeys) {
+  if (sameRequiredLeagueItem(item, league)) return true;
+  if (requiredLeagueFixtureKeys(item).some((key) => fixtureKeys.has(key))) return true;
+  const legs = Array.isArray(item?.legs) ? item.legs : [];
+  return legs.some((leg) =>
+    sameRequiredLeagueItem(leg, league)
+    || requiredLeagueFixtureKeys(leg).some((key) => fixtureKeys.has(key))
+  );
+}
+
+function sameRequiredLeagueItem(item, league) {
+  const expected = requiredLeagueDefinitionKey(league);
+  const actual = requiredLeagueDefinitionKey(requiredLeagueDefinitionFromItem(item));
+  if (expected && actual) return expected === actual;
+  const expectedName = stringOrFallback(league?.name, '').toLowerCase();
+  const actualName = stringOrFallback(item?.league?.name ?? item?.display?.leagueName ?? item?.leagueName, '').toLowerCase();
+  return Boolean(expectedName && actualName && expectedName === actualName);
+}
+
+function requiredLeagueDefinitionFromItem(item) {
+  const league = item?.league && typeof item.league === 'object' ? item.league : {};
+  const display = item?.display && typeof item.display === 'object' ? item.display : {};
+  return {
+    providerCompetitionId: stringOrFallback(
+      league.providerCompetitionId ?? league.id ?? item?.providerCompetitionId ?? item?.competitionId ?? item?.leagueId,
+      '',
+    ),
+    name: stringOrFallback(league.name ?? item?.competitionName ?? display.leagueName ?? item?.leagueName, ''),
+    country: stringOrFallback(league.country ?? item?.country, ''),
+    season: Number.isFinite(league.season) ? league.season : Number.isFinite(item?.season) ? item.season : null,
+  };
+}
+
+function requiredLeagueDefinitionKey(league) {
+  const providerCompetitionId = stringOrFallback(league?.providerCompetitionId ?? league?.id, '');
+  const season = Number.isFinite(league?.season) ? String(league.season) : '';
+  if (providerCompetitionId) return `${providerCompetitionId}:${season}`;
+  const name = stringOrFallback(league?.name, '').toLowerCase();
+  const country = stringOrFallback(league?.country, '').toLowerCase();
+  return name ? `${name}:${country}:${season}` : '';
 }
 
 function requiredLeagueFixtureMetaByKey(fixtures) {
@@ -737,17 +986,22 @@ function hasRequiredLeagueSelections(artifact) {
 function requiredLeagueDiscordEmbeds(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return [];
+  return requiredLeagueSections(data).flatMap((section) => requiredLeagueSectionDiscordEmbeds(artifact, section));
+}
+
+function requiredLeagueSectionDiscordEmbeds(artifact, data) {
   const summaryLines = formatRequiredLeagueSummaryLines(data);
   if (!summaryLines.length) return [];
+  const title = requiredLeagueTitle(data);
   const embeds = [{
-    title: `🌍 Obligatorio · ${requiredLeagueTitle(data)}`,
+    title: `🌍 Obligatorio · ${title}`,
     description: truncate(summaryLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
     color: requiredLeagueStatus(data) === 'passed' ? 0x27ae60 : 0xf2994a,
   }];
   const predictionLines = formatRequiredLeaguePredictionLines(data);
   if (predictionLines.length) {
     embeds.push({
-      title: `📌 Predicciones obligatorias · ${requiredLeagueTitle(data)}`,
+      title: `📌 Predicciones obligatorias · ${title}`,
       description: truncate(predictionLines.map((line) => `> ${line}`).join('\n'), DISCORD_DESCRIPTION_LIMIT),
       color: 0x9b51e0,
     });
@@ -758,8 +1012,8 @@ function requiredLeagueDiscordEmbeds(artifact) {
     for (const [index, description] of descriptions.entries()) {
       embeds.push({
         title: index === 0
-          ? `📋 Predicciones generales · ${requiredLeagueTitle(data)}`
-          : `📋 Predicciones generales cont. ${index + 1} · ${requiredLeagueTitle(data)}`,
+          ? `📋 Predicciones generales · ${title}`
+          : `📋 Predicciones generales cont. ${index + 1} · ${title}`,
         description: truncate(description, DISCORD_DESCRIPTION_LIMIT),
         color: 0x56ccf2,
       });
@@ -772,20 +1026,26 @@ function requiredLeagueDiscordEmbeds(artifact) {
 function formatRequiredLeagueLines(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return [];
-  const title = requiredLeagueTitle(data);
-  const status = requiredLeagueStatus(data);
-  const statusIcon = status === 'passed' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
-  const fixtures = data.coverage?.fixtureCount;
-  const covered = data.coverage?.coveredFixtures;
-  const fixturePart = Number.isFinite(fixtures) && Number.isFinite(covered)
-    ? ` · ${covered}/${fixtures} fixtures`
-    : '';
-  return [`🌍 Obligatorio ${title}: ${statusIcon} ${status}${fixturePart}`];
+  return requiredLeagueSections(data).map((section) => {
+    const title = requiredLeagueTitle(section);
+    const status = requiredLeagueStatus(section);
+    const statusIcon = status === 'passed' ? '✅' : status === 'blocked' ? '🚫' : '🟡';
+    const fixtures = section.coverage?.fixtureCount;
+    const covered = section.coverage?.coveredFixtures;
+    const fixturePart = Number.isFinite(fixtures) && Number.isFinite(covered)
+      ? ` · ${covered}/${fixtures} fixtures`
+      : '';
+    return `🌍 Obligatorio ${title}: ${statusIcon} ${status}${fixturePart}`;
+  });
 }
 
 function formatRequiredLeagueGatewayDetailLines(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return [];
+  return requiredLeagueSections(data).flatMap((section) => formatRequiredLeagueGatewaySectionDetailLines(artifact, section));
+}
+
+function formatRequiredLeagueGatewaySectionDetailLines(artifact, data) {
   const title = requiredLeagueTitle(data);
   const lines = [];
   const summaryLines = formatRequiredLeagueSummaryLines(data);
@@ -856,6 +1116,7 @@ function formatRequiredLeaguePredictionLines(data) {
 }
 
 function formatRequiredLeagueGeneralPredictionLines(artifact, data) {
+  if (!shouldRenderRequiredLeagueGeneralPredictions(data)) return [];
   const predictions = requiredLeagueGeneralPredictionSource(artifact, data);
   if (!predictions.length) return [];
   const fixtures = Array.isArray(data?.coverage?.fixtures) ? data.coverage.fixtures : [];
@@ -889,10 +1150,36 @@ function formatRequiredLeagueGeneralPredictionLines(artifact, data) {
   return lines;
 }
 
+export function shouldRenderRequiredLeagueGeneralPredictions(data) {
+  return !isKLeagueOneRequiredLeague(data);
+}
+
+function isKLeagueOneRequiredLeague(data) {
+  const leagues = Array.isArray(data?.requiredLeagues)
+    ? data.requiredLeagues
+    : Array.isArray(data?.goalCheck?.requiredLeagues)
+      ? data.goalCheck.requiredLeagues
+      : [];
+  if (leagues.some((league) =>
+    String(league?.providerCompetitionId ?? league?.id ?? '').trim() === '292'
+    || stringOrFallback(league?.name, '').trim().toLowerCase() === 'k league 1'
+  )) {
+    return true;
+  }
+  return requiredLeagueTitle(data).trim().toLowerCase() === 'k league 1';
+}
+
 function requiredLeagueGeneralPredictionSource(artifact, data) {
   const fromData = Array.isArray(data?.generalPredictions) ? data.generalPredictions : [];
   if (fromData.length) return fromData;
-  return Array.isArray(artifact?.requiredLeagueGeneralPredictions) ? artifact.requiredLeagueGeneralPredictions : [];
+  const fromArtifact = artifactLevelRequiredLeagueGeneralPredictions(artifact);
+  if (!fromArtifact.length) return [];
+  const fixtures = Array.isArray(data?.coverage?.fixtures) ? data.coverage.fixtures : [];
+  const fixtureKeys = new Set(fixtures.flatMap(requiredLeagueFixtureKeys));
+  const league = Array.isArray(data?.requiredLeagues) ? data.requiredLeagues[0] : undefined;
+  return fromArtifact.filter((prediction) =>
+    itemBelongsToRequiredLeagueSection(prediction, league, fixtureKeys)
+  );
 }
 
 function groupRequiredLeagueGeneralPredictions(predictions) {

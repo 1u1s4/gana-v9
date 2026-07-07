@@ -26,6 +26,7 @@ import {
   sendDiscordNativePayload,
   sendDiscordPayload,
   sendHermesGatewayMessage,
+  shouldRenderRequiredLeagueGeneralPredictions,
 } from './notify-discord-recommendations.mjs';
 import { resolveDiscordTarget } from './discord-targets.mjs';
 
@@ -546,6 +547,7 @@ function formatRequiredLeagueValidationPredictionLines(data) {
 }
 
 function formatRequiredLeagueValidationGeneralPredictionLines(data) {
+  if (!shouldRenderRequiredLeagueGeneralPredictions(data)) return [];
   const predictions = Array.isArray(data.generalPredictions) ? data.generalPredictions : [];
   if (!predictions.length) return [];
   const fixtures = Array.isArray(data.coverage?.fixtures) ? data.coverage.fixtures : [];

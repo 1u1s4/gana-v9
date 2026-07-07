@@ -180,8 +180,9 @@ try {
 }
 
 function runLogged(logFd, args, env) {
-  writeLogLine(logFd, `started ${new Date().toISOString()} pnpm ${args.join(' ')}`);
-  const result = spawnSync('pnpm', args, {
+  const command = resolveCronCommand(args);
+  writeLogLine(logFd, `started ${new Date().toISOString()} ${command.join(' ')}`);
+  const result = spawnSync(command[0], command.slice(1), {
     cwd: REPO_ROOT,
     env,
     stdio: ['ignore', logFd, logFd],
@@ -189,6 +190,13 @@ function runLogged(logFd, args, env) {
   writeLogLine(logFd, `completed ${new Date().toISOString()} status=${result.status} signal=${result.signal ?? 'none'}`);
   if (result.error) writeLogLine(logFd, `error ${result.error.message}`);
   return result;
+}
+
+function resolveCronCommand(args) {
+  if (args[0] !== 'gana') return args;
+  const compiledCli = resolve(REPO_ROOT, 'dist', 'cli.js');
+  if (existsSync(compiledCli)) return ['node', compiledCli, ...args.slice(1)];
+  return ['node', '--import', 'tsx', 'src/cli.ts', ...args.slice(1)];
 }
 
 function parseArgs(argv) {

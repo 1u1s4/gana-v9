@@ -28,6 +28,7 @@ export interface DailyRequiredLeagueInput {
 
 export const DAILY_REQUIRED_LEAGUE_DEFAULTS: DailyRequiredLeagueInput[] = [
   { providerCompetitionId: '1', name: 'World Cup', country: 'World', season: 2026 },
+  { providerCompetitionId: '292', name: 'K League 1', country: 'South-Korea', season: 2026 },
 ];
 export const DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER = [
   'principal',
