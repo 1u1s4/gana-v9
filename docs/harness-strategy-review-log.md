@@ -1767,3 +1767,86 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Deduplicate prediction signatures before ranking and metrics (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/metrics/daily.ts, src/daily/recommendation-policy.test.ts, src/parlay/analysis.test.ts, src/metrics/daily.test.ts
 - [medium] Add conservative totals to low-odds market coverage (proposed) — src/filters/low-odds-selector.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/parlay/profile-specs.ts, src/parlay/eligibility.ts, src/filters/low-odds-selector.test.ts
 - [medium] Apply rolling calibration penalties to confidence and edge gates (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/gates.ts, skills/score-prediction-v2/prompt.md, src/harness-production-grade.test.ts, src/prediction/gates.test.ts
+
+## 2026-07-08 · strategy-2026-07-07
+
+- Run: strategy-review-2026-07-07-42dd96e5
+- Dates: 2026-07-07
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-07-42dd96e5/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-07-42dd96e5/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 35-10 hit 77.8% (56 total)
+- Parlays: 0-0 hit n/a (1 total)
+
+### Proposed Modifications
+
+- [high] Validate published recommendation targets and carry profile attribution (ready-for-implementation) — src/daily/e2e.ts, src/recommendations/artifact.ts, src/validation/service.ts, src/metrics/daily.ts
+- [high] Deduplicate same-fixture sibling predictions before persistence and metrics (ready-for-implementation) — src/prediction/service.ts, src/metrics/daily.ts, src/strategy-review/daily.ts, skills/score-prediction-v2/prompt.md
+- [high] Raise totals promotion floors and make low-confidence totals review-only (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Demote high-odds h2h away and low-confidence result picks before promotion (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Keep corners as watchlist-only until settlement reliability is measurable (proposed) — src/prediction/service.ts, src/prediction/gates.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Use gpt-5.4-mini only as calibrated consensus support until sample floor is reached (needs-more-data) — src/prediction/service.ts, src/daily/recommendation-policy.ts, src/council/recommendation-council.ts
+
+## 2026-07-08 · strategy-2026-07-07
+
+- Run: strategy-review-2026-07-07-3309f975
+- Dates: 2026-07-07
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-07-3309f975/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-07-3309f975/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 35-10 hit 77.8% (56 total)
+- Parlays: 0-0 hit n/a (1 total)
+
+### Proposed Modifications
+
+- [high] Raise promotion floors for low-confidence totals (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md, src/prediction/service.test.ts, src/prediction/scoring.test.ts
+- [high] Collapse correlated fixture and line duplicates (ready-for-implementation) — src/prediction/service.ts, src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/daily/recommendation-policy.test.ts, src/parlay/analysis.test.ts
+- [high] Apply hard-risk exclusions to daily-focus fallback legs (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/recommendation-policy.test.ts, src/daily/e2e.test.ts
+- [high] Settle artifact-only fallback parlays as synthetic parlays (ready-for-implementation) — src/recommendations/artifact.ts, src/validation/service.ts, src/metrics/daily.ts, src/validation/service.test.ts, src/metrics/daily.test.ts
+- [medium] Move corners to opt-in watchlist coverage (proposed) — src/domain/markets.ts, src/config.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/domain/markets.test.ts, src/filters/config.test.ts
+- [medium] Persist profile labels into validation metrics (ready-for-implementation) — src/prediction/service.ts, src/parlay/service.ts, src/daily/e2e.ts, src/metrics/daily.ts, src/metrics/daily.test.ts, src/daily/e2e.test.ts
+
+## 2026-07-09 · strategy-2026-07-08
+
+- Run: strategy-review-2026-07-08-080031a9
+- Dates: 2026-07-08
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-08-080031a9/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-08-080031a9/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 275-138 hit 66.6% (617 total)
+- Parlays: 6-8 hit 42.9% (17 total)
+
+### Proposed Modifications
+
+- [high] Add market-level validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts, src/daily/recommendation-policy.ts
+- [high] Deduplicate canonical prediction signatures before ranking and metrics (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/metrics/daily.ts, src/prediction/service.ts
+- [high] Tighten parlay model, profile, and high-odds gates before persistence (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/parlay/ranker.ts, src/parlay/analysis.ts
+- [high] Apply market-aware promotion floors to H2H, totals, BTTS, and double_chance (ready-for-implementation) — src/prediction/gates.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Rebalance low-odds discovery toward conservative totals with coverage checks (proposed) — src/filters/low-odds-selector.ts, src/parlay/profile-specs.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Persist explicit profile metadata for predictions and final parlays (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts
+
+## 2026-07-09 · strategy-2026-07-08
+
+- Run: strategy-review-2026-07-08-2ec4dadf
+- Dates: 2026-07-08
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-08-2ec4dadf/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-08-2ec4dadf/strategy-review.md
+- Model: gpt-5.5
+- Reasoning: xhigh
+- Agent status: ok
+- Predictions: 275-138 hit 66.6% (617 total)
+- Parlays: 6-8 hit 42.9% (17 total)
+
+### Proposed Modifications
+
+- [high] Add market, odds-bucket, and profile validation freshness gates (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts, src/strategy-review/daily.ts
+- [high] Hard-cap final parlay promotion by odds, profile, and weak parlay model (ready-for-implementation) — src/daily/recommendation-policy.ts, src/parlay/analysis.ts, src/parlay/profile-specs.ts, src/parlay/service.ts
+- [high] Deduplicate same-fixture sibling predictions before ranking and metrics (ready-for-implementation) — src/prediction/service.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts, src/strategy-review/daily.ts, skills/score-prediction-v2/prompt.md
+- [medium] Raise BTTS and standard totals promotion floors (ready-for-implementation) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Pause double_chance threshold retuning until bucket settlement is fresh (needs-more-data) — src/filters/low-odds-selector.ts, src/scoring/edge-gate.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md

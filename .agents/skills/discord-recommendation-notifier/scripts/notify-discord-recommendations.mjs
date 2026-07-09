@@ -146,8 +146,11 @@ function buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, opt
     const embeds = [];
     const headerSlots = firstPage ? 1 : 0;
     const remaining = requiredLeagueEmbeds.length - index;
-    const includeClosing = remaining <= DISCORD_EMBED_LIMIT - headerSlots - 1;
-    const capacity = Math.max(1, DISCORD_EMBED_LIMIT - headerSlots - (includeClosing ? 1 : 0));
+    const capacityWithoutClosing = Math.max(1, DISCORD_EMBED_LIMIT - headerSlots);
+    const includeClosing = remaining <= capacityWithoutClosing - 1;
+    const capacity = includeClosing
+      ? Math.max(1, capacityWithoutClosing - 1)
+      : Math.max(1, Math.min(capacityWithoutClosing, remaining - 1));
     if (firstPage) embeds.push(headerEmbed(options.artifact, totalCounts, options.artifactDate, options.username));
     embeds.push(...requiredLeagueEmbeds.slice(index, index + capacity));
     index += capacity;

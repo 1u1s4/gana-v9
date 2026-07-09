@@ -11,6 +11,7 @@ if [[ -f .env ]]; then
   source .env
   set +a
 fi
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 gt_date() {
   local offset_days="${1:-0}"

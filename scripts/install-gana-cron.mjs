@@ -3,25 +3,31 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { DISCORD_TARGET_ENV, resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
+import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const args = parseArgs(process.argv.slice(2));
 const env = { ...loadDotEnv(), ...process.env };
 const gatewayTarget = args.gatewayTarget ?? env.GANA_DISCORD_TARGET;
-const targetFlag = gatewayTarget ? ` --gateway-target ${shellQuote(gatewayTarget)}` : '';
-const targetEnvPrefix = discordTargetEnvPrefix();
 const discordTargets = resolveDiscordTargets({ gatewayTarget, env });
+const cronEnvPrefix = cronEnvAssignmentPrefix({
+  PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+  GANA_DISCORD_TARGET: gatewayTarget ?? discordTargets.alerts,
+  GANA_DISCORD_RECOMMENDATIONS_TARGET: discordTargets.recommendations,
+  GANA_DISCORD_VALIDATION_TARGET: discordTargets.validation,
+  GANA_DISCORD_STRATEGY_TARGET: discordTargets.strategy,
+  GANA_DISCORD_ALERTS_TARGET: discordTargets.alerts,
+});
 const begin = '# BEGIN gana-v9 daily operations';
 const end = '# END gana-v9 daily operations';
 const block = [
   begin,
   'MAILTO=""',
   'TZ=America/Guatemala',
-  `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-validate-metrics-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`)}`,
-  `15 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-daily-e2e-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
-  `*/30 10-22 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-daily-e2e-and-notify.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`)}`,
-  `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env zsh -lc ${shellQuote(`${sourceEnvCommand()} ${targetEnvPrefix}node scripts/gana-strategy-review.mjs${targetFlag} >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`)}`,
+  `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-previous-day-validation-notify.sh')} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`,
+  `15 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-daily-e2e-notify.sh')} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`,
+  `*/30 10-22 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-daily-e2e-notify.sh')} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`,
+  `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-strategy-review.sh')} >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`,
   end,
 ].join('\n');
 
@@ -77,15 +83,11 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
-function sourceEnvCommand() {
-  return 'if [ -f .env ]; then set -a; source .env; set +a; fi;';
-}
-
-function discordTargetEnvPrefix() {
-  const assignments = Object.values(DISCORD_TARGET_ENV)
-    .filter((key) => process.env[key])
-    .map((key) => `${key}=${shellQuote(process.env[key])}`);
-  return assignments.length ? `${assignments.join(' ')} ` : '';
+function cronEnvAssignmentPrefix(assignments) {
+  const rendered = Object.entries(assignments)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${key}=${shellQuote(value)}`);
+  return rendered.length ? `${rendered.join(' ')} ` : '';
 }
 
 function loadDotEnv() {

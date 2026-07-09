@@ -470,6 +470,37 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(message, /Sin selecciones/);
   });
 
+  it('paginates a required-only addendum that exactly fills the native Discord embed limit', () => {
+    const artifact = {
+      date: '2026-07-09',
+      dailyBatchId: 'daily-required-with-general-analysis',
+      recommendations: [],
+      requiredLeagueRecommendations: sampleRequiredLeagueRecommendationsPassed(),
+      requiredLeagueGeneralPredictions: [{
+        fixture: 'USA vs Paraguay',
+        providerFixtureId: '1489370',
+        market: 'h2h',
+        selection: 'home',
+        odds: 1.96,
+        confidence: 0.655,
+        status: 'promotable',
+      }],
+    };
+
+    const payloads = buildDiscordPayloads(artifact, { max: 1 });
+    const titles = payloads.flatMap((payload) => payload.embeds.map((embed) => embed.title ?? ''));
+
+    assert.equal(payloads.length, 2);
+    assert.equal(payloads.every((payload) => payload.embeds.length <= 10), true);
+    assert.equal(payloads[0].embeds.length, 9);
+    assert.equal(payloads[1].embeds.length, 2);
+    assert.equal(payloads[0].embeds[0].title, '🏆 Gana v9 · Recomendaciones');
+    assert.equal(payloads[1].embeds.at(-1).title ?? '', '');
+    assert.match(payloads[1].embeds.at(-1).description, /Revisión manual requerida/);
+    assert.ok(titles.includes('📋 Predicciones generales · World Cup'));
+    assert.match(titles.join('\n'), /6️⃣ 🛡️ low-variance/);
+  });
+
   it('renders World Cup and K League 1 as separate mandatory addendum sections', () => {
     const requiredLeagueRecommendations = sampleMultiRequiredLeagueRecommendations();
     const requiredLeagueGeneralPredictions = requiredLeagueRecommendations.generalPredictions;

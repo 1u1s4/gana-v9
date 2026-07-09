@@ -169,6 +169,7 @@ Wrappers versionados:
 - `scripts/gana-daily-e2e-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
 - `scripts/install-gana-hermes-cron.sh`: instala los jobs en Hermes cron.
 - `scripts/install-gana-cron.mjs`: instala un bloque de crontab del sistema como fallback.
+- `scripts/install-gana-launchd.mjs`: instala LaunchAgents de usuario como fallback macOS cuando `crontab` del sistema no esta disponible o no responde.
 
 Hermes cron recomendado:
 
@@ -181,9 +182,11 @@ Jobs esperados:
 ```text
 gana-v9-validate-yesterday-discord  0 7 * * *
 gana-v9-daily-e2e-discord           15 10 * * *
+gana-v9-daily-e2e-catchup-discord   */30 10-22 * * *
+gana-v9-strategy-review             0 13 * * *
 ```
 
-Los wrappers tienen locks por fecha bajo `.artifacts/gana-v9/cron/locks/` para evitar doble envio si Hermes cron y el crontab fallback quedan activos al mismo tiempo. Usar `--force` solo para reprocesos manuales deliberados.
+Los wrappers tienen locks por fecha bajo `.artifacts/gana-v9/cron/locks/` para evitar doble envio si Hermes cron, crontab y LaunchAgents quedan activos al mismo tiempo. Usar `--force` solo para reprocesos manuales deliberados.
 
 Detalles adicionales: `docs/daily-operations-cron.md`.
 
@@ -197,10 +200,10 @@ discord:1494071165453467721
 
 Evitar depender del home channel si Hermes reporta `Unknown Channel`; usar el ID numerico del canal.
 
-Los wrappers operativos enrutan por defecto todos los mensajes de gana-v9 a `#gana-alertas`:
+Los wrappers operativos enrutan recomendaciones y alertas a canales separados:
 
 ```env
-GANA_DISCORD_RECOMMENDATIONS_TARGET=discord:1510041125614915756
+GANA_DISCORD_RECOMMENDATIONS_TARGET=discord:1510040973218939022
 GANA_DISCORD_VALIDATION_TARGET=discord:1510041125614915756
 GANA_DISCORD_STRATEGY_TARGET=discord:1510041125614915756
 GANA_DISCORD_ALERTS_TARGET=discord:1510041125614915756

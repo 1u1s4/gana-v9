@@ -7,6 +7,7 @@ import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendati
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
 import { buildCronOutcome, compactPath, durationBetween, emitCronRichSummary, parseJsonObject } from './gana-telegram-rich-output.mjs';
 import {
+  buildDbPublicationLedgerPlan,
   collectPublicationLedgerTargetIds,
   countPublishableSelections,
   readCurrentRecommendationArtifact,
@@ -26,7 +27,7 @@ const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex';
 const codexModel = args.codexModel ?? process.env.GANA_DAILY_CODEX_MODEL;
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 1);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
-const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026,292:K League 1:South-Korea:2026';
+const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026';
 const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
 const notBefore = args.notBefore ?? process.env.GANA_DAILY_E2E_NOT_BEFORE ?? '10:15';
 const retryDelayMs = positiveMinutes(process.env.GANA_DAILY_EMPTY_RETRY_MINUTES, 120) * 60 * 1000;
@@ -144,6 +145,8 @@ const env = {
 
 const logFd = openSync(logPath, 'a');
 let sentRecommendations = false;
+let retryLockReason = 'daily-e2e produced no Discord recommendations';
+let retryLockRetryAfter;
 try {
   let handled = false;
   writeLogLine(logFd, `started ${startedAt.toISOString()} ${command.join(' ')}`);
@@ -163,6 +166,11 @@ try {
     requiredAtomic: 0,
     requiredSelectedParlays: 0,
   };
+  const providerLimitRetryAfter = artifactState.ok ? apiFootballDailyLimitRetryAfter(artifactState.artifact) : undefined;
+  if (providerLimitRetryAfter) {
+    retryLockReason = 'API-Football daily request limit reached; Daily E2E produced no Discord recommendations';
+    retryLockRetryAfter = providerLimitRetryAfter;
+  }
   const selectionCount = publishableCounts.total;
   const ledgerAlignment = artifactState.ok
     ? validatePublicationLedgerAlignment(artifactState.artifact)
@@ -404,16 +412,16 @@ try {
   }
 } finally {
   if (acquiredRunLock && !sentRecommendations) {
-    const retryAfter = new Date(Date.now() + retryDelayMs).toISOString();
+    const retryAfter = retryLockRetryAfter ?? new Date(Date.now() + retryDelayMs).toISOString();
     writeLock(lockPath, {
       date,
       dailyBatchId,
       status: 'retryable',
       retryAfter,
       updatedAt: new Date().toISOString(),
-      reason: 'daily-e2e produced no Discord recommendations',
+      reason: retryLockReason,
     });
-    writeLogLine(logFd, `daily-e2e lock marked retryable until ${retryAfter}`);
+    writeLogLine(logFd, `daily-e2e lock marked retryable until ${retryAfter}: ${retryLockReason}`);
   }
   closeSync(logFd);
 }
@@ -567,6 +575,26 @@ function positiveMinutes(value, fallback) {
   return parsed;
 }
 
+function apiFootballDailyLimitRetryAfter(artifact) {
+  const reasons = [
+    ...(Array.isArray(artifact?.runDiagnostics?.reasons) ? artifact.runDiagnostics.reasons : []),
+    ...(Array.isArray(artifact?.diagnostics?.reasons) ? artifact.diagnostics.reasons : []),
+    artifact?.error,
+  ].filter(Boolean).join('\n');
+  if (!/API-Football/i.test(reasons) || !/request limit for the day/i.test(reasons)) return undefined;
+  const now = new Date();
+  const nextUtcReset = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0,
+    5,
+    0,
+    0,
+  ));
+  return nextUtcReset.toISOString();
+}
+
 function guatemalaDate(offsetDays) {
   const base = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat('en-CA', {
@@ -645,13 +673,22 @@ function collect(dir, matches, date) {
 
 async function verifyDbPersistenceLedger(artifact) {
   const targets = collectPublicationLedgerTargetIds(artifact);
-  const parlayIds = targets.parlayIds;
-  const predictionIds = targets.predictionIds;
-  if (parlayIds.length + predictionIds.length === 0) {
-    return { ok: false, reason: 'empty-ledger-targets', parlayIds, predictionIds };
+  const plan = buildDbPublicationLedgerPlan(artifact);
+  const parlayIds = plan.persistedParlayIds;
+  const predictionIds = plan.predictionIds;
+  if (targets.parlayIds.length + predictionIds.length === 0) {
+    return { ok: false, reason: 'empty-ledger-targets', parlayIds: targets.parlayIds, predictionIds };
   }
   if (!process.env.DATABASE_URL) {
-    return { ok: false, reason: 'missing-database-url', parlayIds, predictionIds };
+    return {
+      ok: false,
+      reason: 'missing-database-url',
+      parlayIds: targets.parlayIds,
+      dbParlayIds: parlayIds,
+      artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
+      invalidParlayIds: plan.invalidParlayIds,
+      predictionIds,
+    };
   }
 
   let prisma;
@@ -668,13 +705,19 @@ async function verifyDbPersistenceLedger(artifact) {
     ]);
     const foundParlays = new Set(parlays.map((item) => item.id));
     const foundPredictions = new Set(predictions.map((item) => item.id));
-    const missingParlayIds = parlayIds.filter((id) => !foundParlays.has(id));
+    const missingParlayIds = [
+      ...plan.invalidParlayIds,
+      ...parlayIds.filter((id) => !foundParlays.has(id)),
+    ];
     const missingPredictionIds = predictionIds.filter((id) => !foundPredictions.has(id));
     if (missingParlayIds.length || missingPredictionIds.length) {
       return {
         ok: false,
         reason: `missing-db-ledger-targets:p=${missingParlayIds.length},pred=${missingPredictionIds.length}`,
-        parlayIds,
+        parlayIds: targets.parlayIds,
+        dbParlayIds: parlayIds,
+        artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
+        invalidParlayIds: plan.invalidParlayIds,
         predictionIds,
         missingParlayIds,
         missingPredictionIds,
@@ -682,15 +725,21 @@ async function verifyDbPersistenceLedger(artifact) {
     }
     return {
       ok: true,
-      reason: `verified-db-ledger:p=${parlayIds.length},pred=${predictionIds.length}`,
-      parlayIds,
+      reason: `verified-db-ledger:p=${parlayIds.length},artifact-p=${plan.artifactOnlyParlayIds.length},pred=${predictionIds.length}`,
+      parlayIds: targets.parlayIds,
+      dbParlayIds: parlayIds,
+      artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
+      invalidParlayIds: plan.invalidParlayIds,
       predictionIds,
     };
   } catch (err) {
     return {
       ok: false,
       reason: `db-ledger-check-failed:${safeErrorMessage(err)}`,
-      parlayIds,
+      parlayIds: targets.parlayIds,
+      dbParlayIds: parlayIds,
+      artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
+      invalidParlayIds: plan.invalidParlayIds,
       predictionIds,
     };
   } finally {

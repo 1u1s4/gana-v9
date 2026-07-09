@@ -11,6 +11,7 @@ if [[ -f .env ]]; then
   source .env
   set +a
 fi
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 gt_date() {
   local offset_days="${1:-0}"
@@ -52,7 +53,7 @@ export GANA_LOW_ODDS_THRESHOLD="${GANA_LOW_ODDS_THRESHOLD:-1.20}"
 export GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES="${GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES:-${GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES:-10000}}"
 export GANA_DAILY_PROVIDER_CONCURRENCY="${GANA_DAILY_PROVIDER_CONCURRENCY:-1}"
 export GANA_DAILY_CODEX_MODEL="${GANA_DAILY_CODEX_MODEL:-gpt-5.5}"
-export GANA_DAILY_REQUIRED_LEAGUES="${GANA_DAILY_REQUIRED_LEAGUES:-1:World Cup:World:2026,292:K League 1:South-Korea:2026}"
+export GANA_DAILY_REQUIRED_LEAGUES="${GANA_DAILY_REQUIRED_LEAGUES:-1:World Cup:World:2026}"
 export AGENT_CODEX_FALLBACK_MODELS="${AGENT_CODEX_FALLBACK_MODELS:-gpt-5.4-mini}"
 export AGENT_CODEX_SANDBOX="${AGENT_CODEX_SANDBOX:-danger-full-access}"
 

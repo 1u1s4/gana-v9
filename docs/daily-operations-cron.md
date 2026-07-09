@@ -72,8 +72,8 @@ Ambos scripts cargan `.env` si existe.
 
 Variables utiles:
 
-- `GANA_DISCORD_TARGET`: target Discord global. Default final: `discord:1494071165453467721`.
-- `GANA_DISCORD_RECOMMENDATIONS_TARGET`: canal para recomendaciones diarias.
+- `GANA_DISCORD_TARGET`: target Discord global para fallbacks. Default final: `discord:1510041125614915756`.
+- `GANA_DISCORD_RECOMMENDATIONS_TARGET`: canal para recomendaciones diarias. Default operativo: `discord:1510040973218939022`.
 - `GANA_DISCORD_VALIDATION_TARGET`: canal para validaciones y mirror validado.
 - `GANA_DISCORD_STRATEGY_TARGET`: canal para strategy review tecnico.
 - `GANA_DISCORD_ALERTS_TARGET`: canal para fallos/alertas operativas.
@@ -122,7 +122,24 @@ gana-v9-strategy-review             0 13 * * *
 
 Hermes cron muestra los `Next run` en la zona local configurada; en este host debe verse con offset `-06:00`.
 
-El fallback de sistema instalado por `scripts/install-gana-cron.mjs` agrega una segunda linea `*/30 10-22 * * *` para el Daily E2E. Esa linea existe para recuperar ejecuciones perdidas por sleep/darkwake; no debe duplicar publicaciones porque `scripts/gana-daily-e2e-and-notify.mjs` aplica guard de hora minima y lock por fecha. Si un intento produce cero selecciones, el wrapper no envia recomendaciones vacias y marca el lock como retryable para un nuevo catch-up posterior.
+El fallback de sistema instalado por `scripts/install-gana-cron.mjs` agrega una segunda linea `*/30 10-22 * * *` para el Daily E2E. Esa linea existe para recuperar ejecuciones perdidas por sleep/darkwake; no debe duplicar publicaciones porque `scripts/gana-daily-e2e-and-notify.mjs` aplica guard de hora minima y lock por fecha. Si un intento produce cero selecciones, el wrapper no envia recomendaciones vacias y marca el lock como retryable para un nuevo catch-up posterior. Cuando el run falla por limite diario de API-Football, el retry se difiere hasta el siguiente reset UTC de cuota en vez de insistir cada dos horas.
+
+En macOS tambien se puede instalar el fallback de usuario con `launchd`, util cuando `/usr/bin/crontab` no responde o queda bloqueado:
+
+```bash
+node scripts/install-gana-launchd.mjs
+```
+
+Esto crea y carga estos LaunchAgents bajo `~/Library/LaunchAgents/`, usando los mismos wrappers versionados y el mismo `PATH` operativo:
+
+```text
+com.gana-v9.validate-yesterday    07:00
+com.gana-v9.daily-e2e             10:15
+com.gana-v9.daily-e2e-catchup     cada 30 minutos, 10:00-22:30
+com.gana-v9.strategy-review       13:00
+```
+
+Los logs quedan en `.artifacts/gana-v9/cron/launchd-*.log`. Este fallback convive con Hermes y con el crontab de sistema porque los wrappers comparten locks por fecha.
 
 Comando equivalente manual:
 

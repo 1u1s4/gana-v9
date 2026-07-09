@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
+  buildDbPublicationLedgerPlan,
   countPublishableSelections,
   readCurrentRecommendationArtifact,
   validatePublicationLedgerAlignment,
@@ -115,5 +116,58 @@ describe('daily E2E wrapper state helpers', () => {
 
     assert.equal(result.ok, false);
     assert.match(result.reason, /rendered-selection-missing-from-ledger/);
+  });
+
+  it('plans a backed daily-focus parlay as artifact-only while verifying its persisted prediction legs', () => {
+    const predictionIds = [
+      '11111111-1111-5111-8111-111111111111',
+      '22222222-2222-5222-8222-222222222222',
+    ];
+    const parlayId = 'daily-focus-parlay-diamante-deadbeef';
+    const plan = buildDbPublicationLedgerPlan({
+      publishedTargets: { parlayIds: [parlayId], predictionIds },
+      recommendations: [{
+        kind: 'parlay',
+        parlayId,
+        selectionMode: 'analytical-fallback',
+        harnessStatus: 'review-required',
+        riskFlags: ['daily-focus-fallback', 'review-required'],
+        legs: predictionIds.map((predictionId) => ({ predictionId })),
+      }],
+    });
+
+    assert.deepEqual(plan, {
+      persistedParlayIds: [],
+      artifactOnlyParlayIds: [parlayId],
+      invalidParlayIds: [],
+      predictionIds,
+    });
+  });
+
+  it('rejects an unbacked daily-focus parlay and unknown non-UUID parlay targets', () => {
+    const persistedPredictionId = '11111111-1111-5111-8111-111111111111';
+    const missingPredictionId = '22222222-2222-5222-8222-222222222222';
+    const parlayId = 'daily-focus-parlay-refinado-deadbeef';
+    const unknownId = 'typo-or-truncated-real-parlay';
+    const plan = buildDbPublicationLedgerPlan({
+      publishedTargets: {
+        parlayIds: [parlayId, unknownId],
+        predictionIds: [persistedPredictionId],
+      },
+      recommendations: [{
+        kind: 'parlay',
+        parlayId,
+        selectionMode: 'analytical-fallback',
+        harnessStatus: 'review-required',
+        riskFlags: ['daily-focus-fallback'],
+        legs: [
+          { predictionId: persistedPredictionId },
+          { predictionId: missingPredictionId },
+        ],
+      }],
+    });
+
+    assert.deepEqual(plan.artifactOnlyParlayIds, []);
+    assert.deepEqual(plan.invalidParlayIds, [parlayId, unknownId]);
   });
 });

@@ -86,6 +86,33 @@ export function collectPublicationLedgerTargetIds(artifact) {
   };
 }
 
+export function buildDbPublicationLedgerPlan(artifact) {
+  const targets = collectPublicationLedgerTargetIds(artifact);
+  const predictionTargetIds = new Set(targets.predictionIds);
+  const persistedParlayIds = [];
+  const artifactOnlyParlayIds = [];
+  const invalidParlayIds = [];
+
+  for (const parlayId of targets.parlayIds) {
+    if (isUuid(parlayId)) {
+      persistedParlayIds.push(parlayId);
+      continue;
+    }
+    if (isBackedDailyFocusParlay(artifact, parlayId, predictionTargetIds)) {
+      artifactOnlyParlayIds.push(parlayId);
+      continue;
+    }
+    invalidParlayIds.push(parlayId);
+  }
+
+  return {
+    persistedParlayIds,
+    artifactOnlyParlayIds,
+    invalidParlayIds,
+    predictionIds: targets.predictionIds,
+  };
+}
+
 export function selectRecommendations(artifact) {
   if (Array.isArray(artifact?.recommendations)) return artifact.recommendations;
   return [
@@ -186,6 +213,29 @@ function nonSyntheticId(value) {
 
 function isSyntheticRecommendationId(value) {
   return value.startsWith('atomic-') || value.startsWith('analytical-fallback-') || value.startsWith('required-');
+}
+
+function isBackedDailyFocusParlay(artifact, parlayId, predictionTargetIds) {
+  if (!parlayId.startsWith('daily-focus-')) return false;
+  const matches = selectRecommendations(artifact).filter((recommendation) =>
+    recommendation?.kind === 'parlay'
+    && recommendation?.parlayId === parlayId
+  );
+  if (matches.length !== 1) return false;
+  const recommendation = matches[0];
+  if (recommendation?.selectionMode !== 'analytical-fallback') return false;
+  if (recommendation?.harnessStatus !== 'review-required') return false;
+  if (!Array.isArray(recommendation?.riskFlags) || !recommendation.riskFlags.includes('daily-focus-fallback')) return false;
+  const legs = Array.isArray(recommendation?.legs) ? recommendation.legs : [];
+  if (legs.length < 2) return false;
+  const predictionIds = legs.map((leg) => typeof leg?.predictionId === 'string' ? leg.predictionId.trim() : '');
+  if (new Set(predictionIds).size < 2) return false;
+  return predictionIds.every((predictionId) => isUuid(predictionId) && predictionTargetIds.has(predictionId));
+}
+
+function isUuid(value) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
 }
 
 function uniqueStrings(values) {
