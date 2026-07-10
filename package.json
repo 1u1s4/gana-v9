@@ -12,6 +12,7 @@
     "dev": "tsx watch src/cli.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "experiment:atomic-model-matrix": "tsx src/evals/atomic-model-matrix.ts",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate:dev": "prisma migrate dev",

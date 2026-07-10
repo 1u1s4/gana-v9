@@ -182,9 +182,9 @@ describe('agentic provider helpers', () => {
 
   it('defaults Codex to newest configured models before older fallbacks', () => {
     assert.deepEqual(
-      AGENT_PROVIDER_DEFAULT_MODELS.codex.slice(0, 3),
-      ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
+      AGENT_PROVIDER_DEFAULT_MODELS.codex,
+      ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
     );
-    assert.equal(selectDefaultModelForProvider('codex'), 'gpt-5.5');
+    assert.equal(selectDefaultModelForProvider('codex'), 'gpt-5.6-sol');
   });
 });

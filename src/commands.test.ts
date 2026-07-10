@@ -573,3 +573,67 @@ describe('slash policy commands', () => {
     assert.match(output, /Monetary automation is blocked/);
   });
 });
+
+describe('Codex reasoning commands', () => {
+  function withModelCatalog(ctx: CommandContext): void {
+    const catalogPath = join(mkdtempSync(join(tmpdir(), 'gana-models-test-')), 'models.json');
+    writeFileSync(catalogPath, JSON.stringify({
+      models: [
+        {
+          id: 'gpt-5.6-sol',
+          supportedReasoning: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+        },
+        {
+          id: 'gpt-5.6-luna',
+          supportedReasoning: ['low', 'medium', 'high', 'xhigh', 'max'],
+        },
+      ],
+    }));
+    ctx.config.codexModelListPath = catalogPath;
+  }
+
+  it('accepts ultra reasoning for gpt-5.6-sol', async () => {
+    const ctx = commandContext();
+    withModelCatalog(ctx);
+    ctx.config.model = 'gpt-5.6-sol';
+
+    const output = await captureConsole(() => dispatch('/think ultra', ctx));
+
+    assert.equal(ctx.config.reasoningEffort, 'ultra');
+    assert.match(output, /Codex reasoning/);
+    assert.match(output, /ultra/);
+  });
+
+  it('accepts max but rejects unsupported ultra reasoning for gpt-5.6-luna', async () => {
+    const ctx = commandContext();
+    withModelCatalog(ctx);
+    ctx.config.model = 'gpt-5.6-luna';
+
+    await captureConsole(() => dispatch('/think max', ctx));
+    const output = await captureConsole(() => dispatch('/think ultra', ctx));
+
+    assert.equal(ctx.config.reasoningEffort, 'max');
+    assert.match(output, /gpt-5\.6-luna supports: low, medium, high, xhigh, max/);
+  });
+
+  it('resets reasoning to the model default when switching models', async () => {
+    const ctx = commandContext();
+    withModelCatalog(ctx);
+    ctx.config.model = 'gpt-5.6-sol';
+    ctx.config.reasoningEffort = 'ultra';
+    ctx.rl = {
+      question: (_prompt: string, callback: (answer: string) => void) => callback('1'),
+    } as CommandContext['rl'];
+
+    let output = '';
+    try {
+      output = await captureConsole(() => dispatch('/model luna', ctx));
+    } finally {
+      process.stdin.pause();
+    }
+
+    assert.equal(ctx.config.model, 'gpt-5.6-luna');
+    assert.equal(ctx.config.reasoningEffort, undefined);
+    assert.match(output, /Reasoning.*model default/);
+  });
+});

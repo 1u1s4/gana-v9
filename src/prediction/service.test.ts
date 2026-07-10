@@ -1362,8 +1362,8 @@ describe('runFixtureScoring', () => {
     assert.match(persisted[0].warnings.join('\n'), /below promotion floor 0.65/);
   });
 
-  it('keeps gpt-5.4-mini scoring output review-only until calibrated', async () => {
-    const cfg = config({ model: 'gpt-5.4-mini' });
+  it('keeps gpt-5.6-luna scoring output review-only until calibrated', async () => {
+    const cfg = config({ model: 'gpt-5.6-luna' });
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     let persisted: any[] = [];
 
@@ -1398,9 +1398,9 @@ describe('runFixtureScoring', () => {
 
     assert.equal(result.gateResult.verdict, 'review-required');
     assert.equal(persisted[0].status, 'review-required');
-    assert.equal(persisted[0].model, 'gpt-5.4-mini');
+    assert.equal(persisted[0].model, 'gpt-5.6-luna');
     assert.equal(persisted[0].metadata.parlayEligible, false);
-    assert.match(persisted[0].warnings.join('\n'), /gpt-5\.4-mini output is review-only/);
+    assert.match(persisted[0].warnings.join('\n'), /gpt-5\.6-luna output is review-only/);
   });
 
   it('caps inflated double-chance edge against implied probability', async () => {

@@ -150,7 +150,7 @@ Operational run limits:
 - `/provider`: list or switch between `codex` and `openrouter`.
 - `/model`: list, search, and switch models for the active provider.
 - `/fast`: toggle fast mode when supported.
-- `/think low|medium|high|xhigh`: adjust Codex reasoning effort when supported.
+- `/think low|medium|high|xhigh|max|ultra`: adjust Codex reasoning effort when supported.
 - `/web`: show or change native web search mode: `on`, `off`, `cached`, `live`.
 - `/new`: start a new conversation.
 - `exit`: close the TUI.

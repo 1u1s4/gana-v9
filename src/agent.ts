@@ -304,11 +304,13 @@ async function runCodexAgent(
   options?: RunAgentOptions,
 ) {
   const originalModel = config.model;
+  const originalReasoningEffort = config.reasoningEffort;
   const models = codexModelAttempts(config);
   let lastError: unknown;
   for (let index = 0; index < models.length; index += 1) {
     const model = models[index];
     config.model = model;
+    config.reasoningEffort = index === 0 ? originalReasoningEffort : undefined;
     try {
       return await runCodexAgentAttempt(config, input, options);
     } catch (error) {
@@ -325,6 +327,7 @@ async function runCodexAgent(
     }
   }
   config.model = originalModel;
+  config.reasoningEffort = originalReasoningEffort;
   throw lastError;
 }
 

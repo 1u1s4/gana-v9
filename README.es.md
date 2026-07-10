@@ -141,7 +141,7 @@ Limites operativos por run:
 - `/provider`: lista o cambia entre `codex` y `openrouter`.
 - `/model`: lista, busca y cambia modelos del provider activo.
 - `/fast`: alterna modo rapido cuando el modelo/provider lo soporta.
-- `/think low|medium|high|xhigh`: ajusta razonamiento de Codex cuando esta soportado.
+- `/think low|medium|high|xhigh|max|ultra`: ajusta razonamiento de Codex cuando esta soportado.
 - `/web`: muestra o cambia web search nativo: `on`, `off`, `cached`, `live`.
 - `/new`: inicia una conversacion nueva.
 - `exit`: cierra la TUI.

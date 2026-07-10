@@ -30,6 +30,17 @@ function argValue(args: string[], flag: string): string | undefined {
 }
 
 describe('native provider args', () => {
+  it('loads ultra reasoning from AGENT_REASONING_EFFORT', () => {
+    const original = process.env.AGENT_REASONING_EFFORT;
+    process.env.AGENT_REASONING_EFFORT = 'ultra';
+    try {
+      assert.equal(loadConfig({}, { skipApiKey: true }).reasoningEffort, 'ultra');
+    } finally {
+      if (original === undefined) delete process.env.AGENT_REASONING_EFFORT;
+      else process.env.AGENT_REASONING_EFFORT = original;
+    }
+  });
+
   it('does not elevate Codex sandbox from full-permissions profile alone', () => {
     const cfg = config({
       provider: 'codex',
@@ -81,7 +92,16 @@ describe('native provider args', () => {
     assert.equal(args.at(-1), '-');
   });
 
-  it('falls back to gpt-5.4-mini when Codex reports a quota limit for the primary model', async () => {
+  it('passes max and ultra reasoning efforts to Codex', () => {
+    for (const reasoningEffort of ['max', 'ultra'] as const) {
+      const cfg = config({ reasoningEffort });
+      const args = codexArgs(cfg, 'prompt', requirement(cfg));
+
+      assert.equal(argValue(args, '-c'), `model_reasoning_effort="${reasoningEffort}"`);
+    }
+  });
+
+  it('falls back to gpt-5.6-luna when Codex reports a quota limit for the primary model', async () => {
     const originalPath = process.env.PATH;
     const binDir = mkdtempSync(join(tmpdir(), 'gana-codex-bin-'));
     const callsPath = join(binDir, 'calls.jsonl');
@@ -91,8 +111,8 @@ const fs = require('fs');
 const args = process.argv.slice(2);
 const model = args[args.indexOf('-m') + 1];
 fs.appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify({ model, args }) + '\\n');
-if (model === 'gpt-5.3-codex-spark') {
-  console.error('429 quota exceeded for model gpt-5.3-codex-spark');
+if (model === 'gpt-5.6-sol') {
+  console.error('429 quota exceeded for model gpt-5.6-sol');
   process.exit(1);
 }
 console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'fallback ok' } }));
@@ -103,16 +123,20 @@ console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, o
     try {
       const cfg = config({
         provider: 'codex',
-        model: 'gpt-5.3-codex-spark',
-        codexFallbackModels: ['gpt-5.4-mini'],
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'ultra',
+        codexFallbackModels: ['gpt-5.6-luna'],
       });
 
       const result = await runAgent(cfg, 'hello');
 
       assert.equal(result.text, 'fallback ok');
-      assert.equal(cfg.model, 'gpt-5.4-mini');
-      const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { model: string });
-      assert.deepEqual(calls.map((call) => call.model), ['gpt-5.3-codex-spark', 'gpt-5.4-mini']);
+      assert.equal(cfg.model, 'gpt-5.6-luna');
+      assert.equal(cfg.reasoningEffort, undefined);
+      const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { model: string; args: string[] });
+      assert.deepEqual(calls.map((call) => call.model), ['gpt-5.6-sol', 'gpt-5.6-luna']);
+      assert.equal(calls[0].args.includes('model_reasoning_effort="ultra"'), true);
+      assert.equal(calls[1].args.some((arg) => arg.startsWith('model_reasoning_effort=')), false);
     } finally {
       process.env.PATH = originalPath;
     }
@@ -143,15 +167,15 @@ console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, o
       const cfg = config({
         provider: 'codex',
         model: 'gpt-5.3-codex-spark',
-        codexFallbackModels: ['gpt-5.4-mini'],
+        codexFallbackModels: ['gpt-5.6-luna'],
       });
 
       const result = await runAgent(cfg, 'hello');
 
       assert.equal(result.text, 'fallback ok');
-      assert.equal(cfg.model, 'gpt-5.4-mini');
+      assert.equal(cfg.model, 'gpt-5.6-luna');
       const calls = readFileSync(callsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { model: string });
-      assert.deepEqual(calls.map((call) => call.model), ['gpt-5.3-codex-spark', 'gpt-5.4-mini']);
+      assert.deepEqual(calls.map((call) => call.model), ['gpt-5.3-codex-spark', 'gpt-5.6-luna']);
     } finally {
       process.env.PATH = originalPath;
     }

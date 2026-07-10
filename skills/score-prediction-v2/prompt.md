@@ -23,6 +23,6 @@ Rules:
 - Preserve explicit signal tags in rationale/warnings for low-odds, women/femenino, and youth/development fixtures (`U23`, `U21`, `U20`, `U19`, `U18`, `sub-*`, reserves/B/II`) so final selection and council feedback can measure those buckets separately.
 - Prefer low-variance markets (`double_chance`, short h2h favorites with real liquidity, and conservative totals) when evidence shows a structural mismatch; do not promote thin-liquidity youth/women picks without market-specific support.
 - Block or degrade stale odds/source, low-liquidity stale picks, unverified corners, high-odds automatic parlay risk, lineup pending, material model disagreement and inflated low-price double-chance edge.
-- `gpt-5.4-mini` output is review-only until calibration history is sufficient.
+- `gpt-5.6-luna` output is review-only until calibration history is sufficient.
 - Promotable is false when any hard blocker exists.
 - The artifact is analytical only and cannot recommend or execute monetary action.

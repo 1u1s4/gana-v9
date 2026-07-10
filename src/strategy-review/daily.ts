@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { AgentConfig } from '../config.js';
+import { isReasoningEffort, type AgentConfig, type ReasoningEffort } from '../config.js';
 import { runAgent } from '../agent.js';
 import { writeArtifact } from '../runtime/artifacts.js';
 import type { RuntimeContext } from '../runtime/context.js';
@@ -1078,8 +1078,8 @@ function localDate(date: Date, timezone: string): string {
   }).format(date);
 }
 
-function normalizeReasoning(value: string): string {
-  return ['low', 'medium', 'high', 'xhigh'].includes(value) ? value : DEFAULT_REASONING;
+function normalizeReasoning(value: string): ReasoningEffort {
+  return isReasoningEffort(value) ? value : DEFAULT_REASONING;
 }
 
 function strategyRunId(input: RunStrategyReviewInput): string {

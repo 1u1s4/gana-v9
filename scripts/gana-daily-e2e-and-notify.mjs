@@ -130,7 +130,7 @@ const env = {
   GANA_PROFILE: process.env.GANA_PROFILE ?? 'full-permissions',
   GANA_APPROVAL_MODE: process.env.GANA_APPROVAL_MODE ?? 'auto-grant',
   AGENT_PROVIDER: process.env.AGENT_PROVIDER ?? 'codex',
-  AGENT_CODEX_FALLBACK_MODELS: process.env.AGENT_CODEX_FALLBACK_MODELS ?? 'gpt-5.4-mini',
+  AGENT_CODEX_FALLBACK_MODELS: process.env.AGENT_CODEX_FALLBACK_MODELS ?? 'gpt-5.6-luna',
   AGENT_CODEX_SANDBOX: process.env.AGENT_CODEX_SANDBOX ?? 'danger-full-access',
   AGENT_NATIVE_WEB_SEARCH_MODE: process.env.AGENT_NATIVE_WEB_SEARCH_MODE ?? 'live',
   GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,

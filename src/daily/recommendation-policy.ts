@@ -43,7 +43,7 @@ export const DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS = [
   'historically-weak-profile',
   'low-liquidity-h2h-favorite',
 ] as const;
-export const DAILY_FINAL_DEMOTED_MODELS = ['gpt-5.4-mini'] as const;
+export const DAILY_FINAL_DEMOTED_MODELS = ['gpt-5.6-luna'] as const;
 const DAILY_FOCUS_FALLBACK_RISK_FLAG = 'daily-focus-fallback';
 const DAILY_FOCUS_PROFILE_WINDOW_MISS_RISK_FLAG = 'profile-window-miss';
 const DAILY_FOCUS_FALLBACK_MIN_LEGS = 2;

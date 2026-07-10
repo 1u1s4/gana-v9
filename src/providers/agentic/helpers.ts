@@ -27,7 +27,7 @@ export const AGENT_PROVIDER_LABELS: Record<AgentProviderCompat, string> = {
 };
 
 export const AGENT_PROVIDER_DEFAULT_MODELS: Record<AgentProviderCompat, readonly string[]> = {
-  codex: ['gpt-5.5', 'gpt-5.4', 'gpt-5.2'],
+  codex: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
   openrouter: ['anthropic/claude-sonnet-4.5', 'anthropic/claude-haiku-4.5'],
 };
 

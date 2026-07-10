@@ -14,6 +14,7 @@ interface CodexModel {
 
 const OUTPUT_PATH = resolve(process.argv[2] ?? process.env.CODEX_MODEL_LIST_PATH ?? 'config/codex-models.json');
 const CODEX_HOME = process.env.CODEX_HOME ?? `${process.env.HOME}/.codex`;
+const EXCLUDED_MODEL_IDS = new Set(['gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4mini', 'gpt-5.3-codex', 'gpt-5.2']);
 
 function readCatalog(): any {
   try {
@@ -54,7 +55,7 @@ function main() {
   const catalog = readCatalog();
   const models = modelArray(catalog)
     .map(normalizeModel)
-    .filter((model): model is CodexModel => model !== null);
+    .filter((model): model is CodexModel => model !== null && !EXCLUDED_MODEL_IDS.has(model.id));
 
   if (models.length === 0) {
     throw new Error('Codex model catalog returned no parseable models.');

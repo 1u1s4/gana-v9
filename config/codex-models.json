@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-25T11:37:49.494Z",
+  "updatedAt": "2026-07-10T01:40:52.163Z",
   "source": "codex debug models",
   "models": [
     {
@@ -19,15 +19,17 @@
       ]
     },
     {
-      "id": "gpt-5.4",
-      "name": "gpt-5.4",
-      "description": "Strong model for everyday coding.",
-      "defaultReasoning": "medium",
+      "id": "gpt-5.6-sol",
+      "name": "GPT-5.6-Sol",
+      "description": "Latest frontier agentic coding model.",
+      "defaultReasoning": "low",
       "supportedReasoning": [
         "low",
         "medium",
         "high",
-        "xhigh"
+        "xhigh",
+        "max",
+        "ultra"
       ],
       "supportedInApi": true,
       "speedTiers": [
@@ -35,45 +37,52 @@
       ]
     },
     {
-      "id": "gpt-5.4-mini",
-      "name": "GPT-5.4-Mini",
-      "description": "Small, fast, and cost-efficient model for simpler coding tasks.",
+      "id": "gpt-5.6-terra",
+      "name": "GPT-5.6-Terra",
+      "description": "Balanced agentic coding model for everyday work.",
       "defaultReasoning": "medium",
       "supportedReasoning": [
         "low",
         "medium",
         "high",
-        "xhigh"
+        "xhigh",
+        "max",
+        "ultra"
       ],
       "supportedInApi": true,
-      "speedTiers": []
+      "speedTiers": [
+        "fast"
+      ]
     },
     {
-      "id": "gpt-5.3-codex",
-      "name": "gpt-5.3-codex",
-      "description": "Coding-optimized model.",
+      "id": "gpt-5.6-luna",
+      "name": "GPT-5.6-Luna",
+      "description": "Fast and affordable agentic coding model.",
       "defaultReasoning": "medium",
       "supportedReasoning": [
         "low",
         "medium",
         "high",
-        "xhigh"
+        "xhigh",
+        "max"
       ],
       "supportedInApi": true,
-      "speedTiers": []
+      "speedTiers": [
+        "fast"
+      ]
     },
     {
-      "id": "gpt-5.2",
-      "name": "gpt-5.2",
-      "description": "Optimized for professional work and long-running agents.",
-      "defaultReasoning": "medium",
+      "id": "gpt-5.3-codex-spark",
+      "name": "GPT-5.3-Codex-Spark",
+      "description": "Ultra-fast coding model.",
+      "defaultReasoning": "high",
       "supportedReasoning": [
         "low",
         "medium",
         "high",
         "xhigh"
       ],
-      "supportedInApi": true,
+      "supportedInApi": false,
       "speedTiers": []
     },
     {
@@ -88,20 +97,6 @@
         "xhigh"
       ],
       "supportedInApi": true,
-      "speedTiers": []
-    },
-    {
-      "id": "gpt-5.3-codex-spark",
-      "name": "GPT-5.3-Codex-Spark",
-      "description": "Ultra-fast coding model.",
-      "defaultReasoning": "high",
-      "supportedReasoning": [
-        "low",
-        "medium",
-        "high",
-        "xhigh"
-      ],
-      "supportedInApi": false,
       "speedTiers": []
     }
   ]

@@ -7,6 +7,8 @@ import type { ApiFootballLeagueRef, ApiFootballTeamRef } from './filters/types.j
 export type GanaRuntime = 'mvp-productivo-online';
 export type GanaProfile = 'standard' | 'full-permissions';
 export type ApprovalMode = 'manual' | 'auto-grant';
+export const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const;
+export type ReasoningEffort = typeof REASONING_EFFORTS[number];
 
 export interface LoaderConfig {
   text: string;
@@ -74,7 +76,7 @@ export interface AgentConfig extends GanaConfigExtension {
   display: DisplayConfig;
   slashCommands: boolean;
   fastMode: boolean;
-  reasoningEffort?: 'low' | 'medium' | 'high' | 'xhigh';
+  reasoningEffort?: ReasoningEffort;
   nativeWebSearch: boolean;
   nativeWebSearchMode: 'cached' | 'live';
   codexHome: string;
@@ -121,6 +123,10 @@ function isApprovalMode(value: unknown): value is ApprovalMode {
 
 function isCodexSandbox(value: unknown): value is AgentConfig['codexSandbox'] {
   return value === 'read-only' || value === 'workspace-write' || value === 'danger-full-access';
+}
+
+export function isReasoningEffort(value: unknown): value is ReasoningEffort {
+  return typeof value === 'string' && REASONING_EFFORTS.includes(value as ReasoningEffort);
 }
 
 const SUPPORTED_AGENT_PROVIDERS = ['codex', 'openrouter'] as const;
@@ -279,7 +285,7 @@ const DEFAULTS: AgentConfig = {
   codexHome: join(process.env.HOME ?? '', '.codex'),
   codexModelListPath: 'config/codex-models.json',
   codexSandbox: 'workspace-write',
-  codexFallbackModels: ['gpt-5.4-mini'],
+  codexFallbackModels: ['gpt-5.6-luna'],
 };
 
 export function loadConfig(
@@ -355,12 +361,7 @@ export function loadConfig(
     const timeoutMs = parseNumber(process.env.BROWSER_USE_TIMEOUT_MS);
     if (timeoutMs !== undefined) config.browserUse.timeoutMs = timeoutMs;
   }
-  if (
-    process.env.AGENT_REASONING_EFFORT === 'low'
-    || process.env.AGENT_REASONING_EFFORT === 'medium'
-    || process.env.AGENT_REASONING_EFFORT === 'high'
-    || process.env.AGENT_REASONING_EFFORT === 'xhigh'
-  ) {
+  if (isReasoningEffort(process.env.AGENT_REASONING_EFFORT)) {
     config.reasoningEffort = process.env.AGENT_REASONING_EFFORT;
   }
   if (process.env.AGENT_MAX_STEPS) config.maxSteps = Number(process.env.AGENT_MAX_STEPS);

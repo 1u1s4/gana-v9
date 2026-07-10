@@ -666,7 +666,7 @@ describe('runDailyE2E', () => {
     assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.preferredProfileOrder, ['parlay-diamante', 'parlay-refinado', 'low-variance']);
     assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.allowedProfiles, ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance']);
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayFixtures, true);
-    assert.deepEqual(recommendations.recommendationPolicy.demotedModels, ['gpt-5.4-mini']);
+    assert.deepEqual(recommendations.recommendationPolicy.demotedModels, ['gpt-5.6-luna']);
     assert.equal(recommendations.recommendationPolicy.stakeRecommendation.policy, 'bucketed-bankroll-percentage-confidence-edge-recommendation');
     assert.equal(recommendations.recommendations.every((item: any) => [1, 5, 10, 15, 20, 25].includes(item.stakeRecommendation.stake)), true);
     assert.equal(

@@ -1,7 +1,7 @@
 import type { Interface } from 'readline';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
-import type { AgentConfig } from './config.js';
+import { REASONING_EFFORTS, isReasoningEffort, type AgentConfig } from './config.js';
 import type { ChatMessage } from './agent.js';
 import type { LowOddsScanView } from './filters/types.js';
 import { discoverFixtures } from './filters/engine.js';
@@ -551,9 +551,12 @@ commands.push({
     const idx = parseInt(pick) - 1;
     if (idx >= 0 && idx < matches.length) {
       ctx.config.model = matches[idx].id;
+      const resetReasoning = ctx.config.provider === 'codex' && ctx.config.reasoningEffort !== undefined;
+      if (resetReasoning) ctx.config.reasoningEffort = undefined;
       syncRuntime(ctx);
       saveAgentCommandEvent(ctx, 'agent.model_changed', { model: ctx.config.model });
       console.log(`  ${DIM}Model →${RESET} ${CYAN}${ctx.config.model}${RESET}`);
+      if (resetReasoning) console.log(`  ${DIM}Reasoning → model default${RESET}`);
     } else { console.log(`  ${DIM}Cancelled.${RESET}`); }
   },
 });
@@ -583,11 +586,11 @@ commands.push({
 
 commands.push({
   name: '/think',
-  description: 'Set reasoning effort: low, medium, high, xhigh',
+  description: `Set reasoning effort: ${REASONING_EFFORTS.join(', ')}`,
   execute: async (args, ctx) => {
-    const effort = args.trim() as AgentConfig['reasoningEffort'];
-    if (!effort || !['low', 'medium', 'high', 'xhigh'].includes(effort)) {
-      console.log(`  ${DIM}Usage:${RESET} ${CYAN}/think low|medium|high|xhigh${RESET}`);
+    const effort = args.trim();
+    if (!isReasoningEffort(effort)) {
+      console.log(`  ${DIM}Usage:${RESET} ${CYAN}/think ${REASONING_EFFORTS.join('|')}${RESET}`);
       return;
     }
 

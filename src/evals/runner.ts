@@ -700,9 +700,9 @@ function handoffDisclaimerCheck(): CertificationCheck {
 
 function calibrationAndLeaderboardCheck(): CertificationCheck {
   const outcomes = [
-    { probability: 0.8, outcome: 1 as const, promptVersion: 'score-prediction-v1', modelId: 'gpt-5.4-mini', market: 'h2h', league: 'ci' },
-    { probability: 0.3, outcome: 0 as const, promptVersion: 'score-prediction-v1', modelId: 'gpt-5.4-mini', market: 'h2h', league: 'ci' },
-    { probability: 0.7, outcome: 1 as const, promptVersion: 'score-prediction-v1', modelId: 'gpt-5.4-mini', market: 'btts', league: 'ci' },
+    { probability: 0.8, outcome: 1 as const, promptVersion: 'score-prediction-v1', modelId: 'gpt-5.6-luna', market: 'h2h', league: 'ci' },
+    { probability: 0.3, outcome: 0 as const, promptVersion: 'score-prediction-v1', modelId: 'gpt-5.6-luna', market: 'h2h', league: 'ci' },
+    { probability: 0.7, outcome: 1 as const, promptVersion: 'score-prediction-v1', modelId: 'gpt-5.6-luna', market: 'btts', league: 'ci' },
   ];
   const calibration = calibrationPlot(outcomes);
   const leaderboard = buildLeaderboard(outcomes);
