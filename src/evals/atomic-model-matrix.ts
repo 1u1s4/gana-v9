@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { runAgent } from '../agent.js';
 import {
@@ -294,9 +294,11 @@ async function main(): Promise<void> {
   };
   writeJson(join(outputRoot, 'atomic-model-comparison.json'), comparison);
   writeFileSync(join(outputRoot, 'atomic-model-comparison.md'), renderMarkdown(comparison));
+  writeFileSync(join(outputRoot, 'atomic-model-blind-review.md'), renderBlindReviewMarkdown(comparison));
   writeExperimentState(outputRoot, comparison);
   console.log(`Comparison: ${join(outputRoot, 'atomic-model-comparison.json')}`);
   console.log(`Report: ${join(outputRoot, 'atomic-model-comparison.md')}`);
+  console.log(`Blind review: ${join(outputRoot, 'atomic-model-blind-review.md')}`);
 
   if (comparison.status !== 'completed') process.exitCode = 1;
 }
@@ -638,8 +640,8 @@ function renderMarkdown(comparison: any): string {
     const raw = cell.raw?.pick;
     const harness = cell.harness?.pick;
     const usage = cell.execution?.totalUsage;
-    lines.push([
-      `| ${cell.blindLabel}`,
+    lines.push(`| ${[
+      cell.blindLabel,
       cell.intendedModel,
       cell.effort,
       cell.status,
@@ -653,8 +655,7 @@ function renderMarkdown(comparison: any): string {
       cell.execution ? `${Math.round(cell.execution.elapsedMs)}ms` : '',
       usage ? usageTotal(usage) : '',
       usage?.reasoningOutputTokens ?? '',
-      '|',
-    ].join(' | '));
+    ].join(' | ')} |`);
   }
   lines.push('', '## Rationales', '');
   for (const cell of comparison.cells as CellSummary[]) {
@@ -680,12 +681,48 @@ function renderMarkdown(comparison: any): string {
   return `${lines.join('\n')}\n`;
 }
 
+function renderBlindReviewMarkdown(comparison: any): string {
+  const lines = [
+    '# Blind rationale review: Spain vs Belgium',
+    '',
+    'Judge only the supplied decision summaries, grounding, uncertainty treatment, and numerical restraint.',
+    'Model, effort, latency, token use, and operational gate are intentionally hidden.',
+    'These are redacted rationales, not private chain-of-thought.',
+    '',
+  ];
+  const candidates = (comparison.cells as CellSummary[])
+    .filter((item) => item.status === 'completed')
+    .sort((left, right) => String(left.raw?.outputHash).localeCompare(String(right.raw?.outputHash)));
+  for (const [index, cell] of candidates.entries()) {
+    const raw = cell.raw?.pick;
+    lines.push(
+      `## B${String(index + 1).padStart(2, '0')}`,
+      '',
+      `- Pick: ${String(raw?.selection ?? 'n/a')} at ${formatNumber(raw?.odds)}`,
+      `- Model probability: ${formatNumber(raw?.modelProbability ?? raw?.probability)}`,
+      `- Market fair probability: ${formatNumber(raw?.marketFairProbability)}`,
+      `- Edge: ${formatNumber(raw?.edge)}`,
+      `- Confidence: ${formatNumber(raw?.confidence)}`,
+      `- Evidence IDs: ${stringArray(raw?.evidenceIds).map((id) => `\`${id}\``).join(', ') || 'none'}`,
+      `- Claim IDs: ${stringArray(raw?.claimIds).map((id) => `\`${id}\``).join(', ') || 'none'}`,
+      `- Warnings: ${stringArray(raw?.warnings).join('; ') || 'none'}`,
+      `- Blockers: ${stringArray(raw?.blockers).join('; ') || 'none'}`,
+      '',
+      `> ${String(raw?.rationale ?? 'No rationale')}`,
+      '',
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function limitations(): string[] {
   return [
     'One execution per cell measures observed output, not reproducibility or predictive superiority.',
     'The fixture is unsettled; this experiment can compare reasoning quality and harness compliance, not final accuracy yet.',
     'Luna is review-only in the operational harness, so its gate/status is not an intrinsic quality score.',
     'Codex does not expose private chain-of-thought here; rationale, evidence links, warnings, blockers, latency, and token counts are compared instead.',
+    'Model and effort are verified at the harness configuration/CLI boundary; provider events do not independently attest internal routing.',
+    'All completed cells earned the same 100-point structural compliance score, so its latency tie-break is not a reasoning-quality ranking.',
     'Luna/ultra is recorded as unsupported and is not sent to the provider.',
   ];
 }
@@ -715,7 +752,7 @@ function writeExperimentState(outputRoot: string, value: unknown): void {
 }
 
 function writeJson(path: string, value: unknown): void {
-  mkdirSync(resolve(path, '..'), { recursive: true });
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
