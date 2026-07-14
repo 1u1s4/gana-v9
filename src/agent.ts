@@ -482,7 +482,10 @@ async function runCodexAgentAttempt(
   if (requiresNativeWebSearch(requirement) && !sawNativeWebSearch) {
     throw new Error(formatNativeWebSearchEnforcementError(requirement));
   }
-  if (!text.trim() && outputLastMessagePath && existsSync(outputLastMessagePath)) {
+  // Codex may emit intermediate agent_message items before the final structured
+  // response. The file written by --output-last-message is the canonical final
+  // answer, so prefer it over the concatenated event stream when available.
+  if (outputLastMessagePath && existsSync(outputLastMessagePath)) {
     const lastMessage = readFileSync(outputLastMessagePath, 'utf8').trim();
     if (lastMessage) text = lastMessage;
   }

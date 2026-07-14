@@ -339,11 +339,12 @@ function isIncompleteLiveResearchPayload(value: any, web: ResearchWebMode): bool
   if (web !== 'live') return false;
   const claims = Array.isArray(value?.claims) ? value.claims : [];
   const evidenceItems = Array.isArray(value?.evidenceItems) ? value.evidenceItems : [];
+  if (claims.length === 0 && evidenceItems.length === 0) return true;
   const reasons = Array.isArray(value?.gateResult?.reasons) ? value.gateResult.reasons : [];
   const warnings = Array.isArray(value?.gateResult?.warnings) ? value.gateResult.warnings : [];
   const text = [...reasons, ...warnings].filter((item): item is string => typeof item === 'string').join('\n');
   return (claims.length === 0 || evidenceItems.length === 0)
-    && /tool call not yet performed|no valid external evidence gathered|no usable claims|no usable evidence/i.test(text);
+    && /tool call not yet performed|no valid external evidence gathered|no usable claims|no usable evidence|verification is in progress/i.test(text);
 }
 
 function createNativeWebSearchTrace(): NativeWebSearchTrace {

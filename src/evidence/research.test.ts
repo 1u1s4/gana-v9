@@ -1155,6 +1155,45 @@ describe('runFixtureResearch', () => {
     assert.match(retryPrompt, /minimal-research-retry mode/);
   });
 
+  it('retries live web research when an intermediate payload says verification is in progress', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let attempts = 0;
+    const intermediateOutput = agentOutput({
+      sources: [],
+      evidenceItems: [],
+      claims: [],
+      gateResult: {
+        verdict: 'review-required',
+        reasons: ['Live web verification is in progress.'],
+        warnings: [],
+      },
+    });
+
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async (_config, _input, options) => {
+        attempts += 1;
+        if (attempts === 1) return { text: intermediateOutput, usage: {}, output: intermediateOutput };
+        emitNativeWebSearch(options);
+        const output = agentOutput({
+          gateResult: {
+            verdict: 'promotable',
+            reasons: ['web evidence gathered on retry'],
+            warnings: [],
+          },
+        });
+        return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(attempts, 2);
+    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+  });
+
   it('retries live web research in minimal mode after an agent timeout', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

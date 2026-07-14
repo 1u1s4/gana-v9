@@ -92,6 +92,34 @@ describe('native provider args', () => {
     assert.equal(args.at(-1), '-');
   });
 
+  it('prefers the canonical Codex last message over intermediate streamed messages', async () => {
+    const originalPath = process.env.PATH;
+    const binDir = mkdtempSync(join(tmpdir(), 'gana-codex-bin-'));
+    const codexPath = join(binDir, 'codex');
+    writeFileSync(codexPath, `#!/usr/bin/env node
+const fs = require('fs');
+const args = process.argv.slice(2);
+const lastMessagePath = args[args.indexOf('--output-last-message') + 1];
+const finalMessage = JSON.stringify({ stage: 'final' });
+fs.writeFileSync(lastMessagePath, finalMessage);
+console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify({ stage: 'intermediate' }) } }));
+console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: finalMessage } }));
+console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 2 } }));
+`);
+    chmodSync(codexPath, 0o755);
+    process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+    try {
+      const result = await runAgent(config({ provider: 'codex' }), 'hello', {
+        outputSchemaPath: 'skills/research-fixture-v2/output.schema.json',
+        useStdinPrompt: true,
+      });
+
+      assert.equal(result.text, '{"stage":"final"}');
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it('passes max and ultra reasoning efforts to Codex', () => {
     for (const reasoningEffort of ['max', 'ultra'] as const) {
       const cfg = config({ reasoningEffort });
