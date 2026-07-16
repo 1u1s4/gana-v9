@@ -6,11 +6,12 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 
 ## Operating Contract
 
-- Daily schedule: `13:00 America/Guatemala`.
+- Daily schedule: checkpoint `13:15 America/Guatemala` de la tarea unica; si un
+  Daily inicial esta pendiente, strategy se difiere al siguiente checkpoint.
 - Daily target: the previous closed fixture date only.
 - Historical target: all fixture dates with persisted predictions/parlays when `pnpm gana strategy-review --all` is run.
 - Agent: Codex only, configured through `GANA_STRATEGY_REVIEW_MODEL` and `GANA_STRATEGY_REVIEW_REASONING_EFFORT`.
-- Defaults: `gpt-5.5` with `xhigh` reasoning.
+- Defaults: `gpt-5.6-terra` with `high` reasoning, fast tier disabled and no automatic fallback.
 - Output artifacts: `strategy-review.json` and `strategy-review.md` under `.artifacts/gana-v9/runs/<runId>/`.
 - Safety: the automated job does not execute monetary actions and does not patch source files by itself; it records proposed Harness changes here.
 

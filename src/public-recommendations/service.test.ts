@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
+import { isUuid } from '../domain/ids.js';
 import { readPublicRecommendations } from './service.js';
+
+const PREDICTION_1_ID = '11111111-1111-4111-8111-111111111111';
+const PREDICTION_2_ID = '22222222-2222-4222-8222-222222222222';
+const PARLAY_1_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 const FIXTURE = {
   id: 'fixture-1',
@@ -25,7 +30,7 @@ const SECOND_FIXTURE = {
 
 const PREDICTIONS = [
   {
-    id: 'prediction-1',
+    id: PREDICTION_1_ID,
     runId: 'run-codex',
     fixtureId: 'fixture-1',
     marketKey: 'double_chance',
@@ -42,7 +47,7 @@ const PREDICTIONS = [
     fixture: FIXTURE,
   },
   {
-    id: 'prediction-2',
+    id: PREDICTION_2_ID,
     runId: 'run-codex',
     fixtureId: 'fixture-2',
     marketKey: 'total_goals',
@@ -61,7 +66,7 @@ const PREDICTIONS = [
 ];
 
 const PARLAYS = [{
-  id: 'parlay-1',
+  id: PARLAY_1_ID,
   runId: 'run-codex-parlay',
   combinedOdds: 1.65,
   aggregateConfidence: 0.7,
@@ -71,7 +76,7 @@ const PARLAYS = [{
   legs: [{
     id: 'leg-1',
     legIndex: 0,
-    predictionId: 'prediction-1',
+    predictionId: PREDICTION_1_ID,
     fixture: FIXTURE,
     prediction: PREDICTIONS[0],
     marketKey: 'double_chance',
@@ -88,8 +93,8 @@ describe('readPublicRecommendations', () => {
     try {
       writeDailyArtifact(root, {
         recommendations: [
-          parlayRecommendation('parlay-1'),
-          atomicRecommendation('prediction-2'),
+          parlayRecommendation(PARLAY_1_ID),
+          atomicRecommendation(PREDICTION_2_ID),
         ],
         requiredLeagueGeneralPredictions: [requiredLeagueGeneralPrediction()],
       });
@@ -110,7 +115,7 @@ describe('readPublicRecommendations', () => {
       assert.equal(response.parlays[0]?.odds, 1.65);
       assert.equal(response.parlays[0]?.stake?.percentOfBankroll, 0.01);
       assert.equal(response.parlays[0]?.legs[0]?.fixture.label, 'Paraguay vs Francia');
-      assert.equal(response.atomicPredictions[0]?.predictionId, 'prediction-2');
+      assert.equal(response.atomicPredictions[0]?.predictionId, PREDICTION_2_ID);
       assert.equal(response.atomicPredictions[0]?.fixture.label, 'Mexico vs Canada');
       assert.equal(response.requiredLeagueGeneralPredictions[0]?.fixture.label, 'Required Home vs Required Away');
       assert.equal(response.requiredLeague.atomicProjections.length, 1);
@@ -144,8 +149,8 @@ describe('readPublicRecommendations', () => {
     try {
       writeDailyArtifact(root, {
         recommendations: [
-          parlayRecommendation('parlay-1'),
-          atomicRecommendation('prediction-2'),
+          parlayRecommendation(PARLAY_1_ID),
+          atomicRecommendation(PREDICTION_2_ID),
         ],
       });
       writeRequiredLeagueArtifact(root);
@@ -155,8 +160,8 @@ describe('readPublicRecommendations', () => {
           predictions: PREDICTIONS,
           parlays: PARLAYS,
           publications: [
-            publicationRow({ targetType: 'parlay', targetId: 'parlay-1', parlayId: 'parlay-1' }),
-            publicationRow({ targetType: 'prediction', targetId: 'prediction-2', predictionId: 'prediction-2' }),
+            publicationRow({ targetType: 'parlay', targetId: PARLAY_1_ID, parlayId: PARLAY_1_ID }),
+            publicationRow({ targetType: 'prediction', targetId: PREDICTION_2_ID, predictionId: PREDICTION_2_ID }),
           ],
         }) as any,
         { date: '2026-07-02', timezone: 'America/Guatemala' },
@@ -172,8 +177,8 @@ describe('readPublicRecommendations', () => {
         response.source.publicationLedger.payloadSha256,
         'a'.repeat(64),
       );
-      assert.deepEqual(response.source.publicationLedger.parlayIds, ['parlay-1']);
-      assert.deepEqual(response.source.publicationLedger.predictionIds, ['prediction-2']);
+      assert.deepEqual(response.source.publicationLedger.parlayIds, [PARLAY_1_ID]);
+      assert.deepEqual(response.source.publicationLedger.predictionIds, [PREDICTION_2_ID]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -183,7 +188,7 @@ describe('readPublicRecommendations', () => {
     const root = mkdtempSync(join(tmpdir(), 'gana-public-recs-artifact-only-'));
     try {
       writeDailyArtifact(root, {
-        recommendations: [parlayRecommendation('analytical-fallback-1')],
+        recommendations: [parlayRecommendation('daily-focus-parlay-1')],
       });
       const response = await readPublicRecommendations(
         createDb({ runs: [dailyRun(root)], predictions: [PREDICTIONS[0]], parlays: [] }) as any,
@@ -195,7 +200,7 @@ describe('readPublicRecommendations', () => {
       assert.equal(response.parlays.length, 1);
       assert.equal(response.parlays[0]?.source.persisted, false);
       assert.equal(response.parlays[0]?.source.kind, 'artifact');
-      assert.equal(response.parlays[0]?.legs[0]?.predictionId, 'prediction-1');
+      assert.equal(response.parlays[0]?.legs[0]?.predictionId, PREDICTION_1_ID);
       assert.match(response.warnings.join('\n'), /artifact-only/);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -216,13 +221,17 @@ function createDb(input: { runs: any[]; predictions: any[]; parlays: any[]; publ
     },
     prediction: {
       findMany: async (args?: any) => {
-        const ids = new Set(args?.where?.id?.in ?? []);
+        const queryIds = args?.where?.id?.in ?? [];
+        assert.equal(queryIds.every(isUuid), true, `prediction query received a non-UUID id: ${JSON.stringify(queryIds)}`);
+        const ids = new Set(queryIds);
         return input.predictions.filter((prediction) => ids.has(prediction.id));
       },
     },
     parlay: {
       findMany: async (args?: any) => {
-        const ids = new Set(args?.where?.id?.in ?? []);
+        const queryIds = args?.where?.id?.in ?? [];
+        assert.equal(queryIds.every(isUuid), true, `parlay query received a non-UUID id: ${JSON.stringify(queryIds)}`);
+        const ids = new Set(queryIds);
         return input.parlays.filter((parlay) => ids.has(parlay.id));
       },
     },
@@ -242,7 +251,7 @@ function createDb(input: { runs: any[]; predictions: any[]; parlays: any[]; publ
 
 function dailyDateFromArgs(args: any): string | null {
   const json = JSON.stringify(args ?? {});
-  return /"path":"\$\.date","equals":"(\d{4}-\d{2}-\d{2})"/.exec(json)?.[1] ?? null;
+  return /"path":\["date"\],"equals":"(\d{4}-\d{2}-\d{2})"/.exec(json)?.[1] ?? null;
 }
 
 function dailyRun(root: string, date = '2026-07-02') {
@@ -293,7 +302,7 @@ function writeRequiredLeagueArtifact(root: string) {
     coverage: { fixtureCount: 1, missingPredictionFixtures: 0 },
     goalCheck: { status: 'passed' },
     atomicProjections: [{
-      predictionId: 'prediction-1',
+      predictionId: PREDICTION_1_ID,
       market: 'double_chance',
       selection: 'away_or_draw',
       odds: 1.32,
@@ -309,7 +318,7 @@ function writeRequiredLeagueArtifact(root: string) {
       aggregateConfidence: 0.7,
       expectedEdge: 0.04,
       legs: [{
-        predictionId: 'prediction-1',
+        predictionId: PREDICTION_1_ID,
         market: 'double_chance',
         selection: 'away_or_draw',
         odds: 1.32,
@@ -325,6 +334,7 @@ function parlayRecommendation(parlayId: string) {
     kind: 'parlay',
     rank: 1,
     parlayId,
+    predictionIds: [PREDICTION_1_ID, 'daily-focus-non-persisted-prediction'],
     sourceRunIds: ['run-codex-parlay'],
     profile: 'low-variance',
     harnessStatus: 'promotable',
@@ -340,7 +350,7 @@ function parlayRecommendation(parlayId: string) {
     },
     riskFlags: ['low-liquidity-watch'],
     legs: [{
-      predictionId: 'prediction-1',
+      predictionId: PREDICTION_1_ID,
       fixture: 'Paraguay vs Francia',
       market: 'double_chance',
       selection: 'away_or_draw',
@@ -412,7 +422,7 @@ function publicationRow(overrides: Record<string, unknown>) {
     channel: 'discord',
     target: 'recommendations',
     targetType: 'prediction',
-    targetId: 'prediction-1',
+    targetId: PREDICTION_1_ID,
     predictionId: null,
     parlayId: null,
     status: 'published',

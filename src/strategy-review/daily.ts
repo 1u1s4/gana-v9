@@ -205,8 +205,8 @@ interface ReviewRow {
 }
 
 const DEFAULT_DOC_PATH = 'docs/harness-strategy-review-log.md';
-const DEFAULT_MODEL = 'gpt-5.5';
-const DEFAULT_REASONING = 'xhigh';
+const DEFAULT_MODEL = 'gpt-5.6-terra';
+const DEFAULT_REASONING = 'high';
 const STATUSES = ['won', 'lost', 'voided', 'pending', 'blocked', 'unvalidated'] as const;
 
 export async function runStrategyReview(
@@ -390,7 +390,7 @@ async function earliestPredictionDate(db: StrategyReviewDb, timezone: string): P
         { parlayLegs: { some: {} } },
       ],
     },
-    orderBy: { scheduledAt: 'asc' },
+    orderBy: { scheduledAt: { sort: 'asc', nulls: 'last' } },
     select: { scheduledAt: true },
   });
   return fixture?.scheduledAt ? localDate(new Date(fixture.scheduledAt), timezone) : undefined;

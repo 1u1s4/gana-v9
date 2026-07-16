@@ -165,7 +165,10 @@ export interface ProviderSnapshotRecord {
   requestHash: string;
   responseHash: string | null;
   payloadHash: string | null;
+  dedupeKey: string | null;
   capturedAt: DbDate;
+  lastSeenAt: DbDate;
+  observationCount: number;
   quotaMetadata: JsonValue | null;
   requestMetadata: JsonValue | null;
   rawPayload: JsonValue | null;
@@ -183,6 +186,9 @@ export interface ProviderSnapshotInput {
   capturedAt?: Date;
   responseHash?: string | null;
   payloadHash?: string | null;
+  dedupeKey?: string | null;
+  lastSeenAt?: Date;
+  observationCount?: number;
   quotaMetadata?: JsonValue | null;
   requestMetadata?: JsonValue | null;
   rawPayload?: JsonValue | null;
@@ -200,6 +206,9 @@ export interface OddsSnapshotRecord {
   bookmakerCount: number;
   capturedAt: DbDate;
   payloadHash: string | null;
+  dedupeKey: string | null;
+  lastSeenAt: DbDate;
+  observationCount: number;
   metadata: JsonValue | null;
   createdAt: DbDate;
 }
@@ -211,6 +220,9 @@ export interface OddsSnapshotInput {
   providerSnapshotId?: string | null;
   bookmakerCount?: number;
   payloadHash?: string | null;
+  dedupeKey?: string | null;
+  lastSeenAt?: Date;
+  observationCount?: number;
   metadata?: JsonValue | null;
 }
 
@@ -230,6 +242,7 @@ export interface OddsQuoteRecord {
   consensusFairOdds: DbDecimal | null;
   overround: DbDecimal | null;
   marketEfficiencyScore: DbDecimal | null;
+  contentHash: string | null;
   capturedAt: DbDate;
   metadata: JsonValue | null;
   createdAt: DbDate;
@@ -250,6 +263,7 @@ export interface OddsQuoteInput {
   consensusFairOdds?: number | null;
   overround?: number | null;
   marketEfficiencyScore?: number | null;
+  contentHash?: string | null;
   line?: number | null;
   metadata?: JsonValue | null;
 }

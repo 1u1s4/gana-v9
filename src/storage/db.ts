@@ -26,9 +26,14 @@ export interface DbStatusReport extends ServiceStatusReport {
 }
 
 let prisma: PrismaClient | undefined;
+let prismaDatabaseUrl: string | undefined;
 
-export function getPrismaClient(): PrismaClient {
-  prisma ??= new PrismaClient();
+export function getPrismaClient(databaseUrl = process.env.DATABASE_URL): PrismaClient {
+  if (prisma && prismaDatabaseUrl !== databaseUrl) {
+    throw new Error('The active Prisma client uses a different DATABASE_URL. Disconnect it before changing database targets.');
+  }
+  prisma ??= new PrismaClient(databaseUrl ? { datasourceUrl: databaseUrl } : undefined);
+  prismaDatabaseUrl = databaseUrl;
   return prisma;
 }
 
@@ -36,6 +41,7 @@ export async function disconnectDb(): Promise<void> {
   if (!prisma) return;
   await prisma.$disconnect();
   prisma = undefined;
+  prismaDatabaseUrl = undefined;
 }
 
 export async function getDbStatus(config: DbStatusConfig = {}): Promise<DbStatusReport> {
@@ -60,18 +66,18 @@ export async function getDbStatus(config: DbStatusConfig = {}): Promise<DbStatus
     };
   }
 
-  if (identity.engine !== 'mysql') {
+  if (identity.engine !== 'postgresql') {
     return {
       service: 'storage.db',
       status: 'disconnected',
-      message: `DATABASE_URL must use mysql for this PR-03 override; detected ${identity.engine}.`,
+      message: `DATABASE_URL must use PostgreSQL for the Supabase runtime; detected ${identity.engine}.`,
       missing: [],
       configured: ['connection'],
       config: baseConfig,
     };
   }
 
-  const db = getPrismaClient();
+  const db = getPrismaClient(databaseUrl);
   const checkedAt = new Date();
 
   try {
@@ -107,7 +113,7 @@ export async function getDbStatus(config: DbStatusConfig = {}): Promise<DbStatus
     return {
       service: 'storage.db',
       status: 'disconnected',
-      message: actionableDbError(err),
+      message: actionableDbError(err, databaseUrl),
       missing: [],
       configured: ['connection'],
       config: {
@@ -255,11 +261,11 @@ function isMissingTableError(err: any): boolean {
   return err?.code === 'P2021' || message.includes("doesn't exist") || message.includes('does not exist');
 }
 
-function actionableDbError(err: any): string {
-  const engine = detectDatabaseEngine(process.env.DATABASE_URL);
+function actionableDbError(err: any, databaseUrl = process.env.DATABASE_URL): string {
+  const engine = detectDatabaseEngine(databaseUrl);
   const errorCode = typeof err?.code === 'string' ? err.code : 'unknown';
-  if (engine !== 'mysql') {
-    return 'DATABASE_URL is not a MySQL connection string for the active PR-03 override.';
+  if (engine !== 'postgresql') {
+    return 'DATABASE_URL is not a PostgreSQL connection string for the Supabase runtime.';
   }
   return `Database connection failed with Prisma error ${errorCode}. Check DATABASE_URL, network access, SSL settings, and migration state.`;
 }

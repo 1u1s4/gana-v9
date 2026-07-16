@@ -1,39 +1,42 @@
 #!/usr/bin/env node
+import 'dotenv/config';
 import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
-import { buildCronOutcome, compactPath, durationBetween, emitCronRichSummary, parseJsonObject } from './gana-telegram-rich-output.mjs';
+import { buildCronOutcome, compactPath, durationBetween, emitCronRichSummary } from './gana-telegram-rich-output.mjs';
 import {
-  buildDbPublicationLedgerPlan,
-  collectPublicationLedgerTargetIds,
   countPublishableSelections,
+  readExistingRecommendationArtifact,
   readCurrentRecommendationArtifact,
+  validateRetryablePublishLock,
   validatePublicationLedgerAlignment,
 } from './lib/daily-e2e-wrapper-state.mjs';
+import { resolveDailyRuntime } from './lib/daily-e2e-runtime.mjs';
+import { discordMessageIds as publicationDiscordMessageIds, publishDailyRecommendations } from './lib/daily-e2e-publication.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
-const ARTIFACT_ROOT = '.artifacts/gana-v9';
+const ARTIFACT_ROOT = process.env.GANA_ARTIFACT_ROOT?.trim() || '.artifacts/gana-v9';
 const DEFAULT_DISCORD_MAX_SELECTIONS = 25;
 
+if (process.env.GANA_MAINTENANCE_PAUSED === 'true') {
+  console.log('Gana daily operations are paused for database maintenance.');
+  process.exit(0);
+}
+
 const args = parseArgs(process.argv.slice(2));
+const publishExisting = args.publishExisting || strictBooleanEnv('GANA_DAILY_PUBLISH_EXISTING', false);
+if (publishExisting && args.force) throw new Error('--publish-existing cannot be combined with --force.');
+if (publishExisting && (!args.date || !args.dailyBatchId)) {
+  throw new Error('--publish-existing requires both --date and --daily-batch-id.');
+}
 const date = args.date ?? guatemalaDate(1);
 const dailyBatchId = args.dailyBatchId ?? `daily-${date}-full`;
 const discordTargets = resolveDiscordTargets({ gatewayTarget: args.gatewayTarget });
-const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex';
-const codexModel = args.codexModel ?? process.env.GANA_DAILY_CODEX_MODEL;
-const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 1);
-const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
-const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026';
-const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
 const notBefore = args.notBefore ?? process.env.GANA_DAILY_E2E_NOT_BEFORE ?? '10:15';
 const retryDelayMs = positiveMinutes(process.env.GANA_DAILY_EMPTY_RETRY_MINUTES, 120) * 60 * 1000;
-if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
-  throw new Error('--provider-concurrency must be a positive integer.');
-}
 const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}.log`);
 const outcomePath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${dailyBatchId}-outcome.json`);
 const recommendationsPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
@@ -65,6 +68,68 @@ if (!args.force && !hasReachedGuatemalaWallClock(notBefore)) {
     footer: '⏭️ No se corrió nada todavía; el catch-up lo intenta de nuevo en ventana válida.',
   });
   process.exit(0);
+}
+
+if (publishExisting) {
+  const existingRunLock = existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
+  const lockGate = validateRetryablePublishLock(existingRunLock, { date, dailyBatchId });
+  if (!lockGate.ok) {
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e-publish-existing',
+      status: 'skipped',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      reason: lockGate.reason,
+      retryAfter: lockGate.retryAfter,
+      artifacts: [lockPath, outcomePath],
+    }));
+    emitCronRichSummary({
+      title: 'Gana v9 · Publicación existente omitida',
+      status: 'skipped',
+      date,
+      timezone: TIMEZONE,
+      bullets: [
+        `Batch: ${dailyBatchId}`,
+        `Lock gate: ${lockGate.reason}`,
+        lockGate.retryAfter ? `Retry after: ${lockGate.retryAfter}` : undefined,
+        `Lock: ${compactPath(lockPath)}`,
+      ].filter(Boolean),
+      footer: '⏭️ No se ejecutó E2E ni se envió Discord.',
+    });
+    process.exit(0);
+  }
+  const acquiredPublishLock = acquireOnce(lockPath, 20 * 60 * 60 * 1000, {
+    date,
+    dailyBatchId,
+    status: 'publishing-existing',
+    startedAt: new Date().toISOString(),
+    sourceStatus: existingRunLock.status,
+  });
+  if (!acquiredPublishLock) {
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e-publish-existing',
+      status: 'skipped',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      reason: 'publish-lock-race-lost',
+      artifacts: [lockPath, outcomePath],
+    }));
+    process.exit(0);
+  }
+  process.exit(await runPublishExistingMode());
+}
+
+const dailyRuntime = resolveDailyRuntime({ env: process.env, codexModel: args.codexModel });
+const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex';
+const codexModel = dailyRuntime.codexModel;
+const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 1);
+const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
+const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026';
+const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
+if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
+  throw new Error('--provider-concurrency must be a positive integer.');
 }
 let acquiredRunLock = false;
 const existingRunLock = !args.force && existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
@@ -130,8 +195,10 @@ const env = {
   GANA_PROFILE: process.env.GANA_PROFILE ?? 'full-permissions',
   GANA_APPROVAL_MODE: process.env.GANA_APPROVAL_MODE ?? 'auto-grant',
   AGENT_PROVIDER: process.env.AGENT_PROVIDER ?? 'codex',
-  AGENT_CODEX_FALLBACK_MODELS: process.env.AGENT_CODEX_FALLBACK_MODELS ?? 'gpt-5.6-luna',
+  AGENT_CODEX_FALLBACK_MODELS: dailyRuntime.codexFallbackModels.join(','),
   AGENT_CODEX_SANDBOX: process.env.AGENT_CODEX_SANDBOX ?? 'danger-full-access',
+  AGENT_REASONING_EFFORT: dailyRuntime.reasoningEffort,
+  AGENT_FAST_MODE: String(dailyRuntime.fastMode),
   AGENT_NATIVE_WEB_SEARCH_MODE: process.env.AGENT_NATIVE_WEB_SEARCH_MODE ?? 'live',
   GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,
   GANA_DAILY_PROVIDER_CONCURRENCY: process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? String(providerConcurrency),
@@ -175,108 +242,30 @@ try {
   const ledgerAlignment = artifactState.ok
     ? validatePublicationLedgerAlignment(artifactState.artifact)
     : { ok: false, reason: artifactState.reason };
-  const dbLedger = artifactState.ok && selectionCount > 0 && ledgerAlignment.ok
-    ? await verifyDbPersistenceLedger(artifactState.artifact)
-    : { ok: false, reason: selectionCount > 0 ? ledgerAlignment.reason : 'no-publishable-selections' };
-  if (artifactState.ok && selectionCount > 0 && ledgerAlignment.ok && dbLedger.ok) {
-    const notify = spawnSync('node', [
-      '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs',
-      '--artifact', recommendationsPath,
-      '--transport', 'discord-native',
-      '--gateway-target', discordTargets.recommendations,
-      '--max', String(args.max ?? DEFAULT_DISCORD_MAX_SELECTIONS),
-    ], {
-      cwd: REPO_ROOT,
-      env,
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    writeLogLine(logFd, notify.stdout.trim());
-    if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
-    if (notify.status !== 0) throw new Error(`recommendation notification failed with exit ${notify.status}`);
-    sentRecommendations = true;
-    const recommendationNotify = parseJsonObject(notify.stdout);
-    const publicationLedger = await persistDiscordPublicationLedger(artifactState.artifact, {
+  const publication = artifactState.ok && selectionCount > 0 && ledgerAlignment.ok
+    ? await publishDailyRecommendations({
+      artifact: artifactState.artifact,
       artifactPath: recommendationsPath,
-      completedAt,
-      dailyBatchId,
       date,
+      dailyBatchId,
       discordTarget: discordTargets.recommendations,
-      notification: recommendationNotify,
-    });
-    if (!publicationLedger.ok) {
-      writeLogLine(logFd, `Discord notification sent but publication ledger persistence failed: ${publicationLedger.reason}`);
-      await sendStatus(discordTargets.alerts, {
-        title: '⚠️ Gana v9 · Daily E2E publicó sin ledger persistido',
-        description: [
-          `📅 ${date} · ${TIMEZONE}`,
-          `🧪 batch ${dailyBatchId}`,
-          `🗃️ publication ledger: ${publicationLedger.reason}`,
-          `📣 Discord recomendaciones: ${discordMessageIds(recommendationNotify).join(', ') || 'message id unavailable'}`,
-          `📦 artifact ${recommendationsPath}`,
-          '🛡️ No reenviar sin revisar duplicados; Discord ya recibió la publicación.',
-        ].join('\n'),
-        color: 0xeb5757,
-      });
-      emitCronRichSummary({
-        title: 'Gana v9 · Daily E2E publicó sin ledger persistido',
-        status: 'warning',
-        date,
-        timezone: TIMEZONE,
-        bullets: [
-          `Batch: ${dailyBatchId}`,
-          `Publication ledger: ${publicationLedger.reason}`,
-          `Discord recomendaciones: ${discordMessageIds(recommendationNotify).join(', ') || 'message id unavailable'}`,
-          `Recommendations: ${compactPath(recommendationsPath)}`,
-          `Log: ${compactPath(logPath)}`,
-          `Outcome: ${compactPath(outcomePath)}`,
-        ],
-        footer: '⚠️ Discord ya recibió la publicación; revisar ledger antes de cualquier rerun.',
-      });
-      writeLock(lockPath, {
-        date,
-        dailyBatchId,
-        status: 'publication-ledger-error',
-        selectionCount,
-        recommendationCount: publishableCounts.recommendations,
-        requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
-        ledger: dbLedger,
-        publicationLedger,
-        messageId: discordMessageIds(recommendationNotify)[0] ?? null,
-        messageIds: discordMessageIds(recommendationNotify),
-        completedAt: completedAt.toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      writeOutcome(buildCronOutcome({
-        flow: 'daily-e2e',
-        status: 'review-required',
-        date,
-        timezone: TIMEZONE,
-        batchId: dailyBatchId,
-        startedAt,
-        completedAt,
-        command,
-        exitStatus: result.status,
-        signal: result.signal,
-        reason: publicationLedger.reason,
-        counts: publishableCounts,
-        ledger: dbLedger,
-        publicationLedger,
-        notifications: {
-          alerts: discordTargets.alerts,
-          recommendations: discordMessageIds(recommendationNotify),
-        },
-        artifacts: [
-          { label: 'recommendations', path: recommendationsPath },
-          { label: 'log', path: logPath },
-          { label: 'outcome', path: outcomePath },
-        ],
-      }));
-      process.exitCode = 1;
-      handled = true;
-    } else {
+      databaseUrl: process.env.DATABASE_URL,
+      sourceManifest: artifactState.sourceManifest,
+      sourceManifestSha256: artifactState.sourceManifestSha256,
+      maxSelections: args.max ?? DEFAULT_DISCORD_MAX_SELECTIONS,
+      mode: 'daily-e2e',
+    })
+    : { status: 'blocked', reason: selectionCount > 0 ? ledgerAlignment.reason : 'no-publishable-selections' };
+  const dbLedger = publication.dbLedger ?? { ok: false, reason: publication.reason };
+  if (publication.status === 'published' || publication.status === 'already-published') {
+    sentRecommendations = true;
+    const recommendationNotify = publication.notification;
+    const publicationLedger = publication.publicationLedger;
+    const messageIds = publication.status === 'published'
+      ? publicationDiscordMessageIds(recommendationNotify)
+      : publication.messageIds ?? [];
     emitCronRichSummary({
-      title: 'Gana v9 · Daily E2E publicado',
+      title: publication.status === 'published' ? 'Gana v9 · Daily E2E publicado' : 'Gana v9 · Daily E2E ya publicado',
       status: 'ok',
       date,
       timezone: TIMEZONE,
@@ -285,11 +274,9 @@ try {
         `Publicación: ${selectionCount} selections · ${publishableCounts.recommendations} recommendations`,
         `Obligatorias: ${publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays}`,
         `Ledger DB: ${dbLedger.reason}`,
-        `Publication ledger: ${publicationLedger.reason}`,
+        `Publication ledger: ${publication.reason}`,
         `Run: exit ${result.status ?? 'unknown'} · ${durationBetween(startedAt, completedAt)}`,
-        recommendationNotify?.discordResult?.message_id || recommendationNotify?.discordResults?.length
-          ? `Discord recomendaciones: ${recommendationNotify?.discordResult?.message_id ?? recommendationNotify?.discordResults?.map((item) => item.message_id).filter(Boolean).join(', ')}`
-          : undefined,
+        messageIds.length ? `Discord recomendaciones: ${messageIds.join(', ')}` : undefined,
         `Recommendations: ${compactPath(recommendationsPath)}`,
         `Log: ${compactPath(logPath)}`,
         `Outcome: ${compactPath(outcomePath)}`,
@@ -300,14 +287,15 @@ try {
       date,
       dailyBatchId,
       status: 'published',
+      reconciledFromLedger: publication.status === 'already-published',
       selectionCount,
       recommendationCount: publishableCounts.recommendations,
       requiredLeagueSelectionCount: publishableCounts.requiredAtomic + publishableCounts.requiredSelectedParlays,
       ledger: dbLedger,
       publicationLedger,
-      messageId: publicationLedger.discordMessageIds[0] ?? null,
-      messageIds: publicationLedger.discordMessageIds,
-      completedAt: completedAt.toISOString(),
+      messageId: messageIds[0] ?? null,
+      messageIds,
+      completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     writeOutcome(buildCronOutcome({
@@ -317,28 +305,63 @@ try {
       timezone: TIMEZONE,
       batchId: dailyBatchId,
       startedAt,
-      completedAt,
+      completedAt: new Date(),
       command,
       exitStatus: result.status,
       signal: result.signal,
+      reason: publication.reason,
       counts: publishableCounts,
       ledger: dbLedger,
       publicationLedger,
-      notifications: {
-        recommendations: publicationLedger.discordMessageIds,
-      },
+      notifications: { recommendations: messageIds },
       artifacts: [
         { label: 'recommendations', path: recommendationsPath },
         { label: 'log', path: logPath },
         { label: 'outcome', path: outcomePath },
       ],
     }));
-    if (result.status !== 0) {
-      writeLogLine(logFd, `daily-e2e exited with status ${result.status} after producing recommendations; Discord notification sent`);
-    }
     process.exitCode = 0;
     handled = true;
-    }
+  } else if (publication.status === 'ledger-conflict'
+    || publication.status === 'publication-uncertain'
+    || publication.status === 'publication-ledger-error') {
+    sentRecommendations = true;
+    const messageIds = publicationDiscordMessageIds(publication.notification);
+    const terminalStatus = publication.status === 'ledger-conflict' ? 'publication-uncertain' : publication.status;
+    writeLogLine(logFd, `publication blocked from automatic retry: ${publication.reason}`);
+    writeLock(lockPath, {
+      date,
+      dailyBatchId,
+      status: terminalStatus,
+      selectionCount,
+      recommendationCount: publishableCounts.recommendations,
+      ledger: dbLedger,
+      publicationLedger: publication.publicationLedger,
+      messageId: messageIds[0] ?? null,
+      messageIds,
+      updatedAt: new Date().toISOString(),
+      reason: publication.reason,
+    });
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e',
+      status: 'review-required',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      startedAt,
+      completedAt: new Date(),
+      command,
+      exitStatus: result.status,
+      signal: result.signal,
+      reason: publication.reason,
+      counts: publishableCounts,
+      ledger: dbLedger,
+      publicationLedger: publication.publicationLedger,
+      notifications: { recommendations: messageIds },
+      artifacts: [lockPath, recommendationsPath, logPath, outcomePath],
+    }));
+    process.exitCode = 1;
+    handled = true;
   }
   if (artifactState.ok && selectionCount === 0) {
     writeLogLine(logFd, `recommendations artifact contains zero publishable selections; sending operational alert instead of empty Discord recommendations: ${recommendationsPath}`);
@@ -426,6 +449,207 @@ try {
   closeSync(logFd);
 }
 
+async function runPublishExistingMode() {
+  const startedAt = new Date();
+  const logFd = openSync(logPath, 'a');
+  const command = [
+    'node',
+    'scripts/gana-daily-e2e-and-notify.mjs',
+    '--publish-existing',
+    '--date', date,
+    '--daily-batch-id', dailyBatchId,
+  ];
+  let terminalLockWritten = false;
+  let retryReason = 'publish-existing did not complete';
+  try {
+    writeLogLine(logFd, `started ${startedAt.toISOString()} ${command.join(' ')}`);
+    const artifactState = readExistingRecommendationArtifact(recommendationsPath, {
+      date,
+      dailyBatchId,
+      now: startedAt,
+      maxAgeMs: positiveHours(process.env.GANA_DAILY_PUBLISH_EXISTING_MAX_AGE_HOURS, 36) * 60 * 60 * 1000,
+    });
+    if (!artifactState.ok) {
+      retryReason = `publish-existing artifact gate failed: ${artifactState.reason}`;
+      writeLogLine(logFd, retryReason);
+      writeOutcome(buildCronOutcome({
+        flow: 'daily-e2e-publish-existing',
+        status: 'review-required',
+        date,
+        timezone: TIMEZONE,
+        batchId: dailyBatchId,
+        startedAt,
+        completedAt: new Date(),
+        command,
+        reason: artifactState.reason,
+        artifacts: [
+          { label: 'recommendations', path: recommendationsPath },
+          { label: 'log', path: logPath },
+          { label: 'outcome', path: outcomePath },
+        ],
+      }));
+      return 1;
+    }
+
+    const publication = await publishDailyRecommendations({
+      artifact: artifactState.artifact,
+      artifactPath: recommendationsPath,
+      date,
+      dailyBatchId,
+      discordTarget: discordTargets.recommendations,
+      databaseUrl: process.env.DATABASE_URL,
+      sourceManifest: artifactState.sourceManifest,
+      sourceManifestSha256: artifactState.sourceManifestSha256,
+      maxSelections: args.max ?? DEFAULT_DISCORD_MAX_SELECTIONS,
+      mode: 'publish-existing',
+    });
+    const completedAt = new Date();
+    writeLogLine(logFd, `completed ${completedAt.toISOString()} status=${publication.status} reason=${publication.reason}`);
+
+    if (publication.status === 'published' || publication.status === 'already-published') {
+      const messageIds = publication.status === 'published'
+        ? publicationDiscordMessageIds(publication.notification)
+        : publication.messageIds ?? [];
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: 'published',
+        mode: 'publish-existing',
+        reconciledFromLedger: publication.status === 'already-published',
+        selectionCount: publication.counts?.total ?? 0,
+        recommendationCount: publication.counts?.recommendations ?? 0,
+        ledger: publication.dbLedger,
+        publicationLedger: publication.publicationLedger,
+        messageId: messageIds[0] ?? null,
+        messageIds,
+        completedAt: completedAt.toISOString(),
+        updatedAt: completedAt.toISOString(),
+      });
+      terminalLockWritten = true;
+      writeOutcome(buildCronOutcome({
+        flow: 'daily-e2e-publish-existing',
+        status: 'published',
+        date,
+        timezone: TIMEZONE,
+        batchId: dailyBatchId,
+        startedAt,
+        completedAt,
+        command,
+        reason: publication.reason,
+        counts: publication.counts,
+        ledger: publication.dbLedger,
+        publicationLedger: publication.publicationLedger,
+        notifications: { recommendations: messageIds },
+        artifacts: [
+          { label: 'recommendations', path: recommendationsPath },
+          { label: 'log', path: logPath },
+          { label: 'outcome', path: outcomePath },
+        ],
+      }));
+      emitCronRichSummary({
+        title: publication.status === 'published'
+          ? 'Gana v9 · Artifact existente publicado'
+          : 'Gana v9 · Publicación existente reconciliada',
+        status: 'ok',
+        date,
+        timezone: TIMEZONE,
+        bullets: [
+          `Batch: ${dailyBatchId}`,
+          `Publicables: ${publication.counts?.total ?? 0}`,
+          `Estado: ${publication.reason}`,
+          messageIds.length ? `Discord recomendaciones: ${messageIds.join(', ')}` : 'Discord: ledger ya publicado',
+          `Recommendations: ${compactPath(recommendationsPath)}`,
+        ],
+        footer: '🛡️ No se ejecutó E2E ni se invocaron providers/web.',
+      });
+      return 0;
+    }
+
+    if (publication.status === 'ledger-conflict'
+      || publication.status === 'publication-uncertain'
+      || publication.status === 'publication-ledger-error') {
+      const messageIds = publicationDiscordMessageIds(publication.notification);
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: publication.status === 'ledger-conflict' ? 'publication-uncertain' : publication.status,
+        mode: 'publish-existing',
+        reason: publication.reason,
+        selectionCount: publication.counts?.total ?? 0,
+        publicationLedger: publication.publicationLedger,
+        messageId: messageIds[0] ?? null,
+        messageIds,
+        updatedAt: completedAt.toISOString(),
+      });
+      terminalLockWritten = true;
+      writeOutcome(buildCronOutcome({
+        flow: 'daily-e2e-publish-existing',
+        status: 'review-required',
+        date,
+        timezone: TIMEZONE,
+        batchId: dailyBatchId,
+        startedAt,
+        completedAt,
+        command,
+        reason: publication.reason,
+        counts: publication.counts,
+        ledger: publication.dbLedger,
+        publicationLedger: publication.publicationLedger,
+        notifications: { recommendations: messageIds },
+        artifacts: [lockPath, recommendationsPath, logPath, outcomePath],
+      }));
+      return 1;
+    }
+
+    retryReason = `publish-existing blocked: ${publication.reason}`;
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e-publish-existing',
+      status: 'review-required',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      startedAt,
+      completedAt,
+      command,
+      reason: publication.reason,
+      counts: publication.counts,
+      ledger: publication.dbLedger,
+      artifacts: [lockPath, recommendationsPath, logPath, outcomePath],
+    }));
+    return 1;
+  } catch (error) {
+    retryReason = `publish-existing failed: ${safeErrorMessage(error)}`;
+    writeLogLine(logFd, retryReason);
+    writeOutcome(buildCronOutcome({
+      flow: 'daily-e2e-publish-existing',
+      status: 'review-required',
+      date,
+      timezone: TIMEZONE,
+      batchId: dailyBatchId,
+      startedAt,
+      completedAt: new Date(),
+      command,
+      reason: retryReason,
+      artifacts: [lockPath, recommendationsPath, logPath, outcomePath],
+    }));
+    return 1;
+  } finally {
+    if (!terminalLockWritten) {
+      const retryAfter = new Date(Date.now() + retryDelayMs).toISOString();
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: 'retryable',
+        retryAfter,
+        updatedAt: new Date().toISOString(),
+        reason: retryReason,
+      });
+      writeLogLine(logFd, `publish-existing lock marked retryable until ${retryAfter}: ${retryReason}`);
+    }
+    closeSync(logFd);
+  }
+}
+
 function parseArgs(argv) {
   const parsed = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -443,6 +667,7 @@ function parseArgs(argv) {
     else if (arg === '--web') parsed.web = requireValue(argv, ++index, arg);
     else if (arg === '--not-before') parsed.notBefore = requireValue(argv, ++index, arg);
     else if (arg === '--max') parsed.max = Number(requireValue(argv, ++index, arg));
+    else if (arg === '--publish-existing') parsed.publishExisting = true;
     else if (arg === '--force') parsed.force = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -453,17 +678,20 @@ function acquireOnce(path, ttlMs, payload) {
   mkdirSync(dirname(path), { recursive: true });
   if (existsSync(path)) {
     const lock = readJsonFile(path);
-    if (typeof lock?.retryAfter === 'string') {
+    const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
+    if (status === 'retryable' && typeof lock?.retryAfter === 'string') {
       const retryAtMs = Date.parse(lock.retryAfter);
       if (Number.isFinite(retryAtMs) && retryAtMs <= Date.now()) {
         rmSync(path, { force: true });
       } else {
         return false;
       }
-    } else {
+    } else if (status === 'running') {
       const ageMs = Date.now() - statSync(path).mtimeMs;
       if (ageMs < ttlMs) return false;
       rmSync(path, { force: true });
+    } else {
+      return false;
     }
   }
   let fd;
@@ -575,6 +803,20 @@ function positiveMinutes(value, fallback) {
   return parsed;
 }
 
+function positiveHours(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function strictBooleanEnv(name, fallback) {
+  const value = process.env[name];
+  if (value === undefined || value === '') return fallback;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`${name} must be true or false.`);
+}
+
 function apiFootballDailyLimitRetryAfter(artifact) {
   const reasons = [
     ...(Array.isArray(artifact?.runDiagnostics?.reasons) ? artifact.runDiagnostics.reasons : []),
@@ -669,223 +911,6 @@ function collect(dir, matches, date) {
       matches.push({ path, mtimeMs: statSync(path).mtimeMs });
     }
   }
-}
-
-async function verifyDbPersistenceLedger(artifact) {
-  const targets = collectPublicationLedgerTargetIds(artifact);
-  const plan = buildDbPublicationLedgerPlan(artifact);
-  const parlayIds = plan.persistedParlayIds;
-  const predictionIds = plan.predictionIds;
-  if (targets.parlayIds.length + predictionIds.length === 0) {
-    return { ok: false, reason: 'empty-ledger-targets', parlayIds: targets.parlayIds, predictionIds };
-  }
-  if (!process.env.DATABASE_URL) {
-    return {
-      ok: false,
-      reason: 'missing-database-url',
-      parlayIds: targets.parlayIds,
-      dbParlayIds: parlayIds,
-      artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
-      invalidParlayIds: plan.invalidParlayIds,
-      predictionIds,
-    };
-  }
-
-  let prisma;
-  try {
-    const { PrismaClient } = await import('@prisma/client');
-    prisma = new PrismaClient();
-    const [parlays, predictions] = await Promise.all([
-      parlayIds.length
-        ? prisma.parlay.findMany({ where: { id: { in: parlayIds } }, select: { id: true } })
-        : Promise.resolve([]),
-      predictionIds.length
-        ? prisma.prediction.findMany({ where: { id: { in: predictionIds } }, select: { id: true } })
-        : Promise.resolve([]),
-    ]);
-    const foundParlays = new Set(parlays.map((item) => item.id));
-    const foundPredictions = new Set(predictions.map((item) => item.id));
-    const missingParlayIds = [
-      ...plan.invalidParlayIds,
-      ...parlayIds.filter((id) => !foundParlays.has(id)),
-    ];
-    const missingPredictionIds = predictionIds.filter((id) => !foundPredictions.has(id));
-    if (missingParlayIds.length || missingPredictionIds.length) {
-      return {
-        ok: false,
-        reason: `missing-db-ledger-targets:p=${missingParlayIds.length},pred=${missingPredictionIds.length}`,
-        parlayIds: targets.parlayIds,
-        dbParlayIds: parlayIds,
-        artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
-        invalidParlayIds: plan.invalidParlayIds,
-        predictionIds,
-        missingParlayIds,
-        missingPredictionIds,
-      };
-    }
-    return {
-      ok: true,
-      reason: `verified-db-ledger:p=${parlayIds.length},artifact-p=${plan.artifactOnlyParlayIds.length},pred=${predictionIds.length}`,
-      parlayIds: targets.parlayIds,
-      dbParlayIds: parlayIds,
-      artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
-      invalidParlayIds: plan.invalidParlayIds,
-      predictionIds,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: `db-ledger-check-failed:${safeErrorMessage(err)}`,
-      parlayIds: targets.parlayIds,
-      dbParlayIds: parlayIds,
-      artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
-      invalidParlayIds: plan.invalidParlayIds,
-      predictionIds,
-    };
-  } finally {
-    if (prisma) await prisma.$disconnect().catch(() => undefined);
-  }
-}
-
-async function persistDiscordPublicationLedger(artifact, {
-  artifactPath,
-  completedAt,
-  dailyBatchId,
-  date,
-  discordTarget,
-  notification,
-}) {
-  const targets = collectPublicationLedgerTargetIds(artifact);
-  const targetRows = [
-    ...targets.parlayIds.map((id) => ({
-      targetType: 'parlay',
-      targetId: id,
-      parlayId: uuidOrNull(id),
-      predictionId: null,
-    })),
-    ...targets.predictionIds.map((id) => ({
-      targetType: 'prediction',
-      targetId: id,
-      parlayId: null,
-      predictionId: uuidOrNull(id),
-    })),
-  ];
-  const messageIds = discordMessageIds(notification);
-  const payloadPath = stringOrNull(notification?.payloadPath ?? notification?.payload_path);
-  const payloadSha256 = stringOrNull(notification?.payloadSha256 ?? notification?.payload_sha256);
-  if (!targetRows.length) {
-    return { ok: false, reason: 'empty-publication-ledger-targets', inserted: 0, discordMessageIds: messageIds, payloadPath, payloadSha256 };
-  }
-  if (!process.env.DATABASE_URL) {
-    return { ok: false, reason: 'missing-database-url', inserted: 0, discordMessageIds: messageIds, payloadPath, payloadSha256 };
-  }
-
-  let prisma;
-  try {
-    const { PrismaClient } = await import('@prisma/client');
-    prisma = new PrismaClient();
-    const publishedAt = completedAt instanceof Date ? completedAt : new Date(completedAt);
-    const run = await prisma.harnessRun.findUnique({ where: { id: dailyBatchId }, select: { id: true } });
-    const result = await prisma.publicRecommendationPublication.createMany({
-      data: targetRows.map((row) => ({
-        id: randomUUID(),
-        dailyBatchId,
-        runId: run?.id ?? null,
-        slateDate: new Date(`${date}T00:00:00.000Z`),
-        channel: 'discord',
-        target: 'recommendations',
-        status: 'published',
-        targetType: row.targetType,
-        targetId: row.targetId,
-        predictionId: row.predictionId,
-        parlayId: row.parlayId,
-        discordTarget,
-        discordMessageId: messageIds[0] ?? null,
-        discordMessageIds: messageIds,
-        artifactPath,
-        payloadPath,
-        payloadSha256,
-        publishedAt,
-        metadata: {
-          transport: stringOrNull(notification?.transport),
-          selectionCount: finiteOrNull(notification?.selectionCount),
-          gatewayTarget: stringOrNull(notification?.gatewayTarget),
-        },
-      })),
-      skipDuplicates: true,
-    });
-
-    const found = await prisma.publicRecommendationPublication.findMany({
-      where: {
-        dailyBatchId,
-        channel: 'discord',
-        target: 'recommendations',
-        OR: targetRows.map((row) => ({ targetType: row.targetType, targetId: row.targetId })),
-      },
-      select: { targetType: true, targetId: true, discordMessageId: true },
-    });
-    const foundKeys = new Set(found.map((row) => `${row.targetType}:${row.targetId}`));
-    const missing = targetRows.filter((row) => !foundKeys.has(`${row.targetType}:${row.targetId}`));
-    if (missing.length) {
-      return {
-        ok: false,
-        reason: `missing-publication-ledger-rows:${missing.length}`,
-        inserted: result.count,
-        expected: targetRows.length,
-        missing,
-        discordMessageIds: messageIds,
-        payloadPath,
-        payloadSha256,
-      };
-    }
-    return {
-      ok: true,
-      reason: `persisted-publication-ledger:${found.length}/${targetRows.length}`,
-      inserted: result.count,
-      expected: targetRows.length,
-      discordMessageIds: messageIds,
-      payloadPath,
-      payloadSha256,
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: `publication-ledger-persist-failed:${safeErrorMessage(err)}`,
-      inserted: 0,
-      expected: targetRows.length,
-      discordMessageIds: messageIds,
-      payloadPath,
-      payloadSha256,
-    };
-  } finally {
-    if (prisma) await prisma.$disconnect().catch(() => undefined);
-  }
-}
-
-function discordMessageIds(notification) {
-  const values = [
-    notification?.discordResult?.message_id,
-    ...(Array.isArray(notification?.discordResults)
-      ? notification.discordResults.map((item) => item?.message_id)
-      : []),
-  ];
-  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim()))];
-}
-
-function stringOrNull(value) {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function uuidOrNull(value) {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)
-    ? trimmed
-    : null;
-}
-
-function finiteOrNull(value) {
-  return Number.isFinite(value) ? value : null;
 }
 
 function safeErrorMessage(err) {

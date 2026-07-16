@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { readRecommendationSourceSnapshot } from '../../../../scripts/lib/daily-recommendation-source-snapshot.mjs';
 import { resolveDiscordTarget } from './discord-targets.mjs';
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
@@ -33,6 +34,9 @@ export function parseArgs(argv) {
     transport: DEFAULT_TRANSPORT,
     gatewayTarget: undefined,
     hermesPython: process.env.HERMES_GATEWAY_PYTHON || DEFAULT_HERMES_PYTHON,
+    preparedPayload: undefined,
+    expectedPayloadSha256: undefined,
+    expectedSourceManifestSha256: undefined,
     dryRun: false,
     latest: false,
     singleMessage: false,
@@ -48,6 +52,9 @@ export function parseArgs(argv) {
     else if (arg === '--transport') args.transport = parseTransport(requireValue(argv, ++index, arg));
     else if (arg === '--gateway-target') args.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--hermes-python') args.hermesPython = requireValue(argv, ++index, arg);
+    else if (arg === '--prepared-payload') args.preparedPayload = requireValue(argv, ++index, arg);
+    else if (arg === '--expected-payload-sha256') args.expectedPayloadSha256 = parseSha256(requireValue(argv, ++index, arg), arg);
+    else if (arg === '--expected-source-manifest-sha256') args.expectedSourceManifestSha256 = parseSha256(requireValue(argv, ++index, arg), arg);
     else if (arg === '--dry-run') args.dryRun = true;
     else if (arg === '--latest') args.latest = true;
     else if (arg === '--single-message') args.singleMessage = true;
@@ -77,13 +84,19 @@ export function findLatestRecommendationsArtifact(root = DEFAULT_ARTIFACT_ROOT) 
   return matches[0].path;
 }
 
-export function loadRecommendations(path) {
-  const artifact = JSON.parse(readFileSync(path, 'utf8'));
-  if (!artifact || typeof artifact !== 'object') throw new Error(`Invalid recommendations artifact: ${path}`);
-  attachRequiredLeagueRecommendations(artifact, path);
-  attachRequiredLeagueGeneralPredictions(artifact, path);
+export function loadRecommendations(path, { strictSources = false } = {}) {
+  const snapshot = readRecommendationSourceSnapshot(path, { strict: strictSources });
+  const artifact = snapshot.artifact;
+  attachRequiredLeagueRecommendationsFromSnapshot(artifact, snapshot.requiredLeagueRecommendations);
+  attachRequiredLeagueGeneralPredictionsFromSnapshot(artifact, snapshot.providerComparison);
   const recommendations = selectRecommendations(artifact);
-  return { artifact, recommendations };
+  return {
+    artifact,
+    recommendations,
+    sourceArtifactSha256: snapshot.sourceArtifactSha256,
+    sourceManifest: snapshot.sourceManifest,
+    sourceManifestSha256: snapshot.sourceManifestSha256,
+  };
 }
 
 export function buildDiscordPayload(artifact, options = {}) {
@@ -674,6 +687,13 @@ export function attachRequiredLeagueRecommendations(artifact, artifactPath) {
   }
 }
 
+function attachRequiredLeagueRecommendationsFromSnapshot(artifact, requiredLeagueRecommendations) {
+  if (artifact.requiredLeagueRecommendations && typeof artifact.requiredLeagueRecommendations === 'object') return;
+  if (requiredLeagueRecommendations && typeof requiredLeagueRecommendations === 'object') {
+    artifact.requiredLeagueRecommendations = requiredLeagueRecommendations;
+  }
+}
+
 export function attachRequiredLeagueGeneralPredictions(artifact, artifactPath) {
   if (Array.isArray(artifact.requiredLeagueGeneralPredictions)) return;
   const data = requiredLeagueData(artifact);
@@ -689,11 +709,20 @@ export function attachRequiredLeagueGeneralPredictions(artifact, artifactPath) {
   if (!existsSync(resolved)) return;
   try {
     const comparison = JSON.parse(readFileSync(resolved, 'utf8'));
-    const predictions = requiredLeagueGeneralPredictionsFromComparison(comparison, fixtures);
-    if (predictions.length) artifact.requiredLeagueGeneralPredictions = predictions;
+    attachRequiredLeagueGeneralPredictionsFromSnapshot(artifact, comparison);
   } catch {
     // The required addendum remains deliverable without the optional general-analysis section.
   }
+}
+
+function attachRequiredLeagueGeneralPredictionsFromSnapshot(artifact, comparison) {
+  if (Array.isArray(artifact.requiredLeagueGeneralPredictions)) return;
+  if (!comparison || typeof comparison !== 'object') return;
+  const data = requiredLeagueData(artifact);
+  const fixtures = Array.isArray(data?.coverage?.fixtures) ? data.coverage.fixtures : [];
+  if (!fixtures.length) return;
+  const predictions = requiredLeagueGeneralPredictionsFromComparison(comparison, fixtures);
+  if (predictions.length) artifact.requiredLeagueGeneralPredictions = predictions;
 }
 
 function requiredLeagueGeneralPredictionsFromComparison(comparison, fixtures) {
@@ -2099,6 +2128,15 @@ function requireValue(argv, index, flag) {
   return value;
 }
 
+function parseSha256(value, flag) {
+  if (!isSha256(value)) throw new Error(`${flag} must be a 64-character SHA-256 hex digest.`);
+  return value.toLowerCase();
+}
+
+function isSha256(value) {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/i.test(value);
+}
+
 function parseMax(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 25) {
@@ -2245,24 +2283,132 @@ function chunkLinesByLimit(lines, limit) {
   return chunks;
 }
 
-function writeDiscordPayloadArtifact(artifactPath, artifact, options, payloads) {
+export function writeDiscordPayloadArtifact(artifactPath, artifact, options, payloads) {
   const payloadJson = JSON.stringify(payloads);
   const sha256 = createHash('sha256').update(payloadJson).digest('hex');
-  const payloadPath = join(dirname(artifactPath), `discord-recommendations-payload-${sha256.slice(0, 16)}.json`);
-  if (!existsSync(payloadPath)) {
-    mkdirSync(dirname(payloadPath), { recursive: true });
-    writeFileSync(payloadPath, `${JSON.stringify({
-      schemaVersion: 1,
-      kind: 'gana-v9.discord-recommendations-payload',
-      dailyBatchId: artifact?.dailyBatchId ?? null,
-      date: artifact?.date ?? null,
-      transport: options.transport,
-      gatewayTarget: options.gatewayTarget,
-      payloadSha256: sha256,
-      payloads,
-    }, null, 2)}\n`);
+  if (!options.sourceManifest || !isSha256(options.sourceManifestSha256)) {
+    throw new Error('Writing a prepared payload requires the exact rendered source manifest snapshot.');
   }
-  return { path: payloadPath, sha256 };
+  const computedSourceManifestSha256 = createHash('sha256')
+    .update(JSON.stringify(options.sourceManifest))
+    .digest('hex');
+  if (computedSourceManifestSha256 !== options.sourceManifestSha256) {
+    throw new Error('Rendered source manifest SHA-256 verification failed.');
+  }
+  const manifestSourceArtifactSha256 = options.sourceManifest.sources
+    ?.find((source) => source.role === 'recommendations')?.sha256;
+  const sourceArtifactSha256 = options.sourceArtifactSha256 ?? manifestSourceArtifactSha256;
+  if (!isSha256(sourceArtifactSha256)) throw new Error('Rendered source manifest is missing the main artifact SHA-256.');
+  if (sourceArtifactSha256 !== manifestSourceArtifactSha256) {
+    throw new Error('Rendered main artifact SHA-256 does not match the source manifest.');
+  }
+  const proofSha256 = createHash('sha256').update(JSON.stringify({
+    payloadSha256: sha256,
+    sourceManifestSha256: options.sourceManifestSha256,
+    transport: options.transport,
+    gatewayTarget: options.gatewayTarget,
+  })).digest('hex');
+  const payloadPath = join(dirname(artifactPath), `discord-recommendations-payload-${proofSha256.slice(0, 24)}.json`);
+  mkdirSync(dirname(payloadPath), { recursive: true });
+  const preparedPayload = {
+    schemaVersion: 3,
+    kind: 'gana-v9.discord-recommendations-payload',
+    dailyBatchId: artifact?.dailyBatchId ?? null,
+    date: artifact?.date ?? null,
+    sourceArtifactPath: resolve(artifactPath),
+    sourceArtifactSha256,
+    sourceManifest: options.sourceManifest,
+    sourceManifestSha256: options.sourceManifestSha256,
+    transport: options.transport,
+    gatewayTarget: options.gatewayTarget,
+    payloadSha256: sha256,
+    payloadCount: payloads.length,
+    payloads,
+  };
+  const temporaryPayloadPath = `${payloadPath}.tmp-${process.pid}-${Date.now()}`;
+  writeFileSync(temporaryPayloadPath, `${JSON.stringify(preparedPayload, null, 2)}\n`);
+  renameSync(temporaryPayloadPath, payloadPath);
+  return {
+    path: payloadPath,
+    sha256,
+    payloadCount: payloads.length,
+    sourceManifest: options.sourceManifest,
+    sourceManifestSha256: options.sourceManifestSha256,
+  };
+}
+
+export function loadPreparedDiscordPayload(preparedPayloadPath, {
+  artifactPath,
+  artifact,
+  transport,
+  gatewayTarget,
+  sourceManifest,
+  sourceManifestSha256,
+  expectedPayloadSha256,
+  expectedSourceManifestSha256,
+} = {}) {
+  if (!preparedPayloadPath) throw new Error('--prepared-payload requires a payload artifact path.');
+  if (!artifactPath || !artifact) throw new Error('--prepared-payload requires the source recommendations artifact.');
+  if (!isSha256(expectedPayloadSha256)) throw new Error('--prepared-payload requires --expected-payload-sha256.');
+  if (!isSha256(expectedSourceManifestSha256)) {
+    throw new Error('--prepared-payload requires --expected-source-manifest-sha256.');
+  }
+  const resolvedPreparedPath = resolve(preparedPayloadPath);
+  if (dirname(resolvedPreparedPath) !== dirname(resolve(artifactPath))) {
+    throw new Error('Prepared payload must live beside its source recommendations artifact.');
+  }
+  const prepared = JSON.parse(readFileSync(resolvedPreparedPath, 'utf8'));
+  if (prepared?.schemaVersion !== 3 || prepared?.kind !== 'gana-v9.discord-recommendations-payload') {
+    throw new Error('Prepared payload has an unsupported schema or kind.');
+  }
+  if (prepared.dailyBatchId !== artifact.dailyBatchId || prepared.date !== artifact.date) {
+    throw new Error('Prepared payload date/batch does not match the source recommendations artifact.');
+  }
+  if (resolve(prepared.sourceArtifactPath ?? '') !== resolve(artifactPath)) {
+    throw new Error('Prepared payload source path does not match the requested recommendations artifact.');
+  }
+  const currentSnapshot = sourceManifest && sourceManifestSha256
+    ? { sourceManifest, sourceManifestSha256 }
+    : readRecommendationSourceSnapshot(artifactPath, { strict: true });
+  const currentSourceArtifactSha256 = currentSnapshot.sourceManifest?.sources
+    ?.find((source) => source.role === 'recommendations')?.sha256;
+  if (!isSha256(currentSourceArtifactSha256)
+    || prepared.sourceArtifactSha256 !== currentSourceArtifactSha256) {
+    throw new Error('Source recommendations artifact changed after the prepared dry-run.');
+  }
+  const computedSourceManifestSha256 = createHash('sha256')
+    .update(JSON.stringify(currentSnapshot.sourceManifest))
+    .digest('hex');
+  const preparedSourceManifestSha256 = createHash('sha256')
+    .update(JSON.stringify(prepared.sourceManifest))
+    .digest('hex');
+  if (computedSourceManifestSha256 !== currentSnapshot.sourceManifestSha256
+    || preparedSourceManifestSha256 !== prepared.sourceManifestSha256
+    || prepared.sourceManifestSha256 !== currentSnapshot.sourceManifestSha256
+    || expectedSourceManifestSha256 !== currentSnapshot.sourceManifestSha256) {
+    throw new Error('Recommendation source manifest changed after the prepared dry-run.');
+  }
+  if (prepared.transport !== transport || prepared.gatewayTarget !== gatewayTarget) {
+    throw new Error('Prepared payload transport/target does not match the requested delivery.');
+  }
+  if (!Array.isArray(prepared.payloads) || prepared.payloads.length === 0) {
+    throw new Error('Prepared payload contains no Discord messages.');
+  }
+  const payloadSha256 = createHash('sha256').update(JSON.stringify(prepared.payloads)).digest('hex');
+  if (prepared.payloadSha256 !== payloadSha256 || expectedPayloadSha256 !== payloadSha256) {
+    throw new Error('Prepared payload SHA-256 verification failed.');
+  }
+  if (prepared.payloadCount !== prepared.payloads.length) {
+    throw new Error('Prepared payload count verification failed.');
+  }
+  return {
+    path: resolvedPreparedPath,
+    sha256: payloadSha256,
+    payloadCount: prepared.payloads.length,
+    sourceManifest: currentSnapshot.sourceManifest,
+    sourceManifestSha256: currentSnapshot.sourceManifestSha256,
+    payloads: prepared.payloads,
+  };
 }
 
 function usage() {
@@ -2270,6 +2416,7 @@ function usage() {
     'Usage:',
     '  notify-discord-recommendations.mjs --artifact PATH [--max 25] [--single-message] [--gateway-target discord] [--dry-run]',
     '  notify-discord-recommendations.mjs --artifact PATH --transport discord-native --gateway-target discord:CHANNEL_ID',
+    '  notify-discord-recommendations.mjs --artifact PATH --prepared-payload PATH --expected-payload-sha256 SHA --expected-source-manifest-sha256 SHA --transport discord-native',
     '  notify-discord-recommendations.mjs --artifact PATH --transport hermes-gateway --gateway-target discord:CHANNEL_ID',
     '  notify-discord-recommendations.mjs --latest [--artifact-root .artifacts/gana-v9/runs] [--dry-run]',
     '  notify-discord-recommendations.mjs --artifact PATH --transport webhook [--max 25]',
@@ -2288,17 +2435,55 @@ async function main() {
   }
 
   const artifactPath = resolveArtifactPath(options);
-  const { artifact, recommendations } = loadRecommendations(artifactPath);
-  const payload = options.singleMessage ? buildDiscordSinglePayload(artifact, options) : buildDiscordPayload(artifact, options);
-  const payloads = options.singleMessage ? [payload] : buildDiscordPayloads(artifact, options);
-  const gatewayMessage = buildGatewayMessage(artifact, options);
-  const payloadArtifact = writeDiscordPayloadArtifact(artifactPath, artifact, options, payloads);
+  const {
+    artifact,
+    recommendations,
+    sourceArtifactSha256,
+    sourceManifest,
+    sourceManifestSha256,
+  } = loadRecommendations(artifactPath, {
+    strictSources: Boolean(options.expectedSourceManifestSha256 || options.preparedPayload),
+  });
+  if (options.expectedSourceManifestSha256
+    && options.expectedSourceManifestSha256 !== sourceManifestSha256) {
+    throw new Error('Recommendation source manifest does not match the expected dry-run snapshot.');
+  }
+  if (options.preparedPayload && options.dryRun) {
+    throw new Error('--prepared-payload cannot be combined with --dry-run.');
+  }
+  if (options.preparedPayload && (!options.expectedPayloadSha256 || !options.expectedSourceManifestSha256)) {
+    throw new Error('--prepared-payload requires expected payload and source-manifest SHA-256 values.');
+  }
+  const prepared = options.preparedPayload
+    ? loadPreparedDiscordPayload(options.preparedPayload, {
+      artifactPath,
+      artifact,
+      transport: options.transport,
+      gatewayTarget: options.gatewayTarget,
+      sourceManifest,
+      sourceManifestSha256,
+      expectedPayloadSha256: options.expectedPayloadSha256,
+      expectedSourceManifestSha256: options.expectedSourceManifestSha256,
+    })
+    : undefined;
+  const payloads = prepared?.payloads
+    ?? (options.singleMessage ? [buildDiscordSinglePayload(artifact, options)] : buildDiscordPayloads(artifact, options));
+  const payload = payloads[0];
+  const gatewayMessage = prepared ? undefined : buildGatewayMessage(artifact, options);
+  const payloadArtifact = prepared ?? writeDiscordPayloadArtifact(artifactPath, artifact, {
+    ...options,
+    sourceArtifactSha256,
+    sourceManifest,
+    sourceManifestSha256,
+  }, payloads);
 
   if (options.dryRun) {
     console.log(JSON.stringify({
       artifactPath,
       payloadPath: payloadArtifact.path,
       payloadSha256: payloadArtifact.sha256,
+      payloadCount: payloads.length,
+      sourceManifestSha256,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
@@ -2316,6 +2501,8 @@ async function main() {
       artifactPath,
       payloadPath: payloadArtifact.path,
       payloadSha256: payloadArtifact.sha256,
+      payloadCount: payloads.length,
+      sourceManifestSha256,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
@@ -2330,6 +2517,8 @@ async function main() {
       artifactPath,
       payloadPath: payloadArtifact.path,
       payloadSha256: payloadArtifact.sha256,
+      payloadCount: payloads.length,
+      sourceManifestSha256,
       selectionCount: recommendations.length,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
@@ -2347,6 +2536,8 @@ async function main() {
     artifactPath,
     payloadPath: payloadArtifact.path,
     payloadSha256: payloadArtifact.sha256,
+    payloadCount: payloads.length,
+    sourceManifestSha256,
     selectionCount: recommendations.length,
     transport: options.transport,
     discordStatus: results[0]?.status,

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentConfig } from '../config.js';
+import { uniqueUuids } from '../domain/ids.js';
 import { writeArtifact } from '../runtime/artifacts.js';
 import { fixtureDateRange } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
@@ -219,8 +220,12 @@ async function computeDailyMetricSnapshot(
   input: { date: string; timezone: string; scope: string; generatedAt: Date; recommendationTargets?: RecommendationArtifactTargets },
 ): Promise<DailyMetricSnapshot> {
   const window = fixtureDateRange(input.date, input.timezone);
-  const predictionIdFilter = input.recommendationTargets ? { id: { in: input.recommendationTargets.predictionIds } } : {};
-  const parlayIdFilter = input.recommendationTargets ? { id: { in: input.recommendationTargets.parlayIds } } : {};
+  const predictionIdFilter = input.recommendationTargets
+    ? { id: { in: uniqueUuids(input.recommendationTargets.predictionIds) } }
+    : {};
+  const parlayIdFilter = input.recommendationTargets
+    ? { id: { in: uniqueUuids(input.recommendationTargets.parlayIds) } }
+    : {};
   const [predictions, parlays] = await Promise.all([
     db.prediction.findMany({
       where: {

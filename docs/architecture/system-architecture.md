@@ -2,7 +2,7 @@
 source: notion-migration
 issue: J-104
 status: canonical
-updated: 2026-07-01
+updated: 2026-07-14
 migrated_from:
   - notion_id: 390bea9e-4736-8122-ba6b-eea956f63b9d
     title: "J-90 Indice operativo de Ingenieria / Tecnica"
@@ -19,7 +19,7 @@ migrated_from:
 
 Gana v9 es un harness analitico TUI/CLI para investigacion de futbol, revision de odds, scoring de predicciones, construccion de parlays, validacion, dashboards locales y reportes a Discord. El sistema produce artifacts de revision humana; no ejecuta apuestas, pagos, trades ni ninguna accion monetaria.
 
-Esta version migra la lectura tecnica de Notion al repo y corrige una diferencia importante: las paginas Notion J-90/J-91 describian parte de la estrategia tecnica usando lenguaje de un layout futuro tipo `apps/*` y `packages/*`. El repo vigente es un paquete TypeScript con `src/*`, Prisma/MySQL, scripts operativos y docs versionados. Cualquier split futuro debe actualizar este documento y no depender del texto historico de Notion.
+Esta version migra la lectura tecnica de Notion al repo y corrige una diferencia importante: las paginas Notion J-90/J-91 describian parte de la estrategia tecnica usando lenguaje de un layout futuro tipo `apps/*` y `packages/*`. El repo vigente es un paquete TypeScript con `src/*`, Prisma/PostgreSQL sobre Supabase, scripts operativos y docs versionados. Cualquier split futuro debe actualizar este documento y no depender del texto historico de Notion.
 
 ## Flujo canonico
 
@@ -32,7 +32,7 @@ API-Football fixtures/odds/results
   -> parlay construction and risk analysis
   -> council/recommendation policy
   -> validation, metrics and leaderboard analytics
-  -> artifacts, MySQL persistence, dashboard and Discord embeds
+  -> artifacts, PostgreSQL/Supabase persistence, dashboard and Discord embeds
 ```
 
 ## Fronteras de seguridad
@@ -58,7 +58,7 @@ API-Football fixtures/odds/results
 | Prediccion/scoring | `src/prediction/*`, `src/scoring/*` | Prompts, scoring, gates, calibration, ensemble, disagreement y edge gates. |
 | Parlays/recomendaciones | `src/parlay/*`, `src/recommendations/*`, `src/council/*`, `src/daily/*` | Construccion de parlays, perfiles, correlacion, diversificacion, council gate y recomendaciones diarias. |
 | Validacion/analytics | `src/validation/*`, `src/metrics/*`, `src/analytics/*`, `src/evals/*` | Settlement, result fetch, daily metrics, Brier/logloss/CLV, holdout y leaderboard. |
-| Persistencia | `prisma/schema.prisma`, `src/storage/*` | Prisma MySQL, repositorios, transacciones, status DB y redaccion de estado. |
+| Persistencia | `prisma/schema.prisma`, `prisma/postgres/*`, `src/storage/*` | Prisma PostgreSQL/Supabase, repositorios, transacciones, deduplicacion, retencion, status DB y redaccion de estado. |
 | Seguridad/permisos | `src/permissions/*`, `src/security/*` | Policies, approvals, egress/filesystem controls, audit, redaction y bloqueo de acciones monetarias. |
 | Dashboard local | `src/dashboard/*` | Dashboard read-only para resultados persistidos y detalle de runs. |
 | Operaciones | `scripts/*`, `.agents/skills/*`, `docs/*.md` | Cron, Discord, strategy review, runbooks y skills de agentes. |
@@ -77,13 +77,21 @@ Etapas vigentes:
 6. Construir parlays y analisis de riesgo/correlacion.
 7. Validar cuando el modo lo requiere o cuando hay resultados disponibles.
 8. Escribir `evidencePack`, `handoff`, manifests y JSON de run.
-9. Persistir estado en MySQL cuando `DATABASE_URL` esta configurado.
+9. Persistir estado en PostgreSQL/Supabase cuando `DATABASE_URL` esta configurado.
 
 El Daily E2E (`src/daily/e2e.ts`) compone runs de proveedor, compara resultados, aplica council gate, genera recomendaciones diarias y deja artifacts listos para notificacion.
 
 ## Persistencia y datos
 
-La base vigente es Prisma sobre MySQL. PostgreSQL puede evaluarse despues, pero no es el runtime actual.
+La base canonica es Prisma sobre PostgreSQL en Supabase. El runtime usa el pooler
+de sesion en `DATABASE_URL`; esto conserva semantica de sesion y compatibilidad
+con Prisma desde hosts sin conectividad IPv6 directa. `DIRECT_URL` apunta al
+endpoint directo cuando la red lo permite y, si no, al mismo pooler de sesion.
+El pooler de transacciones no es valido para este runtime.
+
+`SOURCE_DATABASE_URL` (MySQL) y `TARGET_DATABASE_URL` (PostgreSQL/libpq) solo
+existen durante la migracion. No son configuracion normal de la aplicacion ni
+deben permanecer en `.env` despues del cutover.
 
 Grupos principales del schema:
 
@@ -95,16 +103,42 @@ Grupos principales del schema:
 - Metricas: `LeaderboardEntry`, `DailyMetric`.
 - Presets operativos: league/team/search presets y low-odds scan records.
 
-Regla de datos: provider snapshots y artifacts son evidencia auditable. No se deben sobrescribir para "limpiar" una decision ya tomada; se generan nuevos runs/artifacts con lineage claro.
+Regla de datos: provider snapshots y artifacts referenciados son evidencia
+auditable. No se sobrescriben para "limpiar" una decision ya tomada; se generan
+nuevos runs/artifacts con lineage claro. La ingesta usa hashes de contenido para
+reutilizar observaciones identicas, mientras `last_seen_at` y
+`observation_count` conservan frecuencia y frescura sin repetir payloads.
+
+La politica de capacidad separa tres niveles:
+
+- Backup completo: dump comprimido y checksummed de la unica base MySQL fuente,
+  guardado fuera de la base live antes de compactar o retirar DigitalOcean.
+- Perfil `compact-free`: 7 dias de crudo/transitorio, 14 dias de
+  investigacion/validacion, 30 dias de analitica no publicada y hasta 60 dias
+  de ledger/metricas durables, mas catalogos y cierre referencial requerido.
+- Linaje acotado: publicaciones dentro de la ventana de 60 dias y todas sus
+  predictions, odds, evidencia, validaciones y relaciones se conservan juntas.
+
+En operacion normal, `pnpm db:retention` es un dry-run. `--apply` solo se ejecuta
+despues de revisar conteos/bytes elegibles. Mensualmente se inspeccionan tamano
+total, tablas e indices, crecimiento y autovacuum. El runbook canonico es
+[Supabase compact migration](../operations/supabase-compact-migration.md) y el
+detalle de ingesta/retencion esta en
+[retencion de datos crudos](../operations/raw-data-retention.md).
 
 ## Operacion diaria
 
-La operacion diaria usa hora Guatemala (`America/Guatemala`):
+La operacion diaria usa una sola autoridad y un dispatcher determinista en hora
+Guatemala (`America/Guatemala`):
 
-- 07:00: validar el dia anterior y publicar metricas/validaciones.
-- 10:15: Daily E2E del dia siguiente, recomendaciones/parlays y Discord.
-- 10:00-22:30 cada 30 minutos: catch-up idempotente si el host estuvo dormido.
-- 13:00: strategy review del dia anterior y actualizacion de `docs/harness-strategy-review-log.md`.
+- 07:15: retencion y validacion/metricas del dia anterior.
+- 10:15: Daily E2E inicial del dia siguiente.
+- 13:15: recuperar un Daily no iniciado o ejecutar strategy review.
+- 18:15 y 22:15: reintentar Daily solo si su lock esta `retryable` y vencido.
+
+El dispatcher serializa los flujos, conserva sus locks por fecha y nunca fuerza
+estados terminales. Codex Scheduled es la autoridad activa; Hermes, crontab y
+launchd son fallbacks mutuamente excluyentes.
 
 La guia canonica esta en [docs/daily-operations-cron.md](../daily-operations-cron.md). El contrato de Discord esta en [docs/discord-recommendation-notifications.md](../discord-recommendation-notifications.md).
 

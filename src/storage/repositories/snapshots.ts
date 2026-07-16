@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type {
   OddsQuoteInput,
   OddsQuoteRecord,
@@ -34,10 +36,34 @@ export interface OddsSnapshotWithQuotesInput {
 export function createProviderSnapshotRepository(db: Pick<StoragePrismaClient, 'providerSnapshot'>) {
   return {
     create(input: ProviderSnapshotInput): Promise<ProviderSnapshotRecord> {
+      const capturedAt = input.capturedAt ?? new Date();
+      const dedupeKey = input.dedupeKey ?? providerSnapshotDedupeKey(input);
+      if (dedupeKey) {
+        return db.providerSnapshot.upsert({
+          where: { dedupeKey },
+          create: compactData({
+            ...input,
+            dedupeKey,
+            capturedAt,
+            lastSeenAt: input.lastSeenAt ?? capturedAt,
+            observationCount: input.observationCount ?? 1,
+          }),
+          update: compactData({
+            lastSeenAt: capturedAt,
+            observationCount: { increment: 1 },
+            responseHash: input.responseHash,
+            quotaMetadata: input.quotaMetadata,
+            requestMetadata: input.requestMetadata,
+            ...(input.rawPayload == null ? {} : { rawPayload: input.rawPayload }),
+          }),
+        });
+      }
       return db.providerSnapshot.create({
         data: compactData({
           ...input,
-          capturedAt: input.capturedAt ?? new Date(),
+          capturedAt,
+          lastSeenAt: input.lastSeenAt ?? capturedAt,
+          observationCount: input.observationCount ?? 1,
         }),
       });
     },
@@ -62,10 +88,13 @@ export function createProviderSnapshotRepository(db: Pick<StoragePrismaClient, '
 export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'oddsSnapshot' | 'oddsQuote' | '$transaction'>) {
   return {
     create(input: OddsSnapshotInput): Promise<OddsSnapshotRecord> {
+      const capturedAt = input.capturedAt ?? new Date();
       return db.oddsSnapshot.create({
         data: compactData({
           ...input,
-          capturedAt: input.capturedAt ?? new Date(),
+          capturedAt,
+          lastSeenAt: input.lastSeenAt ?? capturedAt,
+          observationCount: input.observationCount ?? 1,
         }),
       });
     },
@@ -76,12 +105,25 @@ export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'odds
 
     createWithQuotes(input: OddsSnapshotWithQuotesInput): Promise<OddsSnapshotRecord> {
       return withTransaction(db, async (tx) => {
-        const snapshot = await tx.oddsSnapshot.create({
-          data: compactData({
-            ...input.snapshot,
-            capturedAt: input.snapshot.capturedAt ?? new Date(),
-          }),
+        const capturedAt = input.snapshot.capturedAt ?? new Date();
+        const dedupeKey = input.snapshot.dedupeKey ?? oddsSnapshotDedupeKey(input);
+        const snapshotData = compactData({
+          ...input.snapshot,
+          dedupeKey,
+          capturedAt,
+          lastSeenAt: input.snapshot.lastSeenAt ?? capturedAt,
+          observationCount: input.snapshot.observationCount ?? 1,
         });
+        const snapshot = dedupeKey
+          ? await tx.oddsSnapshot.upsert({
+            where: { dedupeKey },
+            create: snapshotData,
+            update: {
+              lastSeenAt: capturedAt,
+              observationCount: { increment: 1 },
+            },
+          })
+          : await tx.oddsSnapshot.create({ data: snapshotData });
 
         if (input.quotes.length > 0) {
           await tx.oddsQuote.createMany({
@@ -89,7 +131,8 @@ export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'odds
               compactData({
                 ...quote,
                 snapshotId: snapshot.id,
-                capturedAt: quote.capturedAt ?? new Date(),
+                contentHash: quote.contentHash ?? oddsQuoteContentHash(quote),
+                capturedAt: quote.capturedAt ?? capturedAt,
               }),
             ),
             skipDuplicates: input.skipDuplicates ?? true,
@@ -103,7 +146,7 @@ export function createOddsSnapshotRepository(db: Pick<StoragePrismaClient, 'odds
     listLatestByFixture(fixtureId: string, take?: number): Promise<OddsSnapshotRecord[]> {
       return db.oddsSnapshot.findMany({
         where: { fixtureId },
-        orderBy: { capturedAt: 'desc' },
+        orderBy: { lastSeenAt: 'desc' },
         ...takeArg(take),
       });
     },
@@ -116,6 +159,7 @@ export function createOddsQuoteRepository(db: Pick<StoragePrismaClient, 'oddsQuo
       return db.oddsQuote.create({
         data: compactData({
           ...input,
+          contentHash: input.contentHash ?? oddsQuoteContentHash(input),
           capturedAt: input.capturedAt ?? new Date(),
         }),
       });
@@ -126,6 +170,7 @@ export function createOddsQuoteRepository(db: Pick<StoragePrismaClient, 'oddsQuo
         data: inputs.map((input) =>
           compactData({
             ...input,
+            contentHash: input.contentHash ?? oddsQuoteContentHash(input),
             capturedAt: input.capturedAt ?? new Date(),
           }),
         ),
@@ -147,6 +192,74 @@ export function createOddsQuoteRepository(db: Pick<StoragePrismaClient, 'oddsQuo
       });
     },
   };
+}
+
+export function providerSnapshotDedupeKey(input: ProviderSnapshotInput): string | undefined {
+  if (!input.payloadHash) return undefined;
+  return stableContentHash({
+    version: 1,
+    providerId: input.providerId,
+    endpointName: input.endpointName,
+    requestHash: input.requestHash,
+    payloadHash: input.payloadHash,
+    // Provenance-bearing snapshots stay separate. API-Football currently uses
+    // nulls here, allowing unchanged payloads to dedupe across daily runs.
+    runId: input.runId ?? null,
+    taskId: input.taskId ?? null,
+    correlationId: input.correlationId ?? null,
+    traceId: input.traceId ?? null,
+  });
+}
+
+export function oddsSnapshotDedupeKey(input: OddsSnapshotWithQuotesInput): string | undefined {
+  if (!input.snapshot.payloadHash) return undefined;
+  return stableContentHash({
+    version: 1,
+    fixtureId: input.snapshot.fixtureId,
+    providerFixtureId: input.snapshot.providerFixtureId,
+    payloadHash: input.snapshot.payloadHash,
+    bookmakerCount: input.snapshot.bookmakerCount ?? 0,
+    metadata: input.snapshot.metadata ?? null,
+    quoteHashes: input.quotes.map((quote) => quote.contentHash ?? oddsQuoteContentHash(quote)).sort(),
+  });
+}
+
+export function oddsQuoteContentHash(input: Omit<OddsQuoteInput, 'snapshotId'> | OddsQuoteInput): string {
+  return stableContentHash({
+    version: 1,
+    fixtureId: input.fixtureId,
+    bookmaker: input.bookmaker,
+    bookmakerKey: input.bookmakerKey ?? null,
+    marketKey: input.marketKey,
+    selectionKey: input.selectionKey,
+    line: input.line ?? null,
+    price: input.price,
+    impliedProbability: input.impliedProbability ?? null,
+    marketImpliedProbability: input.marketImpliedProbability ?? null,
+    marketFairProbability: input.marketFairProbability ?? null,
+    consensusFairOdds: input.consensusFairOdds ?? null,
+    overround: input.overround ?? null,
+    marketEfficiencyScore: input.marketEfficiencyScore ?? null,
+    metadata: contentMetadata(input.metadata),
+  });
+}
+
+function contentMetadata(metadata: OddsQuoteInput['metadata']): unknown {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return metadata ?? null;
+  const { sourceSnapshotId: _observationId, ...content } = metadata as Record<string, unknown>;
+  return content;
+}
+
+function stableContentHash(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(sortJson(value))).digest('hex');
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJson);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, nested]) => [key, sortJson(nested)]));
 }
 
 export function createSnapshotRepositories(

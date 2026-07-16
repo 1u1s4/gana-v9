@@ -1349,7 +1349,7 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.5 --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.6-terra --max-fixtures 100 --threshold 1.20 --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

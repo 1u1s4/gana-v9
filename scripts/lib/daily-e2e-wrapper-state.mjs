@@ -1,5 +1,10 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+
+import { readRecommendationSourceSnapshot } from './daily-recommendation-source-snapshot.mjs';
+
+const DEFAULT_EXISTING_ARTIFACT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+const DEFAULT_FRESHNESS_TOLERANCE_MS = 5_000;
 
 export function readCurrentRecommendationArtifact(artifactPath, {
   date,
@@ -17,22 +22,148 @@ export function readCurrentRecommendationArtifact(artifactPath, {
     return { ok: false, reason: 'stale-artifact', artifact: undefined, mtimeMs: stat.mtimeMs };
   }
 
-  let artifact;
+  let snapshot;
   try {
-    artifact = JSON.parse(readFileSync(artifactPath, 'utf8'));
+    snapshot = readRecommendationSourceSnapshot(artifactPath, { strict: true });
   } catch {
     return { ok: false, reason: 'invalid-json', artifact: undefined, mtimeMs: stat.mtimeMs };
   }
+  const artifact = snapshot.artifact;
 
-  if (dailyBatchId && artifact?.dailyBatchId && artifact.dailyBatchId !== dailyBatchId) {
+  if (dailyBatchId && artifact?.dailyBatchId !== dailyBatchId) {
     return { ok: false, reason: 'batch-mismatch', artifact, mtimeMs: stat.mtimeMs };
   }
-  if (date && artifact?.date && artifact.date !== date) {
+  if (date && artifact?.date !== date) {
     return { ok: false, reason: 'date-mismatch', artifact, mtimeMs: stat.mtimeMs };
   }
 
-  attachRequiredLeagueRecommendations(artifact, artifactPath);
-  return { ok: true, reason: 'current-artifact', artifact, mtimeMs: stat.mtimeMs };
+  if (!artifact.requiredLeagueRecommendations && snapshot.requiredLeagueRecommendations) {
+    artifact.requiredLeagueRecommendations = snapshot.requiredLeagueRecommendations;
+  }
+  return {
+    ok: true,
+    reason: 'current-artifact',
+    artifact,
+    mtimeMs: stat.mtimeMs,
+    sourceArtifactSha256: snapshot.sourceArtifactSha256,
+    sourceManifest: snapshot.sourceManifest,
+    sourceManifestSha256: snapshot.sourceManifestSha256,
+  };
+}
+
+export function readExistingRecommendationArtifact(artifactPath, {
+  date,
+  dailyBatchId,
+  now = new Date(),
+  maxAgeMs = DEFAULT_EXISTING_ARTIFACT_MAX_AGE_MS,
+  freshnessToleranceMs = DEFAULT_FRESHNESS_TOLERANCE_MS,
+  summaryPath = artifactPath ? resolve(dirname(artifactPath), 'daily-e2e-summary.json') : undefined,
+} = {}) {
+  if (!date || !dailyBatchId) {
+    return { ok: false, reason: 'missing-artifact-identity', artifact: undefined, mtimeMs: undefined };
+  }
+  const current = readCurrentRecommendationArtifact(artifactPath, { date, dailyBatchId });
+  if (!current.ok) return current;
+
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  if (!Number.isFinite(nowMs)) {
+    return { ...current, ok: false, reason: 'invalid-current-time' };
+  }
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+    return { ...current, ok: false, reason: 'invalid-max-artifact-age' };
+  }
+  if (current.mtimeMs > nowMs + freshnessToleranceMs) {
+    return { ...current, ok: false, reason: 'future-artifact' };
+  }
+  if (nowMs - current.mtimeMs > maxAgeMs) {
+    return { ...current, ok: false, reason: 'stale-artifact' };
+  }
+
+  const summary = readJsonObject(summaryPath);
+  if (!summary) {
+    return { ...current, ok: false, reason: 'missing-or-invalid-summary', summary: undefined };
+  }
+  if (summary.dailyBatchId !== dailyBatchId) {
+    return { ...current, ok: false, reason: 'summary-batch-mismatch', summary };
+  }
+  if (summary.date !== date) {
+    return { ...current, ok: false, reason: 'summary-date-mismatch', summary };
+  }
+  if (summary.status !== 'succeeded') {
+    return { ...current, ok: false, reason: `summary-not-succeeded:${summary.status ?? 'unknown'}`, summary };
+  }
+
+  const startedMs = Date.parse(summary.startedAt);
+  const completedMs = Date.parse(summary.completedAt);
+  if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs) || completedMs < startedMs) {
+    return { ...current, ok: false, reason: 'invalid-summary-window', summary };
+  }
+  if (completedMs > nowMs + freshnessToleranceMs) {
+    return { ...current, ok: false, reason: 'future-summary', summary };
+  }
+  if (nowMs - completedMs > maxAgeMs) {
+    return { ...current, ok: false, reason: 'stale-summary', summary };
+  }
+  if (current.mtimeMs + freshnessToleranceMs < startedMs || current.mtimeMs > completedMs + freshnessToleranceMs) {
+    return { ...current, ok: false, reason: 'artifact-outside-summary-window', summary };
+  }
+
+  const completedGuatemalaDate = guatemalaDate(new Date(completedMs));
+  const previousSlateDate = shiftDate(date, -1);
+  if (completedGuatemalaDate !== previousSlateDate && completedGuatemalaDate !== date) {
+    return { ...current, ok: false, reason: 'summary-outside-slate-window', summary };
+  }
+
+  const expectedRecommendations = Number(summary?.counts?.recommendations);
+  if (!Number.isInteger(expectedRecommendations) || expectedRecommendations < 0) {
+    return { ...current, ok: false, reason: 'missing-summary-recommendation-count', summary };
+  }
+  const actualRecommendations = selectRecommendations(current.artifact).length;
+  if (expectedRecommendations !== actualRecommendations) {
+    return {
+      ...current,
+      ok: false,
+      reason: `summary-recommendation-count-mismatch:${expectedRecommendations}/${actualRecommendations}`,
+      summary,
+    };
+  }
+
+  return { ...current, ok: true, reason: 'existing-artifact-verified', summary };
+}
+
+export function validateRetryablePublishLock(lock, {
+  date,
+  dailyBatchId,
+  now = new Date(),
+} = {}) {
+  if (!lock || typeof lock !== 'object') return { ok: false, reason: 'missing-lock' };
+  if (lock.status !== 'retryable') {
+    return { ok: false, reason: `incompatible-lock-status:${lock.status ?? 'unknown'}` };
+  }
+  if (lock.date !== date) return { ok: false, reason: 'lock-date-mismatch' };
+  if (lock.dailyBatchId !== dailyBatchId) return { ok: false, reason: 'lock-batch-mismatch' };
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  const retryAtMs = Date.parse(lock.retryAfter);
+  if (!Number.isFinite(nowMs)) return { ok: false, reason: 'invalid-current-time' };
+  if (!Number.isFinite(retryAtMs)) return { ok: false, reason: 'invalid-lock-retry-after' };
+  if (retryAtMs > nowMs) {
+    return { ok: false, reason: 'retry-pending', retryAfter: lock.retryAfter };
+  }
+  return { ok: true, reason: 'compatible-retryable-lock', retryAfter: lock.retryAfter };
+}
+
+export function validatePublicationTargetIds(artifact) {
+  const plan = buildDbPublicationLedgerPlan(artifact);
+  const invalidPredictionIds = plan.predictionIds.filter((predictionId) => !isUuid(predictionId));
+  if (plan.invalidParlayIds.length || invalidPredictionIds.length) {
+    return {
+      ok: false,
+      reason: `invalid-publication-target-ids:p=${plan.invalidParlayIds.length},pred=${invalidPredictionIds.length}`,
+      ...plan,
+      invalidPredictionIds,
+    };
+  }
+  return { ok: true, reason: 'publication-target-ids-valid', ...plan, invalidPredictionIds };
 }
 
 export function countPublishableSelections(artifact) {
@@ -156,25 +287,6 @@ function collectRenderedPublicationSelections(artifact) {
   return selections;
 }
 
-function attachRequiredLeagueRecommendations(artifact, artifactPath) {
-  if (!artifact || typeof artifact !== 'object') return;
-  if (artifact.requiredLeagueRecommendations && typeof artifact.requiredLeagueRecommendations === 'object') return;
-  const requiredPath = typeof artifact.requiredLeagueRecommendationsPath === 'string'
-    ? artifact.requiredLeagueRecommendationsPath.trim()
-    : '';
-  if (!requiredPath) return;
-  const resolved = isAbsolute(requiredPath) ? requiredPath : resolve(dirname(artifactPath), requiredPath);
-  if (!existsSync(resolved)) return;
-  try {
-    const requiredLeagueRecommendations = JSON.parse(readFileSync(resolved, 'utf8'));
-    if (requiredLeagueRecommendations && typeof requiredLeagueRecommendations === 'object') {
-      artifact.requiredLeagueRecommendations = requiredLeagueRecommendations;
-    }
-  } catch {
-    // Optional addendum loading should not make the wrapper publish unsafe data.
-  }
-}
-
 function requiredLeagueCounts(artifact) {
   const data = requiredLeagueData(artifact);
   if (!data) return { atomic: 0, selectedParlays: 0 };
@@ -240,4 +352,30 @@ function isUuid(value) {
 
 function uniqueStrings(values) {
   return Array.from(new Set(values.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim())));
+}
+
+function readJsonObject(path) {
+  if (!path || !existsSync(path)) return undefined;
+  try {
+    const value = JSON.parse(readFileSync(path, 'utf8'));
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function guatemalaDate(value) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+}
+
+function shiftDate(value, days) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return undefined;
+  const shifted = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days));
+  return shifted.toISOString().slice(0, 10);
 }

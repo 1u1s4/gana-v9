@@ -8,6 +8,7 @@ import { runParlayBuild, type ParlayBuildRunResult } from '../parlay/service.js'
 import { runValidation, type ValidationRunResult } from '../validation/service.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from '../metrics/daily.js';
 import { runDailyE2E, type DailyE2ERunResult } from '../daily/e2e.js';
+import { applyDailyRuntimeDefaults, resolveDailyRuntimeDefaults } from '../daily/runtime-defaults.js';
 import { runStrategyReview, type StrategyReviewResult } from '../strategy-review/daily.js';
 import {
   exportRunArtifacts as runServiceExportRunArtifacts,
@@ -199,11 +200,13 @@ export async function runDailyE2ECommand(ctx: CommandRunnerContext, flags: Comma
   const persistMetrics = flags['persist-metrics'] === true || persistMetricsFlag === undefined
     ? true
     : !['false', 'off', 'no', '0'].includes(persistMetricsFlag.toLowerCase());
-  return runDailyE2E(ctx.config, {
+  const dailyRuntime = resolveDailyRuntimeDefaults();
+  const explicitModels = optionalDailyProviderModelsFlag(flags);
+  return runDailyE2E(applyDailyRuntimeDefaults(ctx.config, dailyRuntime), {
     date: requireDateFlag(flags),
     providers: optionalDailyProvidersFlag(flags),
     providerConcurrency: optionalPositiveIntegerFlag(flags, 'provider-concurrency'),
-    models: optionalDailyProviderModelsFlag(flags),
+    models: explicitModels ?? { codex: dailyRuntime.codexModel },
     maxFixtures: optionalPositiveIntegerFlag(flags, 'max-fixtures'),
     threshold: optionalFloatFlag(flags, 'threshold'),
     web: optionalResearchWebModeFlag(flags),

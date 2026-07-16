@@ -336,7 +336,10 @@ export function loadConfig(
   }
   config.provider = parseAgentProvider(process.env.AGENT_PROVIDER, 'AGENT_PROVIDER') ?? config.provider;
   if (process.env.AGENT_MODEL) config.model = process.env.AGENT_MODEL;
-  if (process.env.AGENT_FAST_MODE === 'true') config.fastMode = true;
+  {
+    const fastMode = parseBoolean(process.env.AGENT_FAST_MODE);
+    if (fastMode !== undefined) config.fastMode = fastMode;
+  }
   if (process.env.AGENT_NATIVE_WEB_SEARCH === 'true') config.nativeWebSearch = true;
   if (process.env.AGENT_NATIVE_WEB_SEARCH === 'false') config.nativeWebSearch = false;
   if (process.env.AGENT_NATIVE_WEB_SEARCH_MODE === 'cached' || process.env.AGENT_NATIVE_WEB_SEARCH_MODE === 'live') {
@@ -369,7 +372,9 @@ export function loadConfig(
   if (process.env.CODEX_HOME) config.codexHome = process.env.CODEX_HOME;
   if (process.env.CODEX_MODEL_LIST_PATH) config.codexModelListPath = process.env.CODEX_MODEL_LIST_PATH;
   if (isCodexSandbox(process.env.AGENT_CODEX_SANDBOX)) config.codexSandbox = process.env.AGENT_CODEX_SANDBOX;
-  if (process.env.AGENT_CODEX_FALLBACK_MODELS) config.codexFallbackModels = parseStringList(process.env.AGENT_CODEX_FALLBACK_MODELS) ?? [];
+  if (process.env.AGENT_CODEX_FALLBACK_MODELS !== undefined) {
+    config.codexFallbackModels = parseStringList(process.env.AGENT_CODEX_FALLBACK_MODELS) ?? [];
+  }
 
   const envSeason = parseNumber(process.env.GANA_DEFAULT_SEASON);
   const envThreshold = parseNumber(process.env.GANA_LOW_ODDS_THRESHOLD);

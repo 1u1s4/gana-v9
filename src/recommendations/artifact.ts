@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { normalizeUuid } from '../domain/ids.js';
 
 export interface RecommendationArtifactTargets {
   predictionIds: string[];
@@ -47,38 +48,39 @@ export function recommendationArtifactTargets(artifact: unknown, sourcePath?: st
   for (const recommendation of recommendations) {
     const item = objectRecord(recommendation);
     const kind = stringValue(item.kind);
-    const parlayId = stringValue(item.parlayId);
-    if (kind === 'parlay' && parlayId && !isSyntheticRecommendationId(parlayId)) {
+    const parlayId = normalizeUuid(item.parlayId);
+    if (kind === 'parlay' && parlayId) {
       parlayIds.add(parlayId);
     }
 
     for (const id of stringArray(item.predictionIds)) {
-      if (!isSyntheticRecommendationId(id)) predictionIds.add(id);
+      const predictionId = normalizeUuid(id);
+      if (predictionId) predictionIds.add(predictionId);
     }
-    const predictionId = stringValue(item.predictionId);
-    if (predictionId && !isSyntheticRecommendationId(predictionId)) predictionIds.add(predictionId);
+    const predictionId = normalizeUuid(item.predictionId);
+    if (predictionId) predictionIds.add(predictionId);
 
     for (const leg of Array.isArray(item.legs) ? item.legs : []) {
-      const legPredictionId = stringValue(objectRecord(leg).predictionId);
-      if (legPredictionId && !isSyntheticRecommendationId(legPredictionId)) predictionIds.add(legPredictionId);
+      const legPredictionId = normalizeUuid(objectRecord(leg).predictionId);
+      if (legPredictionId) predictionIds.add(legPredictionId);
     }
   }
 
   for (const projection of Array.isArray(requiredLeague.atomicProjections) ? requiredLeague.atomicProjections : []) {
     const item = objectRecord(projection);
-    const predictionId = stringValue(item.predictionId);
-    if (predictionId && !isSyntheticRecommendationId(predictionId)) predictionIds.add(predictionId);
+    const predictionId = normalizeUuid(item.predictionId);
+    if (predictionId) predictionIds.add(predictionId);
   }
 
   for (const projection of Array.isArray(requiredLeague.parlayProjections) ? requiredLeague.parlayProjections : []) {
     const item = objectRecord(projection);
-    const projectionParlayId = stringValue(item.parlayId);
-    if (stringValue(item.status) === 'selected' && projectionParlayId && !isSyntheticRecommendationId(projectionParlayId)) {
+    const projectionParlayId = normalizeUuid(item.parlayId);
+    if (stringValue(item.status) === 'selected' && projectionParlayId) {
       parlayIds.add(projectionParlayId);
     }
     for (const leg of Array.isArray(item.legs) ? item.legs as unknown[] : []) {
-      const legPredictionId = stringValue(objectRecord(leg).predictionId);
-      if (legPredictionId && !isSyntheticRecommendationId(legPredictionId)) predictionIds.add(legPredictionId);
+      const legPredictionId = normalizeUuid(objectRecord(leg).predictionId);
+      if (legPredictionId) predictionIds.add(legPredictionId);
     }
   }
 
@@ -250,10 +252,6 @@ function artifactSelectionFromRequiredGeneralPrediction(value: unknown): Recomme
     expectedEdge: numberOrNull(item.expectedEdge),
     ...(stringValue(item.status) && { status: stringValue(item.status) }),
   };
-}
-
-function isSyntheticRecommendationId(value: string): boolean {
-  return value.startsWith('atomic-') || value.startsWith('analytical-fallback-') || value.startsWith('required-');
 }
 
 function objectRecord(value: unknown): Record<string, unknown> {

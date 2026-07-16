@@ -9,6 +9,14 @@ import { createRuntimeContext } from '../runtime/context.js';
 import { runValidation } from './service.js';
 
 const now = new Date('2026-04-25T20:00:00.000Z');
+const PREDICTION_TARGET_ID = '11111111-1111-4111-8111-111111111111';
+const PARLAY_TARGET_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const ARTIFACT_PREDICTION_1_ID = '21111111-1111-4111-8111-111111111111';
+const ARTIFACT_PREDICTION_2_ID = '22222222-2222-4222-8222-222222222222';
+const ARTIFACT_PREDICTION_3_ID = '23333333-3333-4333-8333-333333333333';
+const ARTIFACT_PREDICTION_4_ID = '24444444-4444-4444-8444-444444444444';
+const ARTIFACT_PARLAY_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const ARTIFACT_FIXTURE_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const finalFixture = {
   id: 'fixture-1',
@@ -184,7 +192,7 @@ describe('runValidation prediction targets', () => {
       const cfg = config();
       const runtime = createRuntimeContext(cfg, 'session.jsonl');
 
-      const result = await runValidation(cfg, { predictionId: 'prediction-1' }, runtime, {
+      const result = await runValidation(cfg, { predictionId: PREDICTION_TARGET_ID }, runtime, {
         now: () => now,
         writeArtifact: () => '/tmp/validations.json',
         fetcher: fetcher({ cornersHome: 6, cornersAway: 4 }),
@@ -215,7 +223,7 @@ describe('runValidation prediction targets', () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
 
-    const result = await runValidation(cfg, { predictionId: 'prediction-1' }, runtime, {
+    const result = await runValidation(cfg, { predictionId: PREDICTION_TARGET_ID }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/validations-blocked.json',
       fetcher: fetcher(),
@@ -238,7 +246,7 @@ describe('runValidation prediction targets', () => {
     let artifactPayload: any;
     let leaderboardRows: any[] = [];
 
-    const result = await runValidation(cfg, { predictionId: 'prediction-1' }, runtime, {
+    const result = await runValidation(cfg, { predictionId: PREDICTION_TARGET_ID }, runtime, {
       now: () => now,
       writeArtifact: (_runId, _name, payload) => {
         artifactPayload = payload;
@@ -268,6 +276,31 @@ describe('runValidation prediction targets', () => {
     assert.equal(leaderboardRows.length, 1);
     assert.equal(leaderboardRows[0].modelId, 'gpt-test');
   });
+
+  it('blocks synthetic direct target ids before repository queries without changing a human HarnessRun id', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    runtime.runId = 'daily-2026-07-15-full';
+    let predictionReads = 0;
+
+    const result = await runValidation(cfg, { predictionId: 'daily-focus-prediction-1' }, runtime, {
+      writeArtifact: () => '/tmp/validations-blocked.json',
+      repositories: repositories({
+        predictions: {
+          findById: async () => {
+            predictionReads += 1;
+            return null;
+          },
+          listForFixtureDate: async () => [],
+        },
+      }),
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? '', /valid UUID/);
+    assert.equal(predictionReads, 0);
+    assert.equal(result.runId, 'daily-2026-07-15-full');
+  });
 });
 
 describe('runValidation parlay and date targets', () => {
@@ -276,7 +309,7 @@ describe('runValidation parlay and date targets', () => {
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const statuses: string[] = [];
 
-    const result = await runValidation(cfg, { parlayId: 'parlay-1' }, runtime, {
+    const result = await runValidation(cfg, { parlayId: PARLAY_TARGET_ID }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/validations.json',
       fetcher: fetcher(),
@@ -301,7 +334,7 @@ describe('runValidation parlay and date targets', () => {
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const statuses: string[] = [];
 
-    const result = await runValidation(cfg, { parlayId: 'parlay-1' }, runtime, {
+    const result = await runValidation(cfg, { parlayId: PARLAY_TARGET_ID }, runtime, {
       now: () => now,
       writeArtifact: () => '/tmp/validations.json',
       fetcher: fetcher(),
@@ -427,24 +460,28 @@ describe('runValidation parlay and date targets', () => {
       recommendations: [
         {
           kind: 'parlay',
-          parlayId: 'parlay-1',
-          legs: [{ predictionId: 'prediction-parlay-leg-1' }],
+          parlayId: ARTIFACT_PARLAY_ID,
+          predictionIds: [ARTIFACT_PREDICTION_1_ID, 'daily-focus-prediction-list'],
+          legs: [{ predictionId: ARTIFACT_PREDICTION_1_ID }],
         },
         {
           kind: 'atomic-prediction',
-          predictionId: 'prediction-atomic-1',
-          parlayId: 'atomic-prediction-atomic-1',
-          legs: [{ predictionId: 'prediction-atomic-1' }],
+          predictionId: ARTIFACT_PREDICTION_2_ID,
+          parlayId: 'daily-focus-atomic-prediction',
+          legs: [{ predictionId: ARTIFACT_PREDICTION_2_ID }, { predictionId: 'not-a-uuid' }],
         },
       ],
       requiredLeagueRecommendations: {
-        atomicProjections: [{ predictionId: 'prediction-required-atomic-1' }],
+        atomicProjections: [
+          { predictionId: ARTIFACT_PREDICTION_3_ID },
+          { predictionId: 'daily-focus-required-atomic' },
+        ],
         parlayProjections: [{
           profile: 'principal',
-          legs: [{ predictionId: 'prediction-required-parlay-leg-1' }],
+          legs: [{ predictionId: ARTIFACT_PREDICTION_4_ID }],
         }],
         generalPredictions: [{
-          fixtureId: 'fixture-1',
+          fixtureId: ARTIFACT_FIXTURE_ID,
           providerFixtureId: '1001',
           fixture: 'Team A vs Team B',
           market: 'btts',
@@ -452,11 +489,18 @@ describe('runValidation parlay and date targets', () => {
           odds: 1.8,
           confidence: 0.7,
           status: 'promotable',
+        }, {
+          fixtureId: 'daily-focus-fixture-should-not-query',
+          providerFixtureId: '1002',
+          fixture: 'Synthetic A vs Synthetic B',
+          market: 'h2h',
+          selection: 'home',
         }],
       },
     }));
     const predictionReads: string[] = [];
     const parlayReads: string[] = [];
+    const fixtureReads: string[] = [];
 
     const result = await runValidation(cfg, { date: '2026-04-25', recommendationArtifact }, runtime, {
       now: () => now,
@@ -482,17 +526,24 @@ describe('runValidation parlay and date targets', () => {
             throw new Error('date-wide parlay validation should not run');
           },
         },
+        fixtures: {
+          findById: async (id: string) => {
+            fixtureReads.push(id);
+            return fixtureRecord;
+          },
+        },
       }),
     });
 
     assert.equal(result.ok, true);
     assert.deepEqual(predictionReads, [
-      'prediction-parlay-leg-1',
-      'prediction-atomic-1',
-      'prediction-required-atomic-1',
-      'prediction-required-parlay-leg-1',
+      ARTIFACT_PREDICTION_1_ID,
+      ARTIFACT_PREDICTION_2_ID,
+      ARTIFACT_PREDICTION_3_ID,
+      ARTIFACT_PREDICTION_4_ID,
     ]);
-    assert.deepEqual(parlayReads, ['parlay-1']);
+    assert.deepEqual(parlayReads, [ARTIFACT_PARLAY_ID]);
+    assert.equal(fixtureReads.includes('daily-focus-fixture-should-not-query'), false);
     assert.equal(result.validations.length, 6);
     assert.equal(result.validations.at(-1)?.metadata?.source, 'required-league-general');
     assert.equal(result.validations.at(-1)?.actual?.summary, 'BTTS SI (2-1)');

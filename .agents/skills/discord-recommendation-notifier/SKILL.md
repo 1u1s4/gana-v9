@@ -108,10 +108,11 @@ Use `scripts/notify-discord-daily-stats.mjs` for validation/day-after statistics
 
 Repo-level cron wrappers:
 
+- `scripts/gana-daily-ops-dispatch.mjs`: single deterministic entrypoint for retention, validation, Daily E2E, strategy review, and due Daily recovery checkpoints.
 - `scripts/gana-daily-e2e-and-notify.mjs`: runs full daily E2E for tomorrow's Guatemala date, applies the recommendation council gate, and sends recommendations with the council summary included in the final control embed.
 - `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date scoped to the published recommendations artifact, builds daily metrics scoped to those same published targets, and sends stats.
-- `scripts/install-gana-hermes-cron.sh`: installs Hermes cron jobs at 7am/10am America/Guatemala.
-- `scripts/install-gana-cron.mjs`: installs a system crontab fallback at 7am/10am America/Guatemala.
+- `scripts/install-gana-hermes-cron.sh`: installs one dormant-capable Hermes fallback job at 07:15/10:15/13:15/18:15/22:15 America/Guatemala.
+- `scripts/install-gana-cron.mjs`: installs the same single dispatcher job as a system crontab fallback.
 - `.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs`: centralizes flow-specific Discord target resolution for notifiers and repo-level cron wrappers.
 
 Useful commands:

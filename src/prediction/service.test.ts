@@ -143,9 +143,16 @@ describe('runFixtureScoring', () => {
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     let persisted: any[] = [];
 
-    const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+    const result = await runFixtureScoring(cfg, { fixtureId: '12345' }, runtime, {
       now: () => now,
-      repositories: repositories(),
+      repositories: repositories({
+        fixtures: {
+          findById: async () => {
+            throw new Error('provider fixture ids must not be queried as PostgreSQL UUIDs');
+          },
+          findByProviderKey: async (_providerId: string, id: string) => id === '12345' ? fixture : null,
+        },
+      }),
       writeArtifact: () => '/tmp/predictions.json',
       agentRunner: async () => ({
         text: JSON.stringify({

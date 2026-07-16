@@ -1,6 +1,7 @@
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { normalizeUuid } from '../domain/ids.js';
 import { fixtureDateRange, redactText } from '../storage/repositories/helpers.js';
 import { getPrismaClient } from '../storage/db.js';
 import { readPublicRecommendations, type PublicRecommendationsDb } from '../public-recommendations/service.js';
@@ -90,6 +91,16 @@ const DEFAULT_SORT_BY = {
   daily: 'createdAt',
 } as const;
 
+const NULLABLE_SORT_FIELDS: Partial<Record<DashboardTab, ReadonlySet<string>>> = {
+  fixtures: new Set(['scheduledAt']),
+  predictions: new Set(['edge']),
+  parlays: new Set(['combinedOdds']),
+  runs: new Set(['startedAt', 'completedAt', 'verdict']),
+  daily: new Set(['startedAt', 'completedAt', 'verdict']),
+};
+
+class DashboardInputError extends Error {}
+
 export async function startDashboardServer(
   config: AgentConfig,
   options: DashboardOptions = {},
@@ -148,6 +159,9 @@ export async function startDashboardServer(
 
       return sendJson(res, 404, { error: 'not_found' });
     } catch (err: unknown) {
+      if (err instanceof DashboardInputError) {
+        return sendJson(res, 400, { error: 'invalid_filter', message: err.message });
+      }
       return sendJson(res, 500, {
         error: 'dashboard_error',
         message: redactText(err instanceof Error ? err.message : String(err)) ?? 'dashboard request failed',
@@ -192,6 +206,7 @@ export async function readOverview(
     defaultSortBy: DEFAULT_SORT_BY.fixtures,
     defaultDirection: 'desc',
   });
+  assertValidOverviewUuidFilters(query);
 
   const page = Math.max(1, query.page);
   const normalized = normalizeSortAndDirectionForTab(query.tab, query.sort, query.direction);
@@ -268,6 +283,9 @@ export async function readEntity(
   kind: DashboardEntityKind,
   id: string,
 ): Promise<DashboardEntityResponse | { error: 'not_found'; message: string }> {
+  if (kind !== 'run' && !normalizeUuid(id)) {
+    return { error: 'not_found', message: `${kind} ${id} not found` };
+  }
   if (kind === 'metric') {
     const row = (await db.dailyMetric.findUnique({ where: { id } })) as unknown;
     if (!row) return { error: 'not_found', message: `metric ${id} not found` };
@@ -504,18 +522,18 @@ function buildDailyWhere(
   const clauses: QueryArgs[] = [{
     OR: [
       { id: { startsWith: 'daily-' } },
-      { metadata: { path: '$.dailyRole', equals: 'batch' } },
+      { metadata: { path: ['dailyRole'], equals: 'batch' } },
     ],
   }];
   if (query.dailyBatchId) clauses.push({ id: query.dailyBatchId });
   if (query.runId) clauses.push({ id: query.runId });
   if (statusFilter.length) clauses.push({ status: inFilter(statusFilter) });
   if (dateWindow) clauses.push({ createdAt: dateRangeFilter(dateWindow) });
-  if (query.provider) clauses.push({ providerAgentic: { contains: query.provider } });
-  if (query.model) clauses.push({ model: { contains: query.model } });
-  if (query.family) clauses.push({ metadata: { path: `$.counts.parlayFamilies.${query.family}`, not: Prisma.JsonNull } });
+  if (query.provider) clauses.push({ providerAgentic: { contains: query.provider, mode: 'insensitive' } });
+  if (query.model) clauses.push({ model: { contains: query.model, mode: 'insensitive' } });
+  if (query.family) clauses.push({ metadata: { path: ['counts', 'parlayFamilies', query.family], not: Prisma.JsonNull } });
   if (query.recommendationTier && query.recommendationTier !== 'top') {
-    clauses.push({ metadata: { path: '$.parlayAnalysis.top', array_contains: [{ harnessStatus: query.recommendationTier }] } });
+    clauses.push({ metadata: { path: ['parlayAnalysis', 'top'], array_contains: [{ harnessStatus: query.recommendationTier }] } });
   }
   return clauses.length === 1 ? clauses[0] as QueryArgs : { AND: clauses };
 }
@@ -1023,15 +1041,36 @@ function dateRangeFilter(window: DateWindow): QueryArgs {
   return { gte: window.start, lt: window.end };
 }
 
-function buildOrderBy(tab: DashboardTab, sort: string, direction: DashboardDirection): Array<Record<string, Prisma.SortOrder>> {
+function buildOrderBy(tab: DashboardTab, sort: string, direction: DashboardDirection): Array<Record<string, unknown>> {
   const safeSort = isAllowedSort(tab, sort) ? sort : DEFAULT_SORT_BY[tab];
   const safeDirection: Prisma.SortOrder = direction === 'asc' ? Prisma.SortOrder.asc : Prisma.SortOrder.desc;
-  const candidate: Array<Record<string, Prisma.SortOrder>> = [{ [safeSort]: safeDirection }];
+  const sortValue = NULLABLE_SORT_FIELDS[tab]?.has(safeSort)
+    ? { sort: safeDirection, nulls: 'last' }
+    : safeDirection;
+  const candidate: Array<Record<string, unknown>> = [{ [safeSort]: sortValue }];
 
   if (safeSort !== 'id') {
     candidate.push({ id: safeDirection });
   }
   return candidate;
+}
+
+function assertValidOverviewUuidFilters(query: ReturnType<typeof parseOverviewQuery>): void {
+  for (const [name, value] of [
+    ['team', query.team],
+    ['competition', query.competition],
+  ] as const) {
+    if (value && !normalizeUuid(value)) {
+      throw new DashboardInputError(`${name} must be a valid UUID.`);
+    }
+  }
+  if (
+    query.targetId
+    && (query.validationTarget === 'prediction' || query.validationTarget === 'parlay')
+    && !normalizeUuid(query.targetId)
+  ) {
+    throw new DashboardInputError('targetId must be a valid UUID for prediction/parlay validation filters.');
+  }
 }
 
 function isAllowedSort(tab: DashboardTab, sort: string): sort is string {

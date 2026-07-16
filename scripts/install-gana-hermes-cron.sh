@@ -5,15 +5,30 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 HERMES_SCRIPTS_DIR="${HERMES_SCRIPTS_DIR:-$HOME/.hermes/scripts}"
 
-VALIDATION_JOB_NAME="${GANA_VALIDATION_CRON_NAME:-gana-v9-validate-yesterday-discord}"
-DAILY_JOB_NAME="${GANA_DAILY_CRON_NAME:-gana-v9-daily-e2e-discord}"
-DAILY_CATCHUP_JOB_NAME="${GANA_DAILY_CATCHUP_CRON_NAME:-gana-v9-daily-e2e-catchup-discord}"
-STRATEGY_REVIEW_JOB_NAME="${GANA_STRATEGY_REVIEW_CRON_NAME:-gana-v9-strategy-review}"
-VALIDATION_SCHEDULE="${GANA_VALIDATION_CRON_SCHEDULE:-0 7 * * *}"
-DAILY_SCHEDULE="${GANA_DAILY_CRON_SCHEDULE:-15 10 * * *}"
-DAILY_CATCHUP_SCHEDULE="${GANA_DAILY_CATCHUP_CRON_SCHEDULE:-*/30 10-22 * * *}"
-STRATEGY_REVIEW_SCHEDULE="${GANA_STRATEGY_REVIEW_CRON_SCHEDULE:-0 13 * * *}"
+JOB_NAME="gana-v9-daily-operations"
+SCHEDULE="15 7,10,13,18,22 * * *"
+LEGACY_JOB_NAMES=(
+  "gana-v9-raw-retention"
+  "gana-v9-validate-yesterday-discord"
+  "gana-v9-daily-e2e-discord"
+  "gana-v9-daily-e2e-catchup-discord"
+  "gana-v9-strategy-review"
+)
+LEGACY_WRAPPERS=(
+  "gana_v9_raw_retention_apply.sh"
+  "gana_v9_previous_day_validation_notify.sh"
+  "gana_v9_daily_e2e_notify.sh"
+  "gana_v9_strategy_review.sh"
+)
 HERMES_CRON_DELIVER="${GANA_HERMES_CRON_DELIVER:-${GANA_DISCORD_ALERTS_TARGET:-discord:1510041125614915756}}"
+UNINSTALL=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --uninstall) UNINSTALL=1 ;;
+    *) echo "Unknown argument: $arg" >&2; exit 64 ;;
+  esac
+done
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -24,7 +39,6 @@ require_command() {
 
 write_wrapper() {
   local name="$1"
-  local target="$2"
   local path="$HERMES_SCRIPTS_DIR/$name"
   cat > "$path" <<EOF
 #!/usr/bin/env bash
@@ -39,7 +53,7 @@ export GANA_DISCORD_STRATEGY_TARGET="\${GANA_DISCORD_STRATEGY_TARGET:-discord:15
 export GANA_DISCORD_ALERTS_TARGET="\${GANA_DISCORD_ALERTS_TARGET:-discord:1510041125614915756}"
 export GANA_CRON_DIRECT_TELEGRAM="\${GANA_CRON_DIRECT_TELEGRAM:-0}"
 export GANA_CRON_TELEGRAM_TARGET="\${GANA_CRON_TELEGRAM_TARGET:-discord:1510041125614915756}"
-exec "$target"
+exec node "$REPO_ROOT/scripts/gana-daily-ops-dispatch.mjs"
 EOF
   chmod +x "$path"
   echo "$name"
@@ -47,17 +61,26 @@ EOF
 
 job_id_by_name() {
   local name="$1"
-  hermes cron list 2>/dev/null | awk -v expected="$name" '
+  hermes cron list --all 2>/dev/null | awk -v expected="$name" '
     /^[[:space:]]+[[:xdigit:]]+[[:space:]]+\[/ { id = $1 }
     /^[[:space:]]+Name:[[:space:]]+/ {
       current = $0
       sub(/^[[:space:]]+Name:[[:space:]]+/, "", current)
       if (current == expected && id != "") {
         print id
-        exit
       }
     }
   '
+}
+
+remove_jobs_by_name() {
+  local name="$1"
+  local id
+  while IFS= read -r id; do
+    [[ -n "$id" ]] || continue
+    hermes cron remove "$id"
+    echo "Hermes cron job removed: $name ($id)"
+  done < <(job_id_by_name "$name")
 }
 
 upsert_job() {
@@ -65,8 +88,17 @@ upsert_job() {
   local schedule="$2"
   local wrapper="$3"
   local id
-  id="$(job_id_by_name "$name")"
-  if [[ -n "$id" ]]; then
+  local duplicate_id
+  local ids=()
+  while IFS= read -r id; do
+    [[ -n "$id" ]] && ids+=("$id")
+  done < <(job_id_by_name "$name")
+  if (( ${#ids[@]} > 0 )); then
+    id="${ids[0]}"
+    for duplicate_id in "${ids[@]:1}"; do
+      hermes cron remove "$duplicate_id"
+      echo "Duplicate Hermes cron job removed: $name ($duplicate_id)"
+    done
     hermes cron edit \
       --schedule "$schedule" \
       --name "$name" \
@@ -89,13 +121,21 @@ upsert_job() {
 require_command hermes
 mkdir -p "$HERMES_SCRIPTS_DIR"
 
-validation_wrapper="$(write_wrapper gana_v9_previous_day_validation_notify.sh "$REPO_ROOT/scripts/gana-previous-day-validation-notify.sh")"
-daily_wrapper="$(write_wrapper gana_v9_daily_e2e_notify.sh "$REPO_ROOT/scripts/gana-daily-e2e-notify.sh")"
-strategy_review_wrapper="$(write_wrapper gana_v9_strategy_review.sh "$REPO_ROOT/scripts/gana-strategy-review.sh")"
+for legacy_name in "${LEGACY_JOB_NAMES[@]}"; do
+  remove_jobs_by_name "$legacy_name"
+done
+for legacy_wrapper in "${LEGACY_WRAPPERS[@]}"; do
+  rm -f "$HERMES_SCRIPTS_DIR/$legacy_wrapper"
+done
 
-upsert_job "$VALIDATION_JOB_NAME" "$VALIDATION_SCHEDULE" "$validation_wrapper"
-upsert_job "$DAILY_JOB_NAME" "$DAILY_SCHEDULE" "$daily_wrapper"
-upsert_job "$DAILY_CATCHUP_JOB_NAME" "$DAILY_CATCHUP_SCHEDULE" "$daily_wrapper"
-upsert_job "$STRATEGY_REVIEW_JOB_NAME" "$STRATEGY_REVIEW_SCHEDULE" "$strategy_review_wrapper"
+if (( UNINSTALL == 1 )); then
+  remove_jobs_by_name "$JOB_NAME"
+  rm -f "$HERMES_SCRIPTS_DIR/gana_v9_daily_operations.sh"
+  echo "Hermes Gana cron jobs uninstalled."
+  exit 0
+fi
 
-hermes cron list | grep -A5 -E "Name:      ($VALIDATION_JOB_NAME|$DAILY_JOB_NAME|$DAILY_CATCHUP_JOB_NAME|$STRATEGY_REVIEW_JOB_NAME)" || true
+wrapper="$(write_wrapper gana_v9_daily_operations.sh)"
+upsert_job "$JOB_NAME" "$SCHEDULE" "$wrapper"
+
+hermes cron list --all | grep -A5 -F "Name:      $JOB_NAME" || true

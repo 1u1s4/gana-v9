@@ -778,6 +778,7 @@ export async function createApiFootballPersistence(
         const quoteRecordIds: Record<string, string> = {};
         const records = await repositories.oddsQuotes.listLatest({
           fixtureId: snapshot.fixtureId,
+          snapshotId: oddsSnapshot.id,
           take: Math.max(snapshot.quotes.length, 20),
         });
         for (const record of records) {

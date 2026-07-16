@@ -26,11 +26,12 @@ describe('storage redacted status', () => {
     assert.deepEqual(status.missing, ['connection']);
   });
 
-  it('rejects non-mysql urls for the active PR-03 override', async () => {
-    const status = await getDbStatus({ databaseUrl: 'postgresql://user:secret@example.com:5432/db' });
+  it('rejects non-postgresql urls for the Supabase runtime', async () => {
+    const status = await getDbStatus({ databaseUrl: 'mysql://user:secret@example.com:3306/db' });
 
     assert.equal(status.status, 'disconnected');
-    assert.equal(status.config.engine, 'postgresql');
+    assert.equal(status.config.engine, 'mysql');
+    assert.match(status.message, /PostgreSQL/);
     assert.doesNotMatch(JSON.stringify(status), /secret/);
   });
 });

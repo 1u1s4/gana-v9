@@ -13,7 +13,7 @@ The default agent backend is local Codex authentication through `codex exec`. Op
 - Runs a terminal UI for agent-assisted research and operations.
 - Discovers fixtures and odds through API-Football.
 - Scores predictions and builds analytical parlay candidates.
-- Persists operational data in MySQL through Prisma.
+- Persists operational data in PostgreSQL/Supabase through Prisma.
 - Exports artifacts, evidence packs, validation results, and daily metrics.
 - Serves a local read-only dashboard for persisted results.
 - Publishes daily Discord recommendation and validation summaries with native embeds.
@@ -38,11 +38,14 @@ The migrated public-picks funnel and P0 documentation live in versioned repo doc
 
 - Node.js with npm or pnpm.
 - Codex CLI login for the default provider, or OpenRouter credentials for the optional provider.
-- `DATABASE_URL` for persisted operations.
+- `DATABASE_URL` for the PostgreSQL/Supabase runtime, using the session pooler.
 - `API_FOOTBALL_KEY` for live football data.
 - Prisma migrations applied to the target database.
 
-The current production-candidate database target is DigitalOcean MySQL through Prisma. PostgreSQL is documented as a future migration path, not the current runtime requirement.
+The canonical database target is PostgreSQL on Supabase. `DATABASE_URL` uses the
+session pooler so the CLI, cron and Prisma can connect from IPv4-only hosts.
+`DIRECT_URL` uses the direct endpoint when it is reachable; otherwise it may use
+the same session pooler. Do not use the transaction pooler for this runtime.
 
 ## Quick Start
 
@@ -57,6 +60,10 @@ Create local configuration:
 ```bash
 cp .env.example .env
 ```
+
+Fill the PostgreSQL `DATABASE_URL` and `DIRECT_URL` placeholders locally. Keep
+credentials out of Git. `SOURCE_DATABASE_URL` and `TARGET_DATABASE_URL` are
+temporary migration inputs only; remove them after the MySQL cutover.
 
 For the default Codex backend, no API key is needed if you have already run `codex login`. If you use OpenRouter, set `AGENT_PROVIDER=openrouter` and provide `OPENROUTER_API_KEY`.
 
@@ -102,13 +109,21 @@ Daily operations use Guatemala time (`America/Guatemala`) and publish native Dis
 ```bash
 node scripts/gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD
 node scripts/gana-daily-e2e-and-notify.mjs --date YYYY-MM-DD
+node scripts/gana-daily-ops-dispatch.mjs --dry-run
 node scripts/install-gana-cron.mjs
 ```
 
-Operational cron schedule:
+The canonical authority is one Codex Scheduled task. It calls the deterministic
+dispatcher at five Guatemala checkpoints:
 
-- 07:00: validate the previous day, compute `daily-metrics`, and send stats.
-- 10:00: run the full daily E2E flow for the next day and send parlays/recommendations.
+- 07:15: retention plus previous-day validation/statistics.
+- 10:15: initial Daily E2E for the next day.
+- 13:15: missed Daily recovery or strategy review.
+- 18:15 and 22:15: due Daily retries only.
+
+Hermes, system cron, and launchd are mutually exclusive fallback authorities;
+their installers each create the same single dispatcher job and must remain
+disabled while Codex Scheduled is active.
 
 Optional per-flow Discord targets:
 
@@ -120,6 +135,24 @@ Optional per-flow Discord targets:
 Each target falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, and finally `discord:1510041125614915756` (`#gana-alertas`).
 
 See [Discord recommendation notifications](docs/discord-recommendation-notifications.md).
+
+## Database Capacity
+
+The live Supabase database is intentionally compact:
+
+- Keep raw/transient observations for 7 days, research/validation for 14 days,
+  and non-published operational analytics for 30 days.
+- Keep the durable Discord ledger and consolidated metrics for at most 60 days.
+- Preserve recommendations published within that window and every row needed by their lineage.
+- Keep a checksummed full MySQL backup outside the live database before compaction.
+- Run retention in dry-run mode first, apply only after review, and inspect database/table size monthly.
+
+```bash
+pnpm db:retention
+pnpm db:retention -- --apply
+```
+
+Migration and rollback gates are documented in [Supabase compact migration](docs/operations/supabase-compact-migration.md). Runtime deduplication and retention details are in [raw-data retention](docs/operations/raw-data-retention.md).
 
 ## Configuration
 
@@ -199,7 +232,7 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
   --max 3
 ```
 
-Previous-day validation/statistics and the Guatemala 07:00/10:00 cron jobs are documented in [docs/daily-operations-cron.md](docs/daily-operations-cron.md).
+The single-task Guatemala daily operations schedule is documented in [docs/daily-operations-cron.md](docs/daily-operations-cron.md).
 
 ```bash
 scripts/install-gana-hermes-cron.sh

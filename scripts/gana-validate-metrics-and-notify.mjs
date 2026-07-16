@@ -8,7 +8,12 @@ import { compactPath, emitCronRichSummary, parseJsonObject } from './gana-telegr
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
-const ARTIFACT_ROOT = '.artifacts/gana-v9';
+const ARTIFACT_ROOT = process.env.GANA_ARTIFACT_ROOT?.trim() || '.artifacts/gana-v9';
+
+if (process.env.GANA_MAINTENANCE_PAUSED === 'true') {
+  console.log('Gana daily operations are paused for database maintenance.');
+  process.exit(0);
+}
 
 const args = parseArgs(process.argv.slice(2));
 const date = args.date ?? guatemalaDate(-1);

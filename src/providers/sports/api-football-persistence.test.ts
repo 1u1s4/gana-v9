@@ -16,7 +16,7 @@ afterEach(async () => {
 
 describe('api-football persistence', () => {
   it('throws an explicit initialization error when DATABASE_URL is configured but storage is unavailable', async () => {
-    process.env.DATABASE_URL = 'mysql://user:pass@127.0.0.1:1/gana';
+    process.env.DATABASE_URL = 'postgresql://user:pass@127.0.0.1:1/gana?schema=gana_ops';
 
     await assert.rejects(
       createApiFootballPersistence({

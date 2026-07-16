@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { normalizeUuid, uniqueUuids } from '../domain/ids.js';
 import { readRecommendationArtifactTargets } from '../recommendations/artifact.js';
 import type { StoragePrismaClient } from '../storage/types.js';
 import {
@@ -33,7 +34,7 @@ const REQUIRED_LEAGUE_ARTIFACT = 'daily-required-league-recommendations.json';
 const DAILY_BATCH_WHERE = {
   OR: [
     { id: { startsWith: 'daily-' } },
-    { metadata: { path: '$.dailyRole', equals: 'batch' } },
+    { metadata: { path: ['dailyRole'], equals: 'batch' } },
   ],
 };
 
@@ -128,23 +129,23 @@ function findDailyRunForDate(db: PublicRecommendationsDb, date: string): Promise
     where: {
       AND: [
         DAILY_BATCH_WHERE,
-        { metadata: { path: '$.date', equals: date } },
+        { metadata: { path: ['date'], equals: date } },
       ],
     },
-    orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+    orderBy: [{ completedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
   });
 }
 
 function findLatestDailyRun(db: PublicRecommendationsDb): Promise<unknown | null> {
   return db.harnessRun.findFirst({
     where: DAILY_BATCH_WHERE,
-    orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+    orderBy: [{ completedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
   });
 }
 
 function predictionsQuery(ids: string[]) {
   return {
-    where: { id: { in: ids } },
+    where: { id: { in: uniqueUuids(ids) } },
     include: {
       fixture: {
         include: {
@@ -159,7 +160,7 @@ function predictionsQuery(ids: string[]) {
 
 function parlaysQuery(ids: string[]) {
   return {
-    where: { id: { in: ids } },
+    where: { id: { in: uniqueUuids(ids) } },
     include: {
       legs: {
         orderBy: { legIndex: 'asc' },
@@ -209,14 +210,17 @@ function collectRecommendationIds(recommendations: unknown[]): { predictionIds: 
   for (const value of recommendations) {
     const recommendation = toRecord(value);
     const kind = stringValue(recommendation.kind);
-    const parlayId = stringValue(recommendation.parlayId);
-    if (kind === 'parlay' && parlayId && !isSyntheticRecommendationId(parlayId)) parlayIds.add(parlayId);
-    for (const id of stringArray(recommendation.predictionIds)) predictionIds.add(id);
-    const predictionId = stringValue(recommendation.predictionId);
-    if (predictionId && !isSyntheticRecommendationId(predictionId)) predictionIds.add(predictionId);
+    const parlayId = normalizeUuid(recommendation.parlayId);
+    if (kind === 'parlay' && parlayId) parlayIds.add(parlayId);
+    for (const id of stringArray(recommendation.predictionIds)) {
+      const predictionId = normalizeUuid(id);
+      if (predictionId) predictionIds.add(predictionId);
+    }
+    const predictionId = normalizeUuid(recommendation.predictionId);
+    if (predictionId) predictionIds.add(predictionId);
     for (const leg of toArray(recommendation.legs)) {
-      const legPredictionId = stringValue(toRecord(leg).predictionId);
-      if (legPredictionId && !isSyntheticRecommendationId(legPredictionId)) predictionIds.add(legPredictionId);
+      const legPredictionId = normalizeUuid(toRecord(leg).predictionId);
+      if (legPredictionId) predictionIds.add(legPredictionId);
     }
   }
 
@@ -753,10 +757,6 @@ function dateInTimezone(date: Date, timezone: string): string {
   }).formatToParts(date);
   const byType = new Map(parts.map((part) => [part.type, part.value]));
   return `${byType.get('year')}-${byType.get('month')}-${byType.get('day')}`;
-}
-
-function isSyntheticRecommendationId(value: string): boolean {
-  return value.startsWith('atomic-') || value.startsWith('analytical-fallback-') || value.startsWith('council-composed-');
 }
 
 function toRecord(value: unknown): JsonRecord {

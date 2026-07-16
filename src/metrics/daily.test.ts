@@ -6,6 +6,13 @@ import { join } from 'node:path';
 import { loadConfig } from '../config.js';
 import { runDailyMetrics } from './daily.js';
 
+const PREDICTION_1_ID = '11111111-1111-4111-8111-111111111111';
+const PREDICTION_2_ID = '22222222-2222-4222-8222-222222222222';
+const PREDICTION_3_ID = '33333333-3333-4333-8333-333333333333';
+const PREDICTION_REQUIRED_1_ID = '44444444-4444-4444-8444-444444444444';
+const PREDICTION_REQUIRED_2_ID = '55555555-5555-4555-8555-555555555555';
+const PARLAY_1_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
 const config = loadConfig({
   databaseUrl: '',
   apiFootball: {
@@ -152,21 +159,22 @@ describe('daily metrics service', () => {
       recommendations: [
         {
           kind: 'parlay',
-          parlayId: 'parlay-1',
-          legs: [{ predictionId: 'prediction-1' }, { predictionId: 'prediction-2' }],
+          parlayId: PARLAY_1_ID,
+          predictionIds: [PREDICTION_1_ID, 'daily-focus-prediction-list'],
+          legs: [{ predictionId: PREDICTION_1_ID }, { predictionId: PREDICTION_2_ID }],
         },
         {
           kind: 'atomic-prediction',
-          predictionId: 'prediction-3',
-          parlayId: 'atomic-prediction-3',
-          legs: [{ predictionId: 'prediction-3' }],
+          predictionId: PREDICTION_3_ID,
+          parlayId: 'daily-focus-atomic-prediction-3',
+          legs: [{ predictionId: PREDICTION_3_ID }, { predictionId: 'not-a-uuid' }],
         },
       ],
       requiredLeagueRecommendations: {
-        atomicProjections: [{ predictionId: 'prediction-required-1' }],
+        atomicProjections: [{ predictionId: PREDICTION_REQUIRED_1_ID }, { predictionId: 'daily-focus-required-atomic' }],
         parlayProjections: [{
           profile: 'principal',
-          legs: [{ predictionId: 'prediction-required-2' }],
+          legs: [{ predictionId: PREDICTION_REQUIRED_2_ID }],
         }],
         generalPredictions: [{
           fixtureId: 'fixture-required-1',
@@ -213,13 +221,13 @@ describe('daily metrics service', () => {
 
     assert.equal(result.ok, true);
     assert.deepEqual(predictionQueries[0].where.id.in, [
-      'prediction-1',
-      'prediction-2',
-      'prediction-3',
-      'prediction-required-1',
-      'prediction-required-2',
+      PREDICTION_1_ID,
+      PREDICTION_2_ID,
+      PREDICTION_3_ID,
+      PREDICTION_REQUIRED_1_ID,
+      PREDICTION_REQUIRED_2_ID,
     ]);
-    assert.deepEqual(parlayQueries[0].where.id.in, ['parlay-1']);
+    assert.deepEqual(parlayQueries[0].where.id.in, [PARLAY_1_ID]);
     assert.equal(artifactPayload.recommendationTargets.artifactSelections.length, 1);
   });
 

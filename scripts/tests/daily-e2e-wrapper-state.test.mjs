@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   buildDbPublicationLedgerPlan,
   countPublishableSelections,
+  readExistingRecommendationArtifact,
   readCurrentRecommendationArtifact,
+  validatePublicationTargetIds,
+  validateRetryablePublishLock,
   validatePublicationLedgerAlignment,
 } from '../lib/daily-e2e-wrapper-state.mjs';
 
@@ -69,6 +72,109 @@ describe('daily E2E wrapper state helpers', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('accepts a fresh completed artifact only when its summary matches the slate and batch', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-daily-e2e-state-'));
+    try {
+      const artifactPath = join(dir, 'daily-parlay-recommendations.json');
+      const summaryPath = join(dir, 'daily-e2e-summary.json');
+      const completedAt = new Date('2026-07-14T16:36:20.000Z');
+      writeFileSync(artifactPath, JSON.stringify({
+        date: '2026-07-15',
+        dailyBatchId: 'daily-2026-07-15-full',
+        recommendations: [{ kind: 'atomic-prediction' }],
+      }));
+      utimesSync(artifactPath, completedAt, completedAt);
+      writeFileSync(summaryPath, JSON.stringify({
+        date: '2026-07-15',
+        dailyBatchId: 'daily-2026-07-15-full',
+        status: 'succeeded',
+        startedAt: '2026-07-14T16:15:00.000Z',
+        completedAt: completedAt.toISOString(),
+        counts: { recommendations: 1 },
+      }));
+
+      const result = readExistingRecommendationArtifact(artifactPath, {
+        date: '2026-07-15',
+        dailyBatchId: 'daily-2026-07-15-full',
+        now: new Date('2026-07-14T19:00:00.000Z'),
+      });
+
+      assert.equal(result.ok, true);
+      assert.equal(result.reason, 'existing-artifact-verified');
+      assert.equal(result.summary.status, 'succeeded');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects missing, stale, future, and summary-mismatched existing artifacts', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-daily-e2e-state-'));
+    try {
+      const artifactPath = join(dir, 'daily-parlay-recommendations.json');
+      const summaryPath = join(dir, 'daily-e2e-summary.json');
+      writeFileSync(artifactPath, JSON.stringify({
+        date: '2026-07-15',
+        dailyBatchId: 'daily-2026-07-15-full',
+        recommendations: [],
+      }));
+      writeFileSync(summaryPath, JSON.stringify({
+        date: '2026-07-15',
+        dailyBatchId: 'daily-wrong',
+        status: 'succeeded',
+        startedAt: '2026-07-14T16:00:00.000Z',
+        completedAt: '2026-07-14T16:10:00.000Z',
+        counts: { recommendations: 0 },
+      }));
+      utimesSync(artifactPath, new Date('2026-07-14T16:10:00.000Z'), new Date('2026-07-14T16:10:00.000Z'));
+
+      assert.equal(readExistingRecommendationArtifact(join(dir, 'missing.json'), {
+        date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T17:00:00.000Z'),
+      }).reason, 'missing-artifact');
+      assert.equal(readExistingRecommendationArtifact(artifactPath, {
+        date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T17:00:00.000Z'),
+      }).reason, 'summary-batch-mismatch');
+
+      const matchingSummary = {
+        date: '2026-07-15',
+        dailyBatchId: 'daily-2026-07-15-full',
+        status: 'succeeded',
+        startedAt: '2026-07-14T16:00:00.000Z',
+        completedAt: '2026-07-14T16:10:00.000Z',
+        counts: { recommendations: 0 },
+      };
+      writeFileSync(summaryPath, JSON.stringify(matchingSummary));
+      assert.equal(readExistingRecommendationArtifact(artifactPath, {
+        date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-16T12:00:00.000Z'), maxAgeMs: 60_000,
+      }).reason, 'stale-artifact');
+      assert.equal(readExistingRecommendationArtifact(artifactPath, {
+        date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T15:00:00.000Z'),
+      }).reason, 'future-artifact');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('only accepts an expired retryable lock for the exact slate and batch', () => {
+    const lock = {
+      status: 'retryable',
+      date: '2026-07-15',
+      dailyBatchId: 'daily-2026-07-15-full',
+      retryAfter: '2026-07-14T18:00:00.000Z',
+    };
+    assert.equal(validateRetryablePublishLock(lock, {
+      date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T19:00:00.000Z'),
+    }).ok, true);
+    assert.equal(validateRetryablePublishLock({ ...lock, status: 'published' }, {
+      date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T19:00:00.000Z'),
+    }).reason, 'incompatible-lock-status:published');
+    assert.equal(validateRetryablePublishLock({ ...lock, dailyBatchId: 'daily-other' }, {
+      date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T19:00:00.000Z'),
+    }).reason, 'lock-batch-mismatch');
+    assert.equal(validateRetryablePublishLock(lock, {
+      date: '2026-07-15', dailyBatchId: 'daily-2026-07-15-full', now: new Date('2026-07-14T17:00:00.000Z'),
+    }).reason, 'retry-pending');
   });
 
   it('accepts render selections that are present in the DB publication ledger targets', () => {
@@ -169,5 +275,15 @@ describe('daily E2E wrapper state helpers', () => {
 
     assert.deepEqual(plan.artifactOnlyParlayIds, []);
     assert.deepEqual(plan.invalidParlayIds, [parlayId, unknownId]);
+  });
+
+  it('rejects non-UUID prediction publication targets before touching Prisma', () => {
+    const result = validatePublicationTargetIds({
+      publishedTargets: { parlayIds: [], predictionIds: ['not-a-uuid'] },
+      recommendations: [{ kind: 'atomic-prediction', predictionId: 'not-a-uuid' }],
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'invalid-publication-target-ids:p=0,pred=1');
   });
 });

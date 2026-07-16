@@ -41,6 +41,17 @@ describe('native provider args', () => {
     }
   });
 
+  it('allows an empty AGENT_CODEX_FALLBACK_MODELS to disable model fallback', () => {
+    const original = process.env.AGENT_CODEX_FALLBACK_MODELS;
+    process.env.AGENT_CODEX_FALLBACK_MODELS = '';
+    try {
+      assert.deepEqual(loadConfig({}, { skipApiKey: true }).codexFallbackModels, []);
+    } finally {
+      if (original === undefined) delete process.env.AGENT_CODEX_FALLBACK_MODELS;
+      else process.env.AGENT_CODEX_FALLBACK_MODELS = original;
+    }
+  });
+
   it('does not elevate Codex sandbox from full-permissions profile alone', () => {
     const cfg = config({
       provider: 'codex',
@@ -127,6 +138,18 @@ console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, o
 
       assert.equal(argValue(args, '-c'), `model_reasoning_effort="${reasoningEffort}"`);
     }
+  });
+
+  it('passes high reasoning without enabling the fast service tier', () => {
+    const cfg = config({
+      model: 'gpt-5.6-terra',
+      reasoningEffort: 'high',
+      fastMode: false,
+    });
+    const args = codexArgs(cfg, 'prompt', requirement(cfg));
+
+    assert.equal(args.includes('model_reasoning_effort="high"'), true);
+    assert.equal(args.includes('service_tier="fast"'), false);
   });
 
   it('falls back to gpt-5.6-luna when Codex reports a quota limit for the primary model', async () => {

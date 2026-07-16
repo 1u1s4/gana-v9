@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
@@ -22,78 +22,66 @@ const baseEnvironment = {
   GANA_DISCORD_ALERTS_TARGET: discordTargets.alerts,
 };
 
-const jobs = [
-  {
-    label: 'com.gana-v9.validate-yesterday',
-    script: 'scripts/gana-previous-day-validation-notify.sh',
-    calendar: { Hour: 7, Minute: 0 },
-    stdout: '.artifacts/gana-v9/cron/launchd-validation.log',
-    stderr: '.artifacts/gana-v9/cron/launchd-validation.err.log',
-  },
-  {
-    label: 'com.gana-v9.daily-e2e',
-    script: 'scripts/gana-daily-e2e-notify.sh',
-    calendar: { Hour: 10, Minute: 15 },
-    stdout: '.artifacts/gana-v9/cron/launchd-daily-e2e.log',
-    stderr: '.artifacts/gana-v9/cron/launchd-daily-e2e.err.log',
-  },
-  {
-    label: 'com.gana-v9.daily-e2e-catchup',
-    script: 'scripts/gana-daily-e2e-notify.sh',
-    calendar: halfHourCalendar(10, 22),
-    stdout: '.artifacts/gana-v9/cron/launchd-daily-e2e-catchup.log',
-    stderr: '.artifacts/gana-v9/cron/launchd-daily-e2e-catchup.err.log',
-  },
-  {
-    label: 'com.gana-v9.strategy-review',
-    script: 'scripts/gana-strategy-review.sh',
-    calendar: { Hour: 13, Minute: 0 },
-    stdout: '.artifacts/gana-v9/cron/launchd-strategy-review.log',
-    stderr: '.artifacts/gana-v9/cron/launchd-strategy-review.err.log',
-  },
+const legacyLabels = [
+  'com.gana-v9.raw-retention',
+  'com.gana-v9.validate-yesterday',
+  'com.gana-v9.daily-e2e',
+  'com.gana-v9.daily-e2e-catchup',
+  'com.gana-v9.strategy-review',
 ];
+const job = {
+  label: 'com.gana-v9.daily-operations',
+  script: 'scripts/gana-daily-ops-dispatch.mjs',
+  calendar: [7, 10, 13, 18, 22].map((Hour) => ({ Hour, Minute: 15 })),
+  stdout: '.artifacts/gana-v9/cron/launchd-daily-operations.log',
+  stderr: '.artifacts/gana-v9/cron/launchd-daily-operations.err.log',
+};
+
+const plistPath = join(launchAgentsDir, `${job.label}.plist`);
+const plist = buildPlist(job);
+
+if (args.print) {
+  console.log(`### ${plistPath}`);
+  console.log(plist);
+  process.exit(0);
+}
 
 mkdirSync(launchAgentsDir, { recursive: true });
 
-const results = [];
-for (const job of jobs) {
-  const plistPath = join(launchAgentsDir, `${job.label}.plist`);
-  const plist = buildPlist(job);
-  if (args.print) {
-    console.log(`### ${plistPath}`);
-    console.log(plist);
-    continue;
-  }
-  writeFileSync(plistPath, plist);
-  unload(job.label, plistPath);
-  const bootstrap = run('launchctl', ['bootstrap', userDomain, plistPath], { allowFailure: true });
-  if (bootstrap.status !== 0 && !alreadyBootstrapped(bootstrap.stderr)) {
-    throw new Error(`launchctl bootstrap failed for ${job.label}: ${(bootstrap.stderr || bootstrap.stdout).trim()}`);
-  }
-  run('launchctl', ['enable', `${userDomain}/${job.label}`]);
-  const print = run('launchctl', ['print', `${userDomain}/${job.label}`], { allowFailure: true });
-  results.push({
+if (args.uninstall) {
+  const removed = removeJobs([job.label, ...legacyLabels]);
+  console.log(JSON.stringify({ ok: true, uninstalled: true, userDomain, jobs: removed }, null, 2));
+  process.exit(0);
+}
+
+const removedLegacyJobs = removeJobs(legacyLabels);
+mkdirSync(dirname(resolve(REPO_ROOT, job.stdout)), { recursive: true });
+mkdirSync(dirname(resolve(REPO_ROOT, job.stderr)), { recursive: true });
+writeFileSync(plistPath, plist);
+unload(job.label, plistPath);
+const bootstrap = run('launchctl', ['bootstrap', userDomain, plistPath], { allowFailure: true });
+if (bootstrap.status !== 0 && !alreadyBootstrapped(bootstrap.stderr)) {
+  throw new Error(`launchctl bootstrap failed for ${job.label}: ${(bootstrap.stderr || bootstrap.stdout).trim()}`);
+}
+run('launchctl', ['enable', `${userDomain}/${job.label}`]);
+const print = run('launchctl', ['print', `${userDomain}/${job.label}`], { allowFailure: true });
+
+console.log(JSON.stringify({
+  ok: true,
+  userDomain,
+  discordTargets,
+  removedLegacyJobs,
+  jobs: [{
     label: job.label,
     plistPath,
     bootstrapStatus: bootstrap.status,
     loaded: print.status === 0,
-  });
-}
-
-if (!args.print) {
-  console.log(JSON.stringify({
-    ok: true,
-    userDomain,
-    discordTargets,
-    jobs: results,
-  }, null, 2));
-}
+  }],
+}, null, 2));
 
 function buildPlist(job) {
   const stdout = resolve(REPO_ROOT, job.stdout);
   const stderr = resolve(REPO_ROOT, job.stderr);
-  mkdirSync(dirname(stdout), { recursive: true });
-  mkdirSync(dirname(stderr), { recursive: true });
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -102,7 +90,8 @@ function buildPlist(job) {
   <string>${escapeXml(job.label)}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
+    <string>/usr/bin/env</string>
+    <string>node</string>
     <string>${escapeXml(resolve(REPO_ROOT, job.script))}</string>
   </array>
   <key>WorkingDirectory</key>
@@ -139,13 +128,22 @@ ${spaces}  <integer>${item.Minute}</integer>
 ${spaces}</dict>`;
 }
 
-function halfHourCalendar(startHour, endHour) {
-  const entries = [];
-  for (let hour = startHour; hour <= endHour; hour += 1) {
-    entries.push({ Hour: hour, Minute: 0 });
-    entries.push({ Hour: hour, Minute: 30 });
-  }
-  return entries;
+function removeJobs(labels) {
+  return labels.map((label) => {
+    const managedPlistPath = join(launchAgentsDir, `${label}.plist`);
+    unload(label, managedPlistPath);
+    rmSync(managedPlistPath, { force: true });
+    const print = run('launchctl', ['print', `${userDomain}/${label}`], { allowFailure: true });
+    if (print.status === 0) {
+      throw new Error(`launchd job remained loaded after removal: ${label}`);
+    }
+    return {
+      label,
+      plistPath: managedPlistPath,
+      loaded: false,
+      plistPresent: existsSync(managedPlistPath),
+    };
+  });
 }
 
 function unload(label, plistPath) {
@@ -172,6 +170,7 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--print') parsed.print = true;
+    else if (arg === '--uninstall') parsed.uninstall = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return parsed;

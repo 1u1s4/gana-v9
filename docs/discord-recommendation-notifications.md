@@ -165,28 +165,29 @@ Wrappers versionados:
 
 - `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, localiza el artifact publicado para esa fecha, corre `pnpm gana validate --date DATE --recommendation-artifact PATH`, corre `pnpm gana metrics daily --date DATE --scope daily-DATE --recommendation-artifact PATH` y notifica las estadisticas a Discord.
 - `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de manana en `America/Guatemala`, corre E2E completo Codex con low-odds threshold `1.20`, pasa recomendaciones por council gate y notifica recomendaciones con resumen council integrado.
+- `scripts/gana-daily-ops-dispatch.mjs`: decide deterministicamente retencion, validacion, Daily inicial, strategy review y retries Daily vencidos en los cinco checkpoints diarios.
 - `scripts/gana-previous-day-validation-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
 - `scripts/gana-daily-e2e-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
-- `scripts/install-gana-hermes-cron.sh`: instala los jobs en Hermes cron.
-- `scripts/install-gana-cron.mjs`: instala un bloque de crontab del sistema como fallback.
-- `scripts/install-gana-launchd.mjs`: instala LaunchAgents de usuario como fallback macOS cuando `crontab` del sistema no esta disponible o no responde.
+- `scripts/install-gana-hermes-cron.sh`: instala un solo job dispatcher en Hermes cron.
+- `scripts/install-gana-cron.mjs`: instala un solo job dispatcher en crontab como fallback.
+- `scripts/install-gana-launchd.mjs`: instala un solo LaunchAgent dispatcher como fallback macOS cuando `crontab` no esta disponible.
 
-Hermes cron recomendado:
+Hermes cron es un fallback y no debe habilitarse junto con Codex Scheduled:
 
 ```bash
 scripts/install-gana-hermes-cron.sh
 ```
 
-Jobs esperados:
+Job esperado:
 
 ```text
-gana-v9-validate-yesterday-discord  0 7 * * *
-gana-v9-daily-e2e-discord           15 10 * * *
-gana-v9-daily-e2e-catchup-discord   */30 10-22 * * *
-gana-v9-strategy-review             0 13 * * *
+gana-v9-daily-operations  15 7,10,13,18,22 * * *
 ```
 
-Los wrappers tienen locks por fecha bajo `.artifacts/gana-v9/cron/locks/` para evitar doble envio si Hermes cron, crontab y LaunchAgents quedan activos al mismo tiempo. Usar `--force` solo para reprocesos manuales deliberados.
+El dispatcher y los wrappers tienen locks por fecha bajo
+`.artifacts/gana-v9/cron/locks/`. Esos locks son defensa en profundidad, no una
+autorizacion para mantener varias autoridades activas. El dispatcher nunca usa
+`--force`; reservarlo para reprocesos manuales deliberados.
 
 Detalles adicionales: `docs/daily-operations-cron.md`.
 

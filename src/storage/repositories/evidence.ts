@@ -170,6 +170,7 @@ export function createResearchBundleRepository(
               bundleId: bundle.id,
               runId: input.bundle.runId,
               fixtureId: input.bundle.fixtureId,
+              providerSnapshotId: providerSnapshotId(source.snapshotId, source.sourceType ?? source.type),
               sourceType: source.sourceType ?? source.type,
               url: redactText(source.url),
               title: redactText(source.title),
@@ -406,4 +407,12 @@ function scopedResearchId(bundleId: string, localId: string): string {
 function normalizeSourceHash(value: unknown): string | undefined {
   if (typeof value !== 'string' || !value) return undefined;
   return value.length <= 64 ? value : value.slice(0, 64);
+}
+
+function providerSnapshotId(value: unknown, sourceType: unknown): string | undefined {
+  if (sourceType !== 'provider-snapshot' && sourceType !== 'api-football') return undefined;
+  if (typeof value !== 'string') return undefined;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : undefined;
 }

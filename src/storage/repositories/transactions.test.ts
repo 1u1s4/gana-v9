@@ -91,6 +91,42 @@ describe('compound storage writes', () => {
     assert.equal(transactions, 1);
   });
 
+  it('promotes valid provider snapshot source IDs to the relational FK', async () => {
+    const sources: any[] = [];
+    const db: any = {
+      researchBundle: delegate({ id: 'research-bundle-1' }),
+      sourceRecord: {
+        ...delegate(),
+        create: async (args: any) => {
+          sources.push(args.data);
+          return { id: args.data.id, ...args.data, createdAt: now };
+        },
+      },
+      evidenceItem: delegate(),
+      claim: delegate(),
+      artifact: delegate(),
+      $transaction: async (fn: (tx: any) => Promise<unknown>) => fn(db),
+    };
+
+    await createResearchBundleRepository(db).createWithItems({
+      bundle: {
+        id: 'research-bundle-1',
+        runId: 'run-1',
+        fixtureId: 'fixture-1',
+        sources: [
+          { id: 'provider', sourceType: 'provider-snapshot', snapshotId: '02e6633e-7164-46f7-b81a-c779a8dbff70' },
+          { id: 'synthetic', sourceType: 'provider-snapshot', snapshotId: 'provider-snapshot:hash' },
+          { id: 'web', sourceType: 'web-search', snapshotId: 'ce1a030e-a669-4ebb-98ec-98c7f94529df' },
+        ],
+      },
+    });
+
+    assert.equal(sources[0].providerSnapshotId, '02e6633e-7164-46f7-b81a-c779a8dbff70');
+    assert.equal('providerSnapshotId' in sources[1], false);
+    assert.equal(sources[1].metadata.snapshotId, 'provider-snapshot:hash');
+    assert.equal('providerSnapshotId' in sources[2], false);
+  });
+
   it('creates parlays and legs inside a transaction', async () => {
     let transactions = 0;
     const db: any = {

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { AgentConfig } from '../config.js';
 import { runAgentWithRetry } from '../agent.js';
+import { normalizeUuid } from '../domain/ids.js';
 import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import { runFixtureResearch } from '../evidence/research.js';
 import { createApiFootballPersistence, createApiFootballProvider } from '../providers/sports/api-football.js';
@@ -604,8 +605,11 @@ function defaultRepositories(): PredictionServiceRepositories {
 }
 
 async function resolveFixture(repositories: PredictionServiceRepositories, fixtureId: string): Promise<FixtureRecord | null> {
-  const byId = await repositories.fixtures.findById(fixtureId);
-  if (byId) return byId;
+  const persistedFixtureId = normalizeUuid(fixtureId);
+  if (persistedFixtureId) {
+    const byId = await repositories.fixtures.findById(persistedFixtureId);
+    if (byId) return byId;
+  }
   const provider = await repositories.sportsProviders.findByCode(API_FOOTBALL_PROVIDER);
   if (!provider) return null;
   return repositories.fixtures.findByProviderKey(provider.id, fixtureId);

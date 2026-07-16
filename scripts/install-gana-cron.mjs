@@ -20,19 +20,35 @@ const cronEnvPrefix = cronEnvAssignmentPrefix({
 });
 const begin = '# BEGIN gana-v9 daily operations';
 const end = '# END gana-v9 daily operations';
+const jobName = 'gana-v9-daily-operations';
+const dispatcher = 'scripts/gana-daily-ops-dispatch.mjs';
+const managedJobNames = [
+  jobName,
+  'gana-v9-raw-retention',
+  'gana-v9-validate-yesterday-discord',
+  'gana-v9-daily-e2e-discord',
+  'gana-v9-daily-e2e-catchup-discord',
+  'gana-v9-strategy-review',
+];
+const managedScripts = [
+  dispatcher,
+  'scripts/gana-raw-retention-apply.sh',
+  'scripts/gana-previous-day-validation-notify.sh',
+  'scripts/gana-daily-e2e-notify.sh',
+  'scripts/gana-strategy-review.sh',
+];
 const block = [
   begin,
+  `# ${jobName}`,
   'MAILTO=""',
   'TZ=America/Guatemala',
-  `0 7 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-previous-day-validation-notify.sh')} >> .artifacts/gana-v9/cron/cron-validation.log 2>&1`,
-  `15 10 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-daily-e2e-notify.sh')} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`,
-  `*/30 10-22 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-daily-e2e-notify.sh')} >> .artifacts/gana-v9/cron/cron-daily-e2e.log 2>&1`,
-  `0 13 * * * cd ${shellQuote(REPO_ROOT)} && /usr/bin/env ${cronEnvPrefix}${shellQuote('scripts/gana-strategy-review.sh')} >> .artifacts/gana-v9/cron/cron-strategy-review.log 2>&1`,
+  cronLine('15 7,10,13,18,22 * * *'),
   end,
 ].join('\n');
 
 const current = readCrontab();
-const next = replaceBlock(current, block);
+const cleaned = removeManagedEntries(current);
+const next = args.uninstall ? withTrailingNewline(cleaned) : appendBlock(cleaned, block);
 
 if (args.print) {
   console.log(next);
@@ -51,7 +67,14 @@ if (args.print) {
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
-  console.log(JSON.stringify({ ok: true, gatewayTarget: gatewayTarget ?? null, discordTargets, timezone: 'America/Guatemala' }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    uninstalled: Boolean(args.uninstall),
+    jobName,
+    gatewayTarget: gatewayTarget ?? null,
+    discordTargets,
+    timezone: 'America/Guatemala',
+  }, null, 2));
 }
 
 function parseArgs(argv) {
@@ -60,6 +83,7 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--print') parsed.print = true;
+    else if (arg === '--uninstall') parsed.uninstall = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return parsed;
@@ -72,15 +96,32 @@ function readCrontab() {
   throw new Error(`crontab -l failed with exit ${child.status}: ${(child.stderr || child.stdout || '').trim()}`);
 }
 
-function replaceBlock(current, block) {
-  const pattern = new RegExp(`${escapeRegex(begin)}[\\s\\S]*?${escapeRegex(end)}`, 'm');
-  const trimmed = current.trimEnd();
-  if (pattern.test(trimmed)) return `${trimmed.replace(pattern, block)}\n`;
-  return `${trimmed ? `${trimmed}\n\n` : ''}${block}\n`;
+function removeManagedEntries(current) {
+  const blockPattern = new RegExp(`${escapeRegex(begin)}[\\s\\S]*?${escapeRegex(end)}(?:\\r?\\n)?`, 'gm');
+  const withoutBlocks = current.replace(blockPattern, '');
+  const retainedLines = withoutBlocks.split(/\r?\n/).filter((line) => {
+    return !managedJobNames.some((name) => line.includes(name))
+      && !managedScripts.some((script) => line.includes(script));
+  });
+  return retainedLines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
+function appendBlock(current, managedBlock) {
+  return `${current ? `${current}\n\n` : ''}${managedBlock}\n`;
+}
+
+function withTrailingNewline(value) {
+  return value ? `${value}\n` : '';
 }
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function cronLine(schedule) {
+  const logDir = join(REPO_ROOT, '.artifacts/gana-v9/cron');
+  const logPath = join(logDir, 'cron-daily-operations.log');
+  return `${schedule} cd ${shellQuote(REPO_ROOT)} && mkdir -p ${shellQuote(logDir)} && /usr/bin/env ${cronEnvPrefix}node ${shellQuote(dispatcher)} >> ${shellQuote(logPath)} 2>&1`;
 }
 
 function cronEnvAssignmentPrefix(assignments) {

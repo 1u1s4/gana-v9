@@ -4,6 +4,7 @@ import type { AgentConfig } from '../config.js';
 import { calibrationPlot, type CalibrationBin } from '../analytics/calibration-plot.js';
 import { buildLeaderboard, type LeaderboardEntry } from '../analytics/leaderboard.js';
 import type { Fixture } from '../domain/fixtures.js';
+import { normalizeUuid, uniqueUuids } from '../domain/ids.js';
 import type { MarketKey, MarketSelection } from '../domain/markets.js';
 import { API_FOOTBALL_PROVIDER } from '../providers/sports/types.js';
 import { hashPayload, writeArtifact } from '../runtime/artifacts.js';
@@ -201,10 +202,12 @@ export async function runValidation(
   const validationContext = createValidationExecutionContext(repositories, fetcher);
 
   try {
-    const pending = input.predictionId
-      ? [await validatePredictionTarget(validationContext, input.predictionId, evaluatedAt, runId)]
-      : input.parlayId
-        ? [await validateParlayTarget(validationContext, input.parlayId, evaluatedAt, runId)]
+    const predictionId = normalizeUuid(input.predictionId);
+    const parlayId = normalizeUuid(input.parlayId);
+    const pending = predictionId
+      ? [await validatePredictionTarget(validationContext, predictionId, evaluatedAt, runId)]
+      : parlayId
+        ? [await validateParlayTarget(validationContext, parlayId, evaluatedAt, runId)]
         : await validateDateTarget(validationContext, input, evaluatedAt, runId, config.apiFootball.timezone);
 
     const analytics = buildValidationAnalytics(pending);
@@ -260,8 +263,14 @@ async function validateDateTarget(
   const date = input.date as string;
   if (input.recommendationArtifact) {
     const targets = readRecommendationArtifactTargets(input.recommendationArtifact);
-    const predictions = await Promise.all(targets.predictionIds.map((predictionId) => context.repositories.predictions.findById(predictionId)));
-    const parlays = await Promise.all(targets.parlayIds.map((parlayId) => context.repositories.parlays.findById(parlayId)));
+    const predictionIds = uniqueUuids(targets.predictionIds);
+    const parlayIds = uniqueUuids(targets.parlayIds);
+    const artifactSelections = targets.artifactSelections.flatMap((selection) => {
+      const fixtureId = normalizeUuid(selection.fixtureId);
+      return fixtureId ? [{ ...selection, fixtureId }] : [];
+    });
+    const predictions = await Promise.all(predictionIds.map((predictionId) => context.repositories.predictions.findById(predictionId)));
+    const parlays = await Promise.all(parlayIds.map((parlayId) => context.repositories.parlays.findById(parlayId)));
     const predictionValidations = await mapLimit(
       predictions.filter((prediction): prediction is PredictionRecord => Boolean(prediction)),
       DATE_VALIDATION_CONCURRENCY,
@@ -273,7 +282,7 @@ async function validateDateTarget(
       (parlay) => validateParlayRecord(context, parlay, evaluatedAt, runId),
     );
     const artifactSelectionValidations = await mapLimit(
-      targets.artifactSelections,
+      artifactSelections,
       DATE_VALIDATION_CONCURRENCY,
       (selection) => validateArtifactSelectionRecord(context, selection, evaluatedAt, runId),
     );
@@ -889,6 +898,12 @@ function assertSingleTarget(input: RunValidationInput): void {
   if (count !== 1) throw new Error('validate requires exactly one of --date, --prediction-id, or --parlay-id.');
   if (input.recommendationArtifact && !input.date) {
     throw new Error('--recommendation-artifact can only be used with --date.');
+  }
+  if (input.predictionId && !normalizeUuid(input.predictionId)) {
+    throw new Error('--prediction-id must be a valid UUID.');
+  }
+  if (input.parlayId && !normalizeUuid(input.parlayId)) {
+    throw new Error('--parlay-id must be a valid UUID.');
   }
 }
 

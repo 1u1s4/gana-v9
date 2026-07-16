@@ -93,13 +93,21 @@ La operacion diaria usa hora Guatemala (`America/Guatemala`) y publica embeds na
 ```bash
 node scripts/gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD
 node scripts/gana-daily-e2e-and-notify.mjs --date YYYY-MM-DD
+node scripts/gana-daily-ops-dispatch.mjs --dry-run
 node scripts/install-gana-cron.mjs
 ```
 
-Cron operativo:
+La autoridad canonica es una sola tarea de Codex Scheduled. Invoca el
+dispatcher determinista en cinco checkpoints de Guatemala:
 
-- 07:00: valida el dia anterior, calcula `daily-metrics` y envia estadisticas.
-- 10:00: ejecuta el E2E diario completo para el dia siguiente y envia parlays/recomendaciones.
+- 07:15: retencion y validacion/estadisticas del dia anterior.
+- 10:15: Daily E2E inicial para el dia siguiente.
+- 13:15: recuperacion de un Daily perdido o strategy review.
+- 18:15 y 22:15: unicamente retries Daily ya vencidos.
+
+Hermes, cron del sistema y launchd son autoridades fallback mutuamente
+excluyentes; cada instalador crea el mismo job unico y deben seguir desactivados
+mientras Codex Scheduled sea la autoridad.
 
 Targets opcionales por flujo:
 
@@ -190,7 +198,7 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
   --max 3
 ```
 
-Las validaciones/estadisticas del dia anterior y los cron jobs de 07:00/10:00 Guatemala estan documentados en [docs/daily-operations-cron.md](docs/daily-operations-cron.md).
+La tarea unica de operaciones diarias en hora Guatemala esta documentada en [docs/daily-operations-cron.md](docs/daily-operations-cron.md).
 
 ```bash
 scripts/install-gana-hermes-cron.sh

@@ -88,7 +88,7 @@ export function createCompetitionRepository(db: Pick<StoragePrismaClient, 'compe
           country: query.country,
           type: query.type,
         }),
-        orderBy: [{ country: 'asc' }, { name: 'asc' }],
+        orderBy: [{ country: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }],
         ...takeArg(query.take),
       });
     },
@@ -188,7 +188,7 @@ export function createFixtureRepository(db: Pick<StoragePrismaClient, 'fixture'>
           status: query.statuses === undefined ? undefined : { in: query.statuses },
           scheduledAt,
         }),
-        orderBy: { scheduledAt: 'asc' },
+        orderBy: { scheduledAt: { sort: 'asc', nulls: 'last' } },
         ...takeArg(query.take),
       });
     },

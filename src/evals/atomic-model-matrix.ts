@@ -11,6 +11,7 @@ import {
   type AgentConfig,
   type ReasoningEffort,
 } from '../config.js';
+import { normalizeUuid } from '../domain/ids.js';
 import {
   runFixtureScoring,
   type FixtureScoringDependencies,
@@ -304,11 +305,17 @@ async function main(): Promise<void> {
 }
 
 async function loadFrozenInput(args: Args): Promise<FrozenInput> {
+  const fixtureId = normalizeUuid(args.fixtureId);
+  const snapshotId = normalizeUuid(args.snapshotId);
+  const bundleId = normalizeUuid(args.bundleId);
+  if (!fixtureId) throw new Error(`--fixture-id must be a valid UUID: ${args.fixtureId}`);
+  if (!snapshotId) throw new Error(`--snapshot-id must be a valid UUID: ${args.snapshotId}`);
+  if (!bundleId) throw new Error(`--bundle-id must be a valid UUID: ${args.bundleId}`);
   const repositories = createStorageRepositories(getPrismaClient() as unknown as StoragePrismaClient);
   const [fixture, snapshot, bundle] = await Promise.all([
-    repositories.fixtures.findById(args.fixtureId),
-    repositories.oddsSnapshots.findById(args.snapshotId),
-    repositories.researchBundles.findById(args.bundleId),
+    repositories.fixtures.findById(fixtureId),
+    repositories.oddsSnapshots.findById(snapshotId),
+    repositories.researchBundles.findById(bundleId),
   ]);
   if (!fixture) throw new Error(`Fixture not found: ${args.fixtureId}`);
   if (!snapshot) throw new Error(`Odds snapshot not found: ${args.snapshotId}`);

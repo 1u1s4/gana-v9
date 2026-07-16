@@ -9,14 +9,14 @@ import {
 } from './server.js';
 
 const FIXTURE = {
-  id: 'fixture-1',
+  id: '11111111-1111-4111-8111-111111111111',
   providerFixtureId: 'p-fx-1',
   scheduledAt: new Date('2026-05-01T12:00:00.000Z'),
   status: 'scheduled',
   scoreHome: 2,
   scoreAway: 1,
   competition: {
-    id: 'competition-1',
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     name: 'Primera',
     country: 'Spain',
     metadata: {
@@ -24,8 +24,8 @@ const FIXTURE = {
       flagUrl: 'https://media.api-sports.io/flags/es.svg',
     },
   },
-  homeTeam: { id: 'team-1', name: 'Home', country: 'Spain', metadata: { logoUrl: 'https://media.api-sports.io/football/teams/1.png' } },
-  awayTeam: { id: 'team-2', name: 'Away', country: 'Spain', metadata: { logoUrl: 'https://media.api-sports.io/football/teams/2.png' } },
+  homeTeam: { id: '88888888-8888-4888-8888-888888888888', name: 'Home', country: 'Spain', metadata: { logoUrl: 'https://media.api-sports.io/football/teams/1.png' } },
+  awayTeam: { id: '99999999-9999-4999-8999-999999999999', name: 'Away', country: 'Spain', metadata: { logoUrl: 'https://media.api-sports.io/football/teams/2.png' } },
   _count: {
     predictions: 1,
     parlayLegs: 1,
@@ -34,13 +34,13 @@ const FIXTURE = {
 };
 
 const VALIDATION = {
-  id: 'validation-1',
+  id: '44444444-4444-4444-8444-444444444444',
   runId: 'run-1',
-  predictionId: 'prediction-1',
+  predictionId: '22222222-2222-4222-8222-222222222222',
   parlayId: null,
   fixture: FIXTURE,
   prediction: {
-    id: 'prediction-1',
+    id: '22222222-2222-4222-8222-222222222222',
     marketKey: 'h2h',
     selectionKey: 'home',
     line: null,
@@ -56,14 +56,14 @@ const VALIDATION = {
 };
 
 const PARLAY_VALIDATION = {
-  id: 'validation-2',
+  id: '55555555-5555-4555-8555-555555555555',
   runId: 'run-1',
   predictionId: null,
-  parlayId: 'parlay-1',
+  parlayId: '33333333-3333-4333-8333-333333333333',
   fixture: FIXTURE,
   prediction: null,
   parlay: {
-    id: 'parlay-1',
+    id: '33333333-3333-4333-8333-333333333333',
     legs: [{ id: 'leg-1' }, { id: 'leg-2' }],
   },
   status: 'won',
@@ -75,7 +75,7 @@ const PARLAY_VALIDATION = {
 };
 
 const PREDICTION = {
-  id: 'prediction-1',
+  id: '22222222-2222-4222-8222-222222222222',
   runId: 'run-1',
   fixture: FIXTURE,
   marketKey: 'h2h',
@@ -95,7 +95,7 @@ const PREDICTION = {
 };
 
 const PARLAY = {
-  id: 'parlay-1',
+  id: '33333333-3333-4333-8333-333333333333',
   runId: 'run-1',
   combinedOdds: 2.4,
   aggregateConfidence: 0.77,
@@ -109,9 +109,9 @@ const PARLAY = {
     {
       id: 'leg-1',
       legIndex: 0,
-      predictionId: 'prediction-1',
+      predictionId: '22222222-2222-4222-8222-222222222222',
       prediction: {
-        id: 'prediction-1',
+        id: '22222222-2222-4222-8222-222222222222',
         status: 'candidate',
         confidence: 0.8,
         edge: 0.04,
@@ -150,7 +150,7 @@ const RUN = {
 };
 
 const DAILY_METRIC = {
-  id: 'metric-1',
+  id: '77777777-7777-4777-8777-777777777777',
   metricDate: new Date('2026-05-01T00:00:00.000Z'),
   timezone: 'America/Guatemala',
   scope: 'all',
@@ -210,7 +210,7 @@ const DAILY_RUN = {
     parlayAnalysis: {
       top: [{
         rank: 1,
-        parlayId: 'parlay-1',
+        parlayId: '33333333-3333-4333-8333-333333333333',
         profile: 'low-odds-top',
         harnessStatus: 'promotable',
         combinedOdds: 1.42,
@@ -232,15 +232,15 @@ const DAILY_RUN = {
 function createDashboardDb() {
   return {
     team: {
-      findMany: async () => [{ id: 'team-1', name: 'Home' }, { id: 'team-2', name: 'Away' }],
+      findMany: async () => [{ id: '88888888-8888-4888-8888-888888888888', name: 'Home' }, { id: '99999999-9999-4999-8999-999999999999', name: 'Away' }],
     },
     competition: {
-      findMany: async () => [{ id: 'competition-1', name: 'Primera' }],
+      findMany: async () => [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Primera' }],
     },
     prediction: {
       findMany: async () => [PREDICTION],
       findUnique: async ({ where }: { where: { id?: string } }) => {
-        if (where?.id === 'prediction-1') return PREDICTION;
+        if (where?.id === '22222222-2222-4222-8222-222222222222') return PREDICTION;
         return null;
       },
       groupBy: async () => [
@@ -257,7 +257,7 @@ function createDashboardDb() {
         validationArtifacts: [VALIDATION],
       }],
       findUnique: async ({ where }: { where: { id?: string } }) => {
-        if (where?.id === 'fixture-1') {
+        if (where?.id === '11111111-1111-4111-8111-111111111111') {
           return {
             ...FIXTURE,
             predictions: [PREDICTION],
@@ -275,7 +275,7 @@ function createDashboardDb() {
     parlay: {
       findMany: async () => [PARLAY],
       findUnique: async ({ where }: { where: { id?: string } }) => {
-        if (where?.id === 'parlay-1') return PARLAY;
+        if (where?.id === '33333333-3333-4333-8333-333333333333') return PARLAY;
         return null;
       },
       groupBy: async () => [
@@ -291,9 +291,9 @@ function createDashboardDb() {
           channel: 'discord',
           target: 'recommendations',
           targetType: 'parlay',
-          targetId: 'parlay-1',
+          targetId: '33333333-3333-4333-8333-333333333333',
           predictionId: null,
-          parlayId: 'parlay-1',
+          parlayId: '33333333-3333-4333-8333-333333333333',
           status: 'published',
           discordTarget: 'recommendations',
           discordMessageId: 'discord-message-1',
@@ -306,7 +306,7 @@ function createDashboardDb() {
     validationArtifact: {
       findMany: async () => [VALIDATION],
       findUnique: async ({ where }: { where: { id?: string } }) => {
-        if (where?.id === 'validation-1') return VALIDATION;
+        if (where?.id === '44444444-4444-4444-8444-444444444444') return VALIDATION;
         return null;
       },
       groupBy: async () => [
@@ -390,7 +390,7 @@ describe('dashboard api queries', () => {
   it('reads overview for predictions with filters, pagination and sort', async () => {
     const db = createDashboardDb() as any;
     const params = new URLSearchParams(
-      'tab=predictions&page=2&take=1&sort=confidence&direction=asc&status=candidate&market=h2h&runId=run-1&team=team-1&competition=competition-1&minConfidence=0.7&maxConfidence=0.9',
+      'tab=predictions&page=2&take=1&sort=confidence&direction=asc&status=candidate&market=h2h&runId=run-1&team=88888888-8888-4888-8888-888888888888&competition=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&minConfidence=0.7&maxConfidence=0.9',
     );
 
     const overview = await readOverview(db, config, params);
@@ -419,7 +419,7 @@ describe('dashboard api queries', () => {
         ...baseDb.validationArtifact,
         findMany: async () => [PARLAY_VALIDATION],
         findUnique: async ({ where }: { where: { id?: string } }) => {
-          if (where?.id === 'validation-2') return PARLAY_VALIDATION;
+          if (where?.id === '55555555-5555-4555-8555-555555555555') return PARLAY_VALIDATION;
           return null;
         },
       },
@@ -430,7 +430,7 @@ describe('dashboard api queries', () => {
     assert.equal(overview.validations[0]?.target.label, 'Parlay');
     assert.equal(overview.validations[0]?.target.summary, 'Parlay de 2 legs');
 
-    const entity = await readEntity(db, 'validation', 'validation-2');
+    const entity = await readEntity(db, 'validation', '55555555-5555-4555-8555-555555555555');
     if ('error' in entity) {
       assert.fail('validation should exist');
     }
@@ -442,7 +442,7 @@ describe('dashboard api queries', () => {
   it('preserves target type when validation relation is missing', async () => {
     const orphanValidation = {
       ...VALIDATION,
-      id: 'validation-3',
+      id: '66666666-6666-4666-8666-666666666666',
       prediction: null,
     };
     const baseDb = createDashboardDb();
@@ -456,7 +456,7 @@ describe('dashboard api queries', () => {
 
     const overview = await readOverview(db, config, new URLSearchParams('tab=validations&validationTarget=prediction'));
     assert.equal(overview.validations[0]?.target.kind, 'prediction');
-    assert.equal(overview.validations[0]?.target.id, 'prediction-1');
+    assert.equal(overview.validations[0]?.target.id, '22222222-2222-4222-8222-222222222222');
     assert.equal(overview.validations[0]?.target.summary, null);
   });
 
@@ -502,11 +502,11 @@ describe('dashboard api queries', () => {
     const overview = await readOverview(
       db,
       config,
-      new URLSearchParams('tab=validations&validationTarget=prediction&targetId=prediction-1'),
+      new URLSearchParams('tab=validations&validationTarget=prediction&targetId=22222222-2222-4222-8222-222222222222'),
     );
     assert.equal(overview.filters.validationTarget, 'prediction');
-    assert.equal(overview.filters.targetId, 'prediction-1');
-    assert.equal(validationWhere.predictionId, 'prediction-1');
+    assert.equal(overview.filters.targetId, '22222222-2222-4222-8222-222222222222');
+    assert.equal(validationWhere.predictionId, '22222222-2222-4222-8222-222222222222');
     assert.equal(validationWhere.parlayId, null);
   });
 
@@ -536,24 +536,24 @@ describe('dashboard api queries', () => {
 
   it('reads prediction entity and validation history', async () => {
     const db = createDashboardDb() as any;
-    const response = await readEntity(db, 'prediction', 'prediction-1');
+    const response = await readEntity(db, 'prediction', '22222222-2222-4222-8222-222222222222');
     if ('error' in response) {
       assert.fail('prediction should exist');
     }
     assert.equal(response.kind, 'prediction');
-    assert.equal(response.entity.id, 'prediction-1');
+    assert.equal(response.entity.id, '22222222-2222-4222-8222-222222222222');
     assert.equal(Array.isArray(response.validationHistory), true);
     assert.equal(response.validationHistory?.length, 1);
     assert.equal(response.validationHistory?.[0]?.target.kind, 'prediction');
   });
 
   it('reads fixture entity with recent prediction and settlement detail', async () => {
-    const response = await readEntity(createDashboardDb() as any, 'fixture', 'fixture-1');
+    const response = await readEntity(createDashboardDb() as any, 'fixture', '11111111-1111-4111-8111-111111111111');
     if ('error' in response) {
       assert.fail('fixture should exist');
     }
     assert.equal(response.kind, 'fixture');
-    assert.equal(response.entity.id, 'fixture-1');
+    assert.equal(response.entity.id, '11111111-1111-4111-8111-111111111111');
     const fixture = response.entity as any;
     assert.equal(Array.isArray(fixture.recentPredictions), true);
     assert.equal(Array.isArray(fixture.recentValidations), true);
@@ -571,9 +571,9 @@ describe('dashboard api queries', () => {
     assert.equal(run.predictionCount, 1);
     assert.equal(run.parlayCount, 1);
     assert.equal(run.validationCount, 1);
-    assert.equal(run.recentPredictions[0]?.id, 'prediction-1');
-    assert.equal(run.recentParlays[0]?.id, 'parlay-1');
-    assert.equal(run.recentValidations[0]?.id, 'validation-1');
+    assert.equal(run.recentPredictions[0]?.id, '22222222-2222-4222-8222-222222222222');
+    assert.equal(run.recentParlays[0]?.id, '33333333-3333-4333-8333-333333333333');
+    assert.equal(run.recentValidations[0]?.id, '44444444-4444-4444-8444-444444444444');
   });
 
   it('reads overview for daily metrics with chart-ready payloads', async () => {
@@ -678,7 +678,7 @@ describe('dashboard endpoints', () => {
       assert.equal(recommendationsPayload.contractVersion, 'gana-v9.public-recommendations.v1');
       assert.equal(recommendationsPayload.stale, false);
       assert.equal(recommendationsPayload.dailySummary.parlays, 1);
-      assert.equal(recommendationsPayload.parlays[0].parlayId, 'parlay-1');
+      assert.equal(recommendationsPayload.parlays[0].parlayId, '33333333-3333-4333-8333-333333333333');
     });
   });
 
@@ -725,16 +725,29 @@ describe('dashboard endpoints', () => {
       assert.equal(Array.isArray(metricsPayload.metrics), true);
       assert.equal(metricsPayload.metrics[0].scope, 'all');
 
-      const prediction = await fetch(`${base}/api/entity/prediction/prediction-1`);
+      const prediction = await fetch(`${base}/api/entity/prediction/22222222-2222-4222-8222-222222222222`);
       assert.equal(prediction.status, 200);
       const predictionPayload = await prediction.json();
       assert.equal(predictionPayload.kind, 'prediction');
-      assert.equal(predictionPayload.entity.id, 'prediction-1');
+      assert.equal(predictionPayload.entity.id, '22222222-2222-4222-8222-222222222222');
 
       const missing = await fetch(`${base}/api/entity/run/missing`);
       assert.equal(missing.status, 404);
       const missingPayload = await missing.json();
       assert.equal(missingPayload.error, 'not_found');
+    });
+  });
+
+  it('rejects invalid PostgreSQL UUID inputs before querying entity/filter columns', async () => {
+    await withServer(async (base) => {
+      const entity = await fetch(`${base}/api/entity/prediction/daily-focus-prediction`);
+      assert.equal(entity.status, 404);
+
+      const filter = await fetch(`${base}/api/overview?tab=predictions&team=team-not-a-uuid`);
+      assert.equal(filter.status, 400);
+      const payload = await filter.json();
+      assert.equal(payload.error, 'invalid_filter');
+      assert.match(payload.message, /team must be a valid UUID/);
     });
   });
 });
