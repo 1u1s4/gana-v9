@@ -10,6 +10,7 @@ import {
   countPublishableSelections,
   readExistingRecommendationArtifact,
   readCurrentRecommendationArtifact,
+  resolveApiFootballLimitRetry,
   validateRetryablePublishLock,
   validatePublicationLedgerAlignment,
 } from './lib/daily-e2e-wrapper-state.mjs';
@@ -233,10 +234,10 @@ try {
     requiredAtomic: 0,
     requiredSelectedParlays: 0,
   };
-  const providerLimitRetryAfter = artifactState.ok ? apiFootballDailyLimitRetryAfter(artifactState.artifact) : undefined;
-  if (providerLimitRetryAfter) {
-    retryLockReason = 'API-Football daily request limit reached; Daily E2E produced no Discord recommendations';
-    retryLockRetryAfter = providerLimitRetryAfter;
+  const providerLimitRetry = artifactState.ok ? resolveApiFootballLimitRetry(artifactState.artifact) : undefined;
+  if (providerLimitRetry) {
+    retryLockReason = providerLimitRetry.reason;
+    retryLockRetryAfter = providerLimitRetry.retryAfter;
   }
   const selectionCount = publishableCounts.total;
   const ledgerAlignment = artifactState.ok
@@ -815,26 +816,6 @@ function strictBooleanEnv(name, fallback) {
   if (value === 'true') return true;
   if (value === 'false') return false;
   throw new Error(`${name} must be true or false.`);
-}
-
-function apiFootballDailyLimitRetryAfter(artifact) {
-  const reasons = [
-    ...(Array.isArray(artifact?.runDiagnostics?.reasons) ? artifact.runDiagnostics.reasons : []),
-    ...(Array.isArray(artifact?.diagnostics?.reasons) ? artifact.diagnostics.reasons : []),
-    artifact?.error,
-  ].filter(Boolean).join('\n');
-  if (!/API-Football/i.test(reasons) || !/request limit for the day/i.test(reasons)) return undefined;
-  const now = new Date();
-  const nextUtcReset = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() + 1,
-    0,
-    5,
-    0,
-    0,
-  ));
-  return nextUtcReset.toISOString();
 }
 
 function guatemalaDate(offsetDays) {

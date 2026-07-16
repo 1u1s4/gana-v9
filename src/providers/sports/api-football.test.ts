@@ -35,6 +35,45 @@ describe('api-football provider', () => {
     );
   });
 
+  it('classifies rate-limit errors embedded in HTTP 200 provider payloads', async () => {
+    globalThis.fetch = (async () => jsonResponse({
+      errors: {
+        rateLimit: 'Too many requests. You have exceeded the limit of requests per minute of your subscription.',
+      },
+      response: [],
+    })) as typeof fetch;
+
+    const provider = createApiFootballProvider(testConfig());
+    await assert.rejects(
+      () => provider.listFixtures({ date: '2026-05-01', league: 39, season: 2026 }),
+      (err) => {
+        assert.equal(isApiFootballProviderError(err), true);
+        assert.equal((err as { code?: string }).code, 'rate_limited');
+        assert.match((err as Error).message, /rate_limited/);
+        return true;
+      },
+    );
+  });
+
+  it('classifies daily-limit payloads before their generic rateLimit field name', async () => {
+    globalThis.fetch = (async () => jsonResponse({
+      errors: {
+        rateLimit: 'You have reached the request limit for the day of your subscription.',
+      },
+      response: [],
+    })) as typeof fetch;
+
+    const provider = createApiFootballProvider(testConfig());
+    await assert.rejects(
+      () => provider.listFixtures({ date: '2026-05-01', league: 39, season: 2026 }),
+      (err) => {
+        assert.equal(isApiFootballProviderError(err), true);
+        assert.equal((err as { code?: string }).code, 'quota_exceeded');
+        return true;
+      },
+    );
+  });
+
   it('omits season from fixture requests when discovery is seasonless', async () => {
     const requests: URL[] = [];
     globalThis.fetch = (async (input) => {

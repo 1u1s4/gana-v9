@@ -32,6 +32,14 @@ const AT = Object.freeze({
   recovery2: new Date('2026-07-16T04:15:00.000Z'),
 });
 
+const ROLLOVER_AT = Object.freeze({
+  afterMidnight: new Date('2026-07-16T06:18:00.000Z'),
+  morning: new Date('2026-07-16T13:15:00.000Z'),
+  daily: new Date('2026-07-16T16:15:00.000Z'),
+});
+
+const ROLLOVER_RETRY_AFTER = '2026-07-16T06:17:08.501Z';
+
 test('Guatemala clock exposes the five exact checkpoints and preserves the local date', () => {
   const expected = [
     [AT.morning, 'morning', '07:15'],
@@ -63,6 +71,100 @@ test('07:15 enables independent morning work and a late wake also catches up Dai
     assert.equal(late.heavy?.flow, 'daily');
     assert.equal(late.heavy?.mode, 'initial');
     assert.equal(late.heavy?.targetDate, '2026-07-16');
+  });
+});
+
+test('a due rollover Daily at 00:18 still waits for the 07:15 checkpoint', () => {
+  withArtifacts((artifactRoot) => {
+    const paths = rolloverPathsFor(artifactRoot);
+    writeJson(paths.rolloverDailyLock, {
+      status: 'retryable',
+      retryAfter: ROLLOVER_RETRY_AFTER,
+    });
+
+    const plan = planDailyOps({ now: ROLLOVER_AT.afterMidnight, artifactRoot });
+    assert.equal(plan.local.time, '00:18:00');
+    assert.equal(plan.heavy, null);
+  });
+});
+
+test('07:15 recovers a due retryable Daily for the slate that rolled into today', () => {
+  withArtifacts((artifactRoot) => {
+    const paths = rolloverPathsFor(artifactRoot);
+    writeJson(paths.rolloverDailyLock, {
+      status: 'retryable',
+      retryAfter: ROLLOVER_RETRY_AFTER,
+    });
+
+    const plan = planDailyOps({ now: ROLLOVER_AT.morning, artifactRoot });
+    assert.deepEqual([plan.heavy?.flow, plan.heavy?.mode], ['daily', 'retry']);
+    assert.equal(plan.heavy?.targetDate, '2026-07-16');
+    assert.equal(plan.heavy?.path, paths.rolloverDailyLock);
+    assert.equal(plan.heavy?.reason, 'daily-rollover-retryable-due');
+  });
+});
+
+test('10:15 prioritizes a due rollover retry over the new next-slate initial run', () => {
+  withArtifacts((artifactRoot) => {
+    const paths = rolloverPathsFor(artifactRoot);
+    writeJson(paths.rolloverDailyLock, {
+      status: 'retryable',
+      retryAfter: ROLLOVER_RETRY_AFTER,
+    });
+    assert.equal(existsSync(paths.dailyLock), false);
+
+    const plan = planDailyOps({ now: ROLLOVER_AT.daily, artifactRoot });
+    assert.deepEqual([plan.heavy?.flow, plan.heavy?.mode], ['daily', 'retry']);
+    assert.equal(plan.heavy?.targetDate, '2026-07-16');
+  });
+});
+
+test('a terminal rollover slate does not block the next-slate initial run', () => {
+  withArtifacts((artifactRoot) => {
+    const paths = rolloverPathsFor(artifactRoot);
+    for (const status of DAILY_TERMINAL_STATUSES) {
+      writeJson(paths.rolloverDailyLock, {
+        status,
+        retryAfter: ROLLOVER_RETRY_AFTER,
+      });
+      const plan = planDailyOps({ now: ROLLOVER_AT.daily, artifactRoot });
+      assert.deepEqual([plan.heavy?.flow, plan.heavy?.mode], ['daily', 'initial'], status);
+      assert.equal(plan.heavy?.targetDate, '2026-07-17', status);
+      assert.equal(plan.heavy?.path, paths.dailyLock, status);
+    }
+  });
+});
+
+test('rollover execution binds Daily date and batch to the recovered target', () => {
+  withArtifacts((artifactRoot) => {
+    const paths = rolloverPathsFor(artifactRoot);
+    writeJson(paths.retentionMarker, { status: 'completed' });
+    writeJson(paths.validationLock, { status: 'published' });
+    writeJson(paths.rolloverDailyLock, {
+      status: 'retryable',
+      retryAfter: ROLLOVER_RETRY_AFTER,
+    });
+    const calls = [];
+
+    const summary = runDailyOpsDispatch({
+      repoRoot: REPO_ROOT,
+      artifactRoot,
+      now: ROLLOVER_AT.morning,
+      env: {},
+      execute(action, childEnv) {
+        calls.push({ action, childEnv });
+        return { status: 0, stdout: '{}' };
+      },
+    });
+
+    assert.equal(summary.status, 'completed');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].action.flow, 'daily');
+    assert.equal(calls[0].action.targetDate, '2026-07-16');
+    assert.equal(calls[0].childEnv.GANA_DAILY_DATE, '2026-07-16');
+    assert.equal(calls[0].childEnv.GANA_DAILY_BATCH_ID, 'daily-2026-07-16-full');
+    assert.equal(calls[0].childEnv.GANA_DAILY_E2E_NOT_BEFORE, '07:15');
+    assert.equal(calls[0].action.command.includes('--force'), false);
   });
 });
 
@@ -391,6 +493,14 @@ function pathsFor(artifactRoot) {
     today: '2026-07-15',
     previous: '2026-07-14',
     next: '2026-07-16',
+  });
+}
+
+function rolloverPathsFor(artifactRoot) {
+  return dailyOpsPaths(artifactRoot, {
+    today: '2026-07-16',
+    previous: '2026-07-15',
+    next: '2026-07-17',
   });
 }
 

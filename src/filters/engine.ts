@@ -32,6 +32,7 @@ interface FixtureDiscoveryRequest {
 }
 
 const FIXTURE_DISCOVERY_CONCURRENCY = 6;
+const DATE_ONLY_DISCOVERY_MAX_FIXTURES = Number.MAX_SAFE_INTEGER;
 
 export async function discoverFixtures(
   config: AgentConfig,
@@ -55,31 +56,61 @@ export async function discoverFixtures(
   }
 
   const byProviderFixtureId = new Map<string, { fixture: Fixture; reasons: Set<FilterReason> }>();
-  const recoverablePresetErrors: unknown[] = [];
-  for (const batch of chunks(validRequests, FIXTURE_DISCOVERY_CONCURRENCY)) {
-    const results = await Promise.all(batch.map(async (request) => ({
-      request,
-      fixtures: await listFixturesForDiscovery(listFixtures, config, filters, request, runtime, recoverablePresetErrors),
-    })));
-    for (const result of results) {
-      for (const fixture of result.fixtures) {
+  let dateOnlyLeagueDiscoverySucceeded = false;
+  if (
+    filters.fullDay
+    && filters.combineMode === 'OR'
+    && leaguePresets.length > 0
+    && teamPresets.length === 0
+  ) {
+    try {
+      const presetLeagueIds = new Set(leaguePresets.map((league) => league.providerCompetitionId));
+      const dateFixtures = await listFixtures(config, {
+        date: filters.date,
+        timezone: filters.timezone,
+        // This query contains every league for the day. Apply the configured
+        // selection cap only after removing fixtures outside the presets.
+        maxFixtures: DATE_ONLY_DISCOVERY_MAX_FIXTURES,
+      }, runtime);
+      for (const fixture of dateFixtures) {
+        if (fixture.leagueId === undefined || !presetLeagueIds.has(String(fixture.leagueId))) continue;
         const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
-        entry.reasons.add(result.request.reason);
+        entry.reasons.add('included-by-default-league');
         byProviderFixtureId.set(fixture.providerFixtureId, entry);
       }
+      dateOnlyLeagueDiscoverySucceeded = true;
+    } catch (err) {
+      if (!isRecoverableSeasonAccessDiscoveryError(err)) throw err;
     }
-    if (!byProviderFixtureId.size && recoverablePresetErrors.length) break;
   }
-  if (!byProviderFixtureId.size && recoverablePresetErrors.length && validRequests.some((request) => request.reason !== 'included-by-manual-query')) {
-    const fallbackFixtures = await listFixtures(config, {
-      date: filters.date,
-      timezone: filters.timezone,
-      maxFixtures: filters.maxFixturesPerRun,
-    }, runtime);
-    for (const fixture of fallbackFixtures) {
-      const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
-      entry.reasons.add('included-by-manual-query');
-      byProviderFixtureId.set(fixture.providerFixtureId, entry);
+
+  if (!dateOnlyLeagueDiscoverySucceeded) {
+    const recoverablePresetErrors: unknown[] = [];
+    for (const batch of chunks(validRequests, FIXTURE_DISCOVERY_CONCURRENCY)) {
+      const results = await Promise.all(batch.map(async (request) => ({
+        request,
+        fixtures: await listFixturesForDiscovery(listFixtures, config, filters, request, runtime, recoverablePresetErrors),
+      })));
+      for (const result of results) {
+        for (const fixture of result.fixtures) {
+          const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
+          entry.reasons.add(result.request.reason);
+          byProviderFixtureId.set(fixture.providerFixtureId, entry);
+        }
+      }
+      if (!byProviderFixtureId.size && recoverablePresetErrors.length) break;
+    }
+    if (!byProviderFixtureId.size && recoverablePresetErrors.length && validRequests.some((request) => request.reason !== 'included-by-manual-query')) {
+      const fallbackFixtures = await listFixtures(config, {
+        date: filters.date,
+        timezone: filters.timezone,
+        maxFixtures: filters.maxFixturesPerRun,
+      }, runtime);
+      for (const fixture of fallbackFixtures) {
+        const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
+        entry.reasons.add('included-by-manual-query');
+        byProviderFixtureId.set(fixture.providerFixtureId, entry);
+      }
     }
   }
 

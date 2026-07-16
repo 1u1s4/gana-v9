@@ -71,6 +71,7 @@ describe('filter engine', () => {
       leagueId: 999,
       scheduledAt: '2026-06-07T12:00:00.000Z',
     });
+    let dateOnlyCalls = 0;
 
     const result = await discoverFixtures({
       ...config,
@@ -93,14 +94,177 @@ describe('filter engine', () => {
             received: { plan: 'Free plans do not have access to this season, try from 2022 to 2024.' },
           });
         }
+        dateOnlyCalls += 1;
+        if (dateOnlyCalls === 1) {
+          throw new ApiFootballProviderError({
+            code: 'provider_unavailable',
+            endpointName: 'fixtures',
+            expected: 'API-Football response without provider errors.',
+            received: { plan: 'Free plans do not have access to this season, try from 2022 to 2024.' },
+          });
+        }
         return [fallbackFixture];
       },
     });
 
-    assert.deepEqual(calls, [{ league: 253, team: undefined }, { league: undefined, team: undefined }]);
+    assert.deepEqual(calls, [
+      { league: undefined, team: undefined },
+      { league: 253, team: undefined },
+      { league: undefined, team: undefined },
+    ]);
     assert.equal(result.fixtures.length, 1);
     assert.equal(result.fixtures[0]?.providerFixtureId, 'fallback-fixture');
     assert.deepEqual(result.evaluations[0]?.includedReasons, ['included-by-manual-query']);
+  });
+
+  it('uses one date-only request and keeps only fixtures from enabled default leagues', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-fixture-discovery-'));
+    const leaguePresetsPath = join(dir, 'league-presets.json');
+    writeFileSync(leaguePresetsPath, JSON.stringify({
+      presetKey: 'test',
+      leagues: [
+        { id: '253', name: 'Major League Soccer', country: 'USA', enabled: true, priority: 20 },
+        { id: '135', name: 'Serie A', country: 'Italy', enabled: true, priority: 10 },
+        { id: '999', name: 'Disabled League', enabled: false, priority: 1 },
+      ],
+    }));
+    const calls: Array<{ league?: number; team?: number; season?: number }> = [];
+
+    const result = await discoverFixtures({
+      ...config,
+      apiFootball: {
+        ...config.apiFootball,
+        leaguePresetsPath,
+      },
+    } as AgentConfig, {
+      date: '2026-06-07',
+      leaguesDefault: true,
+      combineMode: 'OR',
+      fullDay: true,
+    }, undefined, {
+      listFixtures: async (_config, query) => {
+        calls.push({ league: query.league, team: query.team, season: query.season });
+        return [
+          fixture({ providerFixtureId: 'mls', leagueId: 253, scheduledAt: '2026-06-07T18:00:00.000Z' }),
+          fixture({ providerFixtureId: 'serie-a', leagueId: 135, scheduledAt: '2026-06-07T12:00:00.000Z' }),
+          fixture({ providerFixtureId: 'disabled', leagueId: 999, scheduledAt: '2026-06-07T15:00:00.000Z' }),
+          fixture({ providerFixtureId: 'missing-league-id', scheduledAt: '2026-06-07T16:00:00.000Z' }),
+        ];
+      },
+    });
+
+    assert.deepEqual(calls, [{ league: undefined, team: undefined, season: undefined }]);
+    assert.deepEqual(result.fixtures.map((item) => item.providerFixtureId), ['serie-a', 'mls']);
+    assert.deepEqual(result.evaluations.map((evaluation) => evaluation.includedReasons), [
+      ['included-by-default-league'],
+      ['included-by-default-league'],
+    ]);
+    assert.deepEqual(result.requestedLeagues.map((league) => league.providerCompetitionId), ['135', '253']);
+  });
+
+  it('does not fan out after an empty successful date-only request', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-fixture-discovery-'));
+    const leaguePresetsPath = join(dir, 'league-presets.json');
+    writeFileSync(leaguePresetsPath, JSON.stringify({
+      presetKey: 'test',
+      leagues: [
+        { id: '253', name: 'Major League Soccer', country: 'USA', enabled: true },
+        { id: '135', name: 'Serie A', country: 'Italy', enabled: true },
+      ],
+    }));
+    let calls = 0;
+
+    const result = await discoverFixtures({
+      ...config,
+      apiFootball: {
+        ...config.apiFootball,
+        leaguePresetsPath,
+      },
+    } as AgentConfig, {
+      date: '2026-06-07',
+      leaguesDefault: true,
+      fullDay: true,
+    }, undefined, {
+      listFixtures: async () => {
+        calls += 1;
+        return [];
+      },
+    });
+
+    assert.equal(calls, 1);
+    assert.deepEqual(result.fixtures, []);
+    assert.deepEqual(result.evaluations, []);
+  });
+
+  it('applies the fixture cap after filtering date-only noise outside preset leagues', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-fixture-discovery-'));
+    const leaguePresetsPath = join(dir, 'league-presets.json');
+    writeFileSync(leaguePresetsPath, JSON.stringify({
+      presetKey: 'test',
+      leagues: [{ id: '253', name: 'Major League Soccer', country: 'USA', enabled: true }],
+    }));
+    let requestedMaxFixtures = 0;
+
+    const result = await discoverFixtures({
+      ...config,
+      apiFootball: {
+        ...config.apiFootball,
+        leaguePresetsPath,
+        maxFixturesPerRun: 1,
+      },
+    } as AgentConfig, {
+      date: '2026-06-07',
+      leaguesDefault: true,
+      fullDay: true,
+    }, undefined, {
+      listFixtures: async (_config, query) => {
+        requestedMaxFixtures = query.maxFixtures ?? 0;
+        return [
+          fixture({ providerFixtureId: 'outside-preset', leagueId: 999, scheduledAt: '2026-06-07T12:00:00.000Z' }),
+          fixture({ providerFixtureId: 'inside-preset', leagueId: 253, scheduledAt: '2026-06-07T13:00:00.000Z' }),
+        ].slice(0, query.maxFixtures);
+      },
+    });
+
+    assert.ok(requestedMaxFixtures > 1);
+    assert.deepEqual(result.fixtures.map((item) => item.providerFixtureId), ['inside-preset']);
+  });
+
+  it('propagates rate-limit and quota errors from date-only discovery without fan-out', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gana-fixture-discovery-'));
+    const leaguePresetsPath = join(dir, 'league-presets.json');
+    writeFileSync(leaguePresetsPath, JSON.stringify({
+      presetKey: 'test',
+      leagues: [{ id: '253', name: 'Major League Soccer', country: 'USA', enabled: true }],
+    }));
+    let calls = 0;
+
+    for (const code of ['rate_limited', 'quota_exceeded'] as const) {
+      const providerError = new ApiFootballProviderError({
+        code,
+        endpointName: 'fixtures',
+        expected: 'available provider capacity',
+        received: code,
+      });
+      await assert.rejects(discoverFixtures({
+        ...config,
+        apiFootball: {
+          ...config.apiFootball,
+          leaguePresetsPath,
+        },
+      } as AgentConfig, {
+        date: '2026-06-07',
+        leaguesDefault: true,
+        fullDay: true,
+      }, undefined, {
+        listFixtures: async () => {
+          calls += 1;
+          throw providerError;
+        },
+      }), (error) => error === providerError);
+    }
+
+    assert.equal(calls, 2);
   });
 
   it('keeps scheduled fixtures inside the kickoff window', () => {

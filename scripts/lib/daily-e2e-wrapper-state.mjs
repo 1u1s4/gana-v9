@@ -5,6 +5,51 @@ import { readRecommendationSourceSnapshot } from './daily-recommendation-source-
 
 const DEFAULT_EXISTING_ARTIFACT_MAX_AGE_MS = 36 * 60 * 60 * 1000;
 const DEFAULT_FRESHNESS_TOLERANCE_MS = 5_000;
+const DEFAULT_API_FOOTBALL_MINUTE_RETRY_MS = 2 * 60 * 1000;
+
+export function resolveApiFootballLimitRetry(artifact, {
+  now = new Date(),
+  minuteRetryMs = DEFAULT_API_FOOTBALL_MINUTE_RETRY_MS,
+} = {}) {
+  const reasons = [
+    ...(Array.isArray(artifact?.runDiagnostics?.reasons) ? artifact.runDiagnostics.reasons : []),
+    ...(Array.isArray(artifact?.diagnostics?.reasons) ? artifact.diagnostics.reasons : []),
+    artifact?.error,
+  ].filter(Boolean).join('\n');
+  if (!/API-Football/i.test(reasons)) return undefined;
+
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  if (!Number.isFinite(nowMs)) return undefined;
+  if (/(?:request limit for the day|daily request limit)/i.test(reasons)) {
+    const instant = new Date(nowMs);
+    const nextUtcReset = new Date(Date.UTC(
+      instant.getUTCFullYear(),
+      instant.getUTCMonth(),
+      instant.getUTCDate() + 1,
+      0,
+      5,
+      0,
+      0,
+    ));
+    return {
+      kind: 'daily',
+      retryAfter: nextUtcReset.toISOString(),
+      reason: 'API-Football daily request limit reached; Daily E2E produced no Discord recommendations',
+    };
+  }
+
+  if (/(?:too many requests|rate[ _-]?limit(?:ed)?|per minute)/i.test(reasons)) {
+    const delayMs = Number.isFinite(minuteRetryMs) && minuteRetryMs > 0
+      ? minuteRetryMs
+      : DEFAULT_API_FOOTBALL_MINUTE_RETRY_MS;
+    return {
+      kind: 'minute',
+      retryAfter: new Date(nowMs + delayMs).toISOString(),
+      reason: 'API-Football per-minute request limit reached; Daily E2E produced no Discord recommendations',
+    };
+  }
+  return undefined;
+}
 
 export function readCurrentRecommendationArtifact(artifactPath, {
   date,
@@ -192,7 +237,14 @@ export function validatePublicationLedgerAlignment(artifact) {
   const parlayIds = new Set(targets.parlayIds);
   const predictionIds = new Set(targets.predictionIds);
   const missing = rendered.filter((selection) => {
-    if (selection.kind === 'parlay') return !selection.id || !parlayIds.has(selection.id);
+    if (selection.kind === 'parlay') {
+      if (!selection.id) return true;
+      if (parlayIds.has(selection.id)) return false;
+      return !(
+        selection.source.startsWith('recommendations:')
+        && isBackedDailyFocusParlay(artifact, selection.id, predictionIds)
+      );
+    }
     return !selection.id || !predictionIds.has(selection.id);
   });
   if (missing.length) {

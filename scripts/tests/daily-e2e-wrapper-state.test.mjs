@@ -8,12 +8,57 @@ import {
   countPublishableSelections,
   readExistingRecommendationArtifact,
   readCurrentRecommendationArtifact,
+  resolveApiFootballLimitRetry,
   validatePublicationTargetIds,
   validateRetryablePublishLock,
   validatePublicationLedgerAlignment,
 } from '../lib/daily-e2e-wrapper-state.mjs';
 
 describe('daily E2E wrapper state helpers', () => {
+  it('uses a short retry window for API-Football per-minute limits', () => {
+    const retry = resolveApiFootballLimitRetry({
+      runDiagnostics: {
+        reasons: ['API-Football rate_limited: Too many requests; exceeded limit per minute.'],
+      },
+    }, {
+      now: new Date('2026-07-15T22:00:00.000Z'),
+    });
+
+    assert.deepEqual(retry, {
+      kind: 'minute',
+      retryAfter: '2026-07-15T22:02:00.000Z',
+      reason: 'API-Football per-minute request limit reached; Daily E2E produced no Discord recommendations',
+    });
+  });
+
+  it('keeps the UTC reset window for API-Football daily limits', () => {
+    const retry = resolveApiFootballLimitRetry({
+      runDiagnostics: {
+        reasons: ['API-Football quota_exceeded: request limit for the day reached.'],
+      },
+    }, {
+      now: new Date('2026-07-15T22:00:00.000Z'),
+    });
+
+    assert.deepEqual(retry, {
+      kind: 'daily',
+      retryAfter: '2026-07-16T00:05:00.000Z',
+      reason: 'API-Football daily request limit reached; Daily E2E produced no Discord recommendations',
+    });
+  });
+
+  it('does not misclassify generic plan or access failures as a daily quota reset', () => {
+    const retry = resolveApiFootballLimitRetry({
+      runDiagnostics: {
+        reasons: ['API-Football quota_exceeded: HTTP 403; verify credentials or endpoint access.'],
+      },
+    }, {
+      now: new Date('2026-07-15T22:00:00.000Z'),
+    });
+
+    assert.equal(retry, undefined);
+  });
+
   it('rejects stale artifacts from before the current wrapper run', () => {
     const dir = mkdtempSync(join(tmpdir(), 'gana-daily-e2e-state-'));
     try {
@@ -196,6 +241,29 @@ describe('daily E2E wrapper state helpers', () => {
           parlayId: '11111111-1111-5111-8111-111111111111',
         }],
       },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.reason, 'ledger-aligned');
+  });
+
+  it('accepts a backed daily-focus parlay when the ledger persists only its prediction legs', () => {
+    const predictionIds = [
+      '11111111-1111-5111-8111-111111111111',
+      '22222222-2222-5222-8222-222222222222',
+    ];
+    const parlayId = 'daily-focus-parlay-diamante-deadbeef';
+    const result = validatePublicationLedgerAlignment({
+      persistencePolicy: { finalOperationalStore: 'database-ledger' },
+      publishedTargets: { parlayIds: [], predictionIds },
+      recommendations: [{
+        kind: 'parlay',
+        parlayId,
+        selectionMode: 'analytical-fallback',
+        harnessStatus: 'review-required',
+        riskFlags: ['daily-focus-fallback', 'review-required'],
+        legs: predictionIds.map((predictionId) => ({ predictionId })),
+      }],
     });
 
     assert.equal(result.ok, true);

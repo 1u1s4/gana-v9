@@ -359,7 +359,10 @@ export async function executeRunPipeline(
       scoring: [],
       error,
       now,
+      startedAt,
+      marketScope,
       writeJsonArtifact,
+      writeRun,
       exportArtifacts: deps.exportArtifacts,
       deps,
     });
@@ -1378,7 +1381,10 @@ async function finishBlocked(
     scoring: FixtureScoringResult[];
     error: string;
     now: () => Date;
+    startedAt: Date;
+    marketScope: MarketKey[];
     writeJsonArtifact: typeof writeArtifact;
+    writeRun: typeof writeRunJson;
     exportArtifacts?: RunPipelineDependencies['exportArtifacts'];
     deps: RunPipelineDependencies;
   },
@@ -1394,6 +1400,21 @@ async function finishBlocked(
     error: input.error,
   };
   input.writeJsonArtifact(config, input.runId, 'evaluation.json', evaluation);
+  input.writeRun(config, input.runId, {
+    id: input.runId,
+    runtime: config.runtime,
+    profile: config.profile,
+    providerSports: runtime.providerSports,
+    providerAgentic: config.provider,
+    model: config.model,
+    status: 'failed',
+    verdict: 'blocked',
+    date: input.date,
+    startedAt: input.startedAt.toISOString(),
+    completedAt: completedAt.toISOString(),
+    artifactDir: input.artifactDir,
+    marketScope: input.marketScope,
+  });
   await repositories.harnessRuns?.upsertForRun?.({
     id: input.runId,
     runtime: config.runtime,

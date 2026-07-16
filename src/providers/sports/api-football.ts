@@ -1110,13 +1110,22 @@ function assertNoProviderErrors(payload: unknown, endpointName: ApiFootballEndpo
     : Boolean(errors && typeof errors === 'object' && Object.keys(errors).length > 0);
   if (!hasErrors) return;
 
+  const serializedErrors = typeof errors === 'string' ? errors : JSON.stringify(errors);
+  const code = /(?:quota|request limit for the day|daily request limit)/i.test(serializedErrors)
+    ? 'quota_exceeded'
+    : /(?:too many requests|rate[ _-]?limit|per minute)/i.test(serializedErrors)
+      ? 'rate_limited'
+      : 'provider_unavailable';
+
   throw new ApiFootballProviderError({
-    code: 'provider_unavailable',
+    code,
     operation: 'provider request',
     endpointName,
     expected: 'API-Football response without provider errors.',
     received: errors,
-    nextAction: 'Check request parameters, API key and API-Football dashboard.',
+    ...(code === 'provider_unavailable'
+      ? { nextAction: 'Check request parameters, API key and API-Football dashboard.' }
+      : {}),
   });
 }
 

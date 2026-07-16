@@ -2032,6 +2032,13 @@ describe('executeRunPipeline', () => {
     assert.match(result.error ?? '', /provider unavailable/);
     assert.ok(existsSync(result.evidencePackPath));
     assert.ok(existsSync(result.handoffPath));
+
+    const run = JSON.parse(readFileSync(join(result.artifactDir, 'run.json'), 'utf-8'));
+    assert.equal(run.status, 'failed');
+    assert.equal(run.verdict, 'blocked');
+    assert.equal(run.date, '2026-04-29');
+    assert.ok(run.startedAt);
+    assert.ok(run.completedAt);
   });
 });
 

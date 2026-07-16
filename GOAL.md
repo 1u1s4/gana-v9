@@ -1,43 +1,99 @@
-# Goal: OpenWiki documentation integration
+# Goal: recover and harden the Daily E2E catch-up
 
 ## Outcome
 
-Integrate OpenWiki into this repository so Gana v9 documentation can be generated and maintained through versioned local commands and a GitHub Actions workflow.
+Produce and publish a valid, non-empty Daily E2E recommendation artifact for the
+`2026-07-16` slate, and make the canonical dispatcher recover a still-retryable
+Daily from the prior target date after midnight instead of silently orphaning it.
 
 ## Baseline
 
-- The repository has canonical documentation under `docs/`, plus `README.md` and `README.es.md`.
-- There is no `openwiki/` directory yet.
-- There is no `.github/` workflow directory yet.
-- There is no existing `AGENTS.md` or `CLAUDE.md`.
-- The project uses Node/TypeScript with pnpm available, but also has an npm lockfile.
+- Local time at diagnosis: `2026-07-15 22:39` in `America/Guatemala`.
+- The only active scheduler is Codex Automation `gana-daily-e2e`, named
+  `Gana · operaciones diarias`, with checkpoints at 07:15, 10:15, 13:15, 18:15,
+  and 22:15.
+- Batch `daily-2026-07-16-full` was attempted five times on July 15. The latest
+  attempt ran from `2026-07-16T04:16:47Z` to `04:17:03Z` and exited 1.
+- Every attempt produced zero recommendations because API-Football returned a
+  per-minute rate-limit error from the fixtures endpoint.
+- The current lock is `retryable` until `2026-07-16T06:17:08.501Z`, equivalent
+  to July 16 at 00:17 Guatemala. There is no checkpoint then.
+- The dispatcher derives only `today + 1`; after midnight it will target July 17
+  and will no longer inspect the still-retryable July 16 lock. This is the
+  catch-up rollover defect to fix.
+- There is no live Daily E2E process and no publication ledger/message for the
+  empty July 16 artifact.
 
 ## Constraints
 
-- Do not overwrite unrelated local changes.
-- Do not commit secrets, local API keys, model credentials, `.env` content, OpenWiki local state, or generated conversation history.
-- Do not run a real OpenWiki generation unless valid provider credentials are available and the user has approved the external model call.
-- Keep the generated OpenWiki output in `openwiki/` when generation is run.
+- Do not expose `.env` secrets or provider credentials.
+- Do not delete unrelated runs, locks, artifacts, or user changes.
+- Do not duplicate a Discord publication; inspect artifact and ledger state
+  before each publish attempt.
+- Keep recommendations analytical only; do not add betting execution, payment,
+  or bookmaker actions.
+- Do not weaken gates, fabricate selections, substitute mocks, or treat an empty
+  artifact as success.
+- A retry may reuse the canonical batch only after confirming no live process or
+  prior publication. Any cleanup must be limited to that exact batch.
 
-## Verifier
+## Primary verifier
 
-- `pnpm typecheck` passes after the integration.
-- `pnpm exec openwiki --help` works from the repo.
-- The OpenWiki workflow YAML is syntactically valid enough for inspection and uses only documented OpenWiki CLI commands.
-- Documentation explains local setup, required secrets, update commands, generated output, and safety boundaries.
+The final `daily-2026-07-16` recommendation artifact passes the notifier dry-run,
+contains at least one publishable selection, has counts equal to its parlays plus
+atomic predictions, contains no raw UUID or `Fixture ...` label where metadata
+exists, and the requested Discord delivery returns message IDs or a ledger readback
+proves the same payload was already published.
 
-## Loop
+## Supporting checks
 
-1. Inspect the current repo, package manager setup, docs conventions, and OpenWiki upstream usage.
-2. Add the smallest integration surface: dependency/script entries, ignore rules, docs, agent guidance, and CI workflow.
-3. Run non-secret verification commands.
-4. Record any step that cannot be completed because it needs external provider credentials.
+- Add a deterministic regression test showing that a retryable prior target is
+  recovered after midnight/on the next checkpoint before a new Daily is started.
+- Preserve the one-heavy-flow-per-checkpoint rule, terminal-state idempotency,
+  strategy priority, maintenance pause, and global lock behavior.
+- Run focused dispatcher/wrapper tests, `node --check` for changed scripts,
+  `bash -n` if a shell wrapper changes, `pnpm typecheck`, and the full test suite
+  when shared scheduling or publication behavior changes.
 
-## Approval Gates
+## Iteration loop
 
-- Running `openwiki --init` or `openwiki --update` with live provider credentials requires explicit approval because it may make paid model calls.
-- Pushing branches, creating pull requests, or changing repository settings requires explicit approval.
+1. Reconstruct scheduler, lock, provider, artifact, and ledger evidence.
+2. Change one deterministic catch-up or rate-limit behavior at a time.
+3. Run the focused failing/regression test.
+4. Confirm no live process or prior publication, then run the guarded Daily for
+   `2026-07-16`.
+5. Inspect progress and provider artifacts while long phases run.
+6. Validate and dry-run the final recommendation artifact before publication.
+7. Record exact batch, counts, message IDs, commands, and remaining risks.
 
-## Completion Proof
+## Approval gates
 
-Report changed files and verification results, including exact commands run and any credential-gated commands intentionally skipped.
+- The user's request to run the canonical Daily E2E authorizes its normal
+  recommendation publication to the configured Discord channel for this slate.
+- Changing credentials, provider subscriptions, repository remotes, branches,
+  or unrelated schedules requires separate user approval.
+- A second/corrective Discord send after a confirmed publication requires
+  separate approval.
+
+## Blocker standard
+
+Do not mark the goal blocked for a transient provider limit or a failed attempt.
+It is blocked only after the same external condition recurs for the required goal
+turn threshold, safe retries/alternatives are exhausted, and no code or scheduling
+work can make meaningful progress. Record the smallest external action needed.
+
+## Completion proof
+
+Status: achieved on `2026-07-16T05:16:00Z`.
+
+- Batch `daily-2026-07-16-full` completed with 244 predictions, 4 promotable
+  candidates, and 3 review-required daily-focus parlay recommendations.
+- The notifier dry-run rendered one native Discord payload with 3 selections,
+  human fixture labels, and no raw UUID/`Fixture ...` labels.
+- Discord recommendations message: `1527181985456328791`.
+- The publication ledger contains 6/6 published prediction-leg rows with one
+  payload hash and the same Discord message ID; the Daily lock is `published`.
+- The current dispatcher reports `nothing-due`. At the next-day 10:15 rollover,
+  the published July 16 lock is terminal and the dispatcher selects the July 17
+  initial Daily rather than retrying or blocking it.
+- `pnpm typecheck` and the full `pnpm test` suite pass (566/566).

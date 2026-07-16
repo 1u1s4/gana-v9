@@ -10,16 +10,18 @@ Esta guia deja el flujo diario de Gana v9 programable con una sola autoridad de 
 
 ## Horarios
 
-- `07:15` Guatemala: aplicar retencion una vez por fecha y validar el dia anterior contra el artifact publicado, recalculando metricas solo de picks publicados.
+- `07:15` Guatemala: aplicar retencion una vez por fecha, validar el dia anterior contra el artifact publicado y, como flujo agent-heavy, recuperar un Daily `retryable` del slate de hoy cuyo `retryAfter` vencio tras el rollover.
 - `10:15` Guatemala: correr el Daily E2E inicial del dia siguiente con Codex Terra (`gpt-5.6-terra`), reasoning `high`, sin fast tier, council gate y Discord.
 - `13:15` Guatemala: recuperar primero un Daily inicial que nunca se intento; si ya hubo intento, ejecutar strategy review antes de un Daily meramente `retryable`.
-- `18:15` y `22:15` Guatemala: reintentar Daily solo cuando el lock exacto esta `retryable` y `retryAfter` ya vencio.
+- `18:15` y `22:15` Guatemala: reintentar el Daily normal del slate de manana solo cuando el lock exacto esta `retryable` y `retryAfter` ya vencio.
 
 Una sola tarea `Gana · operaciones diarias` dispara los cinco checkpoints. El
 dispatcher permite completar retencion y validacion atrasadas, pero inicia como
 maximo un flujo agent-heavy por checkpoint. Nunca usa `--force` ni reintenta
 estados terminales (`published`, `review-required`, `blocked` o
-`publication-uncertain`).
+`publication-uncertain`). Al cambiar la fecha local tambien inspecciona el lock
+del slate de hoy: un `retryable` vencido conserva prioridad sobre el Daily inicial
+de manana, mientras un estado terminal de hoy no lo bloquea.
 
 ## Dispatcher canonico
 

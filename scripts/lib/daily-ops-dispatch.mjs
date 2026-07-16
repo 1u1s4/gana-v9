@@ -102,6 +102,7 @@ export function dailyOpsPaths(artifactRoot, dates) {
     globalLock: resolve(lockRoot, 'daily-ops-dispatch.lock'),
     retentionMarker: resolve(lockRoot, `raw-retention-${dates.today}.lock`),
     validationLock: resolve(lockRoot, `validation-${dates.previous}.lock`),
+    rolloverDailyLock: resolve(lockRoot, `daily-e2e-${dates.today}.lock`),
     dailyLock: resolve(lockRoot, `daily-e2e-${dates.next}.lock`),
     strategyLock: resolve(lockRoot, `strategy-review-${dates.previous}.lock`),
   };
@@ -124,6 +125,7 @@ export function planDailyOps({
   const paths = dailyOpsPaths(artifactRoot, dates);
   const retention = inspectJsonPath(paths.retentionMarker);
   const validation = inspectJsonPath(paths.validationLock);
+  const rolloverDaily = inspectJsonPath(paths.rolloverDailyLock);
   const daily = inspectJsonPath(paths.dailyLock);
   const strategy = inspectJsonPath(paths.strategyLock);
   const morningEligible = local.minuteOfDay >= MORNING_MINUTE;
@@ -136,6 +138,7 @@ export function planDailyOps({
   const heavy = chooseHeavyAction({
     now: instant,
     minuteOfDay: local.minuteOfDay,
+    rolloverDaily,
     daily,
     strategy,
     paths,
@@ -155,6 +158,7 @@ export function planDailyOps({
     state: {
       retention: publicState(retention),
       validation: publicState(validation),
+      rolloverDaily: publicState(rolloverDaily),
       daily: publicState(daily),
       strategy: publicState(strategy),
     },
@@ -411,7 +415,33 @@ function planValidation({ eligible, state, now, path }) {
   return { flow: 'validation', run: false, path, reason: state.error ? 'lock-invalid' : `lock-blocks-${status ?? 'unknown'}` };
 }
 
-function chooseHeavyAction({ now, minuteOfDay, daily, strategy, paths, dates, isProcessAlive }) {
+function chooseHeavyAction({
+  now,
+  minuteOfDay,
+  rolloverDaily,
+  daily,
+  strategy,
+  paths,
+  dates,
+  isProcessAlive,
+}) {
+  if (minuteOfDay < MORNING_MINUTE) return null;
+
+  // A retry scheduled after midnight belongs to the slate that is now `today`.
+  // Recover it at the first morning checkpoint before considering tomorrow's
+  // new slate. Other rollover states are historical and must not block it.
+  const rolloverRetry = inspectDueDailyRetry(rolloverDaily, now);
+  if (rolloverRetry.due) {
+    return {
+      flow: 'daily',
+      mode: 'retry',
+      targetDate: dates.today,
+      path: paths.rolloverDailyLock,
+      retryAfter: rolloverRetry.retryAfter,
+      reason: 'daily-rollover-retryable-due',
+    };
+  }
+
   if (minuteOfDay < DAILY_MINUTE) return null;
 
   // A missing Daily lock is the only definition of "never attempted" and has
@@ -440,19 +470,27 @@ function chooseHeavyAction({ now, minuteOfDay, daily, strategy, paths, dates, is
   }
 
   if (minuteOfDay < RECOVERY_MINUTE) return null;
-  const dailyStatus = daily.value?.status;
-  if (dailyStatus !== 'retryable') return null;
-  const retryAfter = daily.value?.retryAfter;
-  const retryAt = typeof retryAfter === 'string' ? Date.parse(retryAfter) : Number.NaN;
-  if (!Number.isFinite(retryAt) || retryAt > now.getTime()) return null;
+  const dailyRetry = inspectDueDailyRetry(daily, now);
+  if (!dailyRetry.due) return null;
   return {
     flow: 'daily',
     mode: 'retry',
     targetDate: dates.next,
     path: paths.dailyLock,
-    retryAfter,
+    retryAfter: dailyRetry.retryAfter,
     reason: 'daily-retryable-due',
   };
+}
+
+function inspectDueDailyRetry(state, now) {
+  if (!state.exists || state.error || state.value?.status !== 'retryable') {
+    return { due: false };
+  }
+  const retryAfter = state.value?.retryAfter;
+  const retryAt = typeof retryAfter === 'string' ? Date.parse(retryAfter) : Number.NaN;
+  return Number.isFinite(retryAt) && retryAt <= now.getTime()
+    ? { due: true, retryAfter }
+    : { due: false };
 }
 
 function inspectStrategyPending(state, now, isProcessAlive) {
@@ -500,17 +538,21 @@ function actionDefinition(flow, plan, repoRoot, artifactRoot) {
     };
   }
   if (flow === 'daily') {
+    const targetDate = plan.heavy.targetDate;
     return {
       flow,
       kind: 'heavy',
       mode: plan.heavy.mode,
-      targetDate: plan.dates.next,
+      targetDate,
       command: [resolve(repoRoot, 'scripts/gana-daily-e2e-notify.sh')],
       displayCommand: 'scripts/gana-daily-e2e-notify.sh',
       env: {
         ...commonEnv,
-        GANA_DAILY_DATE: plan.dates.next,
-        GANA_DAILY_BATCH_ID: `daily-${plan.dates.next}-full`,
+        GANA_DAILY_DATE: targetDate,
+        GANA_DAILY_BATCH_ID: `daily-${targetDate}-full`,
+        ...(plan.heavy.reason === 'daily-rollover-retryable-due'
+          ? { GANA_DAILY_E2E_NOT_BEFORE: '07:15' }
+          : {}),
       },
       cwd: repoRoot,
     };
