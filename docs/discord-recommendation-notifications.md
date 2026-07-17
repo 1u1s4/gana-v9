@@ -163,7 +163,7 @@ El formato canonico de validaciones es:
 
 Wrappers versionados:
 
-- `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, localiza el artifact publicado para esa fecha, corre `pnpm gana validate --date DATE --recommendation-artifact PATH`, corre `pnpm gana metrics daily --date DATE --scope daily-DATE --recommendation-artifact PATH` y notifica las estadisticas a Discord.
+- `scripts/gana-validate-metrics-and-notify.mjs`: calcula por defecto la fecha de ayer en `America/Guatemala`, exige el artifact canonico derivado del `dailyBatchId` publicado, corre validacion y metricas por fases y solo entonces notifica. Persiste target, payload hashes y todos los IDs de stats/mirrors; una entrega parcial queda `publication-uncertain`. Los backfills exigen `--test-label`, admiten `--dry-run` sin efectos y tienen `--force` deshabilitado.
 - `scripts/gana-daily-e2e-and-notify.mjs`: calcula por defecto la fecha de manana en `America/Guatemala`, corre E2E completo Codex con low-odds threshold `1.20`, pasa recomendaciones por council gate y notifica recomendaciones con resumen council integrado.
 - `scripts/gana-daily-ops-dispatch.mjs`: decide deterministicamente retencion, validacion, Daily inicial, strategy review y retries Daily vencidos en los cinco checkpoints diarios.
 - `scripts/gana-previous-day-validation-notify.sh`: wrapper shell equivalente para Hermes `--no-agent`.
@@ -187,7 +187,8 @@ gana-v9-daily-operations  15 7,10,13,18,22 * * *
 El dispatcher y los wrappers tienen locks por fecha bajo
 `.artifacts/gana-v9/cron/locks/`. Esos locks son defensa en profundidad, no una
 autorizacion para mantener varias autoridades activas. El dispatcher nunca usa
-`--force`; reservarlo para reprocesos manuales deliberados.
+`--force` y el wrapper de validacion lo rechaza; un reproceso manual deliberado
+usa `--backfill --test-label TEXT` sin omitir el mutex ni el ledger de entrega.
 
 Detalles adicionales: `docs/daily-operations-cron.md`.
 

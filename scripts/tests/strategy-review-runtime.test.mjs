@@ -25,6 +25,9 @@ test('strategy review defaults to Terra high without fast tier or fallbacks', ()
   assert.match(shell, /GANA_STRATEGY_REVIEW_REASONING_EFFORT:-high/);
   assert.match(shell, /GANA_STRATEGY_REVIEW_FAST_MODE:-false/);
   assert.match(shell, /GANA_STRATEGY_REVIEW_CODEX_FALLBACK_MODELS-/);
+  assert.match(shell, /GANA_CODEX_BIN_DIR/);
+  assert.match(shell, /\$HOME\/\.local\/bin/);
+  assert.match(shell, /CODEX_USER_BIN:\+\$CODEX_USER_BIN:/);
   assert.match(shell, /AGENT_FAST_MODE="\$GANA_STRATEGY_REVIEW_FAST_MODE"/);
   assert.match(shell, /AGENT_CODEX_FALLBACK_MODELS="\$GANA_STRATEGY_REVIEW_CODEX_FALLBACK_MODELS"/);
 

@@ -460,6 +460,11 @@ describe('runValidation parlay and date targets', () => {
       recommendations: [
         {
           kind: 'parlay',
+          parlayId: 'daily-focus-parlay-diamante-39d62c9b878aaae9',
+          legs: [{ predictionId: ARTIFACT_PREDICTION_1_ID }],
+        },
+        {
+          kind: 'parlay',
           parlayId: ARTIFACT_PARLAY_ID,
           predictionIds: [ARTIFACT_PREDICTION_1_ID, 'daily-focus-prediction-list'],
           legs: [{ predictionId: ARTIFACT_PREDICTION_1_ID }],
@@ -548,6 +553,74 @@ describe('runValidation parlay and date targets', () => {
     assert.equal(result.validations.at(-1)?.metadata?.source, 'required-league-general');
     assert.equal(result.validations.at(-1)?.actual?.summary, 'BTTS SI (2-1)');
     assert.equal(result.target.recommendationArtifact, recommendationArtifact);
+  });
+
+  it('serializes provider result fetches for a published recommendations artifact', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const root = mkdtempSync(join(tmpdir(), 'gana-validation-serialized-'));
+    const recommendationArtifact = join(root, 'daily-parlay-recommendations.json');
+    const predictionIds = Array.from({ length: 5 }, (_, index) =>
+      `${String(index + 3).repeat(8)}-${String(index + 3).repeat(4)}-4${String(index + 3).repeat(3)}-8${String(index + 3).repeat(3)}-${String(index + 3).repeat(12)}`,
+    );
+    writeFileSync(recommendationArtifact, JSON.stringify({
+      date: '2026-04-25',
+      recommendations: predictionIds.map((predictionId) => ({
+        kind: 'atomic-prediction',
+        predictionId,
+        legs: [{ predictionId }],
+      })),
+    }));
+    let activeFetches = 0;
+    let maxActiveFetches = 0;
+
+    const result = await runValidation(cfg, { date: '2026-04-25', recommendationArtifact }, runtime, {
+      now: () => now,
+      writeArtifact: () => '/tmp/validations.json',
+      fetcher: {
+        fetch: async (input: any) => {
+          activeFetches += 1;
+          maxActiveFetches = Math.max(maxActiveFetches, activeFetches);
+          try {
+            if (activeFetches > 1) {
+              const error = new Error('API-Football rate_limited: concurrent validation burst');
+              Object.assign(error, { code: 'rate_limited' });
+              throw error;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            return {
+              fixture: { ...finalFixture, id: input.fixtureId, providerFixtureId: input.providerFixtureId },
+              providerSnapshotId: `snapshot-${input.fixtureId}`,
+              resultProviderSnapshotId: `snapshot-${input.fixtureId}`,
+            };
+          } finally {
+            activeFetches -= 1;
+          }
+        },
+      },
+      repositories: repositories({
+        predictions: {
+          findById: async (id: string) => {
+            const index = predictionIds.indexOf(id);
+            return prediction({ id, fixtureId: `fixture-serialized-${index + 1}` });
+          },
+          listForFixtureDate: async () => {
+            throw new Error('date-wide prediction validation should not run');
+          },
+        },
+        fixtures: {
+          findById: async (id: string) => ({
+            ...fixtureRecord,
+            id,
+            providerFixtureId: `provider-${id}`,
+          }),
+        },
+      }),
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validations.length, predictionIds.length);
+    assert.equal(maxActiveFetches, 1);
   });
 
   it('keeps date validation pending when unsettled fixtures exist alongside already lost settled targets', async () => {

@@ -45,7 +45,14 @@ DATE="${GANA_VALIDATION_DATE:-$(gt_date -1)}"
 export GANA_PROFILE="${GANA_CRON_PROFILE:-full-permissions}"
 export GANA_APPROVAL_MODE="${GANA_CRON_APPROVAL_MODE:-auto-grant}"
 
-exec node scripts/gana-validate-metrics-and-notify.mjs \
-  --date "$DATE" \
-  --scope "${GANA_METRICS_SCOPE:-daily-$DATE}" \
+ARGS=(
+  --date "$DATE"
+  --scope "${GANA_METRICS_SCOPE:-daily-$DATE}"
   --persist "${GANA_METRICS_PERSIST:-true}"
+)
+
+if [[ -n "${GANA_VALIDATION_RECOMMENDATION_ARTIFACT:-}" ]]; then
+  ARGS+=(--recommendation-artifact "$GANA_VALIDATION_RECOMMENDATION_ARTIFACT")
+fi
+
+exec node scripts/gana-validate-metrics-and-notify.mjs "${ARGS[@]}"

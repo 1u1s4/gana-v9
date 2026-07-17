@@ -97,3 +97,158 @@ Status: achieved on `2026-07-16T05:16:00Z`.
   the published July 16 lock is terminal and the dispatcher selects the July 17
   initial Daily rather than retrying or blocking it.
 - `pnpm typecheck` and the full `pnpm test` suite pass (566/566).
+
+## Continuation: recover July 17 and clear stuck scheduled work
+
+### Outcome
+
+On `2026-07-16`, recover the missing Daily E2E for the `2026-07-17` slate,
+identify why the scheduled catch-up did not produce recommendations, and review
+the Codex Automation runs that appeared stuck without duplicating an existing
+publication.
+
+### Findings
+
+- The 07:15 Automation thread disconnected before it invoked the dispatcher.
+  The 10:15 checkpoint did perform the catch-up, but all 83 initial agentic
+  research requests failed with HTTP 400 because the `gpt-5.6-terra` model
+  required a newer Codex CLI.
+- Scheduled shells prioritized `/opt/homebrew/bin/codex` (`0.136.0`) over the
+  user-updatable CLI. Even the stable user CLI (`0.144.5`) was too old for the
+  model at the time of the incident.
+- Two later Automation threads completed their operational command but then
+  waited 87-223 seconds while trying to archive their own active thread. This
+  made completed work appear hung.
+- The July 15 validation job used a stale `dist/cli.js`. That build passed
+  synthetic `daily-focus-*` parlay identifiers to Prisma UUID queries, so both
+  validation and metrics exited 1.
+- Retention's July 16 `review-required` state is a completed safety gate, not a
+  live or abandoned process. Strategy review completed and published normally.
+
+### Changes
+
+- Upgraded both CLI resolution paths to `codex-cli 0.145.0-alpha.18` and proved
+  `gpt-5.6-terra` works through both paths with live canaries.
+- Daily and strategy shell wrappers now prefer `$HOME/.local/bin`, with
+  `GANA_CODEX_BIN_DIR` as an explicit override, before Homebrew paths.
+- Validation/metrics now use `dist/cli.js` only when it is at least as current
+  as `src`; otherwise they execute `src/cli.ts` through `tsx`.
+- The Automation prompt no longer calls `set_thread_archived` from inside its
+  own active turn. The three affected scheduled threads were archived after
+  their terminal state was audited.
+
+### Completion proof
+
+Status: achieved on `2026-07-16T21:29:26Z`.
+
+- Batch `daily-2026-07-17-full` ran for 34 minutes and published 5 selections:
+  3 parlays and 2 atomic predictions.
+- The final artifact passed the deterministic Discord dry-run in one payload,
+  with human fixture labels and no raw UUID/`Fixture ...` placeholders.
+- Discord recommendations message: `1527426418856820974`.
+- The publication ledger contains 8/8 `published` prediction rows with one
+  payload hash and the same Discord message ID; the Daily lock is `published`.
+- Provider run `b42b4c24-d726-4c09-97ce-6c7ab773c0bb` finished with all 9/9
+  durable tasks `succeeded` in both local artifacts and the database. No Daily,
+  scoring, research, or notifier process remained alive.
+- The July 15 validation catch-up completed with 12 validation rows, one daily
+  metric snapshot, and Discord statistics message `1527426926120271984`; its
+  lock is now `published`.
+- A post-publication 18:15 dispatcher simulation reports `nothing-due`, with
+  the July 17 Daily and July 15 validation both terminal and idempotent.
+- Focused runtime checks pass 16/16; `pnpm typecheck` passes. The full suite
+  passes 565/569 inside the sandbox, with only four dashboard socket tests
+  blocked by `listen EPERM`; the affected dashboard suite passes 20/20 when
+  rerun with local socket permission.
+
+### Reviewed historical state debt
+
+The database also contains 13 old `HarnessRun` rows and 209 old `HarnessTask`
+rows marked nonterminal even though no matching process is alive. They predate
+this incident and are internal lifecycle residue, not active Codex Automation
+threads. They were intentionally not bulk-mutated: nested services can currently
+mark a parent run terminal while its synchronous pipeline is still active, so a
+safe cleanup requires a compare-and-set reconciler and a separate lifecycle fix.
+
+## Continuation: repair previous-day validation and historical catch-up
+
+### Outcome
+
+Repair the validation scheduler so every checkpoint accounts for the previous
+day and safely catches up older omissions. Audit validation dates 2026-07-02
+through 2026-07-15, reuse already-proven deliveries, and resolve only dates that
+are missing, source-misaligned, or have no published Daily.
+
+### Audit result
+
+- Exact successful validation and current-channel Discord delivery already exist
+  for July 2, 5, 6, 7, 9, 10, 12, and 15; they must not be duplicated.
+- July 3 and 14 have a published Daily but validation failed before publication.
+- July 4 and 11 published validation messages against a newer/different artifact,
+  not the Daily batch that was actually published; they require visibly labelled
+  corrections against `daily-2026-07-04-full` and
+  `daily-2026-07-11-sol-high`.
+- July 8 and 13 have Daily locks in `retryable`, not `published`. They must be
+  closed explicitly as no-publication days and must not mirror picks that users
+  never received.
+- Historical validation logs resolve to the same configured validation target,
+  `discord:1510041125614915756`; existing message IDs are delivery evidence,
+  not a reason to resend every correct date.
+
+### Implemented safety contract
+
+- The dispatcher scans yesterday plus a 14-day backlog, prioritizes yesterday,
+  then the oldest safe historical date, and runs at most one validation per tick.
+- A validation is runnable only from a `published` Daily lock and the exact
+  `runs/<dailyBatchId>/daily-parlay-recommendations.json` with aligned date/batch.
+- The wrapper uses an atomic per-date mutex and phase state. `--force` is rejected;
+  a backfill requires a visible `--test-label`.
+- Validate must succeed before metrics, and both must succeed before Discord.
+- Payloads are frozen before send. The lock stores target, hashes, stats ID,
+  every mirror ID, and each delivery entry. Any possible partial delivery becomes
+  `publication-uncertain` and is never retried automatically.
+- Pre-publication retryable work resumes by phase; v2 `review-required` remains
+  manual so a partial validation cannot silently duplicate stored history.
+
+### Verification and pending production gate
+
+- Focused dispatcher/runtime/workflow suite passes 60/60. It includes corrupt,
+  null and status-less locks, impossible dates, read-only mutex inspection,
+  resume-artifact date/missing checks, terminal-state previews and direct-Telegram
+  suppression during `--dry-run`.
+- All six live actions now have a zero-effect `--dry-run`: July 3/4/11/14 resolve
+  to `validate-metrics-notify` with the exact published batch, while July 8/13
+  resolve to `close-no-publication`. Every preview targets
+  `discord:1510041125614915756`; lock hashes remained unchanged and no mutex was
+  created.
+- A no-publication closeout now fails closed unless the Daily lock is missing or
+  has an exact-date `retryable`/`failed`/`blocked` state with no publication
+  evidence. Invalid JSON roots, unknown states and mismatched dates cannot be
+  converted into a closeout.
+- `npm run typecheck`, `node --check`, `bash -n` and `git diff --check` pass. The
+  full suite passes 605/609 inside the sandbox; the only four failures are the
+  expected dashboard socket `listen EPERM` cases, and the dashboard suite passes
+  27/27 with local ephemeral-socket permission.
+- DB preflight is connected, PostgreSQL migrations are applied, and no validation
+  process or mutex is active.
+- The first live July 3 backfill was rejected by the production approval layer
+  before process creation. No DB row, lock, mutex, or Discord message changed.
+- Pending explicit production authorization: recompute/publish July 3 and 14;
+  recompute/publish labelled corrections for July 4 and 11; publish no-publication
+  closeouts (without mirrors) for July 8 and 13.
+
+### Current external blocker
+
+Status: blocked pending explicit production authorization.
+
+- The same approval gate has remained unanswered for three consecutive goal
+  turns. The production approval layer already rejected the first attempted
+  July 3 run before process creation, and retrying without new authorization is
+  prohibited.
+- No live backfill, DB mutation, validation-lock rewrite, mutex creation or
+  Discord send was performed after that rejection. The six exact dry-runs remain
+  the authoritative execution plan.
+- Resume condition: the user explicitly authorizes the six production actions.
+  Then execute sequentially in this stop-on-uncertainty order: July 3, 4, 8, 11,
+  13 and 14, verifying each lock, artifact, DB result and Discord message ID
+  before starting the next date.

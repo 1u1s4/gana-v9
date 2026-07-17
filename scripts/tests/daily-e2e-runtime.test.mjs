@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import {
@@ -10,6 +12,15 @@ import {
 } from '../lib/daily-e2e-runtime.mjs';
 
 describe('daily E2E runtime defaults', () => {
+  it('prefers the user-updatable Codex CLI over an older Homebrew install', () => {
+    const repoRoot = resolve(new URL('../..', import.meta.url).pathname);
+    const shell = readFileSync(resolve(repoRoot, 'scripts/gana-daily-e2e-notify.sh'), 'utf8');
+
+    assert.match(shell, /GANA_CODEX_BIN_DIR/);
+    assert.match(shell, /\$HOME\/\.local\/bin/);
+    assert.match(shell, /CODEX_USER_BIN:\+\$CODEX_USER_BIN:/);
+  });
+
   it('defaults to Terra high without fast tier', () => {
     assert.deepEqual(resolveDailyRuntime({ env: {} }), {
       codexModel: DEFAULT_DAILY_CODEX_MODEL,

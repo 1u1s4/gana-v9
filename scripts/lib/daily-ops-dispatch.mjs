@@ -26,6 +26,7 @@ const STRATEGY_MINUTE = DAILY_OPS_CHECKPOINTS[2].minute;
 const RECOVERY_MINUTE = DAILY_OPS_CHECKPOINTS[3].minute;
 const CHILD_RUNNING_STALE_MS = 20 * 60 * 60 * 1000;
 const GLOBAL_LOCK_INITIALIZATION_GRACE_MS = 30 * 1000;
+const DEFAULT_VALIDATION_CATCHUP_DAYS = 14;
 
 const RETENTION_TERMINAL_STATUSES = new Set([
   'completed',
@@ -113,6 +114,7 @@ export function planDailyOps({
   artifactRoot,
   maintenancePaused = false,
   isProcessAlive = processIsAlive,
+  validationCatchupFrom,
 } = {}) {
   if (!artifactRoot) throw new Error('artifactRoot is required.');
   const instant = validDate(now, 'now');
@@ -124,7 +126,13 @@ export function planDailyOps({
   };
   const paths = dailyOpsPaths(artifactRoot, dates);
   const retention = inspectJsonPath(paths.retentionMarker);
-  const validation = inspectJsonPath(paths.validationLock);
+  const validationCatchup = inspectValidationCatchup({
+    artifactRoot,
+    dates,
+    now: instant,
+    catchupFrom: validationCatchupFrom,
+  });
+  const validation = validationCatchup.previousState;
   const rolloverDaily = inspectJsonPath(paths.rolloverDailyLock);
   const daily = inspectJsonPath(paths.dailyLock);
   const strategy = inspectJsonPath(paths.strategyLock);
@@ -132,7 +140,7 @@ export function planDailyOps({
 
   const morning = [
     planRetention({ eligible: morningEligible, state: retention, path: paths.retentionMarker }),
-    planValidation({ eligible: morningEligible, state: validation, now: instant, path: paths.validationLock }),
+    planValidation({ eligible: morningEligible, catchup: validationCatchup }),
   ];
 
   const heavy = chooseHeavyAction({
@@ -153,6 +161,8 @@ export function planDailyOps({
     local,
     dates,
     paths,
+    validationCatchup: { from: validationCatchup.from, to: validationCatchup.to },
+    validationBacklog: validationCatchup.backlog,
     morning,
     heavy,
     state: {
@@ -184,6 +194,7 @@ export function runDailyOpsDispatch({
     artifactRoot,
     maintenancePaused,
     isProcessAlive,
+    validationCatchupFrom: env.GANA_VALIDATION_CATCHUP_FROM,
   });
   const summary = baseSummary(initialPlan, dryRun);
 
@@ -222,6 +233,7 @@ export function runDailyOpsDispatch({
       artifactRoot,
       maintenancePaused: false,
       isProcessAlive,
+      validationCatchupFrom: env.GANA_VALIDATION_CATCHUP_FROM,
     });
     Object.assign(summary, baseSummary(plan, false));
     summary.globalLock = publicGlobalLock(lock, plan.paths.globalLock);
@@ -232,7 +244,7 @@ export function runDailyOpsDispatch({
         actions.push(skippedAction(morningAction));
         continue;
       }
-      const action = actionDefinition(morningAction.flow, plan, repoRoot, artifactRoot);
+      const action = actionDefinition(morningAction.flow, plan, repoRoot, artifactRoot, morningAction);
       const result = safelyExecute(execute, action, { ...env, ...action.env });
       const recorded = executedAction(action, result);
       if (morningAction.flow === 'retention') {
@@ -405,14 +417,301 @@ function planRetention({ eligible, state, path }) {
   return { flow: 'retention', run: false, path, reason: state.error ? 'marker-invalid' : `marker-blocks-${status ?? 'unknown'}` };
 }
 
-function planValidation({ eligible, state, now, path }) {
-  if (!eligible) return { flow: 'validation', run: false, path, reason: 'before-07:15' };
-  if (!state.exists) return { flow: 'validation', run: true, path, reason: 'daily-lock-missing' };
-  const status = state.value?.status;
-  if (status === 'running' && state.mtimeMs !== undefined && now.getTime() - state.mtimeMs >= CHILD_RUNNING_STALE_MS) {
-    return { flow: 'validation', run: true, path, reason: 'stale-running-lock-delegated-to-wrapper' };
+function inspectValidationCatchup({ artifactRoot, dates, now, catchupFrom }) {
+  const from = resolveValidationCatchupFrom(dates, catchupFrom);
+  const lockRoot = resolve(artifactRoot, 'cron', 'locks');
+  const entries = [];
+  let previousState = inspectJsonPath(resolve(lockRoot, `validation-${dates.previous}.lock`));
+
+  for (let date = from; date <= dates.previous; date = offsetIsoDate(date, 1)) {
+    const validationLock = resolve(lockRoot, `validation-${date}.lock`);
+    const dailyLock = resolve(lockRoot, `daily-e2e-${date}.lock`);
+    const validationState = date === dates.previous
+      ? previousState
+      : inspectJsonPath(validationLock);
+    if (date === dates.previous) previousState = validationState;
+    const entry = inspectValidationDate({
+      artifactRoot,
+      date,
+      now,
+      dailyLock,
+      dailyState: inspectJsonPath(dailyLock),
+      validationLock,
+      validationState,
+    });
+    if (!entry.terminal) entries.push(entry);
   }
-  return { flow: 'validation', run: false, path, reason: state.error ? 'lock-invalid' : `lock-blocks-${status ?? 'unknown'}` };
+
+  const runnable = entries.filter((entry) => entry.runnable);
+  const selected = runnable.find((entry) => entry.date === dates.previous)
+    ?? runnable.find((entry) => entry.date < dates.previous)
+    ?? null;
+  return {
+    from,
+    to: dates.previous,
+    previousState,
+    backlog: entries.map(publicValidationBacklogEntry),
+    selected,
+  };
+}
+
+function resolveValidationCatchupFrom(dates, configured) {
+  const value = typeof configured === 'string' ? configured.trim() : '';
+  const from = value || offsetIsoDate(dates.today, -DEFAULT_VALIDATION_CATCHUP_DAYS);
+  if (!isExactIsoDate(from)) {
+    throw new Error('GANA_VALIDATION_CATCHUP_FROM must be a valid YYYY-MM-DD date.');
+  }
+  if (from > dates.previous) {
+    throw new Error(`GANA_VALIDATION_CATCHUP_FROM must be on or before ${dates.previous}.`);
+  }
+  return from;
+}
+
+function inspectValidationDate({
+  artifactRoot,
+  date,
+  now,
+  dailyLock,
+  dailyState,
+  validationLock,
+  validationState,
+}) {
+  const dailyStatus = statusValue(dailyState);
+  const validationStatus = statusValue(validationState);
+  const dailyBatchId = typeof dailyState.value?.dailyBatchId === 'string'
+    ? dailyState.value.dailyBatchId.trim()
+    : '';
+  const recommendationArtifact = validBatchId(dailyBatchId)
+    ? resolve(artifactRoot, 'runs', dailyBatchId, 'daily-parlay-recommendations.json')
+    : undefined;
+  const source = inspectValidationSource({
+    date,
+    dailyBatchId,
+    dailyState,
+    recommendationArtifact,
+  });
+  const common = {
+    date,
+    dailyLock,
+    validationLock,
+    dailyBatchId: dailyBatchId || undefined,
+    recommendationArtifact,
+    dailyStatus,
+    validationStatus,
+    sourceReason: source.reason,
+  };
+
+  if (validationState.error) {
+    return { ...common, runnable: false, terminal: false, reason: 'validation-lock-invalid' };
+  }
+
+  if (validationState.exists && validationStatus === 'published') {
+    const exact = source.ok
+      && validationPublishedExact({
+        date,
+        dailyBatchId,
+        recommendationArtifact,
+        value: validationState.value,
+      });
+    return exact
+      ? { ...common, runnable: false, terminal: true, reason: 'validation-terminal-published' }
+      : { ...common, runnable: false, terminal: false, reason: 'published-validation-misaligned' };
+  }
+
+  if (validationState.exists && validationStatus === 'not-applicable') {
+    const exact = validationNotApplicableExact({
+      date,
+      dailyLock,
+      dailyState,
+      value: validationState.value,
+    });
+    return exact
+      ? { ...common, runnable: false, terminal: true, reason: 'validation-terminal-not-applicable' }
+      : { ...common, runnable: false, terminal: false, reason: 'not-applicable-validation-misaligned' };
+  }
+
+  if (validationStatus === 'publishing' || validationStatus === 'publication-uncertain') {
+    return { ...common, runnable: false, terminal: false, reason: `validation-${validationStatus}` };
+  }
+
+  if (!source.ok) {
+    return { ...common, runnable: false, terminal: false, reason: source.reason };
+  }
+
+  if (!validationState.exists) {
+    return { ...common, runnable: true, terminal: false, reason: 'validation-lock-missing' };
+  }
+
+  const lockDate = validationState.value?.date;
+  if (lockDate !== undefined && lockDate !== date) {
+    return { ...common, runnable: false, terminal: false, reason: 'validation-lock-date-mismatch' };
+  }
+  const notificationIds = validationNotificationIds(validationState.value);
+
+  if (validationStatus === 'review-required') {
+    if (notificationIds.length > 0) {
+      return { ...common, runnable: false, terminal: false, reason: 'review-required-notification-uncertain' };
+    }
+    if (Number(validationState.value?.schemaVersion) >= 2) {
+      return { ...common, runnable: false, terminal: false, reason: 'review-required-manual' };
+    }
+    return { ...common, runnable: true, terminal: false, reason: 'legacy-review-required-without-notifications' };
+  }
+
+  if (validationStatus === 'retryable') {
+    if (notificationIds.length > 0) {
+      return { ...common, runnable: false, terminal: false, reason: 'retryable-notification-uncertain' };
+    }
+    const retryAfter = validationState.value?.retryAfter;
+    const retryAt = typeof retryAfter === 'string' ? Date.parse(retryAfter) : Number.NaN;
+    return Number.isFinite(retryAt) && retryAt <= now.getTime()
+      ? { ...common, runnable: true, terminal: false, retryAfter, reason: 'validation-retryable-due' }
+      : { ...common, runnable: false, terminal: false, retryAfter, reason: 'validation-retryable-not-due' };
+  }
+
+  if (validationStatus === 'running' || validationStatus.startsWith('running-')) {
+    if (notificationIds.length > 0) {
+      return { ...common, runnable: false, terminal: false, reason: 'running-notification-uncertain' };
+    }
+    const stale = validationState.mtimeMs !== undefined
+      && now.getTime() - validationState.mtimeMs >= CHILD_RUNNING_STALE_MS;
+    return stale
+      ? { ...common, runnable: true, terminal: false, reason: 'stale-running-lock-delegated-to-wrapper' }
+      : { ...common, runnable: false, terminal: false, reason: 'validation-running' };
+  }
+
+  return {
+    ...common,
+    runnable: false,
+    terminal: false,
+    reason: `validation-lock-blocks-${validationStatus}`,
+  };
+}
+
+function inspectValidationSource({ date, dailyBatchId, dailyState, recommendationArtifact }) {
+  if (!dailyState.exists) return { ok: false, reason: 'daily-lock-missing' };
+  if (dailyState.error) return { ok: false, reason: 'daily-lock-invalid' };
+  if (dailyState.value?.status !== 'published') {
+    return { ok: false, reason: `daily-not-published-${dailyState.value?.status ?? 'unknown'}` };
+  }
+  if (dailyState.value?.date !== date) return { ok: false, reason: 'daily-lock-date-mismatch' };
+  if (!validBatchId(dailyBatchId)) return { ok: false, reason: 'daily-batch-id-invalid' };
+  const artifact = inspectJsonPath(recommendationArtifact);
+  if (!artifact.exists) return { ok: false, reason: 'canonical-recommendation-artifact-missing' };
+  if (artifact.error) return { ok: false, reason: 'canonical-recommendation-artifact-invalid' };
+  if (artifact.value?.date !== date || artifact.value?.dailyBatchId !== dailyBatchId) {
+    return { ok: false, reason: 'canonical-recommendation-artifact-misaligned' };
+  }
+  return { ok: true, reason: 'published-daily-source-exact' };
+}
+
+function validationPublishedExact({ date, dailyBatchId, recommendationArtifact, value }) {
+  if (value?.date !== date || value?.validationExit !== 0 || value?.metricsExit !== 0) return false;
+  if (value?.dailyBatchId !== undefined && value.dailyBatchId !== dailyBatchId) return false;
+  if (value?.source?.dailyBatchId !== undefined && value.source.dailyBatchId !== dailyBatchId) return false;
+  const artifacts = [
+    value?.recommendationArtifact,
+    value?.source?.recommendationArtifact,
+    value?.artifacts?.recommendation,
+    ...(Array.isArray(value?.artifacts) ? value.artifacts : []),
+  ].filter((item) => typeof item === 'string');
+  if (!artifacts.some((item) => resolve(item) === resolve(recommendationArtifact))) return false;
+  return validationNotificationIds(value).length > 0;
+}
+
+function validationNotApplicableExact({ date, dailyLock, dailyState, value }) {
+  if (value?.date !== date || dailyState.error) return false;
+  const actualDailyStatus = dailyState.exists ? dailyState.value?.status ?? 'unknown' : 'missing';
+  if (actualDailyStatus === 'published' || value?.source?.dailyStatus !== actualDailyStatus) return false;
+  if (typeof value?.source?.dailyLock !== 'string' || resolve(value.source.dailyLock) !== resolve(dailyLock)) return false;
+  return validationNotificationIds(value).length > 0;
+}
+
+function validationNotificationIds(value) {
+  const found = [];
+  const visit = (item) => {
+    if (typeof item === 'string') {
+      if (/^\d{10,}$/.test(item)) found.push(item);
+      return;
+    }
+    if (typeof item === 'number' && Number.isSafeInteger(item) && item > 0) {
+      found.push(String(item));
+      return;
+    }
+    if (Array.isArray(item)) {
+      for (const child of item) visit(child);
+      return;
+    }
+    if (item && typeof item === 'object') {
+      for (const child of Object.values(item)) visit(child);
+    }
+  };
+  visit(value?.notifications);
+  visit(value?.notificationIds);
+  visit(value?.messageId);
+  visit(value?.messageIds);
+  return [...new Set(found)];
+}
+
+function validBatchId(value) {
+  return typeof value === 'string'
+    && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+    && value !== '.'
+    && value !== '..';
+}
+
+function statusValue(state) {
+  if (!state.exists) return 'missing';
+  return typeof state.value?.status === 'string' && state.value.status.trim()
+    ? state.value.status.trim()
+    : 'unknown';
+}
+
+function isExactIsoDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  try {
+    return offsetIsoDate(value, 0) === value;
+  } catch {
+    return false;
+  }
+}
+
+function publicValidationBacklogEntry(entry) {
+  return {
+    date: entry.date,
+    runnable: entry.runnable,
+    reason: entry.reason,
+    retryAfter: entry.retryAfter,
+    dailyStatus: entry.dailyStatus,
+    validationStatus: entry.validationStatus,
+    dailyBatchId: entry.dailyBatchId,
+    recommendationArtifact: entry.recommendationArtifact,
+    dailyLock: entry.dailyLock,
+    validationLock: entry.validationLock,
+    sourceReason: entry.sourceReason,
+  };
+}
+
+function planValidation({ eligible, catchup }) {
+  if (!eligible) {
+    return { flow: 'validation', run: false, reason: 'before-07:15' };
+  }
+  if (!catchup.selected) {
+    return {
+      flow: 'validation',
+      run: false,
+      reason: catchup.backlog.length > 0 ? 'validation-backlog-no-runnable' : 'validation-backlog-empty',
+    };
+  }
+  return {
+    flow: 'validation',
+    run: true,
+    path: catchup.selected.validationLock,
+    targetDate: catchup.selected.date,
+    recommendationArtifact: catchup.selected.recommendationArtifact,
+    dailyBatchId: catchup.selected.dailyBatchId,
+    reason: catchup.selected.reason,
+  };
 }
 
 function chooseHeavyAction({
@@ -513,7 +812,7 @@ function inspectStrategyPending(state, now, isProcessAlive) {
   return { pending: false, reason: 'strategy-running-owner-unknown' };
 }
 
-function actionDefinition(flow, plan, repoRoot, artifactRoot) {
+function actionDefinition(flow, plan, repoRoot, artifactRoot, plannedAction) {
   const commonEnv = { GANA_ARTIFACT_ROOT: artifactRoot };
   if (flow === 'retention') {
     return {
@@ -527,13 +826,22 @@ function actionDefinition(flow, plan, repoRoot, artifactRoot) {
     };
   }
   if (flow === 'validation') {
+    if (!plannedAction?.targetDate || !plannedAction?.recommendationArtifact) {
+      throw new Error('Validation dispatch requires an exact target date and recommendation artifact.');
+    }
     return {
       flow,
       kind: 'morning',
-      targetDate: plan.dates.previous,
+      targetDate: plannedAction.targetDate,
+      dailyBatchId: plannedAction.dailyBatchId,
+      recommendationArtifact: plannedAction.recommendationArtifact,
       command: [resolve(repoRoot, 'scripts/gana-previous-day-validation-notify.sh')],
       displayCommand: 'scripts/gana-previous-day-validation-notify.sh',
-      env: { ...commonEnv, GANA_VALIDATION_DATE: plan.dates.previous },
+      env: {
+        ...commonEnv,
+        GANA_VALIDATION_DATE: plannedAction.targetDate,
+        GANA_VALIDATION_RECOMMENDATION_ARTIFACT: plannedAction.recommendationArtifact,
+      },
       cwd: repoRoot,
     };
   }
@@ -651,6 +959,7 @@ function executedAction(action, result) {
     kind: action.kind,
     mode: action.mode,
     targetDate: action.targetDate,
+    recommendationArtifact: action.recommendationArtifact,
     command: action.displayCommand,
     decision: 'executed',
     status: result.exitCode === 0 && !result.error ? 'completed' : 'failed',
@@ -666,6 +975,7 @@ function skippedAction(action) {
   return {
     flow: action.flow,
     kind: 'morning',
+    targetDate: action.targetDate,
     decision: 'skipped',
     reason: action.reason,
   };
@@ -675,6 +985,8 @@ function plannedActions(plan) {
   const actions = plan.morning.map((action) => ({
     flow: action.flow,
     kind: 'morning',
+    targetDate: action.targetDate,
+    recommendationArtifact: action.recommendationArtifact,
     decision: action.run ? 'would-run' : 'skipped',
     reason: action.reason,
   }));
@@ -704,6 +1016,8 @@ function baseSummary(plan, dryRun) {
     checkpoint: plan.local.checkpoint,
     dates: plan.dates,
     state: plan.state,
+    validationCatchup: plan.validationCatchup,
+    validationBacklog: plan.validationBacklog,
     heavyDecision: plan.heavy ? {
       flow: plan.heavy.flow,
       mode: plan.heavy.mode,

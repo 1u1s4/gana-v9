@@ -159,6 +159,11 @@ describe('daily metrics service', () => {
       recommendations: [
         {
           kind: 'parlay',
+          parlayId: 'daily-focus-parlay-diamante-39d62c9b878aaae9',
+          legs: [{ predictionId: PREDICTION_1_ID }],
+        },
+        {
+          kind: 'parlay',
           parlayId: PARLAY_1_ID,
           predictionIds: [PREDICTION_1_ID, 'daily-focus-prediction-list'],
           legs: [{ predictionId: PREDICTION_1_ID }, { predictionId: PREDICTION_2_ID }],

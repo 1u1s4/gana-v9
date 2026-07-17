@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -58,6 +59,7 @@ test('Guatemala clock exposes the five exact checkpoints and preserves the local
 
 test('07:15 enables independent morning work and a late wake also catches up Daily', () => {
   withArtifacts((artifactRoot) => {
+    publishDailyForDate(artifactRoot, '2026-07-14');
     const before = planDailyOps({ now: AT.beforeMorning, artifactRoot });
     assert.deepEqual(before.morning.map((item) => item.run), [false, false]);
     assert.equal(before.heavy, null);
@@ -71,6 +73,239 @@ test('07:15 enables independent morning work and a late wake also catches up Dai
     assert.equal(late.heavy?.flow, 'daily');
     assert.equal(late.heavy?.mode, 'initial');
     assert.equal(late.heavy?.targetDate, '2026-07-16');
+  });
+});
+
+test('validation catch-up scans 14 prior dates by default and keeps blocked Daily dates visible', () => {
+  withArtifacts((artifactRoot) => {
+    const plan = planDailyOps({ now: AT.morning, artifactRoot });
+    assert.deepEqual(plan.validationCatchup, { from: '2026-07-01', to: '2026-07-14' });
+    assert.equal(plan.validationBacklog.length, 14);
+    assert.deepEqual(
+      [plan.validationBacklog[0].date, plan.validationBacklog.at(-1).date],
+      ['2026-07-01', '2026-07-14'],
+    );
+    assert.equal(plan.validationBacklog.at(-1).reason, 'daily-lock-missing');
+    assert.equal(plan.morning[1].run, false);
+    assert.equal(plan.morning[1].reason, 'validation-backlog-no-runnable');
+  });
+});
+
+test('validation catch-up prioritizes yesterday, then the oldest runnable historical date', () => {
+  withArtifacts((artifactRoot) => {
+    const yesterdayArtifact = publishDailyForDate(artifactRoot, '2026-07-14');
+    const oldestArtifact = publishDailyForDate(artifactRoot, '2026-07-03', 'daily-2026-07-03-recovered');
+    const options = {
+      now: AT.morning,
+      artifactRoot,
+      validationCatchupFrom: '2026-07-02',
+    };
+
+    let plan = planDailyOps(options);
+    assert.equal(plan.morning[1].targetDate, '2026-07-14');
+    assert.equal(plan.morning[1].recommendationArtifact, yesterdayArtifact);
+
+    publishValidationForDate(artifactRoot, '2026-07-14', yesterdayArtifact);
+    plan = planDailyOps(options);
+    assert.equal(plan.morning[1].targetDate, '2026-07-03');
+    assert.equal(plan.morning[1].recommendationArtifact, oldestArtifact);
+
+    writeJson(pathsFor(artifactRoot).retentionMarker, { status: 'completed' });
+    const calls = [];
+    const summary = runDailyOpsDispatch({
+      repoRoot: REPO_ROOT,
+      artifactRoot,
+      now: AT.morning,
+      env: { GANA_VALIDATION_CATCHUP_FROM: '2026-07-02' },
+      execute(action, childEnv) {
+        calls.push({ action, childEnv });
+        return { status: 0, stdout: '{}' };
+      },
+    });
+    assert.equal(summary.status, 'completed');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].action.flow, 'validation');
+    assert.equal(calls[0].action.targetDate, '2026-07-03');
+    assert.equal(calls[0].action.recommendationArtifact, oldestArtifact);
+    assert.equal(calls[0].childEnv.GANA_VALIDATION_DATE, '2026-07-03');
+    assert.equal(calls[0].childEnv.GANA_VALIDATION_RECOMMENDATION_ARTIFACT, oldestArtifact);
+  });
+});
+
+test('validation catch-up only trusts a published Daily lock and its canonical exact artifact', () => {
+  withArtifacts((artifactRoot) => {
+    const date = '2026-07-14';
+    const dailyBatchId = `daily-${date}-full`;
+    const dailyLock = join(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`);
+    const artifact = join(artifactRoot, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
+    const options = { now: AT.morning, artifactRoot, validationCatchupFrom: date };
+
+    writeJson(dailyLock, { date, dailyBatchId, status: 'retryable' });
+    writeJson(artifact, { date, dailyBatchId, recommendations: [] });
+    let plan = planDailyOps(options);
+    assert.equal(plan.morning[1].run, false);
+    assert.equal(plan.validationBacklog[0].reason, 'daily-not-published-retryable');
+    assert.equal(plan.validationBacklog[0].dailyStatus, 'retryable');
+
+    writeJson(dailyLock, { date, dailyBatchId, status: 'published' });
+    rmSync(artifact);
+    plan = planDailyOps(options);
+    assert.equal(plan.validationBacklog[0].reason, 'canonical-recommendation-artifact-missing');
+
+    writeJson(artifact, { date: '2026-07-13', dailyBatchId, recommendations: [] });
+    plan = planDailyOps(options);
+    assert.equal(plan.validationBacklog[0].reason, 'canonical-recommendation-artifact-misaligned');
+
+    writeJson(artifact, { date, dailyBatchId, recommendations: [] });
+    plan = planDailyOps(options);
+    assert.equal(plan.morning[1].run, true);
+    assert.equal(plan.morning[1].recommendationArtifact, artifact);
+  });
+});
+
+test('an exact not-applicable closeout is terminal only while Daily was not published', () => {
+  withArtifacts((artifactRoot) => {
+    const date = '2026-07-14';
+    const dailyBatchId = `daily-${date}-full`;
+    const dailyLock = join(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`);
+    const validationLock = join(artifactRoot, 'cron', 'locks', `validation-${date}.lock`);
+    const options = { now: AT.morning, artifactRoot, validationCatchupFrom: date };
+    writeJson(dailyLock, { date, dailyBatchId, status: 'retryable' });
+    writeJson(validationLock, {
+      schemaVersion: 2,
+      date,
+      status: 'not-applicable',
+      source: { dailyLock, dailyStatus: 'retryable' },
+      notifications: { messageIds: ['1527426926120271984'] },
+    });
+
+    let plan = planDailyOps(options);
+    assert.deepEqual(plan.validationBacklog, []);
+    assert.equal(plan.morning[1].reason, 'validation-backlog-empty');
+
+    publishDailyForDate(artifactRoot, date, dailyBatchId);
+    plan = planDailyOps(options);
+    assert.equal(plan.morning[1].run, false);
+    assert.equal(plan.validationBacklog[0].reason, 'not-applicable-validation-misaligned');
+  });
+});
+
+test('validation lock states distinguish safe retries from uncertain publications', () => {
+  withArtifacts((artifactRoot) => {
+    const date = '2026-07-14';
+    const artifact = publishDailyForDate(artifactRoot, date);
+    const lock = join(artifactRoot, 'cron', 'locks', `validation-${date}.lock`);
+    const options = { now: AT.morning, artifactRoot, validationCatchupFrom: date };
+    const validationAction = () => planDailyOps(options).morning[1];
+    const backlog = () => planDailyOps(options).validationBacklog;
+
+    assert.equal(validationAction().reason, 'validation-lock-missing');
+
+    writeJson(lock, {
+      date,
+      status: 'review-required',
+      validationExit: 1,
+      metricsExit: 1,
+      notifications: { alerts: 'discord:1510041125614915756' },
+    });
+    assert.equal(validationAction().reason, 'legacy-review-required-without-notifications');
+
+    writeJson(lock, {
+      schemaVersion: 2,
+      date,
+      status: 'review-required',
+      validationExit: 1,
+      metricsExit: null,
+      notifications: { messageIds: [] },
+    });
+    assert.equal(validationAction().run, false);
+    assert.equal(backlog()[0].reason, 'review-required-manual');
+
+    writeJson(lock, {
+      date,
+      status: 'review-required',
+      notifications: { stats: '1527426926120271984' },
+    });
+    assert.equal(validationAction().run, false);
+    assert.equal(backlog()[0].reason, 'review-required-notification-uncertain');
+
+    writeJson(lock, {
+      date,
+      status: 'retryable',
+      retryAfter: '2026-07-15T13:14:00.000Z',
+    });
+    assert.equal(validationAction().reason, 'validation-retryable-due');
+
+    writeJson(lock, {
+      date,
+      status: 'retryable',
+      retryAfter: '2026-07-15T13:16:00.000Z',
+    });
+    assert.equal(validationAction().run, false);
+    assert.equal(backlog()[0].reason, 'validation-retryable-not-due');
+
+    for (const status of ['running-validation', 'running-metrics']) {
+      writeJson(lock, { date, status });
+      const staleAt = new Date(AT.morning.getTime() - (21 * 60 * 60 * 1000));
+      utimesSync(lock, staleAt, staleAt);
+      assert.equal(validationAction().reason, 'stale-running-lock-delegated-to-wrapper', status);
+      const recentAt = new Date(AT.morning.getTime() - (60 * 60 * 1000));
+      utimesSync(lock, recentAt, recentAt);
+      assert.equal(validationAction().run, false, status);
+      assert.equal(backlog()[0].reason, 'validation-running', status);
+    }
+
+    for (const status of ['publishing', 'publication-uncertain']) {
+      writeJson(lock, { date, status });
+      assert.equal(validationAction().run, false, status);
+      assert.equal(backlog()[0].reason, `validation-${status}`, status);
+    }
+
+    publishValidationForDate(artifactRoot, date, join(artifactRoot, 'runs', 'wrong', 'daily-parlay-recommendations.json'));
+    assert.equal(validationAction().run, false);
+    assert.equal(backlog()[0].reason, 'published-validation-misaligned');
+
+    publishValidationForDate(artifactRoot, date, artifact);
+    assert.equal(validationAction().run, false);
+    assert.equal(validationAction().reason, 'validation-backlog-empty');
+    assert.deepEqual(backlog(), []);
+
+    writeJson(lock, {
+      schemaVersion: 2,
+      date,
+      status: 'published',
+      validationExit: 0,
+      metricsExit: 0,
+      source: {
+        dailyBatchId: `daily-${date}-full`,
+        recommendationArtifact: artifact,
+      },
+      artifacts: {
+        recommendation: artifact,
+        validation: join(artifactRoot, 'runs', 'validation-v2', 'validations.json'),
+        metrics: join(artifactRoot, 'runs', 'metrics-v2', 'daily-metrics.json'),
+      },
+      notifications: {
+        stats: '1527426926120271984',
+        mirrors: ['1527426944126156872'],
+        messageIds: ['1527426926120271984', '1527426944126156872'],
+      },
+    });
+    assert.equal(validationAction().reason, 'validation-backlog-empty');
+    assert.deepEqual(backlog(), []);
+  });
+});
+
+test('invalid validation catch-up start dates fail closed', () => {
+  withArtifacts((artifactRoot) => {
+    assert.throws(
+      () => planDailyOps({ now: AT.morning, artifactRoot, validationCatchupFrom: '2026-02-31' }),
+      /valid YYYY-MM-DD/,
+    );
+    assert.throws(
+      () => planDailyOps({ now: AT.morning, artifactRoot, validationCatchupFrom: '2026-07-15' }),
+      /on or before 2026-07-14/,
+    );
   });
 });
 
@@ -264,6 +499,7 @@ test('strategy running lock is recovered only when both owner and child PIDs are
 
 test('morning failures are independent and at most one heavy flow executes per tick', () => {
   withArtifacts((artifactRoot) => {
+    publishDailyForDate(artifactRoot, '2026-07-14');
     const calls = [];
     const summary = runDailyOpsDispatch({
       repoRoot: REPO_ROOT,
@@ -313,6 +549,7 @@ test('a signaled wrapper is recorded as failed rather than a successful zero exi
 
 test('retention terminal marker makes the daily operation idempotent', () => {
   withArtifacts((artifactRoot) => {
+    publishDailyForDate(artifactRoot, '2026-07-14');
     const paths = pathsFor(artifactRoot);
     const firstCalls = [];
     const first = runDailyOpsDispatch({
@@ -369,6 +606,7 @@ test('a retention mutex skip is not mistaken for a terminal daily marker', () =>
 
 test('maintenance pause and dry-run do not acquire locks or execute commands', () => {
   withArtifacts((artifactRoot) => {
+    publishDailyForDate(artifactRoot, '2026-07-14');
     let calls = 0;
     const paused = runDailyOpsDispatch({
       repoRoot: REPO_ROOT,
@@ -501,6 +739,34 @@ function rolloverPathsFor(artifactRoot) {
     today: '2026-07-16',
     previous: '2026-07-15',
     next: '2026-07-17',
+  });
+}
+
+function publishDailyForDate(artifactRoot, date, dailyBatchId = `daily-${date}-full`) {
+  writeJson(join(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`), {
+    date,
+    dailyBatchId,
+    status: 'published',
+  });
+  const artifact = join(artifactRoot, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
+  writeJson(artifact, {
+    date,
+    dailyBatchId,
+    recommendations: [],
+  });
+  return artifact;
+}
+
+function publishValidationForDate(artifactRoot, date, recommendationArtifact, overrides = {}) {
+  writeJson(join(artifactRoot, 'cron', 'locks', `validation-${date}.lock`), {
+    date,
+    runSlug: `validation-${date}`,
+    status: 'published',
+    validationExit: 0,
+    metricsExit: 0,
+    artifacts: [recommendationArtifact],
+    notifications: { stats: '1527426926120271984' },
+    ...overrides,
   });
 }
 

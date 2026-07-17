@@ -10,18 +10,23 @@ Esta guia deja el flujo diario de Gana v9 programable con una sola autoridad de 
 
 ## Horarios
 
-- `07:15` Guatemala: aplicar retencion una vez por fecha, validar el dia anterior contra el artifact publicado y, como flujo agent-heavy, recuperar un Daily `retryable` del slate de hoy cuyo `retryAfter` vencio tras el rollover.
+- `07:15` Guatemala: aplicar retencion una vez por fecha, validar primero el dia anterior contra el artifact realmente publicado y, como flujo agent-heavy, recuperar un Daily `retryable` del slate de hoy cuyo `retryAfter` vencio tras el rollover.
 - `10:15` Guatemala: correr el Daily E2E inicial del dia siguiente con Codex Terra (`gpt-5.6-terra`), reasoning `high`, sin fast tier, council gate y Discord.
 - `13:15` Guatemala: recuperar primero un Daily inicial que nunca se intento; si ya hubo intento, ejecutar strategy review antes de un Daily meramente `retryable`.
 - `18:15` y `22:15` Guatemala: reintentar el Daily normal del slate de manana solo cuando el lock exacto esta `retryable` y `retryAfter` ya vencio.
 
 Una sola tarea `Gana · operaciones diarias` dispara los cinco checkpoints. El
 dispatcher permite completar retencion y validacion atrasadas, pero inicia como
-maximo un flujo agent-heavy por checkpoint. Nunca usa `--force` ni reintenta
-estados terminales (`published`, `review-required`, `blocked` o
-`publication-uncertain`). Al cambiar la fecha local tambien inspecciona el lock
-del slate de hoy: un `retryable` vencido conserva prioridad sobre el Daily inicial
-de manana, mientras un estado terminal de hoy no lo bloquea.
+maximo un flujo agent-heavy por checkpoint. Para validacion inspecciona por defecto
+los 14 dias anteriores: prioriza ayer y, cuando ayer ya quedo terminal, toma el
+pendiente seguro mas antiguo, como maximo uno por checkpoint. Un catch-up solo es
+runnable si el lock `daily-e2e-YYYY-MM-DD.lock` esta `published` y existe exactamente
+`runs/<dailyBatchId>/daily-parlay-recommendations.json` con date/batch alineados.
+Nunca usa `--force`, no reenvia `publishing`/`publication-uncertain` y deja visibles
+en `validationBacklog` las fechas bloqueadas o sin Daily publicado. Al cambiar la
+fecha local tambien inspecciona el lock del slate de hoy: un `retryable` vencido
+conserva prioridad sobre el Daily inicial de manana, mientras un estado terminal
+de hoy no lo bloquea.
 
 ## Dispatcher canonico
 
@@ -64,10 +69,43 @@ scripts/gana-previous-day-validation-notify.sh
 Este script:
 
 1. Calcula ayer en `America/Guatemala`.
-2. Localiza el `daily-parlay-recommendations.json` publicado para esa fecha.
+2. Lee el lock Daily `published`, deriva el artifact canonico desde su `dailyBatchId` y rechaza cualquier artifact mas nuevo o de otro batch.
 3. Ejecuta `pnpm gana validate --date YYYY-MM-DD --recommendation-artifact PATH`.
 4. Ejecuta `pnpm gana metrics daily --date YYYY-MM-DD --scope daily-YYYY-MM-DD --recommendation-artifact PATH`.
-5. Envia `daily-metrics.json` y el mirror validado al canal de validaciones con embeds nativos usando Hermes gateway.
+5. Solo si ambos comandos terminan correctamente, prepara `daily-metrics.json` y el mirror validado para el canal de validaciones.
+6. Congela los payloads, persiste hashes/target y reserva stats y cada pagina mirror antes de enviar; el lock final guarda todos los message IDs.
+7. Si falla antes del primer envio queda `retryable` con backoff. Si una entrega puede haber quedado parcial pasa a `publication-uncertain` y no se reintenta automaticamente.
+
+El mutex de validacion es independiente del estado y nunca se omite. `--force` se
+rechaza. Un reproceso historico exige `--backfill --test-label TEXT`; una correccion
+de artifact se vuelve visible como retrospectiva y conserva el estado anterior en
+el lock v2. Para cerrar una fecha cuyo Daily nunca se publico se usa el modo
+explicito `--no-publication`: envia solo el cierre, sin espejo de picks inexistentes.
+Ese cierre solo acepta un lock Daily ausente o un estado exacto
+`retryable`/`failed`/`blocked`, con fecha alineada y sin evidencia de publicacion;
+JSON corrupto, `null`, estados desconocidos o message IDs bloquean la operacion.
+
+Ejemplos deliberados:
+
+```bash
+node scripts/gana-validate-metrics-and-notify.mjs \
+  --date YYYY-MM-DD \
+  --backfill \
+  --test-label "Backfill historico · YYYY-MM-DD" \
+  --dry-run
+
+node scripts/gana-validate-metrics-and-notify.mjs \
+  --date YYYY-MM-DD \
+  --backfill \
+  --no-publication \
+  --test-label "Cierre historico · sin Daily publicado" \
+  --dry-run
+```
+
+`--dry-run` resuelve el Daily/artifact/target y muestra la fase que correria, pero
+garantiza cero comandos, escrituras DB, requests API, envios Discord, escrituras de
+lock o creacion de mutex. Retirar el flag solo despues de revisar esa salida y
+obtener la aprobacion correspondiente para efectos live.
 
 Daily E2E y recomendaciones del dia:
 
@@ -120,6 +158,8 @@ Variables utiles:
 - Precedencia de targets: variable especifica del flujo, luego `--gateway-target`, luego `GANA_DISCORD_TARGET`, luego el canal historico.
 - `GANA_DAILY_DATE`: fuerza fecha para Daily E2E.
 - `GANA_VALIDATION_DATE`: fuerza fecha para validacion/metricas.
+- `GANA_VALIDATION_RECOMMENDATION_ARTIFACT`: artifact canonico que el dispatcher entrega al wrapper; debe coincidir con el `dailyBatchId` publicado.
+- `GANA_VALIDATION_CATCHUP_FROM`: inicio ISO opcional del backlog de validacion. Sin valor, el dispatcher inspecciona 14 dias anteriores.
 - `GANA_CRON_MAX_FIXTURES_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_FIXTURES_PER_RUN`.
 - `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN`.
 - `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_PROVIDER_REQUESTS_PER_RUN`.
@@ -168,9 +208,10 @@ Si aparece `falta DATABASE_URL`, corregir el `.env` del repo y repetir el
 preflight; no copiar el secreto al crontab, al comando ni a artifacts.
 
 Despues del dry-run, ejecutar una sola vez el wrapper diario normal. No invocar
-el notifier directo con `--force`: el wrapper y su lock por fecha son la defensa
-principal contra publicaciones duplicadas. Confirmar el ledger antes de dejar
-activa la tarea unica.
+el notifier directo ni usar `--force`: el wrapper lo rechaza y su mutex, estado
+por fases, payload preparado y ledger local de message IDs son la defensa contra
+publicaciones duplicadas. Confirmar el lock `published` antes de dejar activa la
+tarea unica.
 
 Si el E2E ya termino y el lock exacto quedo `retryable` sin haber enviado
 Discord, se puede publicar el artifact existente sin consumir providers ni web:
@@ -282,6 +323,7 @@ bash -n scripts/gana-strategy-review.sh
 bash -n scripts/install-gana-hermes-cron.sh
 node --check scripts/gana-daily-ops-dispatch.mjs
 node --test scripts/tests/daily-ops-dispatch.test.mjs
+node --test scripts/tests/validation-runtime.test.mjs scripts/tests/validation-workflow.test.mjs
 node --test scripts/tests/raw-retention-wrapper.test.mjs
 ```
 

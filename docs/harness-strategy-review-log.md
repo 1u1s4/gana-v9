@@ -2030,3 +2030,20 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [medium] Calibrate safety overrides separately from original model confidence (proposed) — src/daily/recommendation-policy.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
 - [medium] Expand low-odds discovery beyond h2h and double_chance with guarded market caps (proposed) — src/filters/low-odds-selector.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
 - [medium] Reject or normalize unknown parlay profile metadata (ready-for-implementation) — src/parlay/service.ts, src/parlay/analysis.ts, src/strategy-review/daily.ts
+
+## 2026-07-16 · strategy-2026-07-15
+
+- Run: strategy-review-2026-07-15-ba576cf8
+- Dates: 2026-07-15
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-15-ba576cf8/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-07-15-ba576cf8/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: blocked
+- Predictions: 0-0 hit n/a (158 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- None generated.

@@ -11,7 +11,11 @@ if [[ -f .env ]]; then
   source .env
   set +a
 fi
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+CODEX_USER_BIN="${GANA_CODEX_BIN_DIR:-}"
+if [[ -z "$CODEX_USER_BIN" && -n "${HOME:-}" && -d "$HOME/.local/bin" ]]; then
+  CODEX_USER_BIN="$HOME/.local/bin"
+fi
+export PATH="${CODEX_USER_BIN:+$CODEX_USER_BIN:}/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 gt_date() {
   local offset_days="${1:-0}"

@@ -1,302 +1,156 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { sendDiscordNativePayload } from '../.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs';
-import { resolveDiscordTargets } from '../.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs';
-import { compactPath, emitCronRichSummary, parseJsonObject } from './gana-telegram-rich-output.mjs';
+import 'dotenv/config';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { compactPath, emitCronRichSummary, renderCronRichSummary } from './gana-telegram-rich-output.mjs';
+import { runValidationWorkflow, VALIDATION_TIMEZONE } from './lib/validation-workflow.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
-const TIMEZONE = 'America/Guatemala';
-const ARTIFACT_ROOT = process.env.GANA_ARTIFACT_ROOT?.trim() || '.artifacts/gana-v9';
 
-if (process.env.GANA_MAINTENANCE_PAUSED === 'true') {
-  console.log('Gana daily operations are paused for database maintenance.');
-  process.exit(0);
-}
-
-const args = parseArgs(process.argv.slice(2));
-const date = args.date ?? guatemalaDate(-1);
-const discordTargets = resolveDiscordTargets({ gatewayTarget: args.gatewayTarget });
-const runSlug = `validation-${date}`;
-const logPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', `${runSlug}.log`);
-const lockPath = resolve(REPO_ROOT, ARTIFACT_ROOT, 'cron', 'locks', `${runSlug}.lock`);
-
-mkdirSync(dirname(logPath), { recursive: true });
-const existingRunLock = !args.force && existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
-if (!args.force && !acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, runSlug, status: 'running', startedAt: new Date().toISOString() })) {
-  const skip = describeValidationLock(existingRunLock);
-  emitCronRichSummary({
-    title: 'Gana v9 · Validación omitida',
-    status: 'skipped',
-    date,
-    timezone: TIMEZONE,
-    bullets: buildValidationSkipBullets({
-      message: skip.message,
-      lock: existingRunLock,
-      lockPath,
-    }),
-    footer: skip.footer,
-  });
-  process.exit(0);
-}
-const startedAt = Date.now();
-const env = {
-  ...process.env,
-  GANA_PROFILE: process.env.GANA_PROFILE ?? 'full-permissions',
-  GANA_APPROVAL_MODE: process.env.GANA_APPROVAL_MODE ?? 'auto-grant',
-  AGENT_PROVIDER: process.env.AGENT_PROVIDER ?? 'codex',
-  GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,
-};
-
-const logFd = openSync(logPath, 'a');
-try {
-  let handled = false;
-  const recommendationArtifact = args.recommendationArtifact ?? findLatestRecommendation(date);
-  const validationArgs = ['gana', 'validate', '--date', date];
-  const metricsArgs = ['gana', 'metrics', 'daily', '--date', date, '--scope', args.scope ?? `daily-${date}`];
-  const metricsPersist = args.persist ?? process.env.GANA_METRICS_PERSIST;
-  if (metricsPersist !== undefined) metricsArgs.push('--persist', String(metricsPersist));
-  if (recommendationArtifact) {
-    validationArgs.push('--recommendation-artifact', recommendationArtifact);
-    metricsArgs.push('--recommendation-artifact', recommendationArtifact);
-  }
-  const validation = runLogged(logFd, validationArgs, env);
-  const metrics = runLogged(logFd, metricsArgs, env);
-  const validationsArtifact = findLatest(['validations.json', 'validations-blocked.json'], startedAt);
-  const metricsArtifact = findLatest(['daily-metrics.json'], startedAt);
-
-  if (metrics.status === 0 && metricsArtifact) {
-    const notifyArgs = [
-      '.agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs',
-      '--date', date,
-      '--metrics-artifact', metricsArtifact,
-      '--transport', 'discord-native',
-      '--gateway-target', discordTargets.validation,
-    ];
-    if (validationsArtifact) notifyArgs.push('--validation-artifact', validationsArtifact);
-    if (recommendationArtifact) notifyArgs.push('--recommendation-artifact', recommendationArtifact);
-    const notify = spawnSync('node', notifyArgs, {
-      cwd: REPO_ROOT,
-      env,
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-    });
-    writeLogLine(logFd, notify.stdout.trim());
-    if (notify.stderr.trim()) writeLogLine(logFd, notify.stderr.trim());
-    if (notify.status !== 0) throw new Error(`validation notification failed with exit ${notify.status}`);
-    const notifyResult = parseJsonObject(notify.stdout);
-    emitCronRichSummary({
-      title: 'Gana v9 · Validación publicada',
-      status: validation.status === 0 ? 'ok' : 'review',
-      date,
-      timezone: TIMEZONE,
-      bullets: [
-        `Validate exit: ${validation.status ?? 'unknown'}`,
-        `Metrics exit: ${metrics.status ?? 'unknown'}`,
-        notifyResult?.discordResult?.message_id || notifyResult?.message_id
-          ? `Discord stats: ${notifyResult?.discordResult?.message_id ?? notifyResult?.message_id}`
-          : undefined,
-        recommendationArtifact ? `Recommendations: ${compactPath(recommendationArtifact)}` : undefined,
-        validationsArtifact ? `Validations: ${compactPath(validationsArtifact)}` : undefined,
-        metricsArtifact ? `Metrics: ${compactPath(metricsArtifact)}` : undefined,
-        `Log: ${compactPath(logPath)}`,
-      ].filter(Boolean),
-      footer: validation.status === 0
-        ? '✅ Validación/métricas publicadas · revisar antes de ajustar promoción'
-        : '⚠️ Validación con revisión pendiente · no maquillar resultados',
-    });
-    writeLock(lockPath, {
-      date,
-      runSlug,
-      status: 'published',
-      validationExit: validation.status ?? null,
-      metricsExit: metrics.status ?? null,
-      completedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      artifacts: [recommendationArtifact, validationsArtifact, metricsArtifact, logPath].filter(Boolean),
-      notifications: {
-        stats: notifyResult?.discordResult?.message_id ?? notifyResult?.message_id,
-      },
-    });
-    process.exitCode = validation.status === 0 ? 0 : validation.status ?? 1;
-    handled = true;
-  }
-
-  if (!handled) {
-    const reviewLock = {
-      date,
-      runSlug,
-      status: 'review-required',
-      validationExit: validation.status ?? null,
-      metricsExit: metrics.status ?? null,
-      completedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      artifacts: [validationsArtifact, metricsArtifact, logPath].filter(Boolean),
-      notifications: { alerts: discordTargets.alerts },
-    };
-    writeLock(lockPath, reviewLock);
-    let alertError;
-    try {
-      await sendDiscordNativePayload(discordTargets.alerts, {
-        username: 'Gana Hermes',
-        allowed_mentions: { parse: [] },
-        content: '',
-        embeds: [{
-          title: '⚠️ Gana v9 · Validaciones requieren revisión',
-          description: [
-            `📅 ${date} · ${TIMEZONE}`,
-            `🧪 validate exit ${validation.status ?? 'unknown'}`,
-            `📊 metrics exit ${metrics.status ?? 'unknown'}`,
-            metricsArtifact ? `📈 metrics ${metricsArtifact}` : '📈 sin artifact de métricas',
-            '🛡️ Revisar logs antes de ajustar promoción.',
-          ].join('\n'),
-          color: 0xf2994a,
-        }],
-      });
-    } catch (err) {
-      alertError = err instanceof Error ? err.message : String(err);
-      writeLogLine(logFd, `alert notification failed: ${alertError}`);
-      writeLock(lockPath, {
-        ...reviewLock,
-        updatedAt: new Date().toISOString(),
-        notifications: { alerts: discordTargets.alerts, alertError },
-      });
-    }
-    emitCronRichSummary({
-      title: 'Gana v9 · Validaciones requieren revisión',
-      status: 'warning',
-      date,
-      timezone: TIMEZONE,
-      bullets: [
-        `Validate exit: ${validation.status ?? 'unknown'}`,
-        `Metrics exit: ${metrics.status ?? 'unknown'}`,
-        `Discord alertas: ${discordTargets.alerts}`,
-        validationsArtifact ? `Validations: ${compactPath(validationsArtifact)}` : undefined,
-        metricsArtifact ? `Metrics: ${compactPath(metricsArtifact)}` : undefined,
-        `Log: ${compactPath(logPath)}`,
-      ].filter(Boolean),
-      footer: '⚠️ Revisar logs antes de ajustar promoción.',
-    });
-    process.exitCode = metrics.status ?? validation.status ?? 1;
-  }
-} finally {
-  closeSync(logFd);
-}
-
-function runLogged(logFd, args, env) {
-  const command = resolveCronCommand(args);
-  writeLogLine(logFd, `started ${new Date().toISOString()} ${command.join(' ')}`);
-  const result = spawnSync(command[0], command.slice(1), {
-    cwd: REPO_ROOT,
-    env,
-    stdio: ['ignore', logFd, logFd],
-  });
-  writeLogLine(logFd, `completed ${new Date().toISOString()} status=${result.status} signal=${result.signal ?? 'none'}`);
-  if (result.error) writeLogLine(logFd, `error ${result.error.message}`);
-  return result;
-}
-
-function resolveCronCommand(args) {
-  if (args[0] !== 'gana') return args;
-  const compiledCli = resolve(REPO_ROOT, 'dist', 'cli.js');
-  if (existsSync(compiledCli)) return ['node', compiledCli, ...args.slice(1)];
-  return ['node', '--import', 'tsx', 'src/cli.ts', ...args.slice(1)];
-}
-
-function parseArgs(argv) {
-  const parsed = {};
+export function parseValidationArgs(argv) {
+  const parsed = { includeRecommendationMirror: true };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--date') parsed.date = requireValue(argv, ++index, arg);
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--scope') parsed.scope = requireValue(argv, ++index, arg);
     else if (arg === '--recommendation-artifact') parsed.recommendationArtifact = requireValue(argv, ++index, arg);
+    else if (arg === '--validation-artifact') parsed.validationArtifact = requireValue(argv, ++index, arg);
+    else if (arg === '--metrics-artifact') parsed.metricsArtifact = requireValue(argv, ++index, arg);
     else if (arg === '--persist') parsed.persist = requireValue(argv, ++index, arg);
+    else if (arg === '--test-label') parsed.testLabel = requireValue(argv, ++index, arg);
+    else if (arg === '--backfill') parsed.backfill = true;
+    else if (arg === '--notify-only') parsed.notifyOnly = true;
+    else if (arg === '--no-publication') parsed.noPublication = true;
+    else if (arg === '--no-recommendation-mirror') parsed.includeRecommendationMirror = false;
+    else if (arg === '--dry-run') parsed.dryRun = true;
     else if (arg === '--force') parsed.force = true;
+    else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return parsed;
 }
 
-function acquireOnce(path, ttlMs, payload) {
-  mkdirSync(dirname(path), { recursive: true });
-  if (existsSync(path)) {
-    const ageMs = Date.now() - statSync(path).mtimeMs;
-    if (ageMs < ttlMs) return false;
-    rmSync(path, { force: true });
+export async function main(argv = process.argv.slice(2)) {
+  const requestedDryRun = argv.includes('--dry-run');
+  if (process.env.GANA_MAINTENANCE_PAUSED === 'true') {
+    emitSummary({
+      title: 'Gana v9 · Validación pausada',
+      status: 'skipped',
+      timezone: VALIDATION_TIMEZONE,
+      bullets: ['GANA_MAINTENANCE_PAUSED=true'],
+    }, { localOnly: requestedDryRun });
+    return 0;
   }
-  let fd;
+
+  let args;
   try {
-    fd = openSync(path, 'wx');
-  } catch (err) {
-    if (err?.code === 'EEXIST') return false;
-    throw err;
+    args = parseValidationArgs(argv);
+  } catch (error) {
+    emitError(error, { localOnly: requestedDryRun });
+    return 1;
   }
-  try {
-    writeSync(fd, `${JSON.stringify(payload, null, 2)}\n`);
-  } finally {
-    closeSync(fd);
+  if (args.help) {
+    console.log(usage());
+    return 0;
   }
-  return true;
+
+  const date = args.date ?? guatemalaDate(-1);
+  const result = await runValidationWorkflow({
+    ...args,
+    date,
+    repoRoot: REPO_ROOT,
+    artifactRoot: process.env.GANA_ARTIFACT_ROOT,
+    env: process.env,
+  });
+  const ids = result.lock?.notifications?.messageIds ?? [];
+  const title = result.status === 'published'
+    ? 'Gana v9 · Validación publicada'
+    : result.status === 'not-applicable'
+      ? 'Gana v9 · Validación cerrada sin publicación'
+      : result.status === 'dry-run'
+        ? 'Gana v9 · Previsualización de validación'
+      : result.status === 'skipped'
+        ? 'Gana v9 · Validación omitida'
+        : 'Gana v9 · Validación requiere revisión';
+  emitSummary({
+    title,
+    status: result.ok ? (result.status === 'skipped' ? 'skipped' : 'ok') : 'warning',
+    date,
+    timezone: VALIDATION_TIMEZONE,
+    bullets: [
+      `Estado: ${result.status}`,
+      `Motivo: ${result.reason}`,
+      Number.isFinite(result.lock?.validationExit) ? `Validate exit: ${result.lock.validationExit}` : undefined,
+      Number.isFinite(result.lock?.metricsExit) ? `Metrics exit: ${result.lock.metricsExit}` : undefined,
+      result.lock?.discordTarget ? `Discord target: ${result.lock.discordTarget}` : undefined,
+      ids.length ? `Discord IDs: ${ids.join(', ')}` : undefined,
+      result.lock?.source?.dailyBatchId ? `Daily batch: ${result.lock.source.dailyBatchId}` : undefined,
+      result.plan?.action ? `Acción: ${result.plan.action}` : undefined,
+      result.plan ? `Ejecutaría: ${result.plan.run ? 'sí' : 'no'}` : undefined,
+      result.plan?.mode ? `Modo: ${result.plan.mode}` : undefined,
+      result.plan?.phase ? `Fase: ${result.plan.phase}` : undefined,
+      result.plan?.wouldCloseNoPublication ? 'Cierre sin publicación: sí' : undefined,
+      result.plan?.discordTarget ? `Discord target: ${result.plan.discordTarget}` : undefined,
+      result.plan?.source?.status ? `Fuente Daily: ${result.plan.source.status}${result.plan.source.reason ? ` · ${result.plan.source.reason}` : ''}` : undefined,
+      result.plan?.source?.dailyBatchId ? `Daily batch: ${result.plan.source.dailyBatchId}` : undefined,
+      result.plan?.source?.recommendationArtifact ? `Recommendations: ${compactPath(result.plan.source.recommendationArtifact)}` : undefined,
+      result.plan?.artifacts?.validation ? `Validations: ${compactPath(result.plan.artifacts.validation)}` : undefined,
+      result.plan?.artifacts?.metrics ? `Metrics: ${compactPath(result.plan.artifacts.metrics)}` : undefined,
+      result.plan?.existing ? `Lock existente: ${result.plan.existing.exists ? `${result.plan.existing.valid ? result.plan.existing.status ?? 'válido' : 'inválido'}${result.plan.existing.phase ? ` · fase ${result.plan.existing.phase}` : ''}${result.plan.existing.reason ? ` · ${result.plan.existing.reason}` : ''}` : 'ausente'}` : undefined,
+      result.plan?.mutex ? `Mutex: ${result.plan.mutex.wouldAcquire ? (result.plan.mutex.wouldReclaim ? 'reclamaría stale' : 'libre') : `bloqueado · ${result.plan.mutex.reason}`}` : undefined,
+      result.plan?.sideEffects ? `Efectos ejecutados: ${JSON.stringify(result.plan.sideEffects)}` : undefined,
+      result.lock?.artifacts?.recommendation ? `Recommendations: ${compactPath(result.lock.artifacts.recommendation)}` : undefined,
+      result.lock?.artifacts?.validation ? `Validations: ${compactPath(result.lock.artifacts.validation)}` : undefined,
+      result.lock?.artifacts?.metrics ? `Metrics: ${compactPath(result.lock.artifacts.metrics)}` : undefined,
+      `Lock: ${compactPath(result.lockPath)}`,
+      `Log: ${compactPath(result.logPath)}`,
+    ].filter(Boolean),
+    footer: result.status === 'publication-uncertain'
+      ? '⚠️ Entrega incierta: no reintentar automáticamente.'
+      : '🛡️ Resultado histórico etiquetado; sin ejecución monetaria.',
+  }, { localOnly: requestedDryRun || result.status === 'dry-run' });
+  return result.exitCode;
 }
 
-function readJsonFile(path) {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return undefined;
-  }
-}
-
-function writeLock(path, payload) {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
-}
-
-function describeValidationLock(lock) {
-  const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
-  if (status === 'published') {
-    return {
-      message: 'ya corrió y publicó validación/métricas',
-      footer: '⏭️ Sin duplicar validaciones; batch ya publicado.',
-    };
-  }
-  if (status === 'running') {
-    return {
-      message: 'sigue en curso',
-      footer: '⏭️ Sin duplicar validaciones; ejecución activa.',
-    };
-  }
-  if (status === 'review-required') {
-    return {
-      message: 'corrida previa requiere revisión',
-      footer: '⏭️ Sin duplicar validaciones; revisar resultado previo.',
-    };
-  }
-  return {
-    message: `lock activo con estado no reconocido: ${status}`,
-    footer: '⏭️ Sin duplicar validaciones; lock activo.',
-  };
-}
-
-function buildValidationSkipBullets({ message, lock, lockPath }) {
-  const status = typeof lock?.status === 'string' ? lock.status : 'unknown';
-  const completedAt = typeof lock?.completedAt === 'string' ? lock.completedAt : undefined;
+function usage() {
   return [
-    `Motivo: ${message}`,
-    `Lock: ${status}${completedAt ? ` · completed ${completedAt}` : ''}`,
-    Number.isFinite(lock?.validationExit) ? `Validate exit: ${lock.validationExit}` : undefined,
-    Number.isFinite(lock?.metricsExit) ? `Metrics exit: ${lock.metricsExit}` : undefined,
-    lock?.notifications?.stats ? `Discord stats: ${lock.notifications.stats}` : undefined,
-    `Path: ${compactPath(lockPath)}`,
-  ].filter(Boolean);
+    'Usage:',
+    '  gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD [--recommendation-artifact PATH]',
+    '  gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD --backfill --test-label TEXT',
+    '  gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD --backfill --notify-only --test-label TEXT --validation-artifact PATH --metrics-artifact PATH',
+    '  gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD --backfill --no-publication --test-label TEXT',
+    '  Append --dry-run to inspect the exact action without commands, DB/API/Discord, locks, or mutexes.',
+    '',
+    'Safety:',
+    '  The recommendation artifact must match the published Daily batch.',
+    '  --force is rejected; backfills keep the mutex and require a visible label.',
+    '  Partial Discord delivery becomes publication-uncertain and is never retried automatically.',
+  ].join('\n');
+}
+
+function emitError(error, { localOnly = false } = {}) {
+  emitSummary({
+    title: 'Gana v9 · Error de validación',
+    status: 'warning',
+    timezone: VALIDATION_TIMEZONE,
+    bullets: [error instanceof Error ? error.message : String(error)],
+  }, { localOnly });
+}
+
+function emitSummary(input, { localOnly = false } = {}) {
+  if (localOnly) {
+    console.log(renderCronRichSummary(input));
+    return { delivered: false, localOnly: true };
+  }
+  return emitCronRichSummary(input);
 }
 
 function guatemalaDate(offsetDays) {
   const base = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: TIMEZONE,
+    timeZone: VALIDATION_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -309,56 +163,11 @@ function requireValue(argv, index, flag) {
   return value;
 }
 
-function writeLogLine(fd, line) {
-  if (!line) return;
-  writeSync(fd, `${line}\n`);
-}
-
-function findLatest(names, sinceMs) {
-  const runs = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs');
-  const matches = [];
-  collect(runs, matches, new Set(names), sinceMs);
-  matches.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return matches[0]?.path;
-}
-
-function findLatestRecommendation(date) {
-  const runs = resolve(REPO_ROOT, ARTIFACT_ROOT, 'runs');
-  const matches = [];
-  collectRecommendations(runs, matches, date);
-  matches.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return matches[0]?.path;
-}
-
-function collect(dir, matches, names, sinceMs) {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) collect(path, matches, names, sinceMs);
-    else if (entry.isFile() && names.has(entry.name)) {
-      const mtimeMs = statSync(path).mtimeMs;
-      if (mtimeMs >= sinceMs - 1000) matches.push({ path, mtimeMs });
-    }
-  }
-}
-
-function collectRecommendations(dir, matches, date) {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) collectRecommendations(path, matches, date);
-    else if (entry.isFile() && entry.name === 'daily-parlay-recommendations.json' && path.includes(date)) {
-      matches.push({ path, mtimeMs: statSync(path).mtimeMs });
-    }
-  }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().then((exitCode) => {
+    process.exitCode = exitCode;
+  }).catch((error) => {
+    emitError(error, { localOnly: process.argv.includes('--dry-run') });
+    process.exitCode = 1;
+  });
 }

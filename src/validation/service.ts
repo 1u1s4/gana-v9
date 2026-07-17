@@ -36,6 +36,7 @@ const VALIDATABLE_STATUSES = ['candidate', 'review-required', 'promotable'];
 const DATE_PREDICTION_PAGE_SIZE = 500;
 const DATE_PARLAY_PAGE_SIZE = 100;
 const DATE_VALIDATION_CONCURRENCY = 5;
+const RECOMMENDATION_ARTIFACT_VALIDATION_CONCURRENCY = 1;
 
 export interface RunValidationInput {
   date?: string;
@@ -273,17 +274,17 @@ async function validateDateTarget(
     const parlays = await Promise.all(parlayIds.map((parlayId) => context.repositories.parlays.findById(parlayId)));
     const predictionValidations = await mapLimit(
       predictions.filter((prediction): prediction is PredictionRecord => Boolean(prediction)),
-      DATE_VALIDATION_CONCURRENCY,
+      RECOMMENDATION_ARTIFACT_VALIDATION_CONCURRENCY,
       (prediction) => validatePredictionRecord(context, prediction, evaluatedAt, runId),
     );
     const parlayValidations = await mapLimit(
       parlays.filter((parlay): parlay is ParlayRecord => Boolean(parlay)),
-      DATE_VALIDATION_CONCURRENCY,
+      RECOMMENDATION_ARTIFACT_VALIDATION_CONCURRENCY,
       (parlay) => validateParlayRecord(context, parlay, evaluatedAt, runId),
     );
     const artifactSelectionValidations = await mapLimit(
       artifactSelections,
-      DATE_VALIDATION_CONCURRENCY,
+      RECOMMENDATION_ARTIFACT_VALIDATION_CONCURRENCY,
       (selection) => validateArtifactSelectionRecord(context, selection, evaluatedAt, runId),
     );
     return [...predictionValidations, ...parlayValidations, ...artifactSelectionValidations];
