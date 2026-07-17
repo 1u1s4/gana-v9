@@ -210,45 +210,85 @@ are missing, source-misaligned, or have no published Daily.
 - Pre-publication retryable work resumes by phase; v2 `review-required` remains
   manual so a partial validation cannot silently duplicate stored history.
 
-### Verification and pending production gate
+### Verification and production completion
 
-- Focused dispatcher/runtime/workflow suite passes 60/60. It includes corrupt,
-  null and status-less locks, impossible dates, read-only mutex inspection,
-  resume-artifact date/missing checks, terminal-state previews and direct-Telegram
-  suppression during `--dry-run`.
-- All six live actions now have a zero-effect `--dry-run`: July 3/4/11/14 resolve
-  to `validate-metrics-notify` with the exact published batch, while July 8/13
-  resolve to `close-no-publication`. Every preview targets
-  `discord:1510041125614915756`; lock hashes remained unchanged and no mutex was
-  created.
-- A no-publication closeout now fails closed unless the Daily lock is missing or
-  has an exact-date `retryable`/`failed`/`blocked` state with no publication
-  evidence. Invalid JSON roots, unknown states and mismatched dates cannot be
-  converted into a closeout.
-- `npm run typecheck`, `node --check`, `bash -n` and `git diff --check` pass. The
-  full suite passes 605/609 inside the sandbox; the only four failures are the
-  expected dashboard socket `listen EPERM` cases, and the dashboard suite passes
-  27/27 with local ephemeral-socket permission.
-- DB preflight is connected, PostgreSQL migrations are applied, and no validation
-  process or mutex is active.
-- The first live July 3 backfill was rejected by the production approval layer
-  before process creation. No DB row, lock, mutex, or Discord message changed.
-- Pending explicit production authorization: recompute/publish July 3 and 14;
-  recompute/publish labelled corrections for July 4 and 11; publish no-publication
-  closeouts (without mirrors) for July 8 and 13.
+Status: achieved after explicit production authorization on `2026-07-16`.
 
-### Current external blocker
+- The six authorized actions ran sequentially in the approved stop-on-uncertainty
+  order. July 3 and 14 were visibly labelled backfills; July 4 and 11 were visibly
+  labelled corrections against their exact published Daily; July 8 and 13 were
+  no-publication closeouts with no recommendation mirrors.
+- July 3 used `daily-2026-07-03-full`, persisted 32 validations plus the
+  `daily-2026-07-03` metric, and sent Discord IDs `1527551696463597579`,
+  `1527551710807986177`, and `1527551724850511969`.
+- July 4 used `daily-2026-07-04-full`, persisted 34 validations plus the
+  `daily-2026-07-04` metric, and sent Discord IDs `1527552514340294768`,
+  `1527552527879372820`, and `1527552541796077653`.
+- July 8 closed as `not-applicable` with one no-publication message,
+  `1527552659509346455`; no mirror or validation artifact was created.
+- July 11 used `daily-2026-07-11-sol-high`, persisted 13 validations plus the
+  `daily-2026-07-11` metric, and sent Discord IDs `1527553200381628447`,
+  `1527553216110268530`, and `1527553234829316099`.
+- July 13 closed as `not-applicable` with one no-publication message,
+  `1527553355097051187`; no mirror or validation artifact was created.
+- July 14 used `daily-2026-07-14-full`, persisted 7 validations plus the
+  `daily-2026-07-14` metric, and sent Discord IDs `1527554597487382539`,
+  `1527554615338602498`, and `1527554631805173773`.
+- Provider burst limits stopped the first July 4 and July 14 attempts before any
+  publication. Both remained safely retryable with no message ID or mutex. The
+  published-artifact validation path now serializes result fetches at concurrency
+  one; its regression test deliberately throws `rate_limited` on any overlap.
+- The final audit accounts for all 14 dates from July 2 through July 15: 12 exact
+  published validations and only July 8/13 as exact `not-applicable` closeouts.
+  Every state is source-aligned, all published command exits are 0/0, notification
+  hashes and message IDs match, and no validation mutex remains.
+- The pre-midnight live dispatcher dry-run reports the historical
+  `validationBacklog: []`. After midnight, July 16 appears as the sole runnable
+  candidate but remains correctly skipped as `before-07:15`; a July 17 07:15
+  simulation selects that exact previous day from `daily-2026-07-16-full` and
+  its canonical recommendation artifact.
+- Direct database readback confirms validation counts 32/34/13/7 and one scoped
+  daily metric each for July 3/4/11/14. PostgreSQL migrations remain applied.
+- Focused dispatcher/runtime/workflow checks pass 60/60, validation service checks
+  pass 16/16, `pnpm typecheck`, syntax checks and `git diff --check` pass, and the
+  final unrestricted full suite passes 610/610.
+- An independent lock/artifact/notification audit passed with no blocker.
 
-Status: blocked pending explicit production authorization.
+### Post-completion correction: validation Discord routing
 
-- The same approval gate has remained unanswered for three consecutive goal
-  turns. The production approval layer already rejected the first attempted
-  July 3 run before process creation, and retrying without new authorization is
-  prohibited.
-- No live backfill, DB mutation, validation-lock rewrite, mutex creation or
-  Discord send was performed after that rejection. The six exact dry-runs remain
-  the authoritative execution plan.
-- Resume condition: the user explicitly authorizes the six production actions.
-  Then execute sequentially in this stop-on-uncertainty order: July 3, 4, 8, 11,
-  13 and 14, verifying each lock, artifact, DB result and Discord message ID
-  before starting the next date.
+Status: corrected and reverified on `2026-07-17`.
+
+- The original catch-up messages were real Discord deliveries, but
+  `GANA_DISCORD_VALIDATION_TARGET` incorrectly pointed to the restricted
+  `#gana-alertas` channel (`1510041125614915756`) instead of the dedicated
+  `#gana-validaciones` channel (`1510041050255855616`). Direct Discord GETs
+  proved all original IDs existed; this was a routing/visibility defect, not a
+  false-positive gateway response.
+- The deployment environment, Hermes cron installer default, and notifier guide
+  now route validation to `discord:1510041050255855616`.
+- Frozen, hash-verified payloads were rerouted idempotently to the correct channel
+  with per-date receipts under `.artifacts/gana-v9/cron/reroutes/`:
+  July 3 `1527558102398931036`, `1527558130664210525`, `1527558157449035783`;
+  July 4 `1527558197236469841`, `1527558219310960813`, `1527558241507086356`;
+  July 8 `1527558259471290559`; July 11 `1527558279893618890`,
+  `1527558297786519613`, `1527558316014833730`; July 13
+  `1527558332821405739`; and July 14 `1527558347992203407`,
+  `1527558365054767244`, `1527558385497673817`.
+- The legacy July 15 result was regenerated from its exact validation, metrics,
+  and recommendation artifacts with a visible channel-correction label and sent
+  as `1527558872250716254`, `1527558895386493009`, and
+  `1527558912759304272`.
+- At the user's explicit request, July 16 was validated immediately from
+  `daily-2026-07-16-full`: 6 validations (5 won, 1 voided), one scoped metric,
+  exits 0/0, and correct-channel Discord IDs `1527559008062542016` and
+  `1527559023824736303`.
+- Discord history readback found all 19 corrected-channel messages and no missing
+  ID. All reroute receipts and the July 16 lock are terminal, with no mutex left.
+- The existing Codex automation `Gana · operaciones diarias` remains active at
+  07:15/10:15/13:15/18:15/22:15 Guatemala. Its prompt now explicitly requires
+  the 07:15 checkpoint to validate exactly the previous day from the published
+  Daily and canonical artifact, then send stats plus mirror to the configured
+  validation target.
+- A July 17 07:15 simulation skips July 16 as already published; a July 18 07:15
+  simulation selects exactly July 17 from `daily-2026-07-17-full`. Current
+  `validationBacklog` is empty.

@@ -76,6 +76,10 @@ Este script:
 6. Congela los payloads, persiste hashes/target y reserva stats y cada pagina mirror antes de enviar; el lock final guarda todos los message IDs.
 7. Si falla antes del primer envio queda `retryable` con backoff. Si una entrega puede haber quedado parcial pasa a `publication-uncertain` y no se reintenta automaticamente.
 
+Cuando se valida un artifact Daily publicado, los fetches de resultados al provider
+se serializan con concurrencia 1 para evitar rafagas contra el limite por minuto.
+La validacion amplia por fecha conserva concurrencia 5.
+
 El mutex de validacion es independiente del estado y nunca se omite. `--force` se
 rechaza. Un reproceso historico exige `--backfill --test-label TEXT`; una correccion
 de artifact se vuelve visible como retrospectiva y conserva el estado anterior en
