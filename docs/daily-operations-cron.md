@@ -241,16 +241,16 @@ No mantener simultaneamente Codex Scheduled, Hermes, `launchd` y `crontab`.
 Los locks son defensa en profundidad, no una autorizacion para duplicar la
 autoridad.
 
-En este host la unica autoridad activa es Codex Scheduled con una tarea local:
+En este host la unica autoridad activa es Hermes cron con un job no-agent:
 
 ```text
-Gana · operaciones diarias
-FREQ=DAILY;BYHOUR=7,10,13,18,22;BYMINUTE=15
+gana-v9-daily-operations
+15 7,10,13,18,22 * * *
 ```
 
-Su prompt ejecuta unicamente `node scripts/gana-daily-ops-dispatch.mjs`. Hermes
-no conserva jobs Gana, el bloque Gana de `crontab` esta ausente y no hay
-LaunchAgents Gana cargados.
+Su wrapper ejecuta unicamente `node scripts/gana-daily-ops-dispatch.mjs`. La
+automatizacion equivalente de Codex Scheduled esta retirada, el bloque Gana de
+`crontab` esta ausente y no hay LaunchAgents Gana cargados.
 
 ## Instalar cron en Hermes
 

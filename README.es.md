@@ -97,17 +97,16 @@ node scripts/gana-daily-ops-dispatch.mjs --dry-run
 node scripts/install-gana-cron.mjs
 ```
 
-La autoridad canonica es una sola tarea de Codex Scheduled. Invoca el
-dispatcher determinista en cinco checkpoints de Guatemala:
+La autoridad canonica en este host es un solo cron no-agent de Hermes. Invoca
+el dispatcher determinista en cinco checkpoints de Guatemala:
 
 - 07:15: retencion y validacion/estadisticas del dia anterior.
 - 10:15: Daily E2E inicial para el dia siguiente.
 - 13:15: recuperacion de un Daily perdido o strategy review.
 - 18:15 y 22:15: unicamente retries Daily ya vencidos.
 
-Hermes, cron del sistema y launchd son autoridades fallback mutuamente
-excluyentes; cada instalador crea el mismo job unico y deben seguir desactivados
-mientras Codex Scheduled sea la autoridad.
+Codex Scheduled, cron del sistema y launchd son autoridades fallback mutuamente
+excluyentes y permanecen desactivados mientras el job de Hermes este activo.
 
 Targets opcionales por flujo:
 

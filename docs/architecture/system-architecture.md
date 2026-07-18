@@ -137,8 +137,8 @@ Guatemala (`America/Guatemala`):
 - 18:15 y 22:15: reintentar Daily solo si su lock esta `retryable` y vencido.
 
 El dispatcher serializa los flujos, conserva sus locks por fecha y nunca fuerza
-estados terminales. Codex Scheduled es la autoridad activa; Hermes, crontab y
-launchd son fallbacks mutuamente excluyentes.
+estados terminales. Hermes cron es la autoridad activa; Codex Scheduled, crontab
+y launchd son fallbacks mutuamente excluyentes.
 
 La guia canonica esta en [docs/daily-operations-cron.md](../daily-operations-cron.md). El contrato de Discord esta en [docs/discord-recommendation-notifications.md](../discord-recommendation-notifications.md).
 

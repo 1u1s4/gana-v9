@@ -113,17 +113,16 @@ node scripts/gana-daily-ops-dispatch.mjs --dry-run
 node scripts/install-gana-cron.mjs
 ```
 
-The canonical authority is one Codex Scheduled task. It calls the deterministic
-dispatcher at five Guatemala checkpoints:
+The canonical authority on this host is one Hermes no-agent cron job. It calls
+the deterministic dispatcher at five Guatemala checkpoints:
 
 - 07:15: retention plus previous-day validation/statistics.
 - 10:15: initial Daily E2E for the next day.
 - 13:15: missed Daily recovery or strategy review.
 - 18:15 and 22:15: due Daily retries only.
 
-Hermes, system cron, and launchd are mutually exclusive fallback authorities;
-their installers each create the same single dispatcher job and must remain
-disabled while Codex Scheduled is active.
+Codex Scheduled, system cron, and launchd are mutually exclusive fallback
+authorities and remain disabled while the Hermes job is active.
 
 Optional per-flow Discord targets:
 
