@@ -8,6 +8,7 @@ import { consensusFairPrices } from '../../markets/fair-price.js';
 import { isLowLiquidity, marketEfficiencyScore } from '../../markets/efficiency.js';
 import type { MarketKey } from '../../domain/markets.js';
 import { redactSecrets } from '../../permissions/redaction.js';
+import { mapWithConcurrency } from '../../runtime/concurrency.js';
 import type { RuntimeContext } from '../../runtime/context.js';
 import { createStorageRepositories } from '../../storage/repositories/index.js';
 import { getPrismaClient } from '../../storage/db.js';
@@ -61,6 +62,7 @@ interface ApiFootballResponse<T = unknown> {
 }
 
 const API_FOOTBALL_REQUEST_TIMEOUT_MS = 15_000;
+const FIXTURE_PERSISTENCE_CONCURRENCY = 3;
 
 export function createApiFootballProvider(
   config: ApiFootballProviderConfig,
@@ -828,7 +830,7 @@ export async function createApiFootballPersistence(
           }
         }
 
-        return Promise.all(fixtures.map(async (normalized) => {
+        return mapWithConcurrency(fixtures, FIXTURE_PERSISTENCE_CONCURRENCY, async (normalized) => {
           const competition = normalized.competition
             ? competitions.get(normalized.competition.providerCompetitionId) ?? null
             : null;
@@ -858,7 +860,7 @@ export async function createApiFootballPersistence(
             normalized,
             fixture: fixtureFromRecord(fixture, normalized),
           };
-        }));
+        });
       },
     };
   } catch (err) {
