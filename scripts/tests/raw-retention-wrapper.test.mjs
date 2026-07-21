@@ -79,6 +79,21 @@ test('wrapper safely reclaims a stale lock with a dead owner', () => {
   });
 });
 
+test('wrapper repeats retention until post-delete dependencies reach a clean fixed point', () => {
+  withHarness(({ artifactRoot, env }) => {
+    const child = runWrapper(env, 'residual-then-success');
+    assert.equal(child.status, 0, child.stderr);
+
+    const reports = reportFiles(artifactRoot);
+    assert.equal(reports.length, 1);
+    const report = JSON.parse(readFileSync(join(artifactRoot, 'retention', reports[0]), 'utf8'));
+    assert.equal(report.applyPasses, 2);
+    assert.equal(report.after.totals.rowCount, 0);
+    assert.equal(report.historyAfter.totals.rowCount, 0);
+    assert.equal(report.compactionAfter.totals.rowCount, 0);
+  });
+});
+
 test('wrapper cleanup never removes a lock whose ownership token changed', () => {
   withHarness(({ artifactRoot, env }) => {
     const child = runWrapper(env, 'steal-owner');
@@ -177,6 +192,15 @@ if [[ "\${1:-}" == "scripts/gana-raw-retention.mjs" ]]; then
       owner="\${GANA_ARTIFACT_ROOT}/cron/locks/raw-retention.lock/owner"
       printf 'replacement-owner\\n999999999\\n0\\n' > "$owner"
       printf '%s\\n' "$success"
+      ;;
+    residual-then-success)
+      state="\${GANA_ARTIFACT_ROOT}/retention-pass-state"
+      if [[ ! -e "$state" ]]; then
+        : > "$state"
+        printf '%s\\n' '{"after":{"totals":{"rowCount":7}},"historyAfter":{"totals":{"rowCount":0}},"compactionAfter":{"totals":{"rowCount":0}},"capacityAfter":{"status":"ok"}}'
+      else
+        printf '%s\\n' "$success"
+      fi
       ;;
     success)
       printf '%s\\n' "$success"

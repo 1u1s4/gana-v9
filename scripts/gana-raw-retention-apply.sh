@@ -24,6 +24,8 @@ RAW_OUTPUT=""
 REPORT_PATH=""
 REPORT_TMP=""
 LOCK_FAILURE_KIND="skip"
+APPLY_PASSES=0
+MAX_APPLY_PASSES="${GANA_RAW_RETENTION_APPLY_PASSES:-3}"
 
 cd "$REPO_ROOT"
 umask 077
@@ -233,25 +235,56 @@ REPORT_TMP="$REPORT_PATH.tmp"
 RAW_OUTPUT="$(mktemp "$REPORT_DIR/.retention-${RUN_STAMP}-$$.stdout.XXXXXX")"
 APPLY_STARTED=1
 
-node scripts/gana-raw-retention.mjs --apply --json > "$RAW_OUTPUT" &
-CLI_PID=$!
-set +e
-wait "$CLI_PID"
-CLI_EXIT=$?
-set -e
-CLI_PID=""
-
-if (( CLI_EXIT != 0 )); then
-  write_failure_report "$CLI_EXIT" "retention-apply-command-failed"
-  exit "$CLI_EXIT"
+if [[ ! "$MAX_APPLY_PASSES" =~ ^[1-9][0-9]*$ ]] || (( MAX_APPLY_PASSES > 10 )); then
+  write_failure_report 64 "retention-invalid-apply-pass-limit"
+  exit 64
 fi
+
+# History pruning can make older raw rows newly eligible during the same run.
+# Repeat the idempotent apply until the eligible fixed point is empty, while
+# keeping a small hard cap so a live writer or query regression cannot loop.
+while (( APPLY_PASSES < MAX_APPLY_PASSES )); do
+  APPLY_PASSES=$((APPLY_PASSES + 1))
+  node scripts/gana-raw-retention.mjs --apply --json > "$RAW_OUTPUT" &
+  CLI_PID=$!
+  set +e
+  wait "$CLI_PID"
+  CLI_EXIT=$?
+  set -e
+  CLI_PID=""
+
+  if (( CLI_EXIT != 0 )); then
+    write_failure_report "$CLI_EXIT" "retention-apply-command-failed"
+    exit "$CLI_EXIT"
+  fi
+
+  if ! PASS_RESIDUAL="$(node - "$RAW_OUTPUT" <<'NODE'
+const { readFileSync } = require('node:fs');
+const report = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const residual = Number(report.after?.totals?.rowCount ?? 0)
+  + Number(report.historyAfter?.totals?.rowCount ?? 0)
+  + Number(report.compactionAfter?.totals?.rowCount ?? 0);
+if (!Number.isFinite(residual) || residual < 0) {
+  throw new Error('Retention JSON output has an invalid residual count.');
+}
+process.stdout.write(String(residual));
+NODE
+  )"; then
+    write_failure_report 70 "retention-apply-invalid-json"
+    exit 70
+  fi
+
+  if (( PASS_RESIDUAL == 0 )); then
+    break
+  fi
+done
 
 # Parse and rewrite into a same-directory temp file before rename. A zero-exit
 # command with truncated/non-JSON stdout may already have committed batches, so
 # it is represented as possibly-partial instead of publishing a corrupt file.
-if ! node - "$RAW_OUTPUT" "$REPORT_TMP" <<'NODE'
+if ! node - "$RAW_OUTPUT" "$REPORT_TMP" "$APPLY_PASSES" <<'NODE'
 const { readFileSync, writeFileSync } = require('node:fs');
-const [inputPath, outputPath] = process.argv.slice(2);
+const [inputPath, outputPath, applyPassesRaw] = process.argv.slice(2);
 const report = JSON.parse(readFileSync(inputPath, 'utf8'));
 if (!report || typeof report !== 'object' || Array.isArray(report)) {
   throw new Error('Retention JSON output must be an object.');
@@ -266,6 +299,11 @@ const capacityStatus = report.capacityAfter?.status ?? report.capacityBefore?.st
 if (typeof capacityStatus !== 'string' || !capacityStatus) {
   throw new Error('Retention JSON output is missing capacity status.');
 }
+const applyPasses = Number(applyPassesRaw);
+if (!Number.isSafeInteger(applyPasses) || applyPasses < 1) {
+  throw new Error('Retention wrapper apply pass count is invalid.');
+}
+report.applyPasses = applyPasses;
 writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
 NODE
 then
