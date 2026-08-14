@@ -690,7 +690,7 @@ test('dead-PID global lock is safely reclaimed and released after the tick', () 
   });
 });
 
-test('CLI requires --dry-run for --now and always emits a JSON summary', () => {
+test('CLI requires --dry-run for --now and writes a newline-terminated JSON summary to stdout', () => {
   withArtifacts((artifactRoot) => {
     const invalid = spawnSync(process.execPath, [CLI, '--now', AT.daily.toISOString()], {
       cwd: REPO_ROOT,
@@ -698,6 +698,7 @@ test('CLI requires --dry-run for --now and always emits a JSON summary', () => {
       encoding: 'utf8',
     });
     assert.equal(invalid.status, 1);
+    assert.match(invalid.stdout, /\n$/);
     const invalidSummary = JSON.parse(invalid.stdout);
     assert.equal(invalidSummary.status, 'error');
     assert.match(invalidSummary.reason, /only together with --dry-run/);
@@ -708,6 +709,7 @@ test('CLI requires --dry-run for --now and always emits a JSON summary', () => {
       encoding: 'utf8',
     });
     assert.equal(dryRun.status, 0, dryRun.stderr);
+    assert.match(dryRun.stdout, /\n$/);
     const summary = JSON.parse(dryRun.stdout);
     assert.equal(summary.status, 'dry-run');
     assert.deepEqual(summary.checkpoint, { id: 'daily', wallClock: '10:15' });

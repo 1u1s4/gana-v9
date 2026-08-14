@@ -21,15 +21,15 @@ try {
     dryRun: args.dryRun,
     env: process.env,
   });
-  console.log(JSON.stringify(summary, null, 2));
+  writeSummary(summary);
   if (summary.status === 'review-required') process.exitCode = 1;
 } catch (error) {
-  console.log(JSON.stringify({
+  writeSummary({
     schemaVersion: 1,
     flow: 'daily-ops-dispatch',
     status: 'error',
     reason: error instanceof Error ? error.message : String(error),
-  }, null, 2));
+  });
   process.exitCode = 1;
 }
 
@@ -54,4 +54,8 @@ function parseNow(value) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) throw new Error('--now must be a valid ISO date/time.');
   return date;
+}
+
+function writeSummary(summary) {
+  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }
