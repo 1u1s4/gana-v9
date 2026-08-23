@@ -19,6 +19,7 @@ import type { PipelineValidationMode, RunPipelineDependencies, RunPipelineInput 
 import { buildDailyProviderComparison, type DailyProviderComparison, type DailyProviderConsensus } from './comparison.js';
 import { applyCouncilDecisions, runRecommendationCouncil } from '../council/recommendation-council.js';
 import { recommendationArtifactTargets } from '../recommendations/artifact.js';
+import { selectDailyOddsFloorStrategy, type DailyOddsFloorStrategySelection } from './odds-floor-strategy.js';
 import { DAILY_REQUIRED_LEAGUE_PARLAY_APPROACH_ORDER, buildRequiredLeagueRecommendations, normalizeRequiredLeagues } from './required-leagues.js';
 import type { DailyRequiredLeagueArtifact, DailyRequiredLeagueGoalStatus, DailyRequiredLeagueInput, DailyRequiredLeagueParlayProjection } from './required-leagues.js';
 import {
@@ -145,6 +146,7 @@ export interface DailyE2ERunResult {
     parlays: number;
     atomic: number;
   };
+  dailyOddsFloorStrategy: DailyOddsFloorStrategySelection;
   requiredLeagueRecommendations?: {
     status: DailyRequiredLeagueGoalStatus;
     fixtureCount: number;
@@ -605,6 +607,10 @@ export async function runDailyE2E(
     date: input.date,
     generatedAt: completedAt,
   });
+  const dailyOddsFloorStrategy = selectDailyOddsFloorStrategy({
+    recommendations: finalRecommendations,
+    requiredLeagueRecommendations: requiredLeagueArtifact,
+  });
   const publishedTargets = recommendationArtifactTargets({
     recommendations: finalRecommendations,
     requiredLeagueRecommendations: requiredLeagueArtifact,
@@ -700,6 +706,7 @@ export async function runDailyE2E(
     validationFreshness,
     runDiagnostics,
     parlayApproaches,
+    dailyOddsFloorStrategy,
     requiredLeagueRecommendationsPath,
     requiredLeagueCoverage: requiredLeagueArtifact.coverage,
     requiredLeagueGoalCheck: requiredLeagueArtifact.goalCheck,
@@ -766,6 +773,7 @@ export async function runDailyE2E(
     parlayRecommendations,
     atomicRecommendations,
     parlayApproaches,
+    dailyOddsFloorStrategy,
     requiredLeagueRecommendationsPath,
     requiredLeagueCoverage: requiredLeagueArtifact.coverage,
     requiredLeagueGoalCheck: requiredLeagueArtifact.goalCheck,
@@ -919,6 +927,7 @@ export async function runDailyE2E(
       parlays: parlayRecommendations.length,
       atomic: atomicRecommendations.length,
     },
+    dailyOddsFloorStrategy,
     requiredLeagueRecommendations: {
       status: requiredLeagueArtifact.goalCheck.status,
       fixtureCount: requiredLeagueArtifact.coverage.fixtureCount,
@@ -1570,6 +1579,8 @@ function firstError(
 
 function buildDailyReport(summary: any, recommendationsPath: string): string {
   const counts = summary.counts ?? {};
+  const oddsFloorStrategy = summary.dailyOddsFloorStrategy ?? {};
+  const oddsFloorPick = oddsFloorStrategy.selectedPick ?? null;
   const lines = [
     `# Daily E2E ${summary.date}`,
     '',
@@ -1594,6 +1605,14 @@ function buildDailyReport(summary: any, recommendationsPath: string): string {
     `simples: ${counts.atomicRecommendations ?? 0}`,
     `fallbackParlays: ${counts.fallbackParlayRecommendations ?? 0}`,
     `fallbackSimples: ${counts.fallbackAtomicRecommendations ?? 0}`,
+    '',
+    '## Daily Odds Floor Strategy',
+    `status: ${oddsFloorStrategy.status ?? 'unknown'}`,
+    `rule: publishedOdds >= ${oddsFloorStrategy.rule?.minimumPublishedOdds ?? 1.45}; highest publishedConfidence`,
+    `eligible: ${oddsFloorStrategy.eligiblePickCount ?? 0}/${oddsFloorStrategy.evaluatedPickCount ?? 0}`,
+    oddsFloorPick
+      ? `selection: ${oddsFloorPick.source} | ${oddsFloorPick.profile} | ${oddsFloorPick.id} | odds ${oddsFloorPick.publishedOdds} | confidence ${oddsFloorPick.publishedConfidence}`
+      : 'selection: none',
     '',
     '## Diagnostics',
     `emptyRun: ${Boolean(summary.runDiagnostics?.emptyRun)}`,

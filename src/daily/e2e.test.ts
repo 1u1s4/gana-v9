@@ -157,12 +157,20 @@ describe('runDailyE2E', () => {
     assert.equal(summary.providerComparison.summary.comparablePredictions, 1);
     assert.equal(summary.runDiagnostics.emptyRun, false);
     assert.equal(summary.runDiagnostics.totalProviderPredictions, 1);
+    assert.deepEqual(result.dailyOddsFloorStrategy, summary.dailyOddsFloorStrategy);
+    assert.equal(summary.dailyOddsFloorStrategy.status, 'no-eligible-pick');
+    assert.equal(summary.dailyOddsFloorStrategy.selectedPick, null);
+    assert.equal(summary.dailyOddsFloorStrategy.rule.minimumPublishedOdds, 1.45);
     const report = readFileSync(result.reportPath, 'utf-8');
     assert.match(report, /total: 1/);
     assert.match(report, /simples: 1/);
     assert.match(report, /emptyRun: false/);
+    assert.match(report, /## Daily Odds Floor Strategy/);
+    assert.match(report, /status: no-eligible-pick/);
+    assert.match(report, /selection: none/);
     assert.match(report, /Artifact analitico\. No ejecuta apuestas/);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
+    assert.deepEqual(summary.dailyOddsFloorStrategy, recommendations.dailyOddsFloorStrategy);
     assert.equal(recommendations.executionCapability, 'none');
     assert.equal(recommendations.runDiagnostics.emptyRun, false);
     assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');
@@ -537,7 +545,7 @@ describe('runDailyE2E', () => {
       parlayRecommendation({ rank: 1, parlayId: 'balanced-1', profile: 'balanced', combinedOdds: 1.8, predictionId: 'prediction-balanced-1' }),
       parlayRecommendation({ rank: 2, parlayId: 'balanced-2', profile: 'balanced', combinedOdds: 1.9, predictionId: 'prediction-extra-balanced' }),
       parlayRecommendation({ rank: 3, parlayId: 'diamante-1', profile: 'parlay-diamante', combinedOdds: 1.12, predictionId: 'prediction-atomic-1' }),
-      parlayRecommendation({ rank: 4, parlayId: 'refinado-1', profile: 'parlay-refinado', combinedOdds: 1.43, aggregateConfidence: 0.82, expectedEdge: 0.06, predictionId: 'prediction-refinado' }),
+      parlayRecommendation({ rank: 4, parlayId: 'refinado-1', profile: 'parlay-refinado', combinedOdds: 1.45, aggregateConfidence: 0.82, expectedEdge: 0.06, predictionId: 'prediction-refinado' }),
       parlayRecommendation({ rank: 5, parlayId: 'low-variance-1', profile: 'low-variance', combinedOdds: 1.4, predictionId: 'prediction-low-variance' }),
       parlayRecommendation({ rank: 6, parlayId: 'high-odds-1', profile: 'high-conviction', combinedOdds: 2.6, aggregateConfidence: 0.95, expectedEdge: 0.2, predictionId: 'prediction-high-odds' }),
       parlayRecommendation({ rank: 7, parlayId: 'market-diverse-duplicate', profile: 'market-diverse', combinedOdds: 1.85, predictionId: 'prediction-market-diverse', legs: duplicateLowVarianceLegs }),
@@ -676,6 +684,13 @@ describe('runDailyE2E', () => {
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.counts.parlayRecommendations, 3);
     assert.equal(summary.counts.atomicRecommendations, 1);
+    assert.deepEqual(result.dailyOddsFloorStrategy, summary.dailyOddsFloorStrategy);
+    assert.deepEqual(summary.dailyOddsFloorStrategy, recommendations.dailyOddsFloorStrategy);
+    assert.equal(summary.dailyOddsFloorStrategy.status, 'selected');
+    assert.equal(summary.dailyOddsFloorStrategy.eligiblePickCount, 1);
+    assert.equal(summary.dailyOddsFloorStrategy.selectedPick.id, 'refinado-1');
+    assert.equal(summary.dailyOddsFloorStrategy.selectedPick.publishedOdds, 1.45);
+    assert.equal(summary.dailyOddsFloorStrategy.selectedPick.publishedConfidence, 0.82);
   });
 
   it('fills missing daily focus approaches from reviewable simple recommendations', async () => {

@@ -2709,3 +2709,14 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Do not compose final fallback parlays from parlay-ineligible or hard-risk legs (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/recommendation-policy.test.ts
 - [high] Require persisted-ledger parity for published parlay recommendations (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
 - [high] Add a post-settlement validation completion loop before strategy learning (ready-for-implementation) — src/validation/service.ts, src/validation/service.test.ts, src/metrics/daily.ts
+
+## 2026-08-23 · applied-odds-floor-daily-pick
+
+- Status: implemented
+- Evidence: `.artifacts/gana-v9/reports/positive-strategy-study-2026-07-06-to-2026-08-23.json` and `.artifacts/gana-v9/reports/positive-strategy-study-2026-07-06-to-2026-08-23.md`
+- Historical result: 29 settled selections, 24 won and 5 lost; the analytical $100 bank ended at $234.04. The restarted 2026-08-06 forward segment ended at $129.20 after 7 selections (6 won, 1 lost). These are retrospective/forward analytical observations, not a guarantee.
+- Applied rule: among official published picks with decimal odds `>=1.45`, select the highest published confidence; ties keep the first published pick. If none qualifies, persist `no-eligible-pick` without inventing a fallback.
+- Candidate scope: final daily recommendations, required-league atomic projections, and required-league parlays with `status=selected`; blocked required parlays and general contextual predictions remain excluded.
+- Implementation: persist `dailyOddsFloorStrategy` in the Daily E2E result, summary, recommendation artifact, and report; render the validated snapshot as a dedicated final Discord message without adding a recommendation, publication target, or ledger row.
+- Files: `src/daily/odds-floor-strategy.ts`, `src/daily/e2e.ts`, `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs`, focused tests, notifier skill contract, and daily operations documentation.
+- Verification: `pnpm typecheck`; focused selector/E2E/notifier/publication tests; selected and no-eligible notifier dry-runs from generated E2E artifacts; full `pnpm test` (619 passed, 0 failed).

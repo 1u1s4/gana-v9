@@ -7,6 +7,7 @@ import {
   buildDiscordPayload,
   buildDiscordPayloads,
   buildDiscordSinglePayload,
+  buildDailyOddsFloorStrategyEmbed,
   buildGatewayMessage,
   findLatestRecommendationsArtifact,
   loadRecommendations,
@@ -50,6 +51,101 @@ describe('discord recommendation notifier', () => {
     assert.doesNotMatch(message, /Expo n\/a/);
     assert.match(message, /🛡️ Revisión manual requerida antes de promoción/);
     assert.doesNotMatch(message, /\bbet\b/i);
+  });
+
+  it('appends the persisted selected odds-floor strategy as the final native message', () => {
+    const artifact = {
+      ...sampleArtifactWithAtomic(),
+      dailyOddsFloorStrategy: sampleSelectedOddsFloorStrategy(),
+    };
+
+    const payloads = buildDiscordPayloads(artifact, { max: 2, username: 'Hermes Strategy' });
+    const strategyPayload = payloads.at(-1);
+    const strategyEmbed = strategyPayload.embeds[0];
+    const legacySinglePayloadBuilder = buildDiscordPayload(artifact, { max: 2 });
+
+    assert.equal(payloads.length, 2);
+    assert.equal(strategyPayload.username, 'Hermes Strategy');
+    assert.deepEqual(strategyPayload.allowed_mentions, { parse: [] });
+    assert.equal(strategyPayload.embeds.length, 1);
+    assert.equal(strategyEmbed.title, '🎯 Apuesta analítica del día');
+    assert.match(strategyEmbed.description, /🎟️ Parlay diario · parlay-refinado/);
+    assert.match(strategyEmbed.description, /🥅 Team E vs Team F(?: · \d{2}:\d{2})?: goals over 2\.5 @ 1\.52/);
+    assert.match(strategyEmbed.description, /📊 Cuota 1\.52 · 🍀 Conf 78%/);
+    assert.match(strategyEmbed.description, /Regla: cuota publicada ≥1\.45 · mayor confianza publicada/);
+    assert.match(strategyEmbed.description, /sin ejecución monetaria ni garantía/);
+    assert.equal(payloads.slice(0, -1).some((payload) => payload.embeds.some((embed) => embed.title === strategyEmbed.title)), false);
+    assert.equal(legacySinglePayloadBuilder.embeds.at(-1).title, '🎯 Apuesta analítica del día');
+    assert.equal(legacySinglePayloadBuilder.embeds.length <= 10, true);
+  });
+
+  it('renders an explicit final no-eligible strategy message without deriving a pick from recommendations', () => {
+    const artifact = {
+      ...sampleArtifact(),
+      dailyOddsFloorStrategy: sampleNoEligibleOddsFloorStrategy({ evaluatedPickCount: 3 }),
+    };
+
+    const payloads = buildDiscordPayloads(artifact, { max: 1 });
+    const strategyEmbed = payloads.at(-1).embeds[0];
+
+    assert.equal(payloads.length, 2);
+    assert.equal(strategyEmbed.title, '🎯 Apuesta analítica del día');
+    assert.equal(strategyEmbed.color, 0x828282);
+    assert.match(strategyEmbed.description, /Hoy no hay apuesta elegible/);
+    assert.match(strategyEmbed.description, /Picks oficiales evaluados: 3 · elegibles: 0/);
+    assert.match(strategyEmbed.description, /Ningún pick publicado alcanzó la cuota mínima/);
+    assert.doesNotMatch(strategyEmbed.description, /Team A vs Team B: h2h home/);
+  });
+
+  it('does not add a strategy message for legacy or invalid snapshots', () => {
+    const legacyPayloads = buildDiscordPayloads(sampleArtifact(), { max: 1 });
+    const invalidArtifact = {
+      ...sampleArtifact(),
+      dailyOddsFloorStrategy: {
+        ...sampleSelectedOddsFloorStrategy(),
+        rule: {
+          ...sampleSelectedOddsFloorStrategy().rule,
+          tieBreak: ['rank-ascending'],
+        },
+      },
+    };
+    const invalidPayloads = buildDiscordPayloads(invalidArtifact, { max: 1 });
+
+    assert.equal(legacyPayloads.length, 1);
+    assert.equal(invalidPayloads.length, 1);
+    assert.equal(buildDailyOddsFloorStrategyEmbed(sampleArtifact()), null);
+    assert.equal(buildDailyOddsFloorStrategyEmbed(invalidArtifact), null);
+    assert.doesNotMatch(buildGatewayMessage(invalidArtifact, { max: 1 }), /Apuesta analítica del día/);
+  });
+
+  it('places the persisted strategy section last in plain gateway output', () => {
+    const artifact = {
+      ...sampleArtifact(),
+      dailyOddsFloorStrategy: sampleSelectedOddsFloorStrategy(),
+    };
+
+    const message = buildGatewayMessage(artifact, { max: 1 });
+
+    assert.match(message, /🎯 Apuesta analítica del día/);
+    assert.match(message, /Regla: cuota publicada ≥1\.45/);
+    assert.ok(message.lastIndexOf('🎯 Apuesta analítica del día') > message.lastIndexOf('Revisión manual requerida antes de promoción'));
+    assert.match(message.slice(message.lastIndexOf('🎯 Apuesta analítica del día')), /sin ejecución monetaria ni garantía\.$/);
+  });
+
+  it('uses grammatical daily and required labels for persisted simple and parlay picks', () => {
+    const cases = [
+      [{ source: 'daily', kind: 'atomic-prediction', profile: 'atomic-high-confidence' }, /📌 Simple diaria · atomic-high-confidence/],
+      [{ source: 'required-atomic', kind: 'atomic-prediction', profile: 'required-atomic' }, /📌 Simple obligatoria · required-atomic/],
+      [{ source: 'daily', kind: 'parlay', profile: 'parlay-refinado' }, /🎟️ Parlay diario · parlay-refinado/],
+      [{ source: 'required-parlay', kind: 'parlay', profile: 'principal' }, /🎟️ Parlay obligatorio · principal/],
+    ];
+
+    for (const [selectedPick, expected] of cases) {
+      const embed = buildDailyOddsFloorStrategyEmbed({
+        dailyOddsFloorStrategy: sampleSelectedOddsFloorStrategy({ selectedPick }),
+      });
+      assert.match(embed.description, expected);
+    }
   });
 
   it('formats atomic high-confidence predictions as simple recommendations', () => {
@@ -772,6 +868,28 @@ describe('discord recommendation notifier', () => {
     assert.match(payload.embeds.map((embed) => embed.description ?? '').join('\n'), /14\. 📌 Simple/);
   });
 
+  it('keeps the persisted strategy last within single-message and paginated native limits', () => {
+    const artifact = sampleArtifact();
+    artifact.recommendations = Array.from({ length: 14 }, (_, index) => ({
+      ...sampleArtifact().recommendations[0],
+      rank: index + 1,
+      parlayId: `parlay-${index + 1}`,
+      kind: index < 4 ? 'parlay' : 'atomic-prediction',
+    }));
+    artifact.dailyOddsFloorStrategy = sampleSelectedOddsFloorStrategy();
+
+    const single = buildDiscordSinglePayload(artifact, { max: 14 });
+    const payloads = buildDiscordPayloads(artifact, { max: 14 });
+
+    assert.equal(single.embeds.length <= 10, true);
+    assert.equal(single.embeds.at(-1).title, '🎯 Apuesta analítica del día');
+    assert.equal(payloads.length, 3);
+    assert.equal(payloads.every((payload) => payload.embeds.length <= 10), true);
+    assert.equal(payloads.at(-1).embeds.length, 1);
+    assert.equal(payloads.at(-1).embeds[0].title, '🎯 Apuesta analítica del día');
+    assert.doesNotMatch(payloads.at(-2).embeds.at(-1).description ?? '', /Apuesta analítica del día/);
+  });
+
   it('loads artifacts and resolves the newest recommendations file', () => {
     const root = join(tmpdir(), `gana-discord-notifier-${Date.now()}`);
     const older = join(root, 'older');
@@ -915,6 +1033,68 @@ function sampleArtifact() {
     analyticalArtifactOnly: true,
     executionCapability: 'none',
   };
+}
+
+function sampleSelectedOddsFloorStrategy(overrides = {}) {
+  const base = {
+    version: 'odds-floor-highest-confidence-v1',
+    status: 'selected',
+    rule: {
+      minimumPublishedOdds: 1.45,
+      selection: 'highest-published-confidence',
+      tieBreak: ['published-order-ascending'],
+    },
+    evaluatedPickCount: 6,
+    eligiblePickCount: 2,
+    selectedPick: {
+      source: 'daily',
+      kind: 'parlay',
+      id: 'strategy-parlay-1',
+      rank: 2,
+      publishedOrder: 4,
+      profile: 'parlay-refinado',
+      publishedOdds: 1.52,
+      publishedConfidence: 0.78,
+      confidenceMetric: 'aggregateConfidence',
+      recommendationScore: 0.81,
+      legs: [{
+        predictionId: 'strategy-prediction-1',
+        fixtureId: 'strategy-fixture-1',
+        fixture: 'Team E vs Team F',
+        display: {
+          fixtureLabel: 'Team E vs Team F',
+          homeTeamName: 'Team E',
+          awayTeamName: 'Team F',
+          kickoffLocal: '2026-05-15T20:00:00.000Z',
+        },
+        market: 'goals_over_under',
+        selection: 'over',
+        line: 2.5,
+        odds: 1.52,
+      }],
+    },
+    analyticalArtifactOnly: true,
+    executionCapability: 'none',
+  };
+  return {
+    ...base,
+    ...overrides,
+    rule: { ...base.rule, ...(overrides.rule ?? {}) },
+    selectedPick: overrides.selectedPick === undefined
+      ? base.selectedPick
+      : overrides.selectedPick === null
+        ? null
+        : { ...base.selectedPick, ...overrides.selectedPick },
+  };
+}
+
+function sampleNoEligibleOddsFloorStrategy(overrides = {}) {
+  return sampleSelectedOddsFloorStrategy({
+    status: 'no-eligible-pick',
+    eligiblePickCount: 0,
+    selectedPick: null,
+    ...overrides,
+  });
 }
 
 function sampleArtifactWithAtomic() {

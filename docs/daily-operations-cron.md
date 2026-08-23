@@ -128,7 +128,8 @@ Este script:
 7. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
 8. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
 9. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
-10. Envia `daily-parlay-recommendations.json` al canal de recomendaciones en el formato canonico de embeds nativos y deja el resumen accionable del council al final.
+10. Calcula una sola `dailyOddsFloorStrategy` sobre las recomendaciones finales y el addendum obligatorio: conserva picks con cuota publicada `>=1.45`, elige la mayor confianza publicada y desempata solo por orden publicado. Persiste el mismo snapshot en `daily-e2e-summary.json`, `daily-parlay-recommendations.json` y `daily-report.md`; si no hay elegible, guarda `status=no-eligible-pick` y `selectedPick=null`.
+11. Envia `daily-parlay-recommendations.json` al canal de recomendaciones en el formato canonico de embeds nativos, deja el resumen accionable del council como control y agrega al final un mensaje independiente con la apuesta analitica del dia o la ausencia explicita de un pick elegible.
 
 Strategy review del dia anterior:
 

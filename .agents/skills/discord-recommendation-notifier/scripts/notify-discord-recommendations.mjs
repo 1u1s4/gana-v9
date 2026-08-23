@@ -18,6 +18,9 @@ const DISCORD_NON_SELECTION_EMBEDS = 2;
 const DISCORD_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
 const DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - 1;
 const REQUIRED_GENERAL_HIGH_PROBABILITY_FLOOR = 0.7;
+const DAILY_ODDS_FLOOR_STRATEGY_VERSION = 'odds-floor-highest-confidence-v1';
+const DAILY_ODDS_FLOOR_MINIMUM_PUBLISHED_ODDS = 1.45;
+const DAILY_ODDS_FLOOR_TIE_BREAK = ['published-order-ascending'];
 const GUATEMALA_TIMEZONE = 'America/Guatemala';
 const GUATEMALA_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
   timeZone: GUATEMALA_TIMEZONE,
@@ -102,30 +105,36 @@ export function loadRecommendations(path, { strictSources = false } = {}) {
 export function buildDiscordPayload(artifact, options = {}) {
   const requiredLeagueEmbeds = requiredLeagueDiscordEmbeds(artifact);
   if (requiredLeagueEmbeds.length + DISCORD_NON_SELECTION_EMBEDS > DISCORD_EMBED_LIMIT) {
-    return buildDiscordPayloads(artifact, options)[0];
+    const payload = buildDiscordPayloads(artifact, options)[0];
+    return appendDailyOddsFloorStrategyEmbedIfRoom(payload, artifact);
   }
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const selectionLimit = Math.min(max, Math.max(1, DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS - requiredLeagueEmbeds.length));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, selectionLimit));
-  return buildDiscordPayloadPage(recommendations, { ...options, artifact, artifactDate: artifact?.date });
+  const payload = buildDiscordPayloadPage(recommendations, { ...options, artifact, artifactDate: artifact?.date });
+  return appendDailyOddsFloorStrategyEmbedIfRoom(payload, artifact);
 }
 
 export function buildDiscordPayloads(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const requiredLeagueEmbeds = requiredLeagueDiscordEmbeds(artifact);
+  let payloads;
   if (requiredLeagueEmbeds.length + 1 >= DISCORD_EMBED_LIMIT) {
-    return buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, { ...options, artifact, artifactDate: artifact?.date });
+    payloads = buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, { ...options, artifact, artifactDate: artifact?.date });
+  } else {
+    const pages = paginateDiscordSelectionEmbeds(recommendations, artifact);
+    payloads = pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
+      ...options,
+      artifact,
+      artifactDate: artifact?.date,
+      page: index + 1,
+      pageCount: pages.length,
+      totalRecommendations: recommendations,
+    }));
   }
-  const pages = paginateDiscordSelectionEmbeds(recommendations, artifact);
-  return pages.map((pageRecommendations, index) => buildDiscordPayloadPage(pageRecommendations, {
-    ...options,
-    artifact,
-    artifactDate: artifact?.date,
-    page: index + 1,
-    pageCount: pages.length,
-    totalRecommendations: recommendations,
-  }));
+  const strategyPayload = buildDailyOddsFloorStrategyPayload(artifact, options);
+  return strategyPayload ? [...payloads, strategyPayload] : payloads;
 }
 
 function buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, options = {}) {
@@ -205,11 +214,161 @@ function discordPayloadFromEmbeds(embeds, options = {}) {
   };
 }
 
+export function buildDailyOddsFloorStrategyPayload(artifact, options = {}) {
+  const embed = buildDailyOddsFloorStrategyEmbed(artifact);
+  return embed ? discordPayloadFromEmbeds([embed], options) : null;
+}
+
+export function buildDailyOddsFloorStrategyEmbed(artifact) {
+  const snapshot = validDailyOddsFloorStrategySnapshot(artifact?.dailyOddsFloorStrategy);
+  if (!snapshot) return null;
+  return {
+    title: '🎯 Apuesta analítica del día',
+    description: truncate(formatDailyOddsFloorStrategyLines(snapshot).join('\n'), DISCORD_DESCRIPTION_LIMIT),
+    color: snapshot.status === 'selected' ? 0xf2c94c : 0x828282,
+  };
+}
+
+function appendDailyOddsFloorStrategyEmbedIfRoom(payload, artifact) {
+  const embed = buildDailyOddsFloorStrategyEmbed(artifact);
+  if (!embed || !Array.isArray(payload?.embeds) || payload.embeds.length >= DISCORD_EMBED_LIMIT) return payload;
+  return {
+    ...payload,
+    embeds: [...payload.embeds, embed],
+  };
+}
+
+function formatDailyOddsFloorStrategyLines(snapshot) {
+  const ruleLine = `> 📐 Regla: cuota publicada ≥${formatMetricNumber(snapshot.rule.minimumPublishedOdds, 2)} · mayor confianza publicada`;
+  const safetyLine = '🛡️ Selección analítica · sin ejecución monetaria ni garantía.';
+  if (snapshot.status === 'no-eligible-pick') {
+    return [
+      '> Hoy no hay apuesta elegible.',
+      `> Picks oficiales evaluados: ${snapshot.evaluatedPickCount} · elegibles: 0.`,
+      '> Ningún pick publicado alcanzó la cuota mínima.',
+      ruleLine,
+      '',
+      safetyLine,
+    ];
+  }
+
+  const pick = snapshot.selectedPick;
+  const lines = [
+    `> ${dailyOddsFloorPickLabel(pick)}`,
+    ...pick.legs.slice(0, 8).map((leg) => `> ${formatCompactLeg(leg, { includeKickoff: true })}`),
+  ];
+  if (pick.legs.length > 8) lines.push(`> +${pick.legs.length - 8} selecciones adicionales`);
+  lines.push(
+    `> 📊 Cuota ${formatMetricNumber(pick.publishedOdds, 4)} · 🍀 Conf ${formatPercent(pick.publishedConfidence)}`,
+    ruleLine,
+    '',
+    safetyLine,
+  );
+  return lines;
+}
+
+function dailyOddsFloorPickLabel(pick) {
+  if (pick.kind === 'atomic-prediction') {
+    const source = pick.source === 'required-atomic' ? 'obligatoria' : 'diaria';
+    return `📌 Simple ${source} · ${pick.profile}`;
+  }
+  const source = pick.source === 'required-parlay' ? 'obligatorio' : 'diario';
+  return `🎟️ Parlay ${source} · ${pick.profile}`;
+}
+
+function validDailyOddsFloorStrategySnapshot(value) {
+  if (!isPlainRecord(value)
+    || value.version !== DAILY_ODDS_FLOOR_STRATEGY_VERSION
+    || value.analyticalArtifactOnly !== true
+    || value.executionCapability !== 'none'
+    || !validDailyOddsFloorRule(value.rule)
+    || !nonNegativeInteger(value.evaluatedPickCount)
+    || !nonNegativeInteger(value.eligiblePickCount)
+    || value.eligiblePickCount > value.evaluatedPickCount) {
+    return null;
+  }
+  if (value.status === 'no-eligible-pick') {
+    return value.eligiblePickCount === 0 && value.selectedPick === null ? value : null;
+  }
+  if (value.status !== 'selected'
+    || value.eligiblePickCount < 1
+    || !validDailyOddsFloorPick(value.selectedPick, value.rule.minimumPublishedOdds)) {
+    return null;
+  }
+  return value;
+}
+
+function validDailyOddsFloorRule(value) {
+  return isPlainRecord(value)
+    && value.minimumPublishedOdds === DAILY_ODDS_FLOOR_MINIMUM_PUBLISHED_ODDS
+    && value.selection === 'highest-published-confidence'
+    && Array.isArray(value.tieBreak)
+    && value.tieBreak.length === DAILY_ODDS_FLOOR_TIE_BREAK.length
+    && value.tieBreak.every((item, index) => item === DAILY_ODDS_FLOOR_TIE_BREAK[index]);
+}
+
+function validDailyOddsFloorPick(value, minimumPublishedOdds) {
+  const validSources = new Set(['daily', 'required-atomic', 'required-parlay']);
+  const validKinds = new Set(['parlay', 'atomic-prediction']);
+  const validConfidenceMetrics = new Set(['displayConfidence', 'aggregateConfidence', 'confidence', 'adjustedProbability']);
+  return isPlainRecord(value)
+    && validSources.has(value.source)
+    && validKinds.has(value.kind)
+    && (value.source === 'daily'
+      || (value.source === 'required-atomic' && value.kind === 'atomic-prediction')
+      || (value.source === 'required-parlay' && value.kind === 'parlay'))
+    && nonEmptyText(value.id)
+    && positiveIntegerValue(value.rank)
+    && positiveIntegerValue(value.publishedOrder)
+    && nonEmptyText(value.profile)
+    && Number.isFinite(value.publishedOdds)
+    && value.publishedOdds >= minimumPublishedOdds
+    && Number.isFinite(value.publishedConfidence)
+    && value.publishedConfidence >= 0
+    && value.publishedConfidence <= 1
+    && validConfidenceMetrics.has(value.confidenceMetric)
+    && Number.isFinite(value.recommendationScore)
+    && Array.isArray(value.legs)
+    && value.legs.length > 0
+    && value.legs.every(validDailyOddsFloorLeg);
+}
+
+function validDailyOddsFloorLeg(value) {
+  return isPlainRecord(value)
+    && (value.predictionId === null || nonEmptyText(value.predictionId))
+    && (value.fixtureId === null || nonEmptyText(value.fixtureId))
+    && nonEmptyText(value.fixture)
+    && nonEmptyText(value.market)
+    && nonEmptyText(value.selection)
+    && (value.line === null || Number.isFinite(value.line))
+    && Number.isFinite(value.odds)
+    && value.odds > 0
+    && (value.display === undefined || isPlainRecord(value.display));
+}
+
+function isPlainRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nonEmptyText(value) {
+  return typeof value === 'string' && Boolean(value.trim());
+}
+
+function nonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function positiveIntegerValue(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
 export function buildDiscordSinglePayload(artifact, options = {}) {
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const counts = recommendationCounts(recommendations);
   const hasRequiredSelections = hasRequiredLeagueSelections(artifact);
+  const requiredEmbeds = requiredLeagueDiscordEmbeds(artifact);
+  const strategyEmbed = buildDailyOddsFloorStrategyEmbed(artifact);
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones',
     description: formatHeaderDescription(artifact, counts, artifact?.date),
@@ -217,34 +376,45 @@ export function buildDiscordSinglePayload(artifact, options = {}) {
     footer: { text: 'Gana Hermes · Discord native embeds' },
     timestamp: new Date().toISOString(),
   }];
+  const needsRecommendationEmbed = recommendations.length > 0;
+  const needsEmptyEmbed = !recommendations.length && !hasRequiredSelections;
+  const fixedTrailingEmbeds = 1 + (strategyEmbed ? 1 : 0);
+  const availableContentEmbeds = Math.max(0, DISCORD_EMBED_LIMIT - embeds.length - fixedTrailingEmbeds);
+  const reservedRecommendationEmbeds = needsRecommendationEmbed || needsEmptyEmbed ? 1 : 0;
+  const includedRequiredEmbeds = requiredEmbeds.slice(0, Math.max(0, availableContentEmbeds - reservedRecommendationEmbeds));
+  const availableRecommendationEmbeds = Math.max(0, availableContentEmbeds - includedRequiredEmbeds.length);
 
-  if (!recommendations.length && !hasRequiredSelections) {
+  if (needsEmptyEmbed && availableRecommendationEmbeds > 0) {
     embeds.push({
       title: 'Sin selecciones',
       description: '> El artifact no contiene selecciones para notificar.',
       color: 0x828282,
     });
-  } else {
+  } else if (needsRecommendationEmbed && availableRecommendationEmbeds > 0) {
     const lines = recommendations.flatMap((recommendation, index) => formatCompactRecommendationLines(recommendation, index));
     const descriptions = chunkLinesByLimit(lines, DISCORD_DESCRIPTION_LIMIT - 200);
-    const availableSelectionEmbeds = Math.max(1, DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS - requiredLeagueDiscordEmbeds(artifact).length);
-    for (const [index, description] of descriptions.slice(0, availableSelectionEmbeds).entries()) {
+    for (const [index, description] of descriptions.slice(0, availableRecommendationEmbeds).entries()) {
       embeds.push({
         title: index === 0 ? 'Selecciones' : `Selecciones cont. ${index + 1}`,
         description: truncate(description, DISCORD_DESCRIPTION_LIMIT),
         color: 0x27ae60,
       });
     }
-    if (descriptions.length > availableSelectionEmbeds) {
+    if (descriptions.length > availableRecommendationEmbeds) {
       embeds[embeds.length - 1].description = truncate(`${embeds[embeds.length - 1].description}\n> +selecciones truncadas por limite de Discord`, DISCORD_DESCRIPTION_LIMIT);
     }
   }
 
-  embeds.push(...requiredLeagueDiscordEmbeds(artifact));
+  embeds.push(...includedRequiredEmbeds);
+  const hiddenRequiredEmbeds = requiredEmbeds.length - includedRequiredEmbeds.length;
   embeds.push({
-    description: formatClosingDescription(artifact),
+    description: truncate([
+      formatClosingDescription(artifact),
+      hiddenRequiredEmbeds > 0 ? `\n> +${hiddenRequiredEmbeds} bloques obligatorios truncados por limite de Discord` : undefined,
+    ].filter(Boolean).join('\n'), DISCORD_DESCRIPTION_LIMIT),
     color: 0x56ccf2,
   });
+  if (strategyEmbed) embeds.push(strategyEmbed);
 
   return {
     username: stringOrFallback(options.username, 'Gana Hermes'),
@@ -482,6 +652,16 @@ export function buildGatewayMessage(artifact, options = {}) {
   const councilSummary = formatCouncilSummaryLines(artifact);
   if (councilSummary.length) lines.push(...councilSummary, '');
   lines.push('━━━━━━━━━━━━━━━━━━', '', '🛡️ Revisión manual requerida antes de promoción.');
+  const strategySnapshot = validDailyOddsFloorStrategySnapshot(artifact?.dailyOddsFloorStrategy);
+  if (strategySnapshot) {
+    lines.push(
+      '',
+      '━━━━━━━━━━━━━━━━━━',
+      '',
+      '🎯 Apuesta analítica del día',
+      ...formatDailyOddsFloorStrategyLines(strategySnapshot),
+    );
+  }
   return lines.join('\n');
 }
 
