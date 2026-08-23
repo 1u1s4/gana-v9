@@ -2592,3 +2592,120 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - [high] Add a validation-data sufficiency gate for strategy changes (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts
 - [high] Persist funnel counts and rejection taxonomy into the recommendation artifact (ready-for-implementation) — src/daily/e2e.ts
 - [medium] Defer market-scope expansion and numeric threshold changes until records exist (needs-more-data) — src/filters/low-odds-selector.ts, src/scoring/edge-gate.ts, src/parlay/rules.ts, src/daily/recommendation-policy.ts
+
+## 2026-08-16 · strategy-2026-08-14
+
+- Run: strategy-review-2026-08-14-491b9f03
+- Dates: 2026-08-14
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-14-491b9f03/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-14-491b9f03/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 4-4 hit 50.0% (32 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Make settlement freshness a retried feedback-loop gate (ready-for-implementation) — scripts/lib/validation-workflow.mjs, src/daily/e2e.ts, src/metrics/daily.ts
+- [high] Add an explicit zero-publication selection-funnel diagnostic (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/daily/e2e.test.ts
+- [medium] Record market-specific validation retry and terminal reasons (ready-for-implementation) — src/validation/service.ts, src/metrics/daily.ts, src/strategy-review/daily.ts
+- [medium] Require an out-of-sample h2h calibration decision before changing h2h gates (needs-more-data) — src/prediction/service.ts, src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-08-17 · strategy-2026-08-15
+
+- Run: strategy-review-2026-08-15-524a542c
+- Dates: 2026-08-15
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-15-524a542c/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-15-524a542c/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays; 1 reviewed date(s) had no recommendation artifact; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Fail closed on unexplained empty daily runs (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
+- [high] Short-circuit empty strategy reviews into a data-collection verdict (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Emit daily market-coverage and persistence-failure ledger (ready-for-implementation) — src/prediction/service.ts, src/daily/e2e.ts, src/daily/e2e.test.ts
+- [medium] Defer edge-threshold and profile retuning until settled sample floors are met (needs-more-data) — src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-08-18 · strategy-2026-08-17
+
+- Run: strategy-review-2026-08-17-0040a1e6
+- Dates: 2026-08-17
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-17-0040a1e6/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-17-0040a1e6/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: blocked
+- Predictions: 5-5 hit 50.0% (17 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-08-19 · strategy-2026-08-18
+
+- Run: strategy-review-2026-08-18-731672b7
+- Dates: 2026-08-18
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-18-731672b7/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-18-731672b7/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays; 1 reviewed date(s) had no recommendation artifact; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Fail the daily run when required analytical outputs are absent (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
+- [high] Persist a daily stage-completeness ledger before recommendation selection (ready-for-implementation) — src/daily/e2e.ts, src/recommendations/artifact.ts, src/daily/e2e.test.ts
+- [medium] Add a minimum-sample calibration feedback gate for threshold and profile changes (needs-more-data) — src/daily/recommendation-policy.ts, src/parlay/profile-specs.ts, src/metrics/daily.ts
+- [medium] Record market-coverage and evidence-coverage outcomes in the daily artifact (proposed) — src/daily/e2e.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-08-20 · strategy-2026-08-19
+
+- Run: strategy-review-2026-08-19-e223b1d1
+- Dates: 2026-08-19
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-19-e223b1d1/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-19-e223b1d1/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 2-1 hit 66.7% (39 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Apply a final semantic parlay deduplication gate before writing recommendations (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts
+- [high] Reconcile every published parlay recommendation with persistence and validation eligibility (ready-for-implementation) — src/daily/e2e.ts, src/recommendations/artifact.ts, src/metrics/daily.ts
+- [high] Run post-settlement metrics against the published recommendation artifact and feed completeness into the next run (ready-for-implementation) — src/daily/e2e.ts, src/metrics/daily.ts
+- [medium] Collect sufficient settled samples before tightening confidence and minimum-edge promotion thresholds (needs-more-data) — src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-08-22 · strategy-2026-08-20
+
+- Run: strategy-review-2026-08-20-0277e0e3
+- Dates: 2026-08-20
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-20-0277e0e3/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-20-0277e0e3/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 2-0 hit 100.0% (28 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Deduplicate fallback parlays by semantic leg signature across profiles (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/recommendation-policy.test.ts
+- [high] Do not compose final fallback parlays from parlay-ineligible or hard-risk legs (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/recommendation-policy.test.ts
+- [high] Require persisted-ledger parity for published parlay recommendations (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
+- [high] Add a post-settlement validation completion loop before strategy learning (ready-for-implementation) — src/validation/service.ts, src/validation/service.test.ts, src/metrics/daily.ts
