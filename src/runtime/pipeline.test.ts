@@ -1,3 +1,5 @@
+import { inMemoryRunStore, parentRun } from './run-lifecycle.test-support.js';
+import { persistStageRun } from './run-lifecycle.js';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -2244,5 +2246,55 @@ describe('exportRunArtifacts', () => {
     assert.match(handoff, /validations: 1/);
     assert.match(handoff, /validationStatus: pending/);
     assert.match(handoff, /Wait for fixture completion/);
+  });
+});
+
+
+describe('pipeline run lifecycle ownership', () => {
+  it('clears a prior completion and leaves the running parent untouched by child stages until pipeline finalization', async () => {
+    const cfg = testConfig();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    const previous = { ...parentRun('lifecycle-pipeline'), status: 'succeeded', verdict: 'promotable', completedAt: new Date('2026-04-28T12:00:00.000Z') };
+    const store = inMemoryRunStore(previous);
+    const stageOwners: string[] = [];
+    const deps = successfulPipelineDeps({ target: fixture(), calls: [], runId: previous.id, date: '2026-04-29' });
+    for (const key of ['researchFixture', 'scoreFixture', 'buildParlay', 'validateRun'] as const) {
+      const original = deps[key] as (...args: any[]) => Promise<any>;
+      (deps as any)[key] = async (...args: any[]) => {
+        assert.equal(runtime.runLifecycleOwnerId, previous.id);
+        assert.equal(store.read(previous.id)?.status, 'running');
+        assert.equal(store.read(previous.id)?.completedAt, null);
+        assert.equal(store.read(previous.id)?.verdict, null);
+        const before = store.read(previous.id);
+        await persistStageRun(store.repository, runtime, { ...previous, status: 'failed', verdict: 'blocked', metadata: { fixtureFailure: true } });
+        assert.deepEqual(store.read(previous.id), before);
+        stageOwners.push(key);
+        return original(...args);
+      };
+    }
+    const result = await executeRunPipeline(cfg, { runId: previous.id, date: '2026-04-29', validate: 'force' }, runtime, {
+      ...deps, repositories: { ...deps.repositories, harnessRuns: store.repository },
+    });
+    assert.equal(result.status, 'succeeded');
+    assert.deepEqual(stageOwners, ['researchFixture', 'scoreFixture', 'buildParlay', 'validateRun']);
+    assert.equal(store.read(previous.id)?.status, result.status);
+    assert.equal((store.read(previous.id)?.completedAt as Date).toISOString(), '2026-04-29T12:00:00.000Z');
+    assert.equal(runtime.runLifecycleOwnerId, undefined);
+    // Reusing the runtime/runId after pipeline completion remains a standalone operation.
+    await persistStageRun(store.repository, runtime, { ...previous, status: 'failed', verdict: 'blocked' });
+    assert.equal(store.read(previous.id)?.status, 'failed');
+  });
+
+  it('releases ownership when pipeline initialization throws before any fixture task runs', async () => {
+    const cfg = testConfig();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    await assert.rejects(executeRunPipeline(cfg, { runId: 'initialization-failure', date: '2026-04-29' }, runtime, {
+      repositories: {},
+      writeRunJson: () => {
+        assert.equal(runtime.runLifecycleOwnerId, 'initialization-failure');
+        throw new Error('test run artifact failed');
+      },
+    }), /test run artifact failed/);
+    assert.equal(runtime.runLifecycleOwnerId, undefined);
   });
 });

@@ -1,3 +1,4 @@
+import { inMemoryRunStore, parentRun, runInTestScope } from '../runtime/run-lifecycle.test-support.js';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -1423,3 +1424,51 @@ describe('runFixtureResearch', () => {
     assert.match(artifact, /\[REDACTED\]/);
   });
 });
+
+
+describe('research run ownership', () => {
+  for (const nested of [true, false]) {
+    it(`persists research while ${nested ? 'preserving its running parent' : 'finalizing a standalone with an existing run ID'}`, async () => {
+      const cfg = { ...config(), databaseUrl: 'postgresql://unused/test' };
+      const parent = parentRun();
+      const store = inMemoryRunStore(parent);
+      const runtime = { ...createRuntimeContext(cfg, 'session.jsonl'), runId: parent.id };
+      let persisted = 0;
+      const result = await runInTestScope(nested, runtime, () => runFixtureResearch(cfg, { fixtureId: '1001', web: 'off' }, runtime, {
+        now: () => createdAt,
+        provider: { getFixture: async () => fixture },
+        agentRunner: async () => ({ text: agentOutput(), usage: {}, output: agentOutput() }),
+        repositories: { harnessRuns: store.repository, researchBundles: { createWithItems: async () => { persisted++; } } } as any,
+      }));
+      assert.ok(result.bundle);
+      assert.equal(persisted, 1);
+      if (nested) assert.deepEqual(store.read(parent.id), parent);
+      else {
+        assert.equal(store.read(parent.id)?.status, 'succeeded');
+        assert.ok(store.read(parent.id)?.completedAt instanceof Date);
+      }
+    });
+  }
+});
+
+
+for (const nested of [true, false]) {
+  it(`research persistence failure ${nested ? 'preserves the parent' : 'marks a standalone failed'}`, async () => {
+    const cfg = { ...config(), databaseUrl: 'postgresql://unused/test' };
+    const parent = parentRun();
+    const store = inMemoryRunStore(parent);
+    const runtime = { ...createRuntimeContext(cfg, 'session.jsonl'), runId: parent.id };
+    const result = await runInTestScope(nested, runtime, () => runFixtureResearch(cfg, { fixtureId: '1001', web: 'off' }, runtime, {
+      now: () => createdAt,
+      provider: { getFixture: async () => fixture },
+      agentRunner: async () => ({ text: agentOutput(), usage: {}, output: agentOutput() }),
+      repositories: { harnessRuns: store.repository, researchBundles: { createWithItems: async () => { throw new Error('test bundle persistence failed'); } } } as any,
+    }));
+    assert.equal(result.ok, false);
+    if (nested) assert.deepEqual(store.read(parent.id), parent);
+    else {
+      assert.equal(store.read(parent.id)?.status, 'failed');
+      assert.equal(store.read(parent.id)?.verdict, 'blocked');
+    }
+  });
+}

@@ -1,3 +1,4 @@
+import { persistStageRun, type StageRunRepository } from '../runtime/run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { AgentConfig } from '../config.js';
@@ -150,21 +151,7 @@ export interface PredictionServiceRepositories {
   claims: {
     list(query: { bundleId?: string; fixtureId?: string; take?: number }): Promise<ClaimRecord[]>;
   };
-  harnessRuns?: {
-    upsertForRun?(input: {
-      id: string;
-      runtime: string;
-      profile: string;
-      providerSports: string;
-      providerAgentic?: string | null;
-      model?: string | null;
-      status?: string;
-      verdict?: string | null;
-      startedAt?: Date | null;
-      completedAt?: Date | null;
-      metadata?: JsonValue | null;
-    }): Promise<unknown>;
-  };
+  harnessRuns?: StageRunRepository;
   artifacts?: {
     create(input: {
       name: string;
@@ -1476,7 +1463,7 @@ async function upsertRun(
   status: string,
   completedAt: Date,
 ): Promise<void> {
-  await repositories.harnessRuns?.upsertForRun?.({
+  await persistStageRun(repositories.harnessRuns, runtime, {
     id: runId,
     runtime: config.runtime,
     profile: config.profile,

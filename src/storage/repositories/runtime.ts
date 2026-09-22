@@ -15,6 +15,7 @@ import type {
   StoragePrismaClient,
 } from '../types.js';
 import { compactData, takeArg } from './helpers.js';
+import type { RunWriteOptions } from '../../runtime/run-lifecycle.js';
 
 export interface HarnessRunStatusUpdate {
   status: HarnessStatus | string;
@@ -51,11 +52,13 @@ export function createHarnessRunRepository(db: Pick<StoragePrismaClient, 'harnes
       });
     },
 
-    upsertForRun(input: HarnessRunInput & { id: string }): Promise<HarnessRunRecord> {
-      return db.harnessRun.upsert({
+    async upsertForRun(input: HarnessRunInput & { id: string }, options: RunWriteOptions = {}): Promise<HarnessRunRecord> {
+      const args = {
         where: { id: input.id },
-        create: compactData(input),
-        update: compactData({
+        create: compactData(options.preserveExisting
+          ? { ...input, status: 'running', verdict: null, completedAt: null }
+          : input),
+        update: options.preserveExisting ? {} : compactData({
           runtime: input.runtime,
           profile: input.profile,
           providerSports: input.providerSports,
@@ -67,7 +70,16 @@ export function createHarnessRunRepository(db: Pick<StoragePrismaClient, 'harnes
           completedAt: input.completedAt,
           metadata: input.metadata,
         }),
-      });
+      };
+      try {
+        return await db.harnessRun.upsert(args);
+      } catch (error) {
+        // Prisma may race on an emulated create-only upsert; the winner's row stays intact.
+        if (options.preserveExisting && error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+          return db.harnessRun.upsert(args);
+        }
+        throw error;
+      }
     },
   };
 }

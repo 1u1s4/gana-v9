@@ -1,3 +1,4 @@
+import { persistStageRun } from '../runtime/run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { AgentConfig } from '../config.js';
@@ -58,6 +59,7 @@ export interface FixtureResearchResult {
 }
 
 export interface FixtureResearchDependencies {
+  repositories?: Pick<ReturnType<typeof createStorageRepositories>, 'harnessRuns' | 'researchBundles'>;
   agentRunner?: typeof runAgentWithRetry;
   provider?: ResearchSportsProvider;
   now?: () => Date;
@@ -863,7 +865,7 @@ async function writeAndPersistResearchBundle(
 
   try {
     await deps.createRun?.({ runId });
-    await (deps.persistBundle ?? defaultPersistBundle(config, runtime))(bundle, artifactPath);
+    await (deps.persistBundle ?? defaultPersistBundle(config, runtime, deps.repositories))(bundle, artifactPath);
   } catch (err: any) {
     const errorPath = writeArtifact(config, runId, 'research-persist-error.json', {
       bundle,
@@ -1126,13 +1128,12 @@ function writeBlockedArtifact(
   };
 }
 
-function defaultPersistBundle(config: AgentConfig, runtime: RuntimeContext) {
+function defaultPersistBundle(config: AgentConfig, runtime: RuntimeContext, injectedRepositories?: FixtureResearchDependencies['repositories']) {
   return async (bundle: ResearchBundle, artifactPath: string): Promise<void> => {
     if (!config.databaseUrl) throw new Error('DATABASE_URL is required to persist research bundles.');
 
-    const db = getPrismaClient() as unknown as StoragePrismaClient;
-    const repositories = createStorageRepositories(db);
-    await repositories.harnessRuns.upsertForRun?.({
+    const repositories = injectedRepositories ?? createStorageRepositories(getPrismaClient() as unknown as StoragePrismaClient);
+    const runInput = {
       id: bundle.runId,
       runtime: config.runtime,
       profile: config.profile,
@@ -1143,12 +1144,20 @@ function defaultPersistBundle(config: AgentConfig, runtime: RuntimeContext) {
       verdict: bundle.gateResult.verdict,
       startedAt: new Date(bundle.createdAt),
       completedAt: new Date(),
-    });
-    await repositories.researchBundles.createWithItems({
-      bundle,
-      artifactPath,
-      artifactHash: hashPayload(bundle),
-    });
+    };
+    await persistStageRun(repositories.harnessRuns, runtime, runInput);
+    try {
+      await repositories.researchBundles.createWithItems({
+        bundle,
+        artifactPath,
+        artifactHash: hashPayload(bundle),
+      });
+    } catch (error) {
+      await persistStageRun(repositories.harnessRuns, runtime, {
+        ...runInput, status: 'failed', verdict: 'blocked', completedAt: new Date(),
+      }).catch(() => undefined);
+      throw error;
+    }
   };
 }
 

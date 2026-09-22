@@ -1,3 +1,4 @@
+import { persistStageRun, type StageRunRepository } from '../runtime/run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { basename, join } from 'path';
 import { runAgentWithRetry } from '../agent.js';
@@ -206,21 +207,7 @@ export interface ParlayServiceRepositories {
       timezone?: string;
     }): Promise<PredictionRecord[]>;
   };
-  harnessRuns?: {
-    upsertForRun?(input: {
-      id: string;
-      runtime: string;
-      profile: string;
-      providerSports: string;
-      providerAgentic?: string | null;
-      model?: string | null;
-      status?: string;
-      verdict?: string | null;
-      startedAt?: Date | null;
-      completedAt?: Date | null;
-      metadata?: JsonValue | null;
-    }): Promise<unknown>;
-  };
+  harnessRuns?: StageRunRepository;
   artifacts?: {
     create(input: {
       name: string;
@@ -2734,7 +2721,7 @@ async function upsertRun(
   completedAt: Date,
   date: string,
 ): Promise<void> {
-  await repositories.harnessRuns?.upsertForRun?.({
+  await persistStageRun(repositories.harnessRuns, runtime, {
     id: runId,
     runtime: config.runtime,
     profile: config.profile,

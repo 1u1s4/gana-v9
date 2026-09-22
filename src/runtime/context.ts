@@ -2,6 +2,8 @@ import type { AgentConfig, ApprovalMode, GanaProfile } from '../config.js';
 
 export interface RuntimeContext {
   runId?: string;
+  /** Diagnostic mirror of the active pipeline scope; async context controls write ownership. */
+  runLifecycleOwnerId?: string;
   taskId?: string;
   traceId?: string;
   sessionPath: string;

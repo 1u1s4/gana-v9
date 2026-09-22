@@ -1,3 +1,4 @@
+import { inMemoryRunStore, parentRun, runInTestScope } from '../runtime/run-lifecycle.test-support.js';
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -1575,3 +1576,59 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted, false);
   });
 });
+
+
+describe('scoring run ownership', () => {
+  for (const nested of [true, false]) {
+    it(`records missing-fixture failure without ${nested ? 'finishing the parent' : 'leaving stale standalone success'}`, async () => {
+      const cfg = config();
+      const parent = parentRun();
+      const initial = nested ? parent : { ...parent, status: 'succeeded', verdict: 'promotable' };
+      const store = inMemoryRunStore(initial);
+      const runtime = { ...createRuntimeContext(cfg, 'session.jsonl'), runId: parent.id };
+      const result = await runInTestScope(nested, runtime, () => runFixtureScoring(cfg, { fixtureId: '999999' }, runtime, {
+        repositories: repositories({ harnessRuns: store.repository }),
+        writeArtifact: () => '/tmp/blocked-score.json',
+        now: () => now,
+      }));
+      assert.equal(result.ok, false);
+      if (nested) assert.deepEqual(store.read(parent.id), parent);
+      else {
+        assert.equal(store.read(parent.id)?.status, 'failed');
+        assert.equal(store.read(parent.id)?.verdict, 'blocked');
+      }
+    });
+  }
+});
+
+
+for (const nested of [true, false]) {
+  for (const failPersistence of [false, true]) {
+    it(`scoring persistence ${failPersistence ? 'failure' : 'success'} ${nested ? 'preserves parent lifecycle' : 'finalizes standalone lifecycle'}`, async () => {
+      const cfg = config();
+      const parent = parentRun();
+      const store = inMemoryRunStore(parent);
+      const runtime = { ...createRuntimeContext(cfg, 'session.jsonl'), runId: parent.id };
+      let persistenceAttempts = 0;
+      const result = await runInTestScope(nested, runtime, () => runFixtureScoring(cfg, { fixtureId: '1001' }, runtime, {
+        now: () => now,
+        repositories: repositories({ harnessRuns: store.repository }),
+        writeArtifact: () => '/tmp/scoring-lifecycle.json',
+        agentRunner: async () => ({ text: JSON.stringify({ predictions: [{
+          oddsQuoteId: 'odds-quote-1', market: 'h2h', selection: 'home', line: null, odds: 2.1,
+          probability: 0.56, confidence: 0.75, evidenceIds: ['evidence-1', 'evidence-2'], claimIds: ['claim-1'],
+          rationale: 'Home selection is supported by the supplied evidence.', warnings: [],
+        }] }), usage: {}, output: '' }),
+        persistPredictions: async (records) => {
+          persistenceAttempts++;
+          if (failPersistence) throw new Error('test scoring persistence failed');
+          return records as any;
+        },
+      }));
+      assert.equal(persistenceAttempts, 1);
+      assert.equal(result.ok, !failPersistence);
+      if (nested) assert.deepEqual(store.read(parent.id), parent);
+      else assert.equal(store.read(parent.id)?.status, failPersistence ? 'failed' : 'succeeded');
+    });
+  }
+}

@@ -1,3 +1,4 @@
+import { inMemoryRunStore, parentRun, runInTestScope } from '../runtime/run-lifecycle.test-support.js';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -758,4 +759,31 @@ describe('runValidation parlay and date targets', () => {
     assert.deepEqual(fetchInputs.map((input) => input.market), ['h2h', 'corners_over_under']);
     assert.equal(result.validations.find((item) => item.predictionId === 'prediction-corners')?.actual?.summary, 'corners totales 10 (6-4)');
   });
+});
+
+
+describe('validation run ownership', () => {
+  for (const nested of [true, false]) {
+    for (const failPersistence of [false, true]) {
+      it(`${nested ? 'preserves parent' : 'finalizes standalone'} when validation persistence ${failPersistence ? 'fails' : 'succeeds'}`, async () => {
+        const cfg = config();
+        const parent = parentRun();
+        const store = inMemoryRunStore(parent);
+        const runtime = { ...createRuntimeContext(cfg, 'session.jsonl'), runId: parent.id };
+        const result = await runInTestScope(nested, runtime, () => runValidation(cfg, { predictionId: PREDICTION_TARGET_ID }, runtime, {
+          now: () => now,
+          writeArtifact: () => '/tmp/validation-lifecycle.json',
+          fetcher: fetcher(),
+          repositories: repositories({ harnessRuns: store.repository }),
+          persistValidation: async (input) => {
+            if (failPersistence) throw new Error('test persistence failed');
+            return { ...input, id: 'validation-id', createdAt: now, updatedAt: now } as any;
+          },
+        }));
+        assert.equal(result.ok, !failPersistence);
+        if (nested) assert.deepEqual(store.read(parent.id), parent);
+        else assert.equal(store.read(parent.id)?.status, failPersistence ? 'failed' : 'succeeded');
+      });
+    }
+  }
 });

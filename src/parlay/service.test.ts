@@ -1,3 +1,4 @@
+import { inMemoryRunStore, parentRun, runInTestScope } from '../runtime/run-lifecycle.test-support.js';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { loadConfig } from '../config.js';
@@ -1922,4 +1923,36 @@ describe('parlay repository fixture date query', () => {
     assert.equal(args.take, 25);
     assert.equal(args.skip, 50);
   });
+});
+
+
+describe('parlay run ownership', () => {
+  for (const nested of [true, false]) {
+    for (const failPersistence of [false, true]) {
+      it(`${nested ? 'preserves parent' : 'finalizes standalone'} when parlay persistence ${failPersistence ? 'fails' : 'succeeds'}`, async () => {
+        const cfg = config();
+        const parent = parentRun();
+        const store = inMemoryRunStore(parent);
+        const runtime = { ...createRuntimeContext(cfg, 'session.jsonl'), runId: parent.id };
+        const result = await runInTestScope(nested, runtime, () => runParlayBuild(cfg, { date: '2026-04-25' }, runtime, {
+          now: () => now,
+          writeArtifact: () => '/tmp/parlay-lifecycle.json',
+          repositories: {
+            predictions: { list: async () => [], listForFixtureDate: async () => [
+              prediction({ id: 'p1', fixtureId: 'f1' }), prediction({ id: 'p2', fixtureId: 'f2' }),
+            ] },
+            harnessRuns: store.repository,
+            artifacts: { create: async () => ({ id: 'artifact' }) },
+            parlays: { createWithLegs: async () => {
+              if (failPersistence) throw new Error('test persistence failed');
+              return { id: 'parlay' };
+            } },
+          } as any,
+        }));
+        assert.equal(result.ok, !failPersistence);
+        if (nested) assert.deepEqual(store.read(parent.id), parent);
+        else assert.equal(store.read(parent.id)?.status, failPersistence ? 'failed' : 'succeeded');
+      });
+    }
+  }
 });

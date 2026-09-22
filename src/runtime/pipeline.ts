@@ -1,3 +1,4 @@
+import { withRunLifecycleOwnership } from './run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { basename, join, resolve } from 'path';
@@ -239,6 +240,16 @@ export async function executeRunPipeline(
   runtime: RuntimeContext,
   deps: RunPipelineDependencies = {},
 ): Promise<RunPipelineResult> {
+  const runId = input.runId ?? runtime.runId ?? deps.createRunId?.() ?? randomUUID();
+  return withRunLifecycleOwnership(runtime, runId, () => executeOwnedRunPipeline(config, { ...input, runId }, runtime, deps));
+}
+
+async function executeOwnedRunPipeline(
+  config: AgentConfig,
+  input: RunPipelineInput,
+  runtime: RuntimeContext,
+  deps: RunPipelineDependencies = {},
+): Promise<RunPipelineResult> {
   const now = deps.now ?? (() => new Date());
   const runId = input.runId ?? runtime.runId ?? deps.createRunId?.() ?? randomUUID();
   runtime.runId = runId;
@@ -262,6 +273,7 @@ export async function executeRunPipeline(
     model: config.model,
     status: 'running',
     verdict: null,
+    completedAt: null,
     artifactDir,
     startedAt,
     metadata: toJsonValue({ date: input.date, validate: input.validate ?? 'auto', marketScope, ...(input.metadata ?? {}) }),
