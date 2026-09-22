@@ -133,7 +133,7 @@ no se inventan rankings, calibración o probabilidades ni se rebajan gates.
 - Manifest actualizado por el nuevo contexto de investigación; los verificadores
   siguen intactos. Hash: `00af51c55ce5c4ebf01958399788ba107d408d4527fd8b507145b25e667b8ce7`
 
-## Tercera ejecución real: R3 en curso
+## Tercera ejecución real: R3
 
 - Batch `daily-2026-09-22-r3`, inicio `2026-09-22T08:15:23.329Z`
 - Sesión terminal 45162; salida `/tmp/gana-overhaul-live-r3.log`
@@ -141,9 +141,7 @@ no se inventan rankings, calibración o probabilidades ni se rebajan gates.
   únicamente tras confirmar estado retryable y cero recomendaciones/envíos
 - Mismos parámetros de R1/R2 con código final e historial deportivo nuevo
 
-Pendiente: verificar resultado R3, selecciones y Discord real, registrar evidencia,
-commit/push a main limpio y crear repositorio más tarea posterior del portal.
-No marcar el goal completo antes de ello.
+El resultado de R3 y la siguiente iteración se registran debajo.
 
 
 ## Pruebas de entrega durante R3
@@ -177,4 +175,50 @@ research evalúa disponibilidad factual y scoring produce una estimación fundad
 sin calibrar. No se modificaron gates, umbrales, calibradores o elegibilidad, ni se
 promovió automáticamente ningún bundle anterior. Persisten posibles límites reales
 que sólo una nueva ejecución puede distinguir. 46 tests focalizados y TypeScript
-aprobaron; verificación integrada previa a R4 en curso.
+aprobaron.
+
+## Cuarta ejecución real y cierre de código
+
+- Suite integrada final: **707/707 tests**, 96 suites, TypeScript aprobado.
+  Log: `/tmp/gana-overhaul-r4-preflight.log`. Notificador: 51/51 en
+  `/tmp/gana-overhaul-notifier-final.log`; syntax y diff check limpios
+- Certificación final: `1aa8e49330218fb3b933ab83539a5b329b8ac1fb17a2b504ba1d46c54eb5cf9d`.
+  Los 16 checks internos se mantienen; sólo cambió el digest contractual
+- Código integrado en `c65884b`, sobre main, con 96 archivos. Push pendiente del
+  resultado final y documentación de evidencia. No se hicieron migraciones
+- R4 comenzó `2026-09-22T08:31:44.839Z`, batch `daily-2026-09-22-r4`, provider
+  `8ab12f1a-773c-48c1-803f-ef50fef97ab7`, sesión 55088
+- Log canónico: `.artifacts/gana-v9/cron/daily-2026-09-22-r4.log`
+- R3 quedó terminado con cero recomendaciones/envíos antes de archivar su lock
+  retryable en `audits/2026-09-22/r3-retryable-lock.json`. No se usó `--force`
+- Mismos parámetros reales de las corridas anteriores. El scan completo vuelve
+  a cubrir 115 fixtures, 12/12 páginas, sin errores ni fixtures faltantes; tres
+  cuotas inferiores a 1.10 pertenecen a un único fixture, insuficiente para una
+  combinada con dos o más partidos distintos
+
+## Resultado final R4 y pendiente externo
+
+- R4 terminó `2026-09-22T08:48:03.466Z`, exit 1/review-required, sin fallos de
+  provider: 17 predicciones, 11 blocked, seis review-required, cero publicables
+- Seis bundles, 20 URLs reales, cuatro snapshots históricos. Un research
+  promotable pasó a scoring; 11 probabilidades fueron estimadas sin exigir
+  calibración empírica previa. Los bloqueos restantes son deportivos/matemáticos
+- Cobertura obligatoria 2/2 Colombia 239, cero faltantes. Todos los perfiles
+  bloqueados y apuesta del día `no-eligible-pick`; no se halló otro P1 causal
+- Readback real de alerta Discord R4: `1551877737365635194`, canal
+  `1510041125614915756`, timestamp `2026-09-22T08:48:05.082Z`. No es entrega de picks
+- Consulta DB a las 08:50:58 UTC confirma cero publicaciones para R4 y para la fecha
+- Lock conservado retryable hasta `2026-09-22T10:48:04.966Z`. No reintentar el mismo
+  slate inmediatamente sin evidencia nueva ni retirar el lock por rutina
+- Resultado y rutas de prueba: `docs/analysis/prediction-overhaul-result-2026-09-22.md`
+
+La entrega nueva sigue sin verificarse por ausencia de elegibles. Se mantiene la
+pregunta de cierre sin respuesta; no asumir aceptación por tiempo. El portal tiene
+handoff y prompt preparados (`/tmp/gana-public-picks-task-prompt.md`), pero repositorio
+y tarea aún no se crearon, respetando la secuencia pedida. El goal sigue activo:
+esta es la primera constatación final del impedimento luego de agotar correcciones
+causales; cuatro corridas no equivalen a tres turnos consecutivos de goal bloqueado.
+
+Push de código y documentación a main es el siguiente paso autorizado. Después
+sólo resta la decisión de cierre o evidencia nueva que permita una publicación,
+seguida de crear el repositorio y la tarea del portal. No marcar completo todavía.
