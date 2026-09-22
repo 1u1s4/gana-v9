@@ -340,4 +340,34 @@ simultáneas; mantiene mercados, whitelist, presupuesto y páginas completas.
   requests, cero writes de DB. Evidencia:
   `audits/2026-09-22/arsenal-odds-provider-fallback-canary.json`
 
-Pendiente nuevo E2E con las correcciones; el goal continúa activo.
+Las correcciones y sus verificaciones se subieron a main en `a4383af`.
+
+### R6: verificación real posterior a las correcciones
+
+- Inicio `2026-09-22T14:25:56.456Z`, batch `daily-2026-09-22-r6`, provider
+  `c63ea500-d40b-4351-9c22-23d4d5824dce`, código `a4383af`
+- Se verificó R5 terminal, ningún E2E vivo y cero publicaciones antes de archivar
+  su lock retryable. Archivo: `audits/2026-09-22/r5-retryable-lock-before-r6.json`.
+  No se usó force; el reintento responde a las tres correcciones comprobadas
+- Canonical wrapper con Codex/Astra medium, web live, portfolio-v2, ligas auto,
+  umbral 1.10 y presupuestos/cupos 10000. Sesión terminal 32992, stdout
+  `/tmp/gana-unblock-live-r6.log`; handle durable en
+  `audits/2026-09-22/r6-monitor.json`. Seguir esa sesión, sin duplicarla
+- Discovery: 37 fixtures primarios, 34 de ligas obligatorias; weekly 49 ligas
+- Scan: 127 fixtures, 13/13 páginas, 27 quotes <1.10 en seis fixtures, sin errores
+- Boundary a `2026-09-22T14:30:30.197Z`: 41 fixtures unidos, dos excluidos por
+  estado/kickoff (1640457 live 13:00 y 1602487 scheduled pero kickoff 14:30),
+  39 enviados a research sin recorte
+- Arsenal 1638288 recupera 63 cuotas de cinco mercados en el pipeline real,
+  snapshot `ced0e849-4b05-43e9-860e-0c0353f1681f`, captura 14:28:14.255Z
+
+Research sigue en curso. Próximo verificador: artifacts finales de este provider,
+cuotas efectivamente consumidas al puntuar, selección/EV, ledger y GET de Discord
+si hay publicación. El objetivo permanece activo; una espera con proceso vivo
+no se clasifica como bloqueo ni como éxito de entrega.
+
+Se retiró el worktree temporal `low-odds-live-eligibility` después de comprobar
+que sus nueve archivos modificados/nuevos coincidían byte por byte con HEAD main
+`a4383af` y no contenía archivos ignorados. Prueba de hashes y rutas:
+`audits/2026-09-22/integrated-worktree-cleanup-proof.json`. Se conservaron los
+demás worktrees, incluido el de la tarea del portal.

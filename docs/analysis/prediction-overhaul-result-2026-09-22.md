@@ -5,8 +5,9 @@
 La implementación está integrada y sus pruebas pasan. Tras la reanudación del
 usuario se corrigieron tres faltantes adicionales; la suite pasa 719/719 tests.
 La última ejecución real terminada (R5) produjo **cero recomendaciones elegibles**.
-Está pendiente el nuevo E2E posterior a esas correcciones. No se presenta R5 como
-entrega exitosa de picks. La comprobación de una publicación nueva sigue pendiente.
+R6 está en curso desde las 14:25 UTC con las correcciones de `a4383af`. Ya recuperó
+las cuotas omitidas por el proveedor y excluyó dos fixtures iniciados antes de
+research. La comprobación de una publicación nueva sigue pendiente.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
@@ -30,7 +31,9 @@ Retrospectiva: [portfolio publicado](published-portfolio-2026-09-22.md).
 
 ## Pruebas y retrospectiva
 
-- Suite integrada: **707/707 tests**, 96 suites; TypeScript aprobado
+- Suite integrada inicial: **707/707 tests**, 96 suites; TypeScript aprobado
+- Suite tras las tres correcciones de la reanudación: **719/719 tests**, 97 suites;
+  TypeScript aprobado
 - Notificador: **51/51**; syntax y diff check aprobados
 - Certificación conserva los 16 checks internos. Digest final:
   `1aa8e49330218fb3b933ab83539a5b329b8ac1fb17a2b504ba1d46c54eb5cf9d`
@@ -45,7 +48,7 @@ Retrospectiva: [portfolio publicado](published-portfolio-2026-09-22.md).
 Los tests focalizados se superponen con la suite y no deben sumarse como únicos.
 No hubo migraciones, reescritura del historial ni cambios en permisos/RLS.
 
-## Última ejecución real
+## Evidencia de R4, anterior a la reanudación
 
 Batch `daily-2026-09-22-r4`; provider
 `8ab12f1a-773c-48c1-803f-ef50fef97ab7`; 08:31:44–08:48:03 UTC.
@@ -93,8 +96,9 @@ rechazó sus fixtures terminados antes de reservar o enviar.
 
 Falta una publicación elegible nueva para verificar completamente la entrega.
 Repetir inmediatamente el mismo slate sin evidencia nueva no resuelve la ausencia
-de elegibles. El lock queda retryable hasta `2026-09-22T10:48:04.966Z`; no se fuerza
-ni se borra después del cierre de R4.
+de elegibles. Los nuevos intentos posteriores a R4 se justificaron con datos
+actualizados o fallos reproducidos y corregidos; se archivaron sus locks sólo
+después de comprobar el cierre y la ausencia de publicaciones.
 
 Se consultó al usuario si prefiere cerrar hoy con un resumen explícito sin picks
 y continuar el portal, o conservar la entrega pendiente para un reintento posterior.
@@ -115,8 +119,9 @@ los límites documentados en la auditoría; no se afirma reparación retroactiva
 El control del 22/09 a las 08:59:59 UTC volvió a confirmar cero publicaciones y
 ningún proceso E2E vivo. La misma ausencia de elegibles se constató durante tres
 turnos consecutivos, habiendo completado el trabajo independiente del portal.
-El goal principal queda bloqueado por la prueba de entrega pendiente, sin reducir
-el objetivo ni presentar la alerta operativa como publicación de recomendaciones.
+En ese momento se marcó el goal principal bloqueado por la prueba de entrega
+pendiente. El usuario lo reanudó después; el estado actual es **active**, sin
+reducir el objetivo ni presentar la alerta como publicación de recomendaciones.
 
 ## Reanudación y correcciones posteriores
 
@@ -138,5 +143,22 @@ Los datos nuevos permitieron reproducir y corregir tres faltantes:
 
 Canary del provider corregido: 63 cuotas seleccionables, cinco mercados y nueve
 casas de referencia; IDs, hash y fecha de captura conservados, sin writes de DB.
-Suite integrada posterior: **719/719 tests**, TypeScript aprobado. El nuevo E2E y
-la entrega elegible siguen pendientes; no se rebajaron gates ni se inventaron picks.
+Suite integrada posterior: **719/719 tests**, TypeScript aprobado. Las correcciones
+se subieron a main en `a4383af`; no se rebajaron gates ni se inventaron picks.
+
+## R6 en curso
+
+Batch `daily-2026-09-22-r6`, provider
+`c63ea500-d40b-4351-9c22-23d4d5824dce`, inicio `2026-09-22T14:25:56.456Z`.
+
+- Registro semanal actualizado: 49 ligas; 37 fixtures primarios, 34 de ligas
+  obligatorias antes de evaluar el kickoff, sin recorte por cupo
+- Scan global completo: 127 fixtures, 13/13 páginas, 27 quotes ganadoras <1.10
+  en seis fixtures, cero errores o fixtures faltantes en la cobertura del scan
+- Unión de 41 fixtures; a las 14:30:30 UTC se excluyeron Namibia U20–Seychelles U20
+  (live, kickoff 13:00) y Dumbrăviţa–Reşiţa (kickoff 14:30, aún marcado scheduled)
+- 39 fixtures enviados a investigación, sin cap. Arsenal–Køge tiene 63 cuotas
+  seleccionables en cinco mercados en el artifact real de odds
+
+Estos datos prueban descubrimiento y correcciones operativas. Research, scoring,
+portfolio y publicación todavía deben terminar; no constituyen prueba de entrega.
