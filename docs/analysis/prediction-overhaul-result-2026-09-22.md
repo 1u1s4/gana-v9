@@ -4,8 +4,9 @@
 
 La implementación está integrada y sus pruebas pasan. La última ejecución real
 terminó **sin recomendaciones elegibles**. No se presenta ese resultado como
-entrega exitosa de picks. La comprobación de una publicación nueva y la tarea del
-portal, pedida después de cerrar este flujo, siguen pendientes.
+entrega exitosa de picks. La comprobación de una publicación nueva sigue pendiente.
+Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
+despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
 ## Cambios principales
 
@@ -95,9 +96,16 @@ ni se borra después del cierre de R4.
 
 Se consultó al usuario si prefiere cerrar hoy con un resumen explícito sin picks
 y continuar el portal, o conservar la entrega pendiente para un reintento posterior.
-Sin respuesta, no se asume ese cambio del criterio de cierre. El handoff del portal
-está preparado en `docs/planes/2026-09-22-public-picks-web-handoff.md`, pero aún no
-se creó su repositorio ni su tarea.
+Sin respuesta, no se asume ese cambio del criterio de cierre ni se envía otro mensaje.
+El trabajo independiente del portal, ya autorizado, se inició tras terminar las
+mejoras y su E2E: repositorio privado https://github.com/1u1s4/gana-picks-web,
+commit inicial `d884011`, objetivo e integración documentados y tarea nueva dentro
+de gana-v9: **Portal público de fútbol de Gana**,
+`01a0c854-a360-7c42-8feb-df1bcff6be7c`. `wait_threads` confirmó ejecución activa e
+inspección de la referencia; la tarea reportó su goal activado. El desarrollo y
+su goal pertenecen a esa tarea; la publicación nueva
+permanece pendiente en el goal principal. Handoff:
+`docs/planes/2026-09-22-public-picks-web-handoff.md`.
 
 Las validaciones históricas AET/PEN y la semántica temporal de corners conservan
 los límites documentados en la auditoría; no se afirma reparación retroactiva global.

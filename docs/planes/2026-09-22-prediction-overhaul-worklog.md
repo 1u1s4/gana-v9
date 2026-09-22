@@ -219,6 +219,36 @@ y tarea aún no se crearon, respetando la secuencia pedida. El goal sigue activo
 esta es la primera constatación final del impedimento luego de agotar correcciones
 causales; cuatro corridas no equivalen a tres turnos consecutivos de goal bloqueado.
 
-Push de código y documentación a main es el siguiente paso autorizado. Después
-sólo resta la decisión de cierre o evidencia nueva que permita una publicación,
-seguida de crear el repositorio y la tarea del portal. No marcar completo todavía.
+Código y documentación subidos a main en `c65884b` y `8a969bc`. HEAD/origin/main y
+remoto real coinciden, sin archivos pendientes al cerrar esa ejecución.
+
+## Continuación: portal independiente y segundo control del impedimento
+
+El turno anterior produjo evidencia final y commit/push; se clasifica como progreso.
+A las 08:55 UTC se verificó de nuevo R4 terminal, ningún E2E vivo en la tabla real
+de procesos y cero publicaciones en DB para el batch o la fecha. Persiste la misma
+ausencia de elegibles, segunda constatación consecutiva; no es una espera de proceso
+vivo y no se reinició el pipeline ni se tocaron sus locks.
+
+La creación del portal ya estaba autorizada y puede avanzar tras completar las
+mejoras de Gana, conservando expresamente la prueba de entrega pendiente. No se
+interpreta el silencio como aceptación de cerrar el goal o mandar otro resumen.
+
+- Repositorio: `https://github.com/1u1s4/gana-picks-web`, privado, rama main
+- Ruta: `/Users/luisalvarado/Documents/GitHub/gana-picks-web`
+- Commit inicial subido: `d884011f7410d16606ba767304f30e2cf4815970`
+- Archivos iniciales: GOAL.md, WORKLOG.md, AGENTS.md, README.md, .gitignore y
+  docs/handoff.md. Sin secretos ni implementación fingida
+- Se despachó una nueva tarea en el proyecto gana-v9 con worktree y prompt que
+  exige trabajar en el nuevo repositorio, activar su goal, investigar la referencia,
+  conectar sólo publicaciones reales y verificar la experiencia sin despliegue
+- Tarea: **Portal público de fútbol de Gana**,
+  `01a0c854-a360-7c42-8feb-df1bcff6be7c`, host local, proyecto gana-v9
+- `list_threads` y `wait_threads` confirmaron estado active/turn inProgress, sin
+  error, lectura del nuevo repo e inspección de Gambeta con navegador. La tarea
+  reportó activo el goal: "Completar y verificar el portal público de fútbol
+  definido en /Users/luisalvarado/Documents/GitHub/gana-picks-web/GOAL.md"
+- El requisito del padre de crear y despachar esa tarea queda satisfecho; el
+  portal se implementa allí y su finalización no se da por realizada aquí
+
+El goal principal no está completo: falta una entrega real de picks elegibles.

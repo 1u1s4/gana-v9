@@ -1,8 +1,10 @@
 # Portal público de fútbol: tarea posterior
 
-Este trabajo se inicia en una tarea nueva después de cerrar la mejora del flujo
-diario y verificar su entrega. El usuario autorizó crear un repositorio nuevo y
-activar allí un objetivo persistente. El despliegue público queda para después.
+Este trabajo se inicia en una tarea nueva tras integrar, probar y subir la mejora
+del flujo diario. El usuario autorizó crear un repositorio nuevo y activar allí
+un objetivo persistente. La entrega nueva a Discord permanece pendiente en la
+tarea principal porque el E2E actual no produjo picks elegibles; no se afirma
+que esa verificación haya pasado. El despliegue público queda para después.
 
 ## Resultado pedido
 
