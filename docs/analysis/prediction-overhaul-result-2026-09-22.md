@@ -4,12 +4,11 @@
 
 La implementación está integrada y sus pruebas pasan. Tras la reanudación del
 usuario se corrigieron cuotas, elegibilidad, ligas e historial deportivo omitido.
-La suite actual pasa **734/734 tests**. La última ejecución real terminada (R6)
-produjo **cero recomendaciones elegibles**. Recuperó las cuotas omitidas por el
-proveedor y excluyó dos fixtures iniciados antes de research. El historial adicional
-se integró después, en `3512790`; la comprobación de una publicación nueva sigue
-pendiente. El canary Codex ya verificó el consumo del historial nuevo; R7 está
-ejecutando el flujo canónico completo desde las 15:16 UTC.
+La suite actual pasa **761/761 tests**. La última ejecución real terminada (R7)
+produjo **cero recomendaciones elegibles**. Las 39 investigaciones usaron el
+historial adicional y se verificaron sus fuentes persistidas. Se integró después
+una corrección del ciclo de vida del run. Sigue pendiente una corrección confirmada
+de alternativas de cuota para low odds y la prueba de una publicación nueva.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
@@ -38,6 +37,8 @@ Retrospectiva: [portfolio publicado](published-portfolio-2026-09-22.md).
   TypeScript aprobado
 - Suite con historial adicional por equipo: **734/734 tests**, 98 suites;
   TypeScript aprobado, sin cambios en permisos o gates
+- Suite con control del ciclo de vida y diagnóstico preciso de cobertura:
+  **761/761 tests**, 104 suites; TypeScript aprobado
 - Notificador: **51/51**; syntax y diff check aprobados
 - Certificación conserva los 16 checks internos. Digest actual tras incorporar el
   prompt de historial por equipo:
@@ -215,6 +216,70 @@ del equipo. Los worktrees temporales de esta corrección fueron retirados.
 
 El E2E R7 comenzó a las 15:16:07 UTC con main `a906659`, batch
 `daily-2026-09-22-r7`, provider `5ccf8885-a1f8-454f-afbb-1551d1f63fd0`.
-Scan inicial: 127 fixtures, 13/13 páginas, 27 quotes ganadoras <1.10 en seis
-fixtures. Se enviaron 39 encuentros futuros a investigación. Sus resultados de
-scoring y publicación siguen pendientes; el goal permanece activo.
+Scan: 127 fixtures, 13/13 páginas, 27 quotes ganadoras <1.10 en seis fixtures.
+Se enviaron 39 encuentros futuros a investigación. R7 terminó a las 16:08:46.022
+UTC; batch 16:09:01.689, wrapper 16:09:03.045, salida 1. Las nueve tareas técnicas
+terminaron, pero la selección final requiere revisión. Resultado:
+
+- Research: 39 bundles, 38 para revisión y Bayern–City habilitado. Los 39 citan
+  historial nuevo: 156 fuentes, 114 evidencias vinculadas. Auditoría de 156
+  snapshots y 1.242 filas, sin desvíos de identidad, temporada, fecha o estado
+- Scoring: 133 candidatos, 117 bloqueados y 16 para revisión; 23 probabilidades
+  numéricas y 12 retornos esperados positivos. Confianza de evidencia 0.30–0.42,
+  por debajo del mínimo de promoción; cero candidatos publicables
+- Bayern–City pudo estimar goles y BTTS después de incorporar historia. Over 2.5
+  con p=0.68 y cuota 1.37 tiene retorno esperado −0.0684; BTTS con p=0.65 y cuota
+  1.40 tiene −0.09. La habilitación de research no aseguró valor de apuesta
+- Cobertura obligatoria: 34 fixtures con IDs y temporadas correctos; 25 tienen
+  candidatos y nueve carecen de cuotas. Los nueve sí fueron seleccionados y
+  tienen resultado de scoring bloqueado; no se omitieron del flujo
+- Low odds: tras excluir Namibia terminado, cinco fixtures con 25 hits llegaron
+  a análisis; cobertura 5/5, todos bloqueados por evidencia. Presupuesto deportivo
+  404/10.000 requests; 39 investigaciones
+- Cero recomendaciones, targets, combinadas elegidas o apuesta del día. Lectura
+  DB READ ONLY a las 16:09:44 UTC: cero publicaciones para fecha, batch y provider
+- GET confirmó la [alerta operativa de R7](https://discord.com/channels/1494071161934450890/1510041125614915756/1551988716845670493)
+  a las 16:09:04 UTC. El último mensaje observado en recomendaciones sigue siendo
+  del 18/09; esta alerta no constituye una entrega nueva de apuestas
+
+Pruebas: `audits/2026-09-22/r7-research-scoring-proof.json`,
+`audits/2026-09-22/r7-final-provider-low-odds-proof.json`,
+`audits/r7-portfolio-proof.json`, `audits/2026-09-22/r7-publication-db-proof.json`
+y los readbacks `discord-readback-r7-*.jsonl`. Los hashes almacenados del proveedor
+se contrastaron con las referencias; no se recalcularon desde JSONB reordenado.
+
+## Estado del run: corrección adicional integrada
+
+Durante R7 se detectó que research, scoring, parlay y validación podían marcar
+terminado el HarnessRun compartido antes del cierre real. Esto afectaba dashboard
+y exportaciones; no se encontró que habilitara publicaciones bloqueadas.
+
+El cambio aislado `506e18f` reserva la finalización al pipeline y conserva los
+comandos standalone. Su contexto async también protege de hijos que escriben
+después de un timeout. Pasó revisión independiente, 173 pruebas focalizadas,
+**761/761 tests** de suite completa y TypeScript. Una transacción real con Prisma
+confirmó ocho invariantes y se revirtió; la lectura posterior encontró cero filas
+de prueba. La primera propuesta y su race detectada están documentadas.
+
+Se integró a main por fast-forward en `506e18f` después de confirmar R7 terminal;
+su ejecución pertenece al código anterior. El worktree temporal y su rama fueron
+retirados tras comparar los 15 archivos probados con main. La suite volvió a pasar
+en main después de precisar el mensaje de cobertura sin cambiar su gate. La
+corrección low odds siguiente se mantiene aislada para su propia revisión.
+Prueba de ciclo de vida:
+`audits/2026-09-22/run-lifecycle-verification.json`.
+
+## Alternativas estrictas de precio: corrección en curso
+
+R7 permitió confirmar un hueco de integración: la compactación de cuotas para
+scoring conserva sólo el mejor precio por selección, y puede omitir una alternativa
+real menor a 1.10 que necesita el perfil estricto. En 1593593 estaba Bet365 away
+1.07, omitida por Pinnacle 1.12; en 1602489 estaba Pinnacle home 1.09, omitida por
+Bet365 1.11. Ambas eran seleccionables, del mismo snapshot y lado, dentro de la
+whitelist. Los otros dos cruces provenían de casas excluidas, correctamente.
+
+Se prepara una corrección aislada que preserve el mejor precio general y la
+alternativa estricta con sus IDs, cálculo de valor y gates, sin duplicar exposición
+al partido. Estos dos candidatos de R7 también estaban bloqueados por evidencia;
+su reparación no convierte la corrida en una publicación exitosa ni justifica
+rebajar controles.

@@ -290,8 +290,8 @@ export function buildRequiredLeagueRecommendations(input: {
       name: 'required-fixture-analysis-coverage',
       status: missingPredictionFixtures.length ? 'blocked' as const : 'passed' as const,
       reasons: missingPredictionFixtures.length
-        ? missingPredictionFixtures.map((fixture) => `${fixture.fixture} has no completed scoring result`)
-        : [`${coveredFixtures} required-league fixture(s) have scoring results; ineligible selections may remain unpublished`],
+        ? missingPredictionFixtures.map((fixture) => `${fixture.fixture} has no prediction candidates`)
+        : [`${coveredFixtures} required-league fixture(s) have prediction candidates; ineligible selections may remain unpublished`],
     },
     {
       name: 'required-parlay-approaches',

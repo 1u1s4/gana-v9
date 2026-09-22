@@ -72,3 +72,42 @@ Los grupos de tests se superponen y sus cantidades no deben sumarse como tests �
 3. El helper compartido legacy `fetchLowOddsSnapshot` podía reutilizar un snapshot primario filtrado por bookmaker. El path real de fecha evita ese fallback; el trabajo principal coordina la separación de caché para mantener todas las casas cuando se use la ruta individual.
 4. El período de recuperación de rollover evita starvation de mañana; los filtros de frescura del flujo principal siguen siendo necesarios para excluir partidos ya empezados y recomendaciones vencidas.
 5. La fecha de corte para estadísticas evita datos de partidos posteriores, pero snapshots capturados hoy para una auditoría histórica no deben presentarse como evidencia que ya existía al publicarse la recomendación original.
+
+## Hallazgo adicional durante R7: estado prematuro del run
+
+La DB marcaba el provider run como succeeded mientras su proceso continuaba en
+research. `defaultPersistBundle` finalizaba el mismo run después de cada bundle;
+scoring, parlay y validación repetían el patrón. El comportamiento precedía a esta
+auditoría (commit `a8a7e0d8`, abril). Afectaba los estados y duraciones del dashboard
+y los exports hechos durante una ejecución; no se encontró un bypass de publicación.
+
+Corrección preparada en `506e18f`, checkout aislado: el pipeline conserva la
+autoridad sobre su run mediante un contexto async ligado al runtime e ID exactos.
+La persistencia de etapas sólo asegura que exista, sin cambiar estado, verdict,
+completedAt o metadata del padre. Los comandos independientes mantienen su cierre
+y la reejecución explícita. El inicio del pipeline limpia completedAt anterior.
+
+La revisión encontró y reprodujo una carrera en la primera propuesta: un hijo
+podía persistir después del timeout y de la salida del scope. AsyncLocalStorage
+conserva su identidad de hijo aunque escriba tarde; una regresión y una segunda
+reproducción independiente confirmaron que ya no altera el padre terminado.
+
+Verificación: 173/173 pruebas focalizadas, 761/761 de suite completa, TypeScript
+y diffcheck. Canary real de repositorio/Prisma a las 15:44:15 UTC: ocho controles
+de persistencia, incluido el hijo tardío; transacción deliberadamente revertida
+y lectura posterior con cero filas de prueba. No usó API deportiva, scoring ni
+publicación y no tocó runs existentes. Evidencia:
+`audits/2026-09-22/run-lifecycle-verification.json` y
+`audits/2026-09-22/run-lifecycle-rollback-canary.json`.
+
+Se integró en main `506e18f` tras el cierre de R7 y se retiró el worktree temporal.
+Sus estados observados pertenecen al código previo; no se atribuye a esa corrida
+la corrección nueva. Suite en main: 761/761 y TypeScript aprobado. También se
+precisó el diagnóstico de cobertura: la ausencia de candidatos no afirma que
+scoring no se haya ejecutado; no se modificó el gate.
+
+El aviso `getcwd` de R5 se inspeccionó por separado: el output prueba que el job
+continuó hasta el resultado diario, el workdir configurado existe y un shell
+actual terminó sin stderr. Los procesos del gateway tienen cwd existente.
+No se reprodujo un problema actual ni se reiniciaron servicios; el origen exacto
+de aquella advertencia no quedó determinado.

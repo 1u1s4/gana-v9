@@ -481,3 +481,81 @@ portfolio-v2, ligas auto y umbral 1.10. Scan inicial completo: 127 fixtures,
 excluir Namibia U20–Seychelles U20 ya terminado; los seleccionados conservan
 kickoff futuro al control de elegibilidad. Research y scoring siguen pendientes.
 El monitor durable es `audits/2026-09-22/r7-monitor.json`.
+
+### Ingestión R7 y corrección aislada del lifecycle
+
+Muestra de los primeros ocho bundles: 32 fuentes por equipo/temporada enlazadas
+a 32 snapshots, con hash/consulta/metadata coincidentes. Las 300 filas inspeccionadas
+respetan equipo, temporada, estado y rango; 18 evidencias y 34 claims citan las
+fuentes nuevas. No se recalcularon hashes desde JSONB reordenado. Prueba:
+`audits/2026-09-22/r7-team-history-persistence-proof.json`. Lectura DB READ ONLY
+a las 15:43:23 UTC: 24 bundles, cero predicciones y cero publicaciones en ese
+momento; `r7-progress-db.json`. Son observaciones parciales, no resultado final.
+
+Se confirmó un bug anterior a esta iteración: cada etapa podía finalizar el
+HarnessRun compartido. La sesión 60118 seguía viva aunque DB dijera succeeded.
+Se preparó `506e18f` en `/tmp/gana-run-lifecycle-20260922`, sin cambiar main ni
+interrumpir R7. Pipeline controla su ciclo; las etapas conservan campos del padre,
+y los comandos standalone pueden finalizar y reutilizar un ID explícito.
+
+Revisión independiente detectó una escritura tardía tras timeout en la primera
+propuesta. Se corrigió con AsyncLocalStorage como autoridad por runtime/ID,
+conservando ownership para descendientes tardíos y restaurando el scope visible.
+Se agregó regresión; el revisor reprodujo después la protección correcta.
+
+Resultado final: 173/173 pruebas focalizadas, TypeScript aprobado y suite completa
+761/761, 104 suites, cero fallos. Logs `/tmp/gana-lifecycle-focused-scoped.log`,
+`/tmp/gana-lifecycle-typecheck-scoped.log`, `/tmp/gana-lifecycle-full-tests.log`.
+Los 15 archivos cambiados coinciden exactamente con el commit probado.
+
+Canary real DB final de las 15:44:15 UTC: ocho controles de helper/repositorio,
+incluido hijo tardío, standalone y cierre por el dueño. Tres IDs nuevos dentro de
+una transacción revertida; consulta READ ONLY posterior confirmó cero filas.
+No se tocaron runs existentes, API deportiva ni Discord. El canary inicial se
+conserva con su límite explícito; sólo el final prueba la solución async.
+Evidencia: `run-lifecycle-verification.json`, `run-lifecycle-rollback-canary.json`.
+
+Pendiente: esperar la sesión R7, verificar su resultado/ledger/Discord y después
+integrar el cambio ya probado. No se inicia otra corrida para corregir únicamente
+esta señal de estado ni se rebajan criterios de elegibilidad.
+
+### R7 terminal, verificación de entrega y variante low odds omitida
+
+R7 terminó: provider 16:08:46.022 UTC, batch 16:09:01.689, wrapper 16:09:03.045;
+sesión 60118 terminal con salida 1 y nueve tareas internas succeeded. Research
+39 = 38 review + Bayern–City promotable. Las 39 investigaciones usaron historial
+nuevo: 156 fuentes, 114 evidencias vinculadas, 156 snapshots y 1.242 filas
+inspeccionadas. Scoring 133 = 117 blocked + 16 review; 23 p numéricas, 12 retornos
+esperados positivos, confianza 0.30–0.42, cero publicables. Presupuesto 404/10.000.
+Cobertura requerida 25/34 con candidatos; nueve sin cuotas, todos seleccionados
+y con resultado de scoring bloqueado. No apareció un nuevo fallo causal de
+matemática o ingestión.
+
+DB READ ONLY a las 16:09:44 UTC: cero publicaciones para día/batch/provider.
+GET de Discord: alerta R7 `1551988716845670493`, 16:09:04.652 UTC; recomendaciones
+siguen con último mensaje del 18/09. La alerta no satisface la entrega pendiente.
+Pruebas finales: `r7-research-scoring-proof.json`,
+`r7-final-provider-low-odds-proof.json`, `r7-publication-db-proof.json` y
+`discord-readback-r7-*.jsonl` dentro de `audits/2026-09-22`; portfolio en
+`audits/r7-portfolio-proof.json`.
+
+Tras el cierre se integró `506e18f` por fast-forward. Se compararon sus 15 archivos
+con la copia probada, se retiró únicamente su symlink node_modules y luego el
+worktree/rama temporal. Se precisaron dos mensajes de cobertura: tener cero
+candidatos no equivale a carecer de resultado de scoring. No cambió ningún gate.
+Verificación en main: 761/761, 104 suites y TypeScript; logs
+`/tmp/gana-overhaul-r7-final-tests.log`, `/tmp/gana-overhaul-r7-final-types.log`.
+
+Un control posterior sobre los cinco fixtures low odds detectó un P2: en dos
+snapshots había quotes seleccionables <1.10 omitidas al conservar sólo bestprice:
+1593593 away Bet3651.07 frente a Pinnacle1.12, y 1602489 home Pinnacle1.09 frente
+a Bet3651.11. En los otros dos casos las cuotas bajas eran de casas excluidas;
+Arsenal conservó1.06. Los dos afectados también estaban bloqueados por evidencia.
+
+Se creó `/tmp/gana-low-odds-price-variants-20260922`, rama
+`codex/low-odds-price-variants`, base506e18f. Corrección acotada en curso: preservar
+bestprice general y alternativa estricta hasta su perfil, con IDs, valor y gates
+propios, sin contar el mismo fixture dos veces. No se ejecutan nuevas APIs ni se
+relanzó R7. Main conserva la corrección de estado y el diagnóstico de cobertura;
+la corrección adicional de precios mantiene su rama aislada para una integración
+posterior a pruebas y revisión independiente.
