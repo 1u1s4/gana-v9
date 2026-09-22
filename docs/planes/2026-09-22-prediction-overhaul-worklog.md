@@ -613,3 +613,20 @@ replay, las pruebas terminales y la comparación de los 17 archivos. Se eliminó
 sólo su symlink de dependencias, se verificó status limpio y se borró su rama
 mediante comparación exacta de SHA. `git cherry` confirmó equivalencia del parche
 integrado. Se conservaron los demás worktrees y el paquete reproducible ignorado.
+
+### Cierre local del cron habitual del 23/09
+
+El cron terminó: provider 16:40:40.485 UTC, batch 16:40:50.588, wrapper
+16:40:51.321, salida 1 por revisión requerida. Nueve tareas succeeded; scoring
+55 = 50 blocked + 5 review, cero promotable. Doce probabilidades numéricas y tres
+EV positivos, todos de 1641075 con confianza 0.43–0.44 y restricciones de research
+y disponibilidad. Cero recomendaciones, targets o apuesta del día. Los required
+1638334, 1640760 y 1559612 fueron seleccionados y tienen scoring bloqueado por
+ausencia de cuotas; no se omitieron antes del análisis.
+
+La inspección se limitó a archivos locales, sin credenciales, API, DB o GET de
+Discord adicional. El outcome sólo declara el destino de alerta. Aunque comenzó
+con main en 506e18f, hubo commits y cargas posteriores mientras corría; no se
+atribuye toda la ejecución a un SHA. Ninguno de los 18 resultados de scoring
+incluye `lowOddsPriceVariants` ni metadata nueva de variantes. El cron no verifica
+esa corrección ni resuelve la prueba pendiente de entrega nueva.

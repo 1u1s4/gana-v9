@@ -310,6 +310,14 @@ credenciales en una salida de herramienta se documentaron sin reproducir valores
 corresponde rotar esas credenciales.
 
 El cron habitual de mañana, `daily-2026-09-23-full`, inició a las 16:15:15 UTC y
-seguía en scoring a las 16:39:49. Su código de inicio precede a `32a527d` y no
-verifica la corrección nueva; no se lanzó otra corrida. Seguimiento:
-`audits/2026-09-22/active-cron-2026-09-23-full.json`.
+terminó a las 16:40:51 con revisión requerida: 55 candidatos, 50 bloqueados,
+cinco para revisión y cero recomendaciones/targets. Doce probabilidades numéricas;
+tres EV positivos, todos del mismo fixture y con confianza 0.43–0.44. Los tres
+fixtures obligatorios sin candidatos sí fueron seleccionados, pero no tenían
+cuotas persistidas. Las nueve tareas técnicas terminaron.
+
+Su estado inicial de main precede a `32a527d`; como hubo cambios mientras corría
+y cargas posteriores, no se atribuye toda la ejecución a un único commit.
+Ningún resultado de scoring contiene las variantes nuevas. La notificación figura
+declarada en el artifact; no se hizo un GET ni consulta DB adicional. Este control
+local no demuestra entrega. Prueba: `audits/2026-09-22/active-cron-2026-09-23-full.json`.
