@@ -252,3 +252,30 @@ interpreta el silencio como aceptación de cerrar el goal o mandar otro resumen.
   portal se implementa allí y su finalización no se da por realizada aquí
 
 El goal principal no está completo: falta una entrega real de picks elegibles.
+
+## Tercer control: bloqueo externo confirmado
+
+El turno anterior se clasifica como progreso: creó y verificó el repositorio y
+la tarea del portal, y subió la documentación a main en `5df0cf1`. La ausencia de
+selecciones elegibles persistió al final de ese turno.
+
+En esta tercera constatación consecutiva, a `2026-09-22T08:59:59.606Z`:
+
+- R4 sigue terminal, `failed/completed`, sin candidatos publicables ni targets
+- Consulta nueva de DB en transacción READ ONLY: cero publicaciones para la fecha
+  o el batch R4, sin errores de conexión
+- Tabla de procesos actual: ningún proceso daily-e2e/gana-daily-e2e-and-notify vivo
+- El lock sigue retryable hasta 10:48:04 UTC; un archivo de lock no se interpreta
+  como proceso vivo ni autorización para reiniciar el mismo slate
+- Gana está limpio y sincronizado; la tarea del portal ya fue creada y despachada
+
+Se cumple el umbral de tres turnos con el mismo impedimento. No hay trabajo
+independiente requerido restante en este goal que pueda producir una entrega
+válida sin evidencia deportiva nueva o un cambio explícito del criterio de cierre.
+Corresponde marcar el goal **blocked**, conservando su objetivo completo.
+
+Para retomar: obtener una nueva ejecución con selecciones elegibles cuando cambien
+los datos, pasar el boundary canónico de publicación y verificar sus mensajes por
+GET más ledger DB. No sustituir la prueba por alertas, históricos o picks forzados.
+No se cambia el cron ni se crea un monitor adicional; la tarea del portal conserva
+su propio goal y puede seguir desarrollándose independientemente.

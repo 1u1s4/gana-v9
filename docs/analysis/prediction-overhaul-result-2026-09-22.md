@@ -109,3 +109,9 @@ permanece pendiente en el goal principal. Handoff:
 
 Las validaciones históricas AET/PEN y la semántica temporal de corners conservan
 los límites documentados en la auditoría; no se afirma reparación retroactiva global.
+
+El control del 22/09 a las 08:59:59 UTC volvió a confirmar cero publicaciones y
+ningún proceso E2E vivo. La misma ausencia de elegibles se constató durante tres
+turnos consecutivos, habiendo completado el trabajo independiente del portal.
+El goal principal queda bloqueado por la prueba de entrega pendiente, sin reducir
+el objetivo ni presentar la alerta operativa como publicación de recomendaciones.
