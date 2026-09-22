@@ -1,0 +1,150 @@
+{
+  "observedAt": "2026-09-22T18:31:06.953263+00:00",
+  "codeCommit": "ddff02d857dda2338a0fc1699de6c5e2167f29e4",
+  "batchId": "daily-2026-09-23-corrected",
+  "providerRunId": "6c10e587-b190-4722-b234-3ce80d07d28a",
+  "tests": {
+    "total": 781,
+    "passed": 781,
+    "failed": 0,
+    "suites": 109,
+    "typecheck": "passed"
+  },
+  "e2e": {
+    "providerTasksSucceeded": 9,
+    "selectedFixtures": 19,
+    "researchBundles": 19,
+    "predictions": 60,
+    "blockedPredictions": 56,
+    "reviewRequiredPredictions": 4,
+    "eligiblePredictions": 0,
+    "recommendations": 0,
+    "publications": 0,
+    "wrapperExitCode": 1,
+    "status": "review-required",
+    "meaning": "Technical provider stages completed; no eligible automatic picks; wrapper reports review as exit1."
+  },
+  "db": {
+    "readOnly": true,
+    "integrityTrue": 360,
+    "integrityFalse": 0,
+    "localPredictionMatches": 60
+  },
+  "manualDiscordDelivery": {
+    "messageId": "1552008878391033969",
+    "url": "https://discord.com/channels/1494071161934450890/1510040973218939022/1552008878391033969",
+    "evidenceConfidence": 0.44,
+    "recordedOdds": 1.4,
+    "status": "En revisión",
+    "exactGetMatched": true,
+    "normalLedgerUsed": false
+  },
+  "portal": {
+    "repository": "https://github.com/1u1s4/gana-picks-web",
+    "private": true,
+    "threadId": "01a0c854-a360-7c42-8feb-df1bcff6be7c",
+    "title": "Portal público de fútbol de Gana"
+  },
+  "proofManifest": [
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/process.json",
+      "sha256": "47ae3f51e10cc11296a0fbac8f702b342436a7a33ef890b2d1f76fdee93823da"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/preflight.json",
+      "sha256": "b99a8490a5c1d49eb42fee539ee53b87ce856c9d748c8b797b553bbb8590f55b"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/terminal-source-proof.json",
+      "sha256": "bbb05299abd4adbeb918f43db486b4eee8a56960f63c18a538931380ec6db193"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/weekly-and-required-prefinal-proof.json",
+      "sha256": "0db17c450dcf96e4182a5eb46864a65d776c6a16c82779aaf13372d1e66f2305"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/research-scoring-proof-ddff02d.json",
+      "sha256": "2fd1818dde260f959fb78f34d1eb236c6324411f480eacb16c61c3053d03e5bd"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/low-odds-final-proof.json",
+      "sha256": "3e57679157d8176059731bb77ed2cb6810aa12c6841af90817e410a9a1735455"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/portfolio-final-proof.json",
+      "sha256": "8313dc4708947109cbb960e7c94a37e4e6fa0c28755bf26534eb7f2255b0f4a7"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/db-proof.json",
+      "sha256": "90cacbeedd1764d21ffc8f13947b7828b3903caa8a51a92fa57067c77936e58f"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/strict-quote-db-proof.json",
+      "sha256": "6a9a694ebf27dd53f9b3d3bea3a459203605d3414ecceddefb2d15d921a2a8e5"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/local-db-comparison-proof.json",
+      "sha256": "6881ed5fde521eb3b1fd0d639b1a1cbb7a880708ca8c6eaf2e484e8b8a3053fb"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/notifier-dry-run-proof.json",
+      "sha256": "2dbeef5ccc4c220cd02ad1a5fc5e4b38e18ef1d0e5ed993e9805bcfe2ddda0f0"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/alerts-readback-proof.json",
+      "sha256": "2ddc754aca3c01b93961c3cb376e0e019c7c5d90c92f9e8e511428b71baefe33"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/initial-history-retro-proof.json",
+      "sha256": "6664426cfba631f809ffcbee425b4e5a90794171df7aa973dd4dd352b83c5239"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/portal-handoff-proof.json",
+      "sha256": "2092d6a9f891a78d0852fee34a30f96ca0f76c5c481da33e76e5fbac32aba240"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-corrected-e2e/cleanup.json",
+      "sha256": "bf9240b45c9b2c6d00c8d6bd816ee210371eff8f72b2a55a99c288b66d63f259"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-fixed-e2e/pagination-integration-proof.json",
+      "sha256": "e03a2202d918424af91bcad911752be106d75c8837e9de7b54c78ae48b36603f"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-fixed-e2e/gana-pagination-neutral-full-tests.log",
+      "sha256": "bbde2a9c247bf7daedf836f1a869f0f0915c49226c906f6a705f50efe678dc42"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/final-fixed-e2e/gana-pagination-neutral-typecheck.log",
+      "sha256": "e78c015284ca7b717a878fa767c8a093607d710b7c19b79835bc339bbd6010e9"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/manual-review-dbebd9e5/verification.json",
+      "sha256": "0fbbf2957ba120661d55f839ecc10b317de9f354d81bd6eabafa4171a3b1899b"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/manual-review-dbebd9e5/readback.json",
+      "sha256": "6e2055e18d293cca0b068e1033da25e14dd3026bab60016fd535d0f21d574800"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/r7-low-odds-replay/replay-variants-result.json",
+      "sha256": "1b660ece6b7aa0bb06a1a08b2154c47646ebc43ec688ddc7e73527e2093a25c3"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/r7-low-odds-transaction/verification.json",
+      "sha256": "f27bbc6a679bf85c150e8cf841cc9a1dd2424e70fbb9ff4bd9bd3225bb0cdfdb"
+    },
+    {
+      "path": ".artifacts/gana-v9/audits/2026-09-22/r7-low-odds-transaction/proof-5443a16b-2b63-4462-b9a2-35c4b322142a.json",
+      "sha256": "45a539a39dcc2ae78c6c2f5b081564fb74cd1dc9b82dd144be9e040f0282669a"
+    }
+  ],
+  "limits": [
+    "No positive automatic publication or >=1.20 eligible combination occurred in the final live run.",
+    "No price variant arose in the final run; prior replay and rollback canary verify that branch.",
+    "Three required fixtures and one other selected fixture lacked usable quotes.",
+    "Validation freshness was empty in isolated artifact root; all source candidates were independently ineligible.",
+    "Stored provider source/hash references audited, not every raw payload digest recalculated.",
+    "No demonstrated improvement in predictive performance or future return."
+  ]
+}

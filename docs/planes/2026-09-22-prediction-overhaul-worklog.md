@@ -753,3 +753,45 @@ confirmar que la previa terminó. No se reinició un proceso vivo.
 
 Prueba integrada: `audits/2026-09-22/final-fixed-e2e/pagination-integration-proof.json`.
 El paquete conserva diagnósticos, canary, comparación de checkout y logs de tests.
+
+
+### Verificación final corregida y cierre
+
+La corrida anterior de `5cd9895` terminó a las 17:53:44 UTC con scan incompleto;
+se conservó como intento fallido y su checkout fue retirado. Después comenzó
+`daily-2026-09-23-corrected`, provider `6c10e587-b190-4722-b234-3ce80d07d28a`,
+desde `ddff02d`, a las 17:56:21 UTC. Terminó a las 18:22:47 UTC; sesión 44926,
+wrapper 43007 y supervisor 43003 cerrados. Las nueve tareas succeeded. El wrapper
+terminó exit 1/review-required por cero elegibles; no fue un crash del proveedor.
+
+Scan completo: 9/9 páginas y 84 fixtures, 43 quotes estrictas en ocho partidos.
+Los 19 seleccionados fueron investigados y evaluados. Registro semanal de 48 ligas;
+11 fixtures requeridos incluidos, tres sin cuotas y otro no requerido sin cuotas.
+Research: 19 en revisión, 57 fuentes web, 95 históricas y 81 evidencias enlazadas.
+Scoring: 60 candidatos, 56 blocked y cuatro review, nueve probabilidades numéricas,
+tres EV positivos y confianza máxima 0.46. Cero elegibles, recomendaciones o
+targets; enfoques bloqueados y no-eligible-pick. Se documenta el gate adicional
+validationFreshness empty en el directorio de artifacts aislado.
+
+DB READ ONLY a las 18:24:12: 60 predicciones, 360 comprobaciones de integridad
+verdaderas y cero falsas. Los 60 IDs, precios, estados y referencias coinciden con
+los artifacts; cero publicaciones. La lectura adicional del snapshot 80fb0200
+confirma sólo Bet365 away 1.11, por lo que no faltó una variante estricta
+seleccionable. Siete ganadores ya tenían precio estricto. La rama de derivación
+se verificó con replay y canary previos; esta corrida no generó variantes.
+
+Dry-run final aprobado; GET de la alerta 1552022368707289149 confirma el cierre
+operativo. La entrega manual 1552008878391033969 de las 17:29 UTC conserva la
+confianza 44% y revisión explícita; no fue repetida ni incorporada al ledger
+automático. El manifest final de 379 archivos coincide con checkout y main.
+Se retiró sólo el checkout propio `/tmp/gana-pagination-final-check-20260922` y
+sus symlinks a las 18:28 UTC, conservando artifacts y trabajo ajeno.
+Suite final: 781/781 y TypeScript aprobados.
+
+Se reemplazó el informe de estado por un resultado coherente y un índice de
+pruebas con hashes. Las exigencias anteriores de una nueva apuesta elegible como
+bloqueo obligatorio quedan superadas por la lectura del contrato y el pedido
+manual explícito: se conserva el resultado no-pick, sin presentar el envío manual
+como prueba de elegibilidad ni afirmar la ruta positiva automática. No quedan
+cambios correctivos identificados pendientes; el límite de publicación positiva
+y de cobertura de cuotas permanece explícito.
