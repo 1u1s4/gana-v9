@@ -2720,3 +2720,357 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - Implementation: persist `dailyOddsFloorStrategy` in the Daily E2E result, summary, recommendation artifact, and report; render the validated snapshot as a dedicated final Discord message without adding a recommendation, publication target, or ledger row.
 - Files: `src/daily/odds-floor-strategy.ts`, `src/daily/e2e.ts`, `.agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs`, focused tests, notifier skill contract, and daily operations documentation.
 - Verification: `pnpm typecheck`; focused selector/E2E/notifier/publication tests; selected and no-eligible notifier dry-runs from generated E2E artifacts; full `pnpm test` (619 passed, 0 failed).
+
+## 2026-08-24 · strategy-2026-08-22
+
+- Run: strategy-review-2026-08-22-a5f955a9
+- Dates: 2026-08-22
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-22-a5f955a9/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-22-a5f955a9/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 0-2 hit 0.0% (55 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Reconcile emitted parlays with the persisted validation ledger (ready-for-implementation) — src/daily/e2e.ts, src/recommendations/artifact.ts, src/daily/e2e.test.ts
+- [high] Apply logical-signature deduplication after council and fallback composition (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/daily/e2e.test.ts
+- [high] Make thin validation freshness a council decision gate (ready-for-implementation) — src/council/recommendation-council.ts, src/daily/e2e.ts, src/council/recommendation-council.test.ts
+- [medium] Delay market-specific confidence and edge threshold changes until calibrated cohorts settle (needs-more-data) — src/scoring/edge-gate.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-08-25 · strategy-2026-08-24
+
+- Run: strategy-review-2026-08-24-65b2cd84
+- Dates: 2026-08-24
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-24-65b2cd84/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-24-65b2cd84/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 5-6 hit 45.5% (11 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Make date-odds pagination quota-aware and emit a recoverable coverage failure (ready-for-implementation) — src/providers/sports/api-football.ts, src/filters/low-odds.ts, src/daily/e2e.ts
+- [high] Require fair-price consistency for low-odds double-chance promotion (ready-for-implementation) — src/prediction/service.ts, src/parlay/eligibility.ts, skills/score-prediction-v2/prompt.md
+- [medium] Add minimum-sample market and odds-bucket calibration gates (needs-more-data) — src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+- [medium] Persist fixture-level concentration feedback in daily validation artifacts (proposed) — src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-08-28 · strategy-2026-08-27
+
+- Run: strategy-review-2026-08-27-e26a4641
+- Dates: 2026-08-27
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-27-e26a4641/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-27-e26a4641/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 1-0 hit 100.0% (39 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Block low-confidence fallback atomics from final recommendation artifacts (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/e2e.ts
+- [high] Require an explicit daily parlay profile and persist its coverage reason (ready-for-implementation) — src/daily/e2e.ts
+- [high] Add a post-settlement validation completion gate before strategy feedback (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts
+- [high] Make fallback recommendations retain strict edge and source-status requirements (ready-for-implementation) — src/daily/recommendation-policy.ts, src/scoring/edge-gate.ts
+- [medium] Add market-and-confidence calibration quotas before tuning thresholds (needs-more-data) — skills/score-prediction-v2/prompt.md, src/scoring/edge-gate.ts, src/daily/recommendation-policy.ts
+
+## 2026-08-30 · strategy-2026-08-29
+
+- Run: strategy-review-2026-08-29-c339c265
+- Dates: 2026-08-29
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-29-c339c265/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-29-c339c265/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Require persisted-ledger integrity before a recommendation enters published targets (ready-for-implementation) — src/daily/e2e.ts, src/recommendations/artifact.ts, src/metrics/daily.ts
+- [high] Make hard-risk fallback candidates watchlist-only rather than recommendations (ready-for-implementation) — src/daily/e2e.ts, src/prediction/gates.ts, src/scoring/edge-gate.ts
+- [high] Add a fair-probability consistency gate and prohibit model-probability confidence overrides on anomalies (ready-for-implementation) — src/scoring/edge-gate.ts, src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
+- [medium] Persist a minimum calibration cohort before changing portfolio thresholds or market coverage (needs-more-data) — src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-08-31 · strategy-2026-08-30
+
+- Run: strategy-review-2026-08-30-13458301
+- Dates: 2026-08-30
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-30-13458301/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-08-30-13458301/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 0-0 hit n/a (19 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Require persisted-ledger reconciliation before a parlay recommendation artifact is promotable (ready-for-implementation) — src/daily/e2e.ts
+- [high] Deduplicate final recommendations by canonical semantic leg signature after all fallback and council composition (ready-for-implementation) — src/daily/e2e.ts
+- [high] Create a settlement-triggered validation replay gate for unresolved daily scopes (ready-for-implementation) — src/daily/e2e.ts
+- [medium] Add market-level calibration inputs with a minimum settled-sample guard (needs-more-data) — src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md, src/parlay/eligibility.ts
+
+## 2026-09-02 · strategy-2026-09-01
+
+- Run: strategy-review-2026-09-01-6e44fae7
+- Dates: 2026-09-01
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-01-6e44fae7/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-01-6e44fae7/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 14-7 hit 66.7% (28 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Select a conservative default parlay portfolio for daily E2E runs (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
+- [high] Deduplicate daily predictions by fixture-market-selection-line before outcome aggregation and selection (ready-for-implementation) — src/prediction/service.ts, src/daily/recommendation-policy.ts, src/metrics/daily.ts
+- [high] Add a publication-coverage diagnostic and feedback artifact (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [high] Keep corners review-only until settlement reliability is demonstrated (proposed) — src/parlay/eligibility.ts, src/daily/recommendation-policy.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Add fixture-level directional redundancy controls to scoring prompts and final selection (ready-for-implementation) — skills/score-prediction-v2/prompt.md, src/prediction/service.ts, src/daily/recommendation-policy.ts
+- [medium] Defer market-specific confidence and edge threshold changes until a larger settled sample exists (needs-more-data) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/profile-specs.ts
+
+## 2026-09-04 · strategy-2026-09-02
+
+- Run: strategy-review-2026-09-02-c34521e8
+- Dates: 2026-09-02
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-02-c34521e8/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-02-c34521e8/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays; 1 reviewed date(s) had no recommendation artifact; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Make missing daily recommendation artifacts a first-class terminal completeness failure (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
+- [high] Add per-market stage accounting from requested quote through persisted prediction and final recommendation (ready-for-implementation) — src/daily/e2e.ts, skills/score-prediction-v2/prompt.md, src/daily/e2e.test.ts
+- [medium] Require a minimum settled sample before adjusting market or portfolio thresholds (needs-more-data) — src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/scoring/edge-gate.ts
+- [low] Evaluate portfolio-overlap filtering beyond exact duplicate leg sets after history exists (needs-more-data) — src/daily/recommendation-policy.ts, src/parlay/ranker.ts, src/daily/e2e.ts
+
+## 2026-09-04 · strategy-2026-09-03
+
+- Run: strategy-review-2026-09-03-34f4a655
+- Dates: 2026-09-03
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-03-34f4a655/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-03-34f4a655/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 1-0 hit 100.0% (6 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Make post-settlement validation a hard prerequisite for strategy feedback (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts
+- [high] Default an unprofiled daily run to an explicit conservative parlay build (proposed) — src/daily/e2e.ts
+- [high] Exclude blocked or non-positive-edge predictions from fallback parlay pools (ready-for-implementation) — src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md
+- [medium] Add a per-market calibration sample gate before changing confidence or edge thresholds (needs-more-data) — src/scoring/edge-gate.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-09-05 · strategy-2026-09-04
+
+- Run: strategy-review-2026-09-04-be6f637b
+- Dates: 2026-09-04
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-04-be6f637b/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-04-be6f637b/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: blocked
+- Predictions: 2-1 hit 66.7% (19 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-09-06 · strategy-2026-09-05
+
+- Run: strategy-review-2026-09-05-64df4925
+- Dates: 2026-09-05
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-05-64df4925/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-05-64df4925/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 1-2 hit 33.3% (41 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- [high] Block daily-focus fallback parlays sourced from review-only or parlay-ineligible legs (ready-for-implementation) — src/daily/recommendation-policy.ts, src/daily/e2e.ts
+- [high] Apply duplicate-signature filtering across all final parlay profiles (ready-for-implementation) — src/daily/recommendation-policy.ts
+- [high] Persist every final parlay before it enters the validation scope (ready-for-implementation) — src/daily/e2e.ts, src/recommendations/artifact.ts
+- [medium] Make calibration learning explicitly sample-gated by market, model, and selection mode (needs-more-data) — src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-09-08 · strategy-2026-09-07
+
+- Run: strategy-review-2026-09-07-9b55eda3
+- Dates: 2026-09-07
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-07-9b55eda3/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-07-9b55eda3/strategy-review.md
+- Model: gpt-5.6-terra
+- Reasoning: high
+- Agent status: ok
+- Predictions: 11-5 hit 68.8% (28 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Deduplicate logical selections in daily evaluation cohorts (ready-for-implementation) — src/daily/recommendation-policy.ts, src/metrics/daily.ts
+- [high] Make unresolved settlement backlog a required validation feedback loop (ready-for-implementation) — src/daily/e2e.ts, src/validation/service.ts
+- [high] Treat an empty published recommendation artifact as an explicit no-portfolio outcome (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts
+- [medium] Add a portfolio-feasibility gate before parlay construction (ready-for-implementation) — src/parlay/rules.ts, src/daily/e2e.ts, skills/score-prediction-v2/prompt.md
+- [medium] Calibrate market-specific edge and confidence gates only after unique settled samples accumulate (needs-more-data) — src/scoring/edge-gate.ts, src/prediction/service.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-09-09 · strategy-2026-09-08
+
+- Run: strategy-review-2026-09-08-8d316d63
+- Dates: 2026-09-08
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-08-8d316d63/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-08-8d316d63/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays; 1 reviewed date(s) had no recommendation artifact; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Gate strategy recommendations on available outcome evidence (ready-for-implementation) — src/strategy-review/daily.ts, src/strategy-review/daily.test.ts
+- [high] Distinguish missing, unreadable, invalid and empty recommendation artifacts (ready-for-implementation) — src/strategy-review/daily.ts, src/strategy-review/daily.test.ts
+- [medium] Connect empty reviews to existing daily execution diagnostics (proposed) — src/strategy-review/daily.ts, src/daily/e2e.ts, src/daily/e2e.test.ts, src/strategy-review/daily.test.ts
+
+## 2026-09-11 · strategy-2026-09-10
+
+- Run: strategy-review-2026-09-10-7ba4329a
+- Dates: 2026-09-10
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-10-7ba4329a/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-10-7ba4329a/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (4 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separate prediction eligibility, publication scope, and settlement readiness in strategy review (ready-for-implementation) — src/strategy-review/daily.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [high] Carry rejection causes and distinct-fixture coverage into the review payload (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Make double-chance fair pricing aware of overlapping outcomes (proposed) — src/providers/sports/api-football.ts, src/markets/fair-price.ts, src/prediction/service.ts, skills/score-prediction-v2/prompt.md
+- [medium] Gate abandoned-fixture scoring before model execution (proposed) — src/prediction/service.ts, src/prediction/gates.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-09-12 · strategy-2026-09-11
+
+- Run: strategy-review-2026-09-11-def7736d
+- Dates: 2026-09-11
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-11-def7736d/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-11-def7736d/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays; 1 reviewed date(s) had no recommendation artifact; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Gate performance recommendations on available settlement evidence (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Distinguish missing, unreadable, malformed, and empty recommendation artifacts (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Connect empty strategy reviews to daily execution diagnostics (proposed) — src/daily/e2e.ts, src/strategy-review/daily.ts
+
+## 2026-09-15 · strategy-2026-09-14
+
+- Run: strategy-review-2026-09-14-ed8f5134
+- Dates: 2026-09-14
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-14-ed8f5134/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-14-ed8f5134/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (13 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Include run lineage and upstream failure diagnostics in strategy reviews (ready-for-implementation) — src/strategy-review/daily.ts, src/daily/e2e.ts
+- [high] Gate outcome-driven strategy proposals on settlement readiness (ready-for-implementation) — src/strategy-review/daily.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [high] Explain validation gaps by fixture readiness and publication scope (proposed) — src/strategy-review/daily.ts, scripts/lib/validation-workflow.mjs, scripts/tests/validation-workflow.test.mjs
+- [medium] Expose scoring and selection attrition by market (proposed) — src/prediction/service.ts, src/daily/e2e.ts, src/strategy-review/daily.ts
+
+## 2026-09-17 · strategy-2026-09-16
+
+- Run: strategy-review-2026-09-16-2aff0928
+- Dates: 2026-09-16
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-16-2aff0928/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-16-2aff0928/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: blocked
+- Predictions: 2-0 hit 100.0% (11 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-09-19 · strategy-2026-09-17
+
+- Run: strategy-review-2026-09-17-ae74e09f
+- Dates: 2026-09-17
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-17-ae74e09f/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-17-ae74e09f/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: blocked
+- Predictions: 0-0 hit n/a (0 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted predictions; 1 reviewed date(s) had zero persisted parlays; 1 reviewed date(s) had no recommendation artifact; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-09-20 · strategy-2026-09-19
+
+- Run: strategy-review-2026-09-19-ff5890f1
+- Dates: 2026-09-19
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-19-ff5890f1/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-19-ff5890f1/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 2-1 hit 66.7% (33 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Require sufficient independent outcomes before performance labels (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Separate candidate history from published recommendation outcomes (ready-for-implementation) — src/strategy-review/daily.ts, src/recommendations/artifact.ts
+- [high] Make validation feedback aware of fixture completion and outcome availability (proposed) — src/strategy-review/daily.ts, src/validation/service.ts, src/daily/e2e.ts
+- [high] Keep model probability, market probability, and evidence confidence explicit (ready-for-implementation) — src/daily/recommendation-policy.ts, skills/score-prediction-v2/prompt.md, src/daily/recommendation-policy.test.ts
+- [medium] Expose rejection counts by stage, market, and portfolio profile (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/parlay/eligibility.ts, src/daily/e2e.test.ts

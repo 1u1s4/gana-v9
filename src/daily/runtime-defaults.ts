@@ -1,7 +1,7 @@
 import { isReasoningEffort, type AgentConfig, type ReasoningEffort } from '../config.js';
 
-export const DEFAULT_DAILY_CODEX_MODEL = 'gpt-5.6-terra';
-export const DEFAULT_DAILY_REASONING_EFFORT: ReasoningEffort = 'high';
+export const DEFAULT_DAILY_CODEX_MODEL = 'gpt-6-astra';
+export const DEFAULT_DAILY_REASONING_EFFORT: ReasoningEffort = 'medium';
 export const DEFAULT_DAILY_FAST_MODE = false;
 export const DEFAULT_DAILY_CODEX_FALLBACK_MODELS: readonly string[] = [];
 

@@ -250,7 +250,7 @@ const DEFAULTS: AgentConfig = {
   },
   provider: 'codex',
   apiKey: '',
-  model: 'gpt-5.5',
+  model: 'gpt-6-astra',
   name: 'Gana Agent',
   systemPrompt: [
     'You are Gana Agent, a coding assistant with access to tools for reading, writing, editing, and searching files, and running shell commands.',
@@ -279,7 +279,7 @@ const DEFAULTS: AgentConfig = {
   },
   slashCommands: true,
   fastMode: false,
-  reasoningEffort: undefined,
+  reasoningEffort: 'medium',
   nativeWebSearch: true,
   nativeWebSearchMode: 'live',
   codexHome: join(process.env.HOME ?? '', '.codex'),

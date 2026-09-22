@@ -16,13 +16,13 @@ const ROOT = resolve(new URL('../..', import.meta.url).pathname);
 const WRAPPER = resolve(ROOT, 'scripts/gana-strategy-review.mjs');
 const DATE = '2026-07-14';
 
-test('strategy review defaults to Terra high without fast tier or fallbacks', () => {
+test('strategy review defaults to Astra medium without fast tier or fallbacks', () => {
   const shell = readFileSync(resolve(ROOT, 'scripts/gana-strategy-review.sh'), 'utf8');
   const wrapper = readFileSync(resolve(ROOT, 'scripts/gana-strategy-review.mjs'), 'utf8');
   const service = readFileSync(resolve(ROOT, 'src/strategy-review/daily.ts'), 'utf8');
 
-  assert.match(shell, /GANA_STRATEGY_REVIEW_MODEL:-gpt-5\.6-terra/);
-  assert.match(shell, /GANA_STRATEGY_REVIEW_REASONING_EFFORT:-high/);
+  assert.match(shell, /GANA_STRATEGY_REVIEW_MODEL:-gpt-6-astra/);
+  assert.match(shell, /GANA_STRATEGY_REVIEW_REASONING_EFFORT:-medium/);
   assert.match(shell, /GANA_STRATEGY_REVIEW_FAST_MODE:-false/);
   assert.match(shell, /GANA_STRATEGY_REVIEW_CODEX_FALLBACK_MODELS-/);
   assert.match(shell, /GANA_CODEX_BIN_DIR/);
@@ -31,13 +31,13 @@ test('strategy review defaults to Terra high without fast tier or fallbacks', ()
   assert.match(shell, /AGENT_FAST_MODE="\$GANA_STRATEGY_REVIEW_FAST_MODE"/);
   assert.match(shell, /AGENT_CODEX_FALLBACK_MODELS="\$GANA_STRATEGY_REVIEW_CODEX_FALLBACK_MODELS"/);
 
-  assert.match(wrapper, /AGENT_MODEL: .*'gpt-5\.6-terra'/);
-  assert.match(wrapper, /AGENT_REASONING_EFFORT: .*'high'/);
+  assert.match(wrapper, /AGENT_MODEL: .*'gpt-6-astra'/);
+  assert.match(wrapper, /AGENT_REASONING_EFFORT: .*'medium'/);
   assert.match(wrapper, /AGENT_FAST_MODE: .*'false'/);
   assert.match(wrapper, /AGENT_CODEX_FALLBACK_MODELS: .*''/);
 
-  assert.match(service, /const DEFAULT_MODEL = 'gpt-5\.6-terra'/);
-  assert.match(service, /const DEFAULT_REASONING = 'high'/);
+  assert.match(service, /const DEFAULT_MODEL = 'gpt-6-astra'/);
+  assert.match(service, /const DEFAULT_REASONING = 'medium'/);
 });
 
 test('strategy wrapper owns only review and notification and publishes one terminal outcome', () => {

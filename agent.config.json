@@ -1,7 +1,8 @@
 {
   "name": "Gana Agent",
   "provider": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-6-astra",
+  "reasoningEffort": "medium",
   "fastMode": false,
   "nativeWebSearch": true,
   "nativeWebSearchMode": "live",

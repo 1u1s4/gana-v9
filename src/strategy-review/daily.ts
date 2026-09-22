@@ -205,8 +205,8 @@ interface ReviewRow {
 }
 
 const DEFAULT_DOC_PATH = 'docs/harness-strategy-review-log.md';
-const DEFAULT_MODEL = 'gpt-5.6-terra';
-const DEFAULT_REASONING = 'high';
+const DEFAULT_MODEL = 'gpt-6-astra';
+const DEFAULT_REASONING = 'medium';
 const STATUSES = ['won', 'lost', 'voided', 'pending', 'blocked', 'unvalidated'] as const;
 
 export async function runStrategyReview(

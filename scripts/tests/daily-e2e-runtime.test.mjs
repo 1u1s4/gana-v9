@@ -21,15 +21,15 @@ describe('daily E2E runtime defaults', () => {
     assert.match(shell, /CODEX_USER_BIN:\+\$CODEX_USER_BIN:/);
   });
 
-  it('defaults to Terra high without fast tier', () => {
+  it('defaults to Astra medium without fast tier', () => {
     assert.deepEqual(resolveDailyRuntime({ env: {} }), {
       codexModel: DEFAULT_DAILY_CODEX_MODEL,
       reasoningEffort: DEFAULT_DAILY_REASONING_EFFORT,
       fastMode: DEFAULT_DAILY_FAST_MODE,
       codexFallbackModels: DEFAULT_DAILY_CODEX_FALLBACK_MODELS,
     });
-    assert.equal(DEFAULT_DAILY_CODEX_MODEL, 'gpt-5.6-terra');
-    assert.equal(DEFAULT_DAILY_REASONING_EFFORT, 'high');
+    assert.equal(DEFAULT_DAILY_CODEX_MODEL, 'gpt-6-astra');
+    assert.equal(DEFAULT_DAILY_REASONING_EFFORT, 'medium');
     assert.equal(DEFAULT_DAILY_FAST_MODE, false);
     assert.deepEqual(DEFAULT_DAILY_CODEX_FALLBACK_MODELS, []);
   });

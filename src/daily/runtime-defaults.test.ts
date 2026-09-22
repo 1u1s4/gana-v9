@@ -9,10 +9,10 @@ import {
 } from './runtime-defaults.js';
 
 describe('Daily E2E command runtime defaults', () => {
-  it('defaults direct runs to Terra high without fast or fallbacks', () => {
+  it('defaults direct runs to Astra medium without fast or fallbacks', () => {
     assert.deepEqual(resolveDailyRuntimeDefaults({}), {
       codexModel: DEFAULT_DAILY_CODEX_MODEL,
-      reasoningEffort: 'high',
+      reasoningEffort: 'medium',
       fastMode: false,
       codexFallbackModels: [],
     });
@@ -34,8 +34,8 @@ describe('Daily E2E command runtime defaults', () => {
 
     const daily = applyDailyRuntimeDefaults(generic, defaults);
 
-    assert.equal(defaults.codexModel, 'gpt-5.6-terra');
-    assert.equal(daily.reasoningEffort, 'high');
+    assert.equal(defaults.codexModel, 'gpt-6-astra');
+    assert.equal(daily.reasoningEffort, 'medium');
     assert.equal(daily.fastMode, false);
     assert.deepEqual(daily.codexFallbackModels, []);
     assert.equal(generic.fastMode, true);

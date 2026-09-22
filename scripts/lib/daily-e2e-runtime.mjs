@@ -1,5 +1,5 @@
-export const DEFAULT_DAILY_CODEX_MODEL = 'gpt-5.6-terra';
-export const DEFAULT_DAILY_REASONING_EFFORT = 'high';
+export const DEFAULT_DAILY_CODEX_MODEL = 'gpt-6-astra';
+export const DEFAULT_DAILY_REASONING_EFFORT = 'medium';
 export const DEFAULT_DAILY_FAST_MODE = false;
 export const DEFAULT_DAILY_CODEX_FALLBACK_MODELS = [];
 
