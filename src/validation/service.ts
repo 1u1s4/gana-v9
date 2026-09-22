@@ -1,3 +1,4 @@
+import { isLowOddsPriceVariant } from '../prediction/price-variants.js';
 import { persistStageRun, type StageRunRepository } from '../runtime/run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { basename } from 'path';
@@ -410,6 +411,8 @@ async function validatePredictionRecord(
       providerFixtureId: fixture.providerFixtureId,
       resultProviderSnapshotId: fetched.resultProviderSnapshotId ?? null,
       statisticsProviderSnapshotId: fetched.statisticsProviderSnapshotId ?? null,
+      quoteVariantScope: isLowOddsPriceVariant(prediction) ? 'low-odds-top' : undefined,
+      derivedFromPredictionId: metadataString(prediction.metadata, 'derivedFromPredictionId'),
       modelProbability: numberOrUndefined(prediction.estimatedProbability) ?? numberOrUndefined(prediction.impliedProbability),
       promptVersion: prediction.promptVersion,
       modelId: prediction.model ?? 'unknown-model',
@@ -754,6 +757,7 @@ function buildValidationAnalytics(pending: PendingValidation[]): ValidationAnaly
   const outcomes = pending.flatMap((item) => {
     if (item.input.status !== 'won' && item.input.status !== 'lost') return [];
     const metadata = objectRecord(item.input.metadata);
+    if (metadata.quoteVariantScope === 'low-odds-top') return [];
     const probability = numberOrUndefined(metadata.modelProbability);
     if (probability === undefined) return [];
     return [{

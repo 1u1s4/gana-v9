@@ -46,6 +46,10 @@ export const predictionCandidateSchema = z.object({
     calibratedProbability: z.number().min(0).max(1).optional(),
     warnings: z.array(z.string().min(1)).default([]),
   }).optional(),
+  // Alternate prices are separate records for the strict profile, not new model observations.
+  quoteVariantScope: z.literal('low-odds-top').optional(),
+  derivedFromPredictionId: z.string().min(1).optional(),
+  expectedValue: z.number().optional(),
   oddsSnapshotId: z.string().min(1).optional(),
   oddsQuoteId: z.string().min(1),
   evidenceIds: z.array(z.string().min(1)),
@@ -89,6 +93,7 @@ export const predictionRunResultSchema = z.object({
   providerFixtureId: z.string().min(1).optional(),
   gateResult: researchGateResultSchema,
   predictions: z.array(predictionRecordSchema),
+  lowOddsPriceVariants: z.array(predictionRecordSchema).optional(),
   artifactPath: z.string().min(1).optional(),
   error: z.string().min(1).optional(),
 });

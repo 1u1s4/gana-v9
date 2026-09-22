@@ -1632,3 +1632,149 @@ for (const nested of [true, false]) {
     });
   }
 }
+
+describe('scored low-odds price variants', () => {
+  async function scorePrices(input: {
+    low: number; high: number; probability?: number; selection?: 'home' | 'away';
+    calibrated?: boolean; lowMetadata?: Record<string, unknown>; lowBookmaker?: string;
+    researchStatus?: string;
+  }) {
+    const cfg = config({ apiFootball: { bookmakerAllowlist: ['Bet365', 'Pinnacle'], lowOddsThreshold: 1.1 } });
+    const selection = input.selection ?? 'home';
+    const quotes = [
+      { ...oddsQuote, id: 'best-price', price: input.high, impliedProbability: 1 / input.high, marketFairProbability: 0.9,
+        bookmaker: 'Pinnacle', selectionKey: selection, metadata: { lineupConfirmed: true, lowLiquidity: false } },
+      { ...oddsQuote, id: 'strict-price', price: input.low, impliedProbability: 1 / input.low, marketFairProbability: 0.9,
+        bookmaker: input.lowBookmaker ?? 'Bet365', selectionKey: selection, metadata: { lineupConfirmed: true, lowLiquidity: false, ...input.lowMetadata } },
+    ];
+    let persisted: any[] = [];
+    let artifact: any;
+    let calibrations = 0;
+    const probability = input.probability ?? 0.98;
+    const result = await runFixtureScoring(cfg, { fixtureId: fixture.providerFixtureId, markets: ['h2h'] }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => now,
+      repositories: repositories({
+        oddsQuotes: { listLatest: async () => quotes },
+        claims: { list: async () => claims.map((claim) => ({ ...claim, selectionKey: selection })) },
+        researchBundles: { list: async () => [{ ...researchBundle, status: input.researchStatus ?? 'promotable',
+          gateResult: { verdict: input.researchStatus ?? 'promotable', reasons: [], warnings: [] } }] },
+      }),
+      calibrationHistory: input.calibrated ? { getCalibrationPoints: async () => {
+        calibrations += 1;
+        return Array.from({ length: 100 }, (_, index) => ({ predicted: probability, observed: index < 96 ? 1 : 0 }));
+      } } : undefined,
+      writeArtifact: (_id, _name, payload) => { artifact = payload; return '/tmp/predictions.json'; },
+      persistPredictions: async (records: any[]) => { persisted = records; return records; },
+      agentRunner: async () => ({ text: JSON.stringify({ predictions: [{
+        oddsQuoteId: 'best-price', market: 'h2h', selection, odds: input.high, modelProbability: probability,
+        confidence: 0.95, evidenceIds: ['evidence-1', 'evidence-2'], claimIds: ['claim-1'],
+        rationale: 'The supplied selection evidence supports this event probability.', warnings: [],
+      }] }), usage: {}, output: '' }),
+    });
+    return { result, persisted, artifact, calibrations };
+  }
+
+  for (const [low, high, selection] of [[1.07, 1.12, 'away'], [1.09, 1.11, 'home']] as const) {
+    it(`scores ${low} and preserves general ${high}, with one calibration and independent quote lineage`, async () => {
+      const { result, persisted, artifact, calibrations } = await scorePrices({ low, high, selection, calibrated: true });
+      assert.equal(result.predictions.length, 1);
+      assert.equal(result.lowOddsPriceVariants?.length, 1);
+      const source = result.predictions[0];
+      const variant = result.lowOddsPriceVariants![0];
+      assert.equal(source.odds, high);
+      assert.equal(source.oddsQuoteId, 'best-price');
+      assert.equal(variant.odds, low);
+      assert.equal(variant.oddsQuoteId, 'strict-price');
+      assert.equal(variant.oddsSnapshotId, source.oddsSnapshotId);
+      assert.notEqual(variant.id, source.id);
+      assert.equal(variant.derivedFromPredictionId, source.id);
+      assert.equal(variant.quoteVariantScope, 'low-odds-top');
+      assert.equal(variant.probability, source.probability);
+      assert.equal(variant.modelProbability, source.modelProbability);
+      assert.equal(variant.confidence, source.confidence);
+      assert.deepEqual(variant.calibration, source.calibration);
+      assert.equal(calibrations, 1);
+      assert.equal(result.calibrationSummary?.applied, 1);
+      assert.equal(source.calibration?.rawProbability, 0.98);
+      assert.ok(Math.abs(source.modelProbability! - 0.96) < 1e-12);
+      assert.deepEqual(variant.evidenceIds, source.evidenceIds);
+      assert.deepEqual(variant.claimIds, source.claimIds);
+      assert.equal(variant.impliedProbability, 1 / low);
+      assert.equal(variant.edge, variant.probability! - variant.marketFairProbability!);
+      assert.equal(variant.expectedValue, variant.probability! * low - 1);
+      assert.equal(variant.status, 'promotable');
+      assert.equal(variant.promotable, true);
+      assert.equal(persisted.length, 2);
+      assert.equal(persisted[1].oddsQuoteId, variant.oddsQuoteId);
+      assert.equal(persisted[1].metadata.quoteVariantScope, 'low-odds-top');
+      assert.equal(persisted[1].metadata.derivedFromPredictionId, source.id);
+      assert.deepEqual(artifact.predictions, result.predictions);
+      assert.deepEqual(artifact.lowOddsPriceVariants, result.lowOddsPriceVariants);
+    });
+  }
+
+  it('blocks a negative-EV lower price even when the original price and consensus edge are positive', async () => {
+    const { result } = await scorePrices({ low: 1.07, high: 1.12, probability: 0.92 });
+    const source = result.predictions[0];
+    const variant = result.lowOddsPriceVariants![0];
+    assert.equal(source.status, 'promotable');
+    assert.ok(source.expectedValue! > 0);
+    assert.ok(variant.edge! > 0);
+    assert.ok(variant.expectedValue! < 0);
+    assert.equal(variant.status, 'blocked');
+    assert.equal(variant.promotable, false);
+    assert.equal(variant.parlayEligible, false);
+    assert.ok(variant.blockers.includes('non-positive-expected-value'));
+    assert.equal(variant.probability, source.probability);
+    assert.equal(result.gateResult.verdict, 'promotable', 'a scoped variant does not demote the valid general quote');
+  });
+
+  it('rechecks quote-specific risk and preserves research restrictions', async () => {
+    const stale = await scorePrices({ low: 1.09, high: 1.11, lowMetadata: { lineMovementAgainstPick: true } });
+    assert.equal(stale.result.predictions[0].status, 'promotable');
+    assert.equal(stale.result.lowOddsPriceVariants![0].status, 'blocked');
+    assert.ok(stale.result.lowOddsPriceVariants![0].blockers.includes('stale-pick'));
+    const review = await scorePrices({ low: 1.09, high: 1.11, researchStatus: 'review-required' });
+    assert.equal(review.result.predictions[0].status, 'review-required');
+    assert.equal(review.result.lowOddsPriceVariants![0].status, 'review-required');
+    assert.equal(review.result.lowOddsPriceVariants![0].parlayEligible, review.result.predictions[0].parlayEligible);
+    assert.ok(review.result.lowOddsPriceVariants![0].warnings.includes('research is not promotable'));
+  });
+
+  it('does not create variants at the boundary, outside the whitelist, or when the best price is already strict', async () => {
+    for (const input of [
+      { low: 1.1, high: 1.12 },
+      { low: 1.09, high: 1.11, lowBookmaker: 'ReferenceOnly' },
+      { low: 1.04, high: 1.06 },
+    ]) {
+      const { result, persisted } = await scorePrices(input);
+      assert.equal(result.predictions.length, 1);
+      assert.deepEqual(result.lowOddsPriceVariants, []);
+      assert.equal(persisted.length, 1);
+    }
+  });
+});
+
+
+describe('same-event price probability consistency', () => {
+  it('rejects independent model probabilities for two quotes of the same outcome', async () => {
+    const cfg = config();
+    let writes = 0;
+    const result = await runFixtureScoring(cfg, { fixtureId: fixture.providerFixtureId, markets: ['h2h'] }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => now, writeArtifact: () => '/tmp/duplicate-price-predictions.json',
+      repositories: repositories({ oddsQuotes: { listLatest: async () => [
+        { ...oddsQuote, id: 'best', price: 1.12 }, { ...oddsQuote, id: 'alternate', price: 1.07 },
+      ] } }),
+      persistPredictions: async () => { writes += 1; return []; },
+      agentRunner: async () => ({ text: JSON.stringify({ predictions: [
+        { oddsQuoteId: 'best', odds: 1.12, modelProbability: 0.95 },
+        { oddsQuoteId: 'alternate', odds: 1.07, modelProbability: 0.99 },
+      ].map((pick) => ({ ...pick, market: 'h2h', selection: 'home', confidence: 0.95,
+        evidenceIds: ['evidence-1', 'evidence-2'], claimIds: ['claim-1'], rationale: 'Same event.', warnings: [] })) }),
+        usage: {}, output: '' }),
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error ?? '', /duplicates priced event/);
+    assert.equal(writes, 0);
+  });
+});

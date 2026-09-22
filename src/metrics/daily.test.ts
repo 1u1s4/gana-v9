@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadConfig } from '../config.js';
@@ -271,5 +271,39 @@ describe('daily metrics service', () => {
     assert.equal(serialized.includes('[Circular]'), false);
     assert.equal(artifact.metrics[0].chartMetrics.parlayHitRateByProfile[0].label, 'low-odds-top');
     assert.equal(artifact.metrics[0].predictionMetrics.byMarket[0].label, 'double_chance');
+  });
+});
+
+
+describe('price variant metric cohorts', () => {
+  it('counts the event once generally and retains the real variant price for explicit published targets', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'gana-variant-metrics-'));
+    try {
+      const recommendationArtifact = join(root, 'recommendations.json');
+      writeFileSync(recommendationArtifact, JSON.stringify({ recommendations: [{
+        kind: 'parlay', parlayId: PARLAY_1_ID, legs: [{ predictionId: PREDICTION_2_ID }],
+      }] }));
+      const records = [
+        { id: PREDICTION_1_ID, odds: 1.12 },
+        { id: PREDICTION_2_ID, odds: 1.07, metadata: { quoteVariantScope: 'low-odds-top', derivedFromPredictionId: PREDICTION_1_ID } },
+      ].map((record) => ({ ...record, marketKey: 'h2h', providerAgentic: 'codex', model: 'gpt-6-astra',
+        confidence: 0.95, edge: 0.04, validationArtifacts: [{ status: 'won' }] }));
+      const db = {
+        prediction: { findMany: async (args: any) => records.filter((record) => !args.where.id || args.where.id.in.includes(record.id)) },
+        parlay: { findMany: async () => [] },
+      };
+      const common = { db, now: () => new Date('2026-05-14T12:00:00Z'), writeArtifact: () => '/tmp/variant-metrics.json' };
+      const general = await runDailyMetrics(config, { date: '2026-05-13', persist: false }, {}, common);
+      assert.equal(general.metrics[0].predictionMetrics.total, 1);
+      assert.equal(general.metrics[0].predictionMetrics.won, 1);
+      assert.equal(general.metrics[0].predictionMetrics.avgOdds, 1.12);
+      assert.equal(general.metrics[0].predictionMetrics.byModel?.[0].total, 1);
+      const published = await runDailyMetrics(config, { date: '2026-05-13', persist: false, recommendationArtifact }, {}, common);
+      assert.equal(published.metrics[0].predictionMetrics.total, 1);
+      assert.equal(published.metrics[0].predictionMetrics.won, 1);
+      assert.equal(published.metrics[0].predictionMetrics.avgOdds, 1.07);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

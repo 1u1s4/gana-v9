@@ -5,7 +5,7 @@ import type {
   PrismaBatchPayload,
   StoragePrismaClient,
 } from '../types.js';
-import { compactData, fixtureDateRange, paginationArgs, redactJson, redactText, takeArg } from './helpers.js';
+import { compactData, fixtureDateRange, paginationArgs, redactJson, redactText } from './helpers.js';
 
 export interface PredictionQuery {
   runId?: string;
@@ -13,6 +13,7 @@ export interface PredictionQuery {
   fixtureId?: string;
   status?: PredictionStatus | string | Array<PredictionStatus | string>;
   take?: number;
+  skip?: number;
 }
 
 export interface PredictionFixtureDateQuery {
@@ -61,8 +62,8 @@ export function createPredictionRepository(db: Pick<StoragePrismaClient, 'predic
           fixtureId: query.fixtureId,
           status: Array.isArray(query.status) ? { in: query.status } : query.status,
         }),
-        orderBy: { generatedAt: 'desc' },
-        ...takeArg(query.take),
+        orderBy: [{ generatedAt: 'desc' }, { id: 'asc' }],
+        ...paginationArgs(query),
       });
     },
 

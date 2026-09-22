@@ -787,3 +787,69 @@ describe('validation run ownership', () => {
     }
   }
 });
+
+describe('price variant settlements and model observations', () => {
+  it('settles both price records by ID while counting one model observation in date analytics', async () => {
+    const cfg = config();
+    const records = [
+      prediction({ id: PREDICTION_TARGET_ID, odds: 1.12, estimatedProbability: 0.96 }),
+      prediction({ id: ARTIFACT_PREDICTION_1_ID, odds: 1.07, estimatedProbability: 0.96,
+        metadata: { quoteVariantScope: 'low-odds-top', derivedFromPredictionId: PREDICTION_TARGET_ID } }),
+    ];
+    const persisted: any[] = [];
+    const result = await runValidation(cfg, { date: '2026-04-25' }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => now, writeArtifact: () => '/tmp/variant-validations.json', fetcher: fetcher(),
+      repositories: repositories({ predictions: {
+        findById: async (id: string) => records.find((record) => record.id === id) ?? null,
+        listForFixtureDate: async () => records,
+      } }),
+      persistValidation: async (input: any) => { persisted.push(input); return { ...input, id: `validation-${persisted.length}` }; },
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.validations.map((item) => [item.predictionId, item.status]), [
+      [PREDICTION_TARGET_ID, 'won'], [ARTIFACT_PREDICTION_1_ID, 'won'],
+    ]);
+    assert.equal(persisted[0].resultInput.selection.odds, 1.12);
+    assert.equal(persisted[1].resultInput.selection.odds, 1.07);
+    assert.equal(persisted[1].metadata.derivedFromPredictionId, PREDICTION_TARGET_ID);
+    assert.deepEqual(result.analytics?.outcomes.map((item) => item.predictionId), [PREDICTION_TARGET_ID]);
+  });
+
+  it('settles a published parlay leg at its variant price and preserves variant prediction lineage', async () => {
+    const cfg = config();
+    const leg = { ...await repositories().parlayLegs.list().then((legs: any[]) => legs[0]),
+      id: 'variant-leg', predictionId: ARTIFACT_PREDICTION_1_ID, odds: 1.07 };
+    const updates: any[] = [];
+    let persisted: any;
+    const result = await runValidation(cfg, { parlayId: PARLAY_TARGET_ID }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => now, writeArtifact: () => '/tmp/variant-parlay-validation.json', fetcher: fetcher(),
+      repositories: repositories({ parlayLegs: {
+        list: async () => [leg], updateStatus: async (id: string, status: string) => { updates.push({ id, status }); return { id, status }; },
+      } }),
+      persistValidation: async (input: any) => { persisted = input; return { ...input, id: 'variant-validation' }; },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.validations[0].status, 'won');
+    assert.deepEqual(updates, [{ id: 'variant-leg', status: 'won' }]);
+    assert.equal(persisted.outcome.legOutcomes[0].predictionId, ARTIFACT_PREDICTION_1_ID);
+    assert.equal(persisted.resultInput.legs[0].selection.odds, 1.07);
+    assert.deepEqual(result.analytics?.outcomes, []);
+  });
+});
+
+
+it('keeps a variant-only explicit settlement without claiming a new calibration observation', async () => {
+  const cfg = config();
+  const result = await runValidation(cfg, { predictionId: ARTIFACT_PREDICTION_1_ID }, createRuntimeContext(cfg, 'session.jsonl'), {
+    now: () => now, writeArtifact: () => '/tmp/variant-only-validation.json', fetcher: fetcher(),
+    repositories: repositories({ predictions: {
+      findById: async () => prediction({ id: ARTIFACT_PREDICTION_1_ID, odds: 1.07, estimatedProbability: 0.96,
+        metadata: { quoteVariantScope: 'low-odds-top', derivedFromPredictionId: PREDICTION_TARGET_ID } }),
+      listForFixtureDate: async () => [],
+    } }),
+  });
+  assert.equal(result.validations[0].predictionId, ARTIFACT_PREDICTION_1_ID);
+  assert.equal(result.validations[0].status, 'won');
+  assert.equal(result.validations[0].metadata?.derivedFromPredictionId, PREDICTION_TARGET_ID);
+  assert.deepEqual(result.analytics?.outcomes, []);
+});

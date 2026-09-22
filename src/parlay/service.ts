@@ -1,3 +1,4 @@
+import { isLowOddsPriceVariant } from '../prediction/price-variants.js';
 import { persistStageRun, type StageRunRepository } from '../runtime/run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { basename, join } from 'path';
@@ -196,6 +197,7 @@ export interface ParlayServiceRepositories {
       fixtureId?: string;
       status?: PredictionStatus | string | Array<PredictionStatus | string>;
       take?: number;
+      skip?: number;
     }): Promise<PredictionRecord[]>;
     listForFixtureDate(date: Date | string, query: {
       runId?: string;
@@ -266,11 +268,11 @@ export async function runParlayBuild(
   const sourceScopeLabel = predictionSourceRunIds.length > 1
     ? predictionSourceRunIds.join(',')
     : predictionSourceRunId;
-  const predictions = predictionSourceRunIds.length > 1
-    ? await repositories.predictions.listForFixtureDate(input.date, { ...predictionQuery, runIds: predictionSourceRunIds })
-    : predictionSourceRunId
-    ? await repositories.predictions.listForFixtureDate(input.date, { ...predictionQuery, runId: predictionSourceRunId })
-    : await repositories.predictions.listForFixtureDate(input.date, predictionQuery);
+  const predictions = await listGeneralPredictionRecords((pagination) => repositories.predictions.listForFixtureDate(input.date, {
+    ...predictionQuery,
+    ...(predictionSourceRunIds.length > 1 ? { runIds: predictionSourceRunIds } : predictionSourceRunId ? { runId: predictionSourceRunId } : {}),
+    ...pagination,
+  }));
   const build = buildParlay({
     id: randomUUID(),
     sourceRunId: sourceScopeLabel ?? runId,
@@ -317,6 +319,29 @@ export async function runParlayBuild(
     await upsertRun(config, runtime, repositories, runId, 'blocked', 'failed', now(), input.date).catch(() => undefined);
     return result;
   }
+}
+
+async function listGeneralPredictionRecords(
+  fetchPage: (pagination: { take: number; skip?: number }) => Promise<PredictionRecord[]>,
+): Promise<PredictionRecord[]> {
+  const limit = 500;
+  const predictions: PredictionRecord[] = [];
+  const seen = new Set<string>();
+  for (let skip = 0; predictions.length < limit; skip += limit) {
+    const page = await fetchPage({ take: limit, ...(skip ? { skip } : {}) });
+    let newRecords = 0;
+    for (const prediction of page) {
+      if (seen.has(prediction.id)) continue;
+      seen.add(prediction.id);
+      newRecords += 1;
+      if (!isLowOddsPriceVariant(prediction)) predictions.push(prediction);
+      if (predictions.length === limit) break;
+    }
+    // A price-only variant must not consume the existing general-candidate cap.
+    // Stop on repeated pages as well, so adapters ignoring skip cannot loop.
+    if (page.length < limit || newRecords === 0) break;
+  }
+  return predictions;
 }
 
 function normalizeSourceRunIds(sourceRunIds: string[] | undefined, sourceRunId?: string): string[] {
@@ -394,11 +419,11 @@ async function runParlayPortfolio(
     });
   }
 
-  const records = await repositories.predictions.list({
+  const records = await listGeneralPredictionRecords((pagination) => repositories.predictions.list({
     runId: sourceRunId,
     status: PORTFOLIO_PREDICTION_STATUSES,
-    take: 500,
-  });
+    ...pagination,
+  }));
   const sourcePredictions = records.map(toSourcePrediction);
   const decoratedPredictions = sourcePredictions.map(decoratePortfolioPrediction);
   const portfolioId = randomUUID();
@@ -781,11 +806,11 @@ async function runDeterministicParlayProfile(
   }
 
   const baseSpec = deterministicProfileSpec(profile);
-  const records = await repositories.predictions.list({
+  const records = await listGeneralPredictionRecords((pagination) => repositories.predictions.list({
     ...sourcePredictionScopeQuery(sourceRunIds),
     status: PORTFOLIO_PREDICTION_STATUSES,
-    take: 500,
-  });
+    ...pagination,
+  }));
   const sourcePredictions = records.map(toSourcePrediction).map(decoratePortfolioPrediction);
   const portfolioId = randomUUID();
   const strictExcludedReasons = sourcePredictions

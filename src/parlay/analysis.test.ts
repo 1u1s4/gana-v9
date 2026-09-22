@@ -79,6 +79,24 @@ function leg(input: {
 }
 
 describe('runParlayAnalysis', () => {
+  it('preserves a price variant scope on the analyzed leg without marking ordinary legs', async () => {
+    const cfg = config();
+    const legs = ['a', 'b'].map((id) => leg({
+      id, market: 'h2h', selection: 'home', odds: 1.099, confidence: 0.95, probability: 0.98,
+    }));
+    legs[0].prediction.metadata = { quoteVariantScope: 'low-odds-top' };
+    const row = parlay({ id: 'variant-parlay', profile: 'low-odds-top', status: 'promotable', validation: 'unvalidated', odds: 1.207801, confidence: 0.9025, legs });
+    const result = await runParlayAnalysis(cfg, { runId: 'source-run-analysis', profileScope: 'all' }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => now,
+      db: { parlay: { findMany: async () => [row] } },
+      writeArtifact: () => '/tmp/parlay-analysis.json',
+    });
+    assert.equal(result.top.length, 1);
+    assert.equal(result.top[0].legs[0].quoteVariantScope, 'low-odds-top');
+    assert.equal(result.top[0].legs[1].quoteVariantScope, undefined);
+    assert.equal(result.top[0].legs[0].probability, 0.98);
+  });
+
   it('ranks persisted parlays, assigns analytical stake, identifies banker legs, and backtests selected quality', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');

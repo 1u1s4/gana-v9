@@ -54,6 +54,74 @@ function prediction(overrides: Record<string, unknown> = {}) {
 }
 
 describe('runParlayBuild', () => {
+  for (const portfolio of [undefined, 'llm', 'parlay-refinado'] as const) {
+    it(`excludes scoped price variants before the general candidate cap for ${portfolio ?? 'default'}`, async () => {
+      const cfg = config();
+      const rows = [
+        ...Array.from({ length: 500 }, (_, index) => prediction({
+          id: `variant-${index}`, fixtureId: `variant-fixture-${index}`, odds: 1.09,
+          confidence: 0.99, status: 'promotable', edge: 0.04,
+          metadata: { quoteVariantScope: 'low-odds-top', derivedFromPredictionId: `base-${index}` },
+        })),
+        ...['a', 'b'].map((id) => prediction({
+          id: `general-${id}`, fixtureId: `general-fixture-${id}`, odds: 1.25,
+          confidence: 0.95, status: 'promotable', edge: 0.04,
+        })),
+      ];
+      const pages: number[] = [];
+      const readPage = async (query: { take?: number; skip?: number }) => {
+        pages.push(query.skip ?? 0);
+        return rows.slice(query.skip ?? 0, (query.skip ?? 0) + (query.take ?? rows.length)) as any[];
+      };
+      const result = await runParlayBuild(cfg, { date: '2026-04-25', sourceRunId: 'current-run', portfolio }, createRuntimeContext(cfg, 'session.jsonl'), {
+        now: () => now,
+        agentRunner: async () => ({ text: JSON.stringify({ parlays: [] }) }) as any,
+        writeArtifact: (_runId, name) => `/tmp/${name}`,
+        repositories: {
+          predictions: { list: readPage, listForFixtureDate: async (_date, query) => readPage(query) },
+          harnessRuns: { upsertForRun: async () => ({}) },
+          artifacts: { create: async () => ({ id: 'artifact' }) as any },
+          parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+        },
+      });
+      assert.deepEqual(pages, [0, 500]);
+      if (portfolio) assert.equal(result.portfolio?.diagnostics?.sourcePredictions, 2);
+      else assert.equal(result.build.evaluations.length, 2);
+      const legs = result.portfolio?.parlays.flatMap((item) => item.build.parlay.legs) ?? result.build.parlay.legs;
+      assert.ok(legs.length >= 2);
+      assert.ok(legs.every((leg) => leg.predictionId.startsWith('general-')));
+    });
+  }
+
+  it('retains the 500 general-record cap after skipping a complete variant page', async () => {
+    const cfg = config();
+    const rows = Array.from({ length: 1001 }, (_, index) => prediction({
+      id: `prediction-${index}`, fixtureId: `fixture-${index}`,
+      ...(index < 500 ? { metadata: { quoteVariantScope: 'low-odds-top' } } : {}),
+    }));
+    const pages: number[] = [];
+    const result = await runParlayBuild(cfg, { date: '2026-04-25' }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => now, writeArtifact: () => '/tmp/parlays.json',
+      repositories: {
+        predictions: {
+          list: async () => [],
+          listForFixtureDate: async (_date, query) => {
+            const skip = query.skip ?? 0;
+            pages.push(skip);
+            return rows.slice(skip, skip + (query.take ?? rows.length)) as any[];
+          },
+        },
+        harnessRuns: { upsertForRun: async () => ({}) },
+        artifacts: { create: async () => ({ id: 'artifact' }) as any },
+        parlays: { createWithLegs: async (input) => ({ id: input.parlay.id }) as any },
+      },
+    });
+    assert.deepEqual(pages, [0, 500]);
+    assert.equal(result.build.evaluations.length, 500);
+    assert.equal(result.build.evaluations.some((item) => item.predictionId === 'prediction-1000'), false);
+    assert.equal(result.build.evaluations.some((item) => Number(item.predictionId.split('-')[1]) < 500), false);
+  });
+
   it('builds, writes, and persists analytical parlay artifacts from persisted predictions', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -329,7 +397,8 @@ describe('runParlayBuild', () => {
             assert.equal(query.runId, 'source-run-low-odds');
             assert.deepEqual(query.status, ['candidate', 'review-required', 'promotable']);
             return [
-              prediction({ id: 'top-1', runId: 'source-run-low-odds', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.099, confidence: 0.95, status: 'promotable', edge: 0.04 }),
+              prediction({ id: 'top-1', runId: 'source-run-low-odds', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.099, confidence: 0.95, status: 'promotable', edge: 0.04, metadata: { quoteVariantScope: 'low-odds-top', derivedFromPredictionId: 'best-price-1' } }),
+              prediction({ id: 'same-fixture-price', runId: 'source-run-low-odds', fixtureId: 'fixture-1', marketKey: 'h2h', selectionKey: 'home', odds: 1.099, confidence: 0.93, status: 'promotable', edge: 0.04 }),
               prediction({ id: 'top-2', runId: 'source-run-low-odds', fixtureId: 'fixture-2', marketKey: 'h2h', selectionKey: 'away', odds: 1.099, confidence: 0.94, status: 'candidate', edge: 0.03 }),
               prediction({ id: 'top-3', runId: 'source-run-low-odds', fixtureId: 'fixture-3', marketKey: 'h2h', selectionKey: 'home', odds: 1.08, confidence: 0.93, status: 'promotable', edge: 0.03 }),
               prediction({ id: 'top-4', runId: 'source-run-low-odds', fixtureId: 'fixture-4', marketKey: 'h2h', selectionKey: 'away', odds: 1.08, confidence: 0.92, status: 'promotable', edge: 0.03 }),
@@ -360,6 +429,7 @@ describe('runParlayBuild', () => {
     assert.equal(result.portfolio?.profiles[0]?.profile, 'low-odds-top');
     assert.equal(result.portfolio?.profiles[0]?.included, 1);
     assert.equal(result.portfolio?.parlays.length, 1);
+    assert.equal(new Set(result.portfolio?.parlays[0]?.build.parlay.legs.map((leg) => leg.fixtureId)).size, 2);
     assert.deepEqual(
       result.portfolio?.parlays[0]?.build.parlay.legs.map((leg) => leg.predictionId),
       ['top-1', 'top-2'],

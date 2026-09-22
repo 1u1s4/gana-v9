@@ -1,3 +1,4 @@
+import { isLowOddsPriceVariant } from '../prediction/price-variants.js';
 import { randomUUID } from 'node:crypto';
 import type { AgentConfig } from '../config.js';
 import { uniqueUuids } from '../domain/ids.js';
@@ -204,7 +205,7 @@ export async function runDailyMetrics(
     scope,
     generatedAt: generatedAt.toISOString(),
     recommendationArtifact: input.recommendationArtifact ?? null,
-    targetPolicy: recommendationTargets ? 'published-recommendations-only' : 'all-persisted-targets',
+    targetPolicy: recommendationTargets ? 'published-recommendations-only' : 'model-predictions-and-parlays',
     recommendationTargets: recommendationTargets ?? null,
     persisted,
     metrics,
@@ -249,7 +250,10 @@ async function computeDailyMetricSnapshot(
     }),
   ]);
 
-  const predictionRows = predictions.map(mapPredictionMetricRow);
+  // An alternate price is the same model observation. Published targets retain their actual quoted return.
+  const predictionRows = predictions
+    .filter((prediction) => input.recommendationTargets || !isLowOddsPriceVariant(prediction))
+    .map(mapPredictionMetricRow);
   const parlayRows = parlays.map(mapParlayMetricRow);
   const predictionMetrics = summarizeTargets(predictionRows, {
     market: true,

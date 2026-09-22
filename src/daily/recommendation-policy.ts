@@ -946,6 +946,7 @@ function isDailyFocusLegEligible(
   recommendation: DailyFinalRecommendation,
 ): boolean {
   if (!leg.predictionId || !leg.fixtureId) return false;
+  if (leg.quoteVariantScope === 'low-odds-top') return false;
   if (!['candidate', 'promotable'].includes(recommendation.harnessStatus)) return false;
   if (recommendation.selectionMode === 'analytical-fallback') return false;
   if (!(recommendation.expectedEdge > 0)) return false;

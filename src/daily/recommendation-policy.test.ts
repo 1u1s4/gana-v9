@@ -13,6 +13,23 @@ import {
 } from './recommendation-policy.js';
 
 describe('daily recommendation policy', () => {
+  it('keeps low-odds price variants out of general focus while retaining ordinary low-odds legs', () => {
+    const lowOdds = (scoped: boolean) => ({
+      ...strictSimple('low-source', 'fixture-a'),
+      kind: 'parlay', profile: 'low-odds-top', combinedOdds: 1.21,
+      legs: ['a', 'b'].map((id) => ({
+        ...strictSimple(id, `fixture-${id}`).legs[0],
+        ...(scoped ? { quoteVariantScope: 'low-odds-top' } : {}),
+      })),
+    });
+    const scoped = lowOdds(true);
+    assert.deepEqual(buildMissingDailyFocusParlayRecommendations({ recommendations: [scoped] as any }), []);
+    assert.deepEqual(buildMissingDailyFocusParlayRecommendations({ recommendations: [], candidateRecommendations: [scoped] as any }), []);
+    const ordinary = buildMissingDailyFocusParlayRecommendations({ recommendations: [], candidateRecommendations: [lowOdds(false)] as any });
+    assert.ok(ordinary.some((item) => item.profile === 'parlay-diamante'));
+    assert.ok(ordinary.every((item) => item.legs.every((leg) => !leg.quoteVariantScope)));
+  });
+
   it('uses model probability for combined EV while keeping evidence confidence separate', () => {
     const picks = ['a', 'b'].map((id) => prediction({
       id, fixtureId: id, status: 'promotable', odds: 1.4, confidence: 0.95,

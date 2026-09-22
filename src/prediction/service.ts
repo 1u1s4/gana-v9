@@ -34,6 +34,7 @@ import type {
   StoragePrismaClient,
 } from '../storage/types.js';
 import type { ResearchBundle } from '../evidence/types.js';
+import { selectLowOddsPriceVariantQuote } from './price-variants.js';
 import { aggregatePredictionGate, evaluateEvidenceGate, evaluatePredictionGates } from './gates.js';
 import {
   claimPromptView,
@@ -94,6 +95,7 @@ export interface FixtureScoringResult {
   providerFixtureId?: string;
   gateResult: ReturnType<typeof aggregatePredictionGate>;
   predictions: PredictionRecordView[];
+  lowOddsPriceVariants?: PredictionRecordView[];
   retrievalWarnings?: string[];
   marketCoverage?: ScoringMarketCoverage;
   calibrationSummary?: ScoringCalibrationSummary;
@@ -392,7 +394,11 @@ export async function runFixtureScoring(
   }
 
   const calibrationEvents: Array<NonNullable<PredictionRecordView['calibration']>> = [];
-  const predictions = await Promise.all(llmOutput.map(async (pick) => {
+  const scorePick = async (
+    pick: ParsedTopPick,
+    calibration: Awaited<ReturnType<typeof calibrateModelProbability>>,
+    sourcePrediction?: PredictionRecordView,
+  ): Promise<PredictionRecordView> => {
     const quote = quoteById.get(pick.oddsQuoteId);
     const candidateScore = validateTopPick({
       pick,
@@ -418,13 +424,6 @@ export async function runFixtureScoring(
     const selectedClaimIds = pick.claimIds.length ? pick.claimIds : evidenceGate.claimIds;
 
     const rawModelProbability = pick.modelProbability ?? pick.probability;
-    const calibration = await calibrateModelProbability(rawModelProbability, {
-      market: pick.market,
-      model: config.model,
-      promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
-      fixtureId: fixture.id,
-    }, deps);
-    calibrationEvents.push(calibration);
     const marketSpecificEvidence = evaluateMarketSpecificEvidence({
       pick,
       selectedEvidenceIds,
@@ -448,7 +447,7 @@ export async function runFixtureScoring(
       pick,
       quote,
       warnings: baseWarnings,
-      confidence: calibration.confidence ?? pick.confidence,
+      confidence: Math.min(calibration.confidence ?? pick.confidence, sourcePrediction?.confidence ?? 1),
       calibrationApplied: calibration.applied,
       model: config.model,
     });
@@ -499,10 +498,16 @@ export async function runFixtureScoring(
       researchBundleId: research.researchBundle?.id,
       generatedAt,
     });
-    return {
+    const expectedValue = prediction.probability === undefined ? undefined : prediction.probability * prediction.odds - 1;
+    const repricingBlockers = sourcePrediction && (expectedValue === undefined || expectedValue <= 0)
+      ? ['non-positive-expected-value'] : [];
+    const inheritedBlockers = sourcePrediction?.blockers ?? [];
+    const variantBlocked = Boolean(sourcePrediction && (prediction.status === 'blocked' || sourcePrediction.status === 'blocked' || inheritedBlockers.length || repricingBlockers.length));
+    const finalPrediction: PredictionRecordView = {
       ...prediction,
       calibration,
-      blockers: uniqueStrings([...prediction.blockers, ...pick.blockers]),
+      expectedValue,
+      blockers: uniqueStrings([...prediction.blockers, ...pick.blockers, ...inheritedBlockers, ...repricingBlockers]),
       promotable: prediction.promotable && pick.promotable !== false && !marketSpecificEvidenceMissing && !riskControls.forceReview,
       status: prediction.status === 'promotable' && (pick.promotable === false || marketSpecificEvidenceMissing || riskControls.forceReview) ? 'review-required' : prediction.status,
       warnings: uniqueStrings([
@@ -512,7 +517,46 @@ export async function runFixtureScoring(
           : []),
       ]),
     };
+    if (!sourcePrediction) return finalPrediction;
+    return {
+      ...finalPrediction,
+      quoteVariantScope: 'low-odds-top',
+      derivedFromPredictionId: sourcePrediction.id,
+      promotable: finalPrediction.promotable && sourcePrediction.promotable === true && !variantBlocked,
+      status: variantBlocked ? 'blocked'
+        : finalPrediction.status === 'promotable' && sourcePrediction.status !== 'promotable'
+          ? sourcePrediction.status : finalPrediction.status,
+      parlayEligible: finalPrediction.parlayEligible && sourcePrediction.parlayEligible !== false && !variantBlocked,
+      warnings: uniqueStrings([...finalPrediction.warnings, ...sourcePrediction.warnings, ...repricingBlockers]),
+    };
+  };
+
+  const scoredEvents = await Promise.all(llmOutput.map(async (pick) => {
+    const calibration = await calibrateModelProbability(pick.modelProbability ?? pick.probability, {
+      market: pick.market,
+      model: config.model,
+      promptVersion: SCORE_PREDICTION_PROMPT_VERSION,
+      fixtureId: fixture.id,
+    }, deps);
+    calibrationEvents.push(calibration);
+    const prediction = await scorePick(pick, calibration);
+    const sourceQuote = quoteById.get(pick.oddsQuoteId);
+    const variantQuote = sourceQuote && selectLowOddsPriceVariantQuote(
+      sourceQuote, oddsQuotes, config.apiFootball.bookmakerAllowlist, config.apiFootball.lowOddsThreshold,
+    );
+    const variant = variantQuote ? await scorePick({
+      ...pick,
+      oddsQuoteId: variantQuote.id,
+      odds: numberValue(variantQuote.price),
+      confidence: prediction.confidence,
+      confidenceBand: prediction.confidenceBand,
+      // Edge and return depend on the price. Model-reported price metrics do not transfer.
+      edge: undefined,
+    }, calibration, prediction) : undefined;
+    return { prediction, variant };
   }));
+  const predictions = scoredEvents.map((event) => event.prediction);
+  const lowOddsPriceVariants = scoredEvents.flatMap((event) => event.variant ? [event.variant] : []);
 
   const aggregate = aggregatePredictionGate(predictions.map((prediction) => ({
     verdict: prediction.status === 'candidate' || prediction.status === 'draft'
@@ -540,6 +584,7 @@ export async function runFixtureScoring(
     prompt,
     rawOutput,
     predictions,
+    lowOddsPriceVariants,
   };
   const artifactPath = artifactWriter(runId, 'predictions.json', artifactPayload);
 
@@ -552,7 +597,7 @@ export async function runFixtureScoring(
       fixtureId: fixture.id,
     });
     const persisted = await (deps.persistPredictions ?? defaultPersistPredictions(repositories))(
-      predictions.map((prediction) => toPredictionInput(prediction, fixture, oddsSnapshot, artifact?.id ?? null, includedByFilters)),
+      [...predictions, ...lowOddsPriceVariants].map((prediction) => toPredictionInput(prediction, fixture, oddsSnapshot, artifact?.id ?? null, includedByFilters)),
     );
 
     return {
@@ -562,6 +607,7 @@ export async function runFixtureScoring(
       providerFixtureId: fixture.providerFixtureId,
       gateResult: aggregate,
       predictions: persisted.length ? predictions : [],
+      lowOddsPriceVariants: persisted.length ? lowOddsPriceVariants : [],
       retrievalWarnings,
       marketCoverage,
       calibrationSummary,
@@ -1096,6 +1142,7 @@ function validateTopPicks(
   const allowedEvidenceIds = new Set(allowedScoringEvidenceIds(evidenceGate, evidenceItems));
   const claimIds = new Set(claims.map((claim) => claim.id));
   const seenQuoteIds = new Set<string>();
+  const seenEvents = new Set<string>();
   const coveredMarkets = new Set(picks.map((pick) => pick.market));
   const requiredMarkets = new Set(requiredCoverageQuotes.map((quote) => quote.marketKey));
   for (const market of requiredMarkets) {
@@ -1106,6 +1153,9 @@ function validateTopPicks(
     const quote = quoteById.get(pick.oddsQuoteId);
     if (seenQuoteIds.has(pick.oddsQuoteId)) issues.push(`predictions[${index}] duplicates oddsQuoteId "${pick.oddsQuoteId}"`);
     seenQuoteIds.add(pick.oddsQuoteId);
+    const eventKey = `${pick.market}:${pick.selection}:${pick.line ?? 'null'}`;
+    if (seenEvents.has(eventKey)) issues.push(`predictions[${index}] duplicates priced event "${eventKey}"`);
+    seenEvents.add(eventKey);
     if (!quote) {
       issues.push(`predictions[${index}] references unknown oddsQuoteId "${pick.oddsQuoteId}"`);
       continue;
@@ -1450,6 +1500,9 @@ function toPredictionInput(
       promotable: prediction.promotable ?? prediction.status === 'promotable',
       parlayEligible: prediction.parlayEligible,
       calibration: prediction.calibration,
+      expectedValue: prediction.expectedValue,
+      quoteVariantScope: prediction.quoteVariantScope,
+      derivedFromPredictionId: prediction.derivedFromPredictionId,
     }),
   };
 }

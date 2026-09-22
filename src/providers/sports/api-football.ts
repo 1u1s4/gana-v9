@@ -1184,6 +1184,12 @@ function normalizeBookmakerAllowlist(allowlist: string[] | undefined): Set<strin
     .filter((value) => value.length > 0));
 }
 
+/** Uses the same bookmaker policy as selectable persisted quotes, without the empty-result fallback. */
+export function isApiFootballBookmakerAllowed(bookmaker: string | undefined, allowlist: string[] | undefined): boolean {
+  const normalized = normalizeBookmakerAllowlist(allowlist);
+  return !normalized.size || isAllowedBookmaker(bookmaker, normalized);
+}
+
 function isAllowedBookmaker(bookmaker: string | undefined, allowlist: Set<string>): boolean {
   const bookmakerName = normalizeBookmakerName(bookmaker ?? '');
   if (!bookmakerName) return false;

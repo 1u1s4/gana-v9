@@ -85,6 +85,7 @@ export interface ParlayAnalysisLeg {
   odds: number;
   confidence: number | null;
   probability?: number | null;
+  quoteVariantScope?: 'low-odds-top';
   validationStatus: string;
   warnings: string[];
   banker: boolean;
@@ -416,6 +417,7 @@ function toLeg(leg: any): ParlayAnalysisLeg {
     odds,
     confidence,
     probability: modelProbabilityFor({ probability: prediction.estimatedProbability, modelProbability: prediction.metadata?.modelProbability }),
+    ...(prediction.metadata?.quoteVariantScope === 'low-odds-top' ? { quoteVariantScope: 'low-odds-top' as const } : {}),
     validationStatus: latestStatus(prediction.validationArtifacts),
     warnings,
     banker: Boolean(bankerReason),
