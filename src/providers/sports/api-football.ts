@@ -85,6 +85,7 @@ interface ApiFootballResponse<T = unknown> {
 const API_FOOTBALL_REQUEST_TIMEOUT_MS = 15_000;
 const FIXTURE_PERSISTENCE_CONCURRENCY = 3;
 const runtimeHistoryCaches = new WeakMap<RuntimeContext, Map<string, Promise<CompletedLeagueFixtures>>>();
+const runtimePendingOddsFallbacks = new WeakMap<RuntimeContext, Map<string, Promise<ApiFootballResponse[]>>>();
 
 export function createApiFootballProvider(
   config: ApiFootballProviderConfig,
@@ -98,6 +99,7 @@ export class ApiFootballProvider implements SportsDataProvider {
   readonly name: SportsProvider = API_FOOTBALL_PROVIDER;
   private readonly localRequestBudget = { providerRequestCount: 0 };
   private readonly historyCache: Map<string, Promise<CompletedLeagueFixtures>>;
+  private readonly pendingOddsFallbacks: Map<string, Promise<ApiFootballResponse[]>>;
 
   constructor(
     private readonly config: ApiFootballProviderConfig,
@@ -107,6 +109,9 @@ export class ApiFootballProvider implements SportsDataProvider {
     const shared = runtime && runtimeHistoryCaches.get(runtime);
     this.historyCache = shared ?? new Map();
     if (runtime && !shared) runtimeHistoryCaches.set(runtime, this.historyCache);
+    const pendingOdds = runtime && runtimePendingOddsFallbacks.get(runtime);
+    this.pendingOddsFallbacks = pendingOdds ?? new Map();
+    if (runtime && !pendingOdds) runtimePendingOddsFallbacks.set(runtime, this.pendingOddsFallbacks);
   }
 
   async getCompletedLeagueFixtures(input: CompletedLeagueFixturesQuery): Promise<CompletedLeagueFixtures> {
@@ -267,8 +272,38 @@ export class ApiFootballProvider implements SportsDataProvider {
   async getCanonicalOddsSnapshot(input: OddsQuery): Promise<CanonicalOddsSnapshot> {
     const fixture = await this.resolveFixtureForOdds(input.fixtureId);
     const markets = input.markets ?? this.config.apiFootball.defaultMarkets;
-    const pages = await this.requestPagedOdds(input.fixtureId, markets);
-    const mappedQuotes = pages.flatMap((page) => mapApiFootballOdds(page.payload, {
+    let pages = await this.requestPagedOdds(input.fixtureId, markets);
+    let extraMetadata: Record<string, JsonValue> = {};
+    let fallbackFixtureId: string | undefined;
+    if (pages.every((page) => extractApiFootballResponseArray(page.payload, 'odds').length === 0)) {
+      const query = fixtureOddsFallbackQuery(fixture, input.fixtureId, this.config.apiFootball.timezone, markets);
+      if (query) {
+        const emptyFixtureSnapshotIds = pages.map((page) => page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`);
+        const fallbackPages = await this.requestFreshLeagueDateOdds(query);
+        const matchingPages = fallbackPages.filter((page) => extractApiFootballResponseArray(page.payload, 'odds')
+          .some((row) => stringifyFixtureProviderId((row as any)?.fixture?.id) === input.fixtureId));
+        // Canonical provenance must point to a page containing this fixture, when found.
+        pages = matchingPages.length ? matchingPages : fallbackPages;
+        fallbackFixtureId = input.fixtureId;
+        extraMetadata = {
+          source: 'api-football.odds.fixture-empty-league-date',
+          fixtureOddsFallback: {
+            query,
+            emptyFixtureSnapshotIds,
+            pagesExpected: readPagingTotal(fallbackPages[0]?.payload),
+            pagesFetched: fallbackPages.length,
+            providerSnapshotIds: fallbackPages.map((page) => page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`),
+            matchedFixture: matchingPages.length > 0,
+          },
+        };
+      } else {
+        extraMetadata = { fixtureOddsFallback: { skipped: 'fixture-scope-unavailable' } };
+      }
+    }
+    const mappedQuotes = pages.flatMap((page) => mapApiFootballOdds(fallbackFixtureId ? {
+      response: extractApiFootballResponseArray(page.payload, 'odds')
+        .filter((row) => stringifyFixtureProviderId((row as any)?.fixture?.id) === fallbackFixtureId),
+    } : page.payload, {
       fixtureId: fixture.id,
       providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
       capturedAt: page.capturedAt,
@@ -278,7 +313,7 @@ export class ApiFootballProvider implements SportsDataProvider {
       providerFixtureId: input.fixtureId,
       pages,
       mappedQuotes: filterQuotesByMarkets(mappedQuotes, markets),
-      extraMetadata: {},
+      extraMetadata,
     });
   }
 
@@ -437,6 +472,21 @@ export class ApiFootballProvider implements SportsDataProvider {
 
   private async requestPagedDateOdds(date: string, markets: readonly MarketKey[]): Promise<Array<ApiFootballResponse<unknown>>> {
     return this.requestAllOddsPages({ date, timezone: this.config.apiFootball.timezone, ...oddsMarketQuery(markets) });
+  }
+
+  private async requestFreshLeagueDateOdds(query: Record<string, string | number>): Promise<ApiFootballResponse[]> {
+    const account = createHash('sha256').update(this.config.apiFootballKey).digest('hex');
+    const key = JSON.stringify([this.config.apiFootballBaseUrl, account, query]);
+    const existing = this.pendingOddsFallbacks.get(key);
+    if (existing) return existing;
+    const pending = this.requestAllOddsPages(query);
+    this.pendingOddsFallbacks.set(key, pending);
+    try {
+      return await pending;
+    } finally {
+      // Share concurrent requests only; every later lookup must obtain fresh odds.
+      if (this.pendingOddsFallbacks.get(key) === pending) this.pendingOddsFallbacks.delete(key);
+    }
   }
 
   private async requestAllOddsPages(query: Record<string, string | number>): Promise<Array<ApiFootballResponse<unknown>>> {
@@ -998,6 +1048,32 @@ function assertOddsPage(payload: unknown, expectedPage: number, expectedTotal: n
 function oddsMarketQuery(markets: readonly MarketKey[]): Record<string, number> {
   // Pre-match bet 1 is Match Winner (full-time 1X2), not a live bet ID.
   return markets.length === 1 && markets[0] === 'h2h' ? { bet: 1 } : {};
+}
+
+function fixtureOddsFallbackQuery(
+  fixture: Fixture,
+  providerFixtureId: string,
+  timezone: string,
+  markets: readonly MarketKey[],
+): Record<string, string | number> | null {
+  const { leagueId, season } = fixture;
+  const kickoff = new Date(fixture.scheduledAt);
+  if (fixture.providerFixtureId !== providerFixtureId || !Number.isSafeInteger(leagueId) || (leagueId ?? 0) <= 0
+    || !Number.isSafeInteger(season) || (season ?? 0) < 1900 || !Number.isFinite(kickoff.getTime()) || !timezone) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(kickoff);
+    const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+    return {
+      date: `${value('year')}-${value('month')}-${value('day')}`,
+      league: leagueId!,
+      season: season!,
+      timezone,
+      ...oddsMarketQuery(markets),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function countBookmakersFromQuotes(quotes: OddsQuote[]): number {

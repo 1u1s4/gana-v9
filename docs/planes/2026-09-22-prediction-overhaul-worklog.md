@@ -279,3 +279,65 @@ los datos, pasar el boundary canónico de publicación y verificar sus mensajes 
 GET más ledger DB. No sustituir la prueba por alertas, históricos o picks forzados.
 No se cambia el cron ni se crea un monitor adicional; la tarea del portal conserva
 su propio goal y puede seguir desarrollándose independientemente.
+
+## Reanudación solicitada por el usuario — 22/09, 14:00 UTC
+
+El usuario pidió desbloquear; el estado nativo volvió a **active**. El conteo de
+impedimentos se reinicia. La inspección encontró una corrida real ya iniciada a
+las 13:54:47 UTC: wrapper PID 81959 y CLI 81960, verificados vivos. Se siguió esa
+corrida, sin iniciar otra ni interpretar el lock como único indicador de actividad.
+
+### R5: nueva ejecución del batch diario canónico
+
+- Batch reutilizado `daily-2026-09-22-full`, provider nuevo
+  `92913ab7-5704-4a30-b72e-2f46c9c06e09`, código base `0e12d26`
+- Los artifacts resumen/recomendaciones del batch eran R1 hasta el cierre; se
+  distinguieron por startedAt/provider ID, sin atribuirlos a esta corrida
+- Scan nuevo: 127 fixtures, 13/13 páginas, 27 quotes <1.10 en seis fixtures
+- Diez fixtures investigados, 32 predicciones: 25 blocked, siete review-required,
+  cero publicables. Coverage obligatoria 2/2 Colombia, sin faltantes
+- Final a `2026-09-22T14:12:45.779Z`; DB READ ONLY a las 14:13:56 confirmó cero
+  publicaciones para la fecha/batch/provider y ya no había procesos E2E vivos
+- Research: diez bundles con búsqueda nativa, 31 referencias web reales. Cuotas
+  adicionales no resolvieron las muestras pequeñas ni la incertidumbre deportiva
+
+### Hallazgos corregibles de esta reanudación
+
+1. El scan global podía incluir un fixture live en la unión enviada a research
+   aunque includeLiveFixtures=false. Caso real Namibia U20–Seychelles U20,
+   kickoff 13:00 UTC: fue investigado después de empezar. El guard de publicación
+   lo bloqueó. Corrección preparada en worktree aislado, revisada, 47 tests y
+   TypeScript aprobados; integrada al principal sólo después de terminar R5.
+   Conserva scan/hits completos y audita las exclusiones antes del cupo y del
+   trabajo agentic, incluyendo el caso de cero elegibles
+2. Faltaba el nombre exacto `UEFA Champions League Women` en la selección semanal
+   de ligas importantes. Fixture 1638288, liga 525, entraba sólo por low odds.
+   Regresión reproducida en rojo y corregida; cuatro tests pasan. Refresh real
+   posterior: 45→49 ligas, con incorporación de Champions femenina, Brasileiro
+   Women, FA Cup y KNVB Beker según los datos actuales del proveedor. Evidencia:
+   `audits/2026-09-22/weekly-leagues-women-refresh.json`
+3. Discrepancia real del proveedor para Arsenal–Køge: consulta por fixture y bet=1
+   devuelve HTTP 200/errores vacíos/cero resultados; consulta fresca por liga 525,
+   temporada 2026, fecha y bet=1 devuelve cinco fixtures e incluye Arsenal con
+   nueve casas. El refetch por fixture dejaba vacíos research/scoring pese al scan.
+   Canary de tres requests: una consulta necesitó añadir season tras un error de
+   validación; la consulta corregida y completa confirmó el contraste. Evidencia:
+   `audits/2026-09-22/arsenal-odds-consistency-canary.json`
+
+El fallback quedó integrado: consulta fresca por liga/temporada/fecha sólo ante una
+respuesta por fixture exitosa y vacía, filtrando exactamente el fixture objetivo.
+No reutiliza cuotas antiguas ni ignora errores. Comparte únicamente solicitudes
+simultáneas; mantiene mercados, whitelist, presupuesto y páginas completas.
+
+- 19 tests focalizados de provider/fallback, TypeScript y revisión independiente
+  sin P1/P2. Casos de error, ID distinto, ausencia de metadata, cuenta/runtime,
+  frescura serial y paginación incompleta cubiertos
+- Verificación integrada: **719/719 tests**, 97 suites, TypeScript aprobado.
+  Log `/tmp/gana-unblock-preflight.log`; no se cambiaron prompts/calibración/gates
+- Canary real del provider corregido a `2026-09-22T14:22:46.039Z`: Arsenal–Køge
+  recupera 63 cuotas seleccionables de Bet365/Pinnacle, 313 de referencia en nueve
+  casas, cinco mercados, snapshot/hash de la consulta alternativa actual. Dos
+  requests, cero writes de DB. Evidencia:
+  `audits/2026-09-22/arsenal-odds-provider-fallback-canary.json`
+
+Pendiente nuevo E2E con las correcciones; el goal continúa activo.

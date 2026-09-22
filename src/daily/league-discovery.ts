@@ -9,7 +9,7 @@ const WEEK_MS = 7 * 86_400_000;
 // Top divisions, major international competitions and domestic cups. Names come
 // from the provider, rather than guessing season-specific IDs or league years.
 const IMPORTANT_NAMES: Record<string, readonly string[]> = {
-  World: ['World Cup', 'Euro Championship', 'UEFA Champions League', 'UEFA Europa League', 'UEFA Europa Conference League', 'UEFA Conference League', 'UEFA Nations League', 'CONMEBOL Libertadores', 'CONMEBOL Sudamericana', 'Copa America', 'CONCACAF Champions League', 'CONCACAF Champions Cup', 'CONCACAF Nations League', 'CONCACAF Gold Cup', 'FIFA Club World Cup', 'Africa Cup of Nations', 'Asian Cup'],
+  World: ['World Cup', 'Euro Championship', 'UEFA Champions League', 'UEFA Champions League Women', 'UEFA Europa League', 'UEFA Europa Conference League', 'UEFA Conference League', 'UEFA Nations League', 'CONMEBOL Libertadores', 'CONMEBOL Sudamericana', 'Copa America', 'CONCACAF Champions League', 'CONCACAF Champions Cup', 'CONCACAF Nations League', 'CONCACAF Gold Cup', 'FIFA Club World Cup', 'Africa Cup of Nations', 'Asian Cup'],
   England: ['Premier League', 'FA Cup', 'League Cup', "Women's Super League"],
   Spain: ['La Liga', 'Copa del Rey', 'Primera División Femenina'],
   Germany: ['Bundesliga', 'DFB Pokal', 'Frauen Bundesliga'],

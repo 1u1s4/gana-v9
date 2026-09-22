@@ -319,7 +319,7 @@ export function buildFixtureDiscoveryRequests(
 export function evaluateExclusions(
   fixture: Fixture,
   config: Pick<AgentConfig, 'apiFootball'>,
-  options: { date?: string; timezone?: string; now?: Date; fullDay?: boolean } = {},
+  options: { date?: string; timezone?: string; now?: Date; fullDay?: boolean; requireFutureKickoff?: boolean } = {},
 ): FilterReason[] {
   const reasons: FilterReason[] = [];
   if (fixture.status === 'cancelled' || fixture.status === 'unknown') {
@@ -334,6 +334,8 @@ export function evaluateExclusions(
   if (fixture.status === 'scheduled') {
     const timezone = options.timezone ?? config.apiFootball.timezone;
     if (options.date && localDateKey(fixture.scheduledAt, timezone) !== options.date) {
+      reasons.push('excluded-outside-window');
+    } else if (options.requireFutureKickoff && !(Date.parse(fixture.scheduledAt) > (options.now ?? new Date()).getTime())) {
       reasons.push('excluded-outside-window');
     } else if (!options.fullDay && !withinKickoffWindow(fixture.scheduledAt, config.apiFootball.kickoffWindowHours, options.now)) {
       reasons.push('excluded-outside-window');

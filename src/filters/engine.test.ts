@@ -378,4 +378,13 @@ describe('filter engine', () => {
     assert.deepEqual(evaluateExclusions(fixture({ status: 'live' }), config), ['excluded-outside-window']);
     assert.deepEqual(evaluateExclusions(fixture({ status: 'completed' }), config), ['excluded-outside-window']);
   });
+
+  it('requires a future scheduled kickoff at the analysis boundary while preserving explicit full-day history', () => {
+    const options = { date: '2026-09-22', timezone: 'UTC', now: new Date('2026-09-22T14:00:00Z'), fullDay: true };
+    for (const scheduledAt of ['2026-09-22T13:00:00Z', '2026-09-22T14:00:00Z']) {
+      assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config, { ...options, requireFutureKickoff: true }), ['excluded-outside-window']);
+      assert.deepEqual(evaluateExclusions(fixture({ scheduledAt }), config, options), []);
+    }
+    assert.deepEqual(evaluateExclusions(fixture({ scheduledAt: '2026-09-22T19:00:00Z' }), config, { ...options, requireFutureKickoff: true }), []);
+  });
 });

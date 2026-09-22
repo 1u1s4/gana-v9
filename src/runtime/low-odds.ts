@@ -194,13 +194,14 @@ function fixtureMatchesPriorityLeague(fixture: Fixture, league: PipelinePriority
 export function buildLowOddsPredictionCoverage(
   scan: LowOddsScanView,
   scoring: FixtureScoringResult[],
-  selectedFixtures: Fixture[] = [],
+  selectedFixtures?: Fixture[],
 ): LowOddsPredictionCoverage {
-  const selectedFixtureIds = new Set(selectedFixtures.map((fixture) => fixture.id));
-  const scopedHits = selectedFixtureIds.size
+  const selectedFixtureIds = new Set((selectedFixtures ?? []).map((fixture) => fixture.id));
+  // An explicitly empty analysis scope still excludes every observed global hit.
+  const scopedHits = selectedFixtures !== undefined
     ? scan.hits.filter((hit) => selectedFixtureIds.has(hit.fixtureId))
     : scan.hits;
-  const excludedIndicatorFixtureIds = selectedFixtureIds.size
+  const excludedIndicatorFixtureIds = selectedFixtures !== undefined
     ? [...new Set(scan.hits.map((hit) => hit.fixtureId).filter((fixtureId) => !selectedFixtureIds.has(fixtureId)))]
     : [];
   const hitQuoteFixtures = new Map<string, string>();

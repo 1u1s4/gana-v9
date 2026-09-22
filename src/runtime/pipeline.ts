@@ -5,7 +5,7 @@ import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import type { OddsQuote } from '../domain/odds.js';
-import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
+import { discoverFixtures, evaluateExclusions, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { lowOddsScanProviderConfig, persistLowOddsScanResult, type LowOddsPersistenceRepositories } from '../filters/low-odds.js';
 import { lowOddsSelectorMarketScope } from '../filters/low-odds-selector.js';
 import type { LowOddsScanView } from '../filters/types.js';
@@ -544,9 +544,29 @@ export async function executeRunPipeline(
     fixtureLocalDateKey(fixture.scheduledAt, config.apiFootball.timezone) === input.date
   ));
   const localDateExcludedFixtures = mergedSelectedFixtures.length - localDateEligibleFixtures.length;
+  const selectionNow = now();
+  const eligibilityEvaluations = localDateEligibleFixtures.map((fixture) => ({
+    fixture,
+    excludedReasons: evaluateExclusions(fixture, config, {
+      date: input.date,
+      timezone: config.apiFootball.timezone,
+      now: selectionNow,
+      fullDay: true,
+      // Explicit historical runs keep their completed/past-fixture allowance.
+      requireFutureKickoff: !config.apiFootball.includeCompletedFixtures,
+    }),
+  }));
+  const eligibilityExclusions = eligibilityEvaluations.filter((entry) => entry.excludedReasons.length).map(({ fixture, excludedReasons }) => ({
+    fixtureId: fixture.id,
+    providerFixtureId: fixture.providerFixtureId,
+    status: fixture.status,
+    scheduledAt: fixture.scheduledAt,
+    excludedReasons,
+  }));
+  const eligibleFixtures = eligibilityEvaluations.filter((entry) => !entry.excludedReasons.length).map((entry) => entry.fixture);
   const priorityLeagues = input.priorityLeagues ?? [];
-  const priorityFixtureCount = localDateEligibleFixtures.filter((fixture) => fixturePriorityIndex(fixture, priorityLeagues) !== null).length;
-  const localDateSelectedFixtures = prioritizeFixtureSlate(localDateEligibleFixtures, priorityLeagues);
+  const priorityFixtureCount = eligibleFixtures.filter((fixture) => fixturePriorityIndex(fixture, priorityLeagues) !== null).length;
+  const localDateSelectedFixtures = prioritizeFixtureSlate(eligibleFixtures, priorityLeagues);
   const selectedFixtureLimit = Math.max(1, config.apiFootball.maxFixturesPerRun);
   const selectedFixtures = localDateSelectedFixtures.slice(0, selectedFixtureLimit);
   const selectionCapped = localDateSelectedFixtures.length > selectedFixtures.length;
@@ -556,6 +576,9 @@ export async function executeRunPipeline(
   const selectedFixtureWarnings = [
     ...(localDateExcludedFixtures > 0
       ? [`excluded ${localDateExcludedFixtures} fixtures outside local date ${input.date} in timezone ${config.apiFootball.timezone}`]
+      : []),
+    ...(eligibilityExclusions.length
+      ? [`excluded ${eligibilityExclusions.length} fixtures by status/kickoff policy before research and scoring`]
       : []),
     ...(selectionCapped
       ? [`selected fixtures capped from ${localDateSelectedFixtures.length} to ${selectedFixtures.length} by maxFixturesPerRun=${selectedFixtureLimit}`]
@@ -568,8 +591,11 @@ export async function executeRunPipeline(
     primaryFixtures: fixtureDiscovery.fixtures.length,
     lowOddsUniqueFixtures: uniqueFixtureCount(lowOddsHitFixtures),
     mergedFixtures: mergedSelectedFixtures.length,
-    localDateEligibleFixtures: localDateSelectedFixtures.length,
+    localDateEligibleFixtures: localDateEligibleFixtures.length,
     localDateExcludedFixtures,
+    eligibleFixtures: eligibleFixtures.length,
+    eligibilityExclusions,
+    eligibilityCheckedAt: selectionNow.toISOString(),
     priorityLeagues,
     priorityFixtures: priorityFixtureCount,
     selectedFixtures: selectedFixtures.length,

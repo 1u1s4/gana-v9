@@ -2,8 +2,10 @@
 
 ## Estado verificable
 
-La implementación está integrada y sus pruebas pasan. La última ejecución real
-terminó **sin recomendaciones elegibles**. No se presenta ese resultado como
+La implementación está integrada y sus pruebas pasan. Tras la reanudación del
+usuario se corrigieron tres faltantes adicionales; la suite pasa 719/719 tests.
+La última ejecución real terminada (R5) produjo **cero recomendaciones elegibles**.
+Está pendiente el nuevo E2E posterior a esas correcciones. No se presenta R5 como
 entrega exitosa de picks. La comprobación de una publicación nueva sigue pendiente.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
@@ -115,3 +117,26 @@ ningún proceso E2E vivo. La misma ausencia de elegibles se constató durante tr
 turnos consecutivos, habiendo completado el trabajo independiente del portal.
 El goal principal queda bloqueado por la prueba de entrega pendiente, sin reducir
 el objetivo ni presentar la alerta operativa como publicación de recomendaciones.
+
+## Reanudación y correcciones posteriores
+
+El usuario pidió desbloquear y el goal volvió a active. Se siguió una ejecución
+real ya viva desde las 13:54 UTC, sin duplicarla: provider
+`92913ab7-5704-4a30-b72e-2f46c9c06e09`, batch `daily-2026-09-22-full` reutilizado.
+Terminó a las 14:12 UTC con 32 candidatos y cero elegibles. Se comprobó el startedAt
+nuevo para no confundir los artifacts previos del mismo batch con esta ejecución.
+
+Los datos nuevos permitieron reproducir y corregir tres faltantes:
+
+- Excluir fixtures live o con kickoff pasado antes de investigación, conservando
+  cobertura global y los modos históricos explícitos. Se evita gastar análisis
+  en candidatos que el guard de publicación acabaría bloqueando
+- Incluir Champions femenina en ligas importantes. Refresh real actual: 49 ligas
+- Recuperar cuotas mediante una consulta fresca por liga/temporada/fecha cuando
+  el endpoint por fixture devuelve vacío exitoso. Se reproduce con Arsenal–Køge:
+  la consulta alternativa actual devuelve cuotas que la consulta por ID omite
+
+Canary del provider corregido: 63 cuotas seleccionables, cinco mercados y nueve
+casas de referencia; IDs, hash y fecha de captura conservados, sin writes de DB.
+Suite integrada posterior: **719/719 tests**, TypeScript aprobado. El nuevo E2E y
+la entrega elegible siguen pendientes; no se rebajaron gates ni se inventaron picks.

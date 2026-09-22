@@ -1603,6 +1603,60 @@ describe('executeRunPipeline', () => {
     assert.match(result.steps.find((step) => step.name === 'fetch fixtures')?.warnings.join(' ') ?? '', /required league discovery capped/);
   });
 
+  it('rechecks low-odds status and kickoff before agentic work without losing global scan coverage or explicit historical allowances', async () => {
+    const date = '2026-09-22';
+    const candidates = [
+      fixture({ id: 'fixture-live', providerFixtureId: '1640457', status: 'live', scheduledAt: `${date}T13:00:00Z` }),
+      fixture({ id: 'fixture-started', providerFixtureId: 'started', status: 'scheduled', scheduledAt: `${date}T13:00:00Z` }),
+      fixture({ id: 'fixture-completed', providerFixtureId: 'completed', status: 'completed', scheduledAt: `${date}T12:00:00Z` }),
+      fixture({ id: 'fixture-future', providerFixtureId: 'future', scheduledAt: `${date}T19:00:00Z` }),
+    ];
+    for (const mode of ['prematch', 'historical', 'none-eligible'] as const) {
+      const config = testConfig();
+      config.apiFootball.includeLiveFixtures = mode === 'historical';
+      config.apiFootball.includeCompletedFixtures = mode === 'historical';
+      config.apiFootball.maxFixturesPerRun = 10;
+      const slate = mode === 'none-eligible' ? candidates.slice(0, 3) : candidates;
+      const researched: string[] = [];
+      const scored: string[] = [];
+      const deps = successfulPipelineDeps({ target: candidates[3], calls: [], date, runId: `run-low-odds-status-${mode}`, now: `${date}T14:00:00Z` });
+      deps.discoverFixtures = async () => ({ fixtures: [], evaluations: [], requestedLeagues: [], requestedTeams: [] });
+      deps.fetchLowOddsSlate = async () => ({
+        fixtures: slate,
+        snapshots: slate.map((target) => ({ fixtureId: target.id, providerFixtureId: target.providerFixtureId,
+          providerSnapshotId: `snapshot-${target.providerFixtureId}`, capturedAt: `${date}T13:55:00Z`,
+          bookmakerCount: 1, payloadHash: 'hash', quotes: [lowOddsQuote(target)] })),
+        coverage: { scope: 'provider-date-odds', date, timezone: 'America/Guatemala', pagesExpected: 1, pagesFetched: 1,
+          oddsFixtureCount: slate.length, resolvedFixtureCount: slate.length, missingFixtureIds: [], fixturesWithoutRequestedMarkets: [], complete: true },
+      });
+      deps.researchFixture = async (_config, input) => {
+        researched.push(input.fixtureId);
+        return { ok: true, gateResult: { verdict: 'promotable', reasons: [], warnings: [] } };
+      };
+      deps.scoreFixture = async (_config, input) => {
+        scored.push(input.fixtureId);
+        return { ok: false, runId: `run-low-odds-status-${mode}`, fixtureId: input.fixtureId, providerFixtureId: input.fixtureId,
+          predictions: [], gateResult: { verdict: 'blocked', reasons: ['no model probability'], warnings: [] } };
+      };
+      const result = await executeRunPipeline(config, { date, web: 'off', validate: false }, createRuntimeContext(config, 'session.jsonl'), deps);
+      const expectedIds = mode === 'historical' ? ['completed', '1640457', 'started', 'future'] : mode === 'prematch' ? ['future'] : [];
+      assert.deepEqual(researched, expectedIds);
+      assert.deepEqual(scored, expectedIds);
+      assert.equal(result.lowOddsScan.hitCount, slate.length);
+      assert.equal(result.lowOddsScan.fixtureCount, slate.length);
+      assert.equal(result.lowOddsScan.providerCoverage?.complete, true);
+      const selected = JSON.parse(readFileSync(join(result.artifactDir, 'selected-fixtures.json'), 'utf8'));
+      assert.deepEqual(selected.fixtures.map((target: Fixture) => target.providerFixtureId), expectedIds);
+      assert.equal(selected.eligibilityExclusions.length, mode === 'historical' ? 0 : 3);
+      assert.ok(selected.eligibilityExclusions.every((item: { excludedReasons: string[] }) => item.excludedReasons.includes('excluded-outside-window')));
+      const coverage = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-coverage-audit.json'), 'utf8'));
+      assert.equal(coverage.hits, slate.length);
+      assert.equal(coverage.scopedHits, expectedIds.length);
+      assert.equal(coverage.excludedIndicatorFixtures, mode === 'historical' ? 0 : 3);
+      if (mode === 'none-eligible') assert.deepEqual(coverage.missingIndicatorFixtureIds, []);
+    }
+  });
+
   it('prioritizes required league fixtures before selected and agentic fixture caps', async () => {
     const config = testConfig();
     (config.apiFootball as any).maxFixturesPerRun = 2;

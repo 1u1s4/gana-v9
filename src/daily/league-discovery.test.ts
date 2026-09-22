@@ -19,6 +19,17 @@ test('weekly discovery adds major active competitions, checks dates and retains 
   assert.equal(selectImportantActiveLeagues({ response: [league(39, 'Premier League', 'England', '2026-10-10')] }, '2026-09-22').length, 0);
 });
 
+test('weekly discovery considers active Women Champions League fixtures without depending on low-odds hits', () => {
+  // API-Football fixture 1638288 (Arsenal W–Køge W) belongs to league 525.
+  // Its major competition must enter the required scope regardless of prices.
+  const rows = selectImportantActiveLeagues({ response: [
+    league(525, 'UEFA Champions League Women', 'World', '2026-08-01', '2027-05-30', false),
+  ] }, '2026-09-22');
+  assert.deepEqual(rows.map(({ providerCompetitionId, season, oddsAvailable }) => ({ providerCompetitionId, season, oddsAvailable })), [
+    { providerCompetitionId: '525', season: 2026, oddsAvailable: false },
+  ]);
+});
+
 test('weekly discovery makes one bounded request, reuses cache, retries stale failures without extending expiry', async () => {
   const artifactRoot = mkdtempSync(join(tmpdir(), 'gana-weekly-leagues-'));
   const config = { ...loadConfig(), artifactRoot, apiFootballKey: 'test-only', apiFootballBaseUrl: 'https://v3.football.api-sports.io' };
