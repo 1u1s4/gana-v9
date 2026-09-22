@@ -559,3 +559,57 @@ propios, sin contar el mismo fixture dos veces. No se ejecutan nuevas APIs ni se
 relanzó R7. Main conserva la corrección de estado y el diagnóstico de cobertura;
 la corrección adicional de precios mantiene su rama aislada para una integración
 posterior a pruebas y revisión independiente.
+
+### Alternativas low odds integradas y verificadas localmente
+
+Corrección terminada en `31ede4a`, integrada en main como `32a527d`. Diecisiete
+archivos de código coinciden exactamente con el checkout revisado. Conserva la
+predicción general con mejor precio y deriva una única alternativa estricta por
+evento desde quotes seleccionables del mismo snapshot y lado. Probabilidad,
+calibración y evidencia se reutilizan; precio, valor y riesgo se calculan de nuevo.
+La variante conserva los bloqueos del origen y no se habilita con EV ausente o
+no positivo. No modifica whitelist, cuotas, confianza ni umbrales para publicar.
+
+Scope e IDs propios se conservan hasta el portfolio y la liquidación. Las tres
+entradas generales filtran variantes antes del cupo de 500, con paginación; el
+fallback sólo excluye piernas marcadas, conservando las ordinarias reutilizables.
+Las cohortes generales cuentan el evento una vez. Los targets publicados conservan
+el precio real; validar sólo una variante no agrega observación estadística hasta
+validar el origen.
+
+Revisión independiente de scoring, liquidación, portfolio y métricas sin hallazgos
+pendientes. Foco conjunto 154/154 y foco posterior de métricas 32/32, superpuestos;
+suite completa 780/780, 109 suites, en el checkout aislado y nuevamente en main.
+TypeScript aprobado en ambas ubicaciones. Logs finales en main:
+`/tmp/gana-price-variants-main-tests.log` y
+`/tmp/gana-price-variants-main-typecheck.log`. Comparación y hashes:
+`audits/2026-09-22/low-odds-price-variants-verification.json`.
+
+Replay contra main con respuestas originales de R7 y snapshots exactos: siete
+predicciones generales coincidentes y dos variantes reales, 1.07 y 1.09, ambas
+bloqueadas. Las probabilidades permanecen ausentes, sin inventarlas para probar
+valor numérico. La ejecución final no intentó red, Prisma/DB ni procesos externos;
+los repositorios son en memoria. El paquete final pasó control de secretos.
+Prueba y reproducción: `audits/2026-09-22/r7-low-odds-replay/README.md` y
+`replay-variants-result.json`. No se afirma igualdad del prompt completo ni de
+toda configuración histórica, y este replay no verifica selección o publicación.
+
+Incidente del harness: un primer intento falló antes de scoring y una aserción
+imprimió credenciales reales en la salida de una herramienta. No creó un log ni
+realizó llamadas externas. Se corrigió el diagnóstico para no imprimir valores;
+la salida ya emitida no pudo retirarse. Se informó al usuario que corresponde
+rotar las credenciales expuestas. El intento fallido no cuenta como validación.
+
+El cron habitual inició por su cuenta el batch `daily-2026-09-23-full` a las
+16:15:15 UTC, provider `f0555c29-d7a0-443b-a23e-be7d294b2e39`. Observación de
+proceso vivo a las 16:35:21 y artifacts a las 16:39:49: 18 investigaciones completas,
+scoring en curso y ningún resumen final. Comenzó con el estado correspondiente a
+`506e18f`, anterior a las variantes nuevas; no prueba su integración live. No se
+inició ni interrumpió otra corrida. Evidencia:
+`audits/2026-09-22/active-cron-2026-09-23-full.json`.
+
+Se retiró el checkout `/tmp/gana-low-odds-price-variants-20260922` después del
+replay, las pruebas terminales y la comparación de los 17 archivos. Se eliminó
+sólo su symlink de dependencias, se verificó status limpio y se borró su rama
+mediante comparación exacta de SHA. `git cherry` confirmó equivalencia del parche
+integrado. Se conservaron los demás worktrees y el paquete reproducible ignorado.

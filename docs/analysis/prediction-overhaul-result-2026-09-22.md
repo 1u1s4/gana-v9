@@ -4,11 +4,11 @@
 
 La implementación está integrada y sus pruebas pasan. Tras la reanudación del
 usuario se corrigieron cuotas, elegibilidad, ligas e historial deportivo omitido.
-La suite actual pasa **761/761 tests**. La última ejecución real terminada (R7)
+La suite actual pasa **780/780 tests**. La última ejecución real terminada (R7)
 produjo **cero recomendaciones elegibles**. Las 39 investigaciones usaron el
 historial adicional y se verificaron sus fuentes persistidas. Se integró después
-una corrección del ciclo de vida del run. Sigue pendiente una corrección confirmada
-de alternativas de cuota para low odds y la prueba de una publicación nueva.
+una corrección del ciclo de vida del run y otra para conservar alternativas reales
+de cuota para low odds. Sigue pendiente la prueba de una publicación nueva.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
@@ -39,6 +39,8 @@ Retrospectiva: [portfolio publicado](published-portfolio-2026-09-22.md).
   TypeScript aprobado, sin cambios en permisos o gates
 - Suite con control del ciclo de vida y diagnóstico preciso de cobertura:
   **761/761 tests**, 104 suites; TypeScript aprobado
+- Suite con alternativas estrictas de precio, exposición y cohortes corregidas:
+  **780/780 tests**, 109 suites; TypeScript aprobado en main
 - Notificador: **51/51**; syntax y diff check aprobados
 - Certificación conserva los 16 checks internos. Digest actual tras incorporar el
   prompt de historial por equipo:
@@ -265,11 +267,11 @@ Se integró a main por fast-forward en `506e18f` después de confirmar R7 termin
 su ejecución pertenece al código anterior. El worktree temporal y su rama fueron
 retirados tras comparar los 15 archivos probados con main. La suite volvió a pasar
 en main después de precisar el mensaje de cobertura sin cambiar su gate. La
-corrección low odds siguiente se mantiene aislada para su propia revisión.
+corrección low odds siguiente se integró después de su propia revisión.
 Prueba de ciclo de vida:
 `audits/2026-09-22/run-lifecycle-verification.json`.
 
-## Alternativas estrictas de precio: corrección en curso
+## Alternativas estrictas de precio: corrección integrada
 
 R7 permitió confirmar un hueco de integración: la compactación de cuotas para
 scoring conserva sólo el mejor precio por selección, y puede omitir una alternativa
@@ -278,8 +280,36 @@ real menor a 1.10 que necesita el perfil estricto. En 1593593 estaba Bet365 away
 Bet365 1.11. Ambas eran seleccionables, del mismo snapshot y lado, dentro de la
 whitelist. Los otros dos cruces provenían de casas excluidas, correctamente.
 
-Se prepara una corrección aislada que preserve el mejor precio general y la
-alternativa estricta con sus IDs, cálculo de valor y gates, sin duplicar exposición
-al partido. Estos dos candidatos de R7 también estaban bloqueados por evidencia;
-su reparación no convierte la corrida en una publicación exitosa ni justifica
-rebajar controles.
+La corrección `32a527d` preserva el mejor precio general y deriva como máximo una
+alternativa seleccionable del mismo fixture, snapshot y lado, estrictamente menor
+a 1.10. Reutiliza la probabilidad, calibración y evidencia del evento; recalcula
+retorno y controles de la cuota. Conserva los bloqueos del origen y rechaza un
+retorno esperado ausente o no positivo. No vuelve a consultar al modelo.
+
+La alternativa se persiste con ID propio y alcance `low-odds-top`. Las entradas
+generales la excluyen antes del cupo de 500 candidatos y el fallback respeta su
+alcance. Liquidación conserva su ID y precio; calibración y métricas generales
+cuentan el evento una sola vez, mientras los targets publicados explícitos usan
+la cuota efectivamente elegida. Si se valida sólo una variante, su liquidación
+existe pero no aporta una observación estadística hasta validar el origen.
+
+Revisión independiente sin hallazgos pendientes. Las 780 pruebas y TypeScript
+pasaron tanto en el checkout aislado como en main; no hubo migración ni cambios
+de whitelist, probabilidades, umbrales o gates para lograr una publicación.
+Estos dos candidatos de R7 también estaban bloqueados por evidencia; conservar
+sus precios no convierte la corrida en una entrega exitosa.
+
+Replay local de las respuestas originales y snapshots exactos de R7: siete
+predicciones generales coincidentes y dos variantes con las cuotas esperadas.
+Ambas mantienen probabilidad ausente, confianza cero y bloqueos. La prueba no
+repite el prompt completo ni verifica EV numérico positivo, selección diaria o
+entrega. No hubo intentos de red ni persistencia real durante la ejecución final.
+Paquete reproducible: `audits/2026-09-22/r7-low-odds-replay/README.md`; prueba:
+`replay-variants-result.json`. El intento inicial inválido y su exposición de
+credenciales en una salida de herramienta se documentaron sin reproducir valores;
+corresponde rotar esas credenciales.
+
+El cron habitual de mañana, `daily-2026-09-23-full`, inició a las 16:15:15 UTC y
+seguía en scoring a las 16:39:49. Su código de inicio precede a `32a527d` y no
+verifica la corrección nueva; no se lanzó otra corrida. Seguimiento:
+`audits/2026-09-22/active-cron-2026-09-23-full.json`.

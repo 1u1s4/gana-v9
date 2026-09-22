@@ -111,3 +111,27 @@ continuó hasta el resultado diario, el workdir configurado existe y un shell
 actual terminó sin stderr. Los procesos del gateway tienen cwd existente.
 No se reprodujo un problema actual ni se reiniciaron servicios; el origen exacto
 de aquella advertencia no quedó determinado.
+
+## Hallazgo adicional de R7: alternativa estricta de precio omitida
+
+La compactación de cuotas conservaba el mejor precio de cada selección para el
+modelo. Dos favoritos tenían además un precio seleccionable menor a 1.10 en el
+mismo snapshot: 1593593 away 1.07 frente a 1.12 y 1602489 home 1.09 frente a 1.11.
+El filtro posterior del perfil estricto no podía recuperar esas alternativas.
+
+Corrección integrada en `32a527d`: el pronóstico general conserva su mejor cuota;
+una variante determinista del mismo evento comparte probabilidad, calibración y
+evidencia, pero conserva quote ID y prediction ID propios y recalcula retorno y
+riesgo. El alcance `low-odds-top` viaja hasta las piernas del portfolio. No puede
+convertir un origen bloqueado en publicable ni ocupar el cupo general de 500.
+
+Las liquidaciones conservan los dos precios; las cohortes generales excluyen la
+variante para no contar dos veces el mismo pronóstico. Un target publicado
+explícito sigue usando su precio real. Validar sólo la variante no agrega una
+observación de calibración hasta validar el origen. Pruebas con EV negativo,
+riesgos por cuota, whitelist, frontera 1.10, calibración única, paginación,
+recombinación y liquidación; revisión independiente sin hallazgos pendientes.
+Suite final en main: 780/780 pruebas, 109 suites y TypeScript aprobado.
+
+Los dos ejemplos reales seguían bloqueados por evidencia. Este arreglo no prueba
+una nueva entrega ni justifica repetir research para obtener una selección.
