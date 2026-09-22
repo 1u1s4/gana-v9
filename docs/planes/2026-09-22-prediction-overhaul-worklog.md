@@ -692,3 +692,25 @@ La auditoría satisface el umbral para marcar el goal bloqueado, no completado.
 Se conserva íntegro el objetivo y el cron normal. La rotación diferida por el
 usuario no se usa como motivo de este bloqueo funcional. Evidencia detallada:
 `audits/2026-09-22/completion-audit.json`, `resumedGoalBlockingAudit`.
+
+### Envío manual solicitado y verificado
+
+El usuario pidió enviar el mejor candidato disponible, marcado «en revisión» y
+con su confianza real. Se eligió la mayor confianza de evidencia entre los cinco
+candidatos review-required del cron del 23/09, sin cambiar su estado ni recalcular
+probabilidades: Korea DPR U20 W vs Colombia U20 W, ambos anotan no, cuota registrada
+1.40 y confianza 0.44. Partido el 23/09 a las 10:30 de Guatemala. La probabilidad
+del modelo 0.78 no se presentó como confianza.
+
+El notificador canónico generó un mensaje con dos embeds y menciones desactivadas.
+Se envió el contenido del payload preparado, con verificación de hashes. Discord
+confirmó el mensaje `1552008878391033969` a las 17:29 UTC; un GET individual
+confirmó títulos y descripciones idénticos al preview, incluido «En revisión».
+[Mensaje confirmado](https://discord.com/channels/1494071161934450890/1510040973218939022/1552008878391033969).
+
+Artifact, procedencia con hashes, preview, intento único, recibo y GET están en
+`audits/2026-09-22/manual-review-dbebd9e5/`. El artifact diario conserva su hash y
+cero recomendaciones elegibles. No se usó el ledger diario ni se cambiaron gates;
+este envío manual no certifica selección elegible del flujo automático, diamante,
+low odds o apuesta del día. Sí verifica entrega real del formato conciso para el
+candidato expresamente autorizado. No se repitió el POST.

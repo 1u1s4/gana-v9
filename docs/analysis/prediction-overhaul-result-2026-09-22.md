@@ -352,3 +352,17 @@ todas las variables históricas ni constituye un E2E live completo.
 Prueba: `audits/2026-09-22/r7-low-odds-transaction/proof-5443a16b-2b63-4462-b9a2-35c4b322142a.json`.
 El script ejecutado tiene SHA `3542f29b…`; una versión documental posterior sólo
 agrega la limitación de configuración. No se repitió la transacción por ese texto.
+
+## Envío manual solicitado y verificado
+
+A pedido explícito del usuario, se envió el candidato de mayor confianza para
+revisión: Korea DPR U20 W vs Colombia U20 W, ambos anotan no, cuota registrada
+1.40, confianza de evidencia 44% y marcador «En revisión». El notificador canónico
+conservó el formato conciso y las menciones desactivadas. Un GET individual
+confirmó el [mensaje entregado](https://discord.com/channels/1494071161934450890/1510040973218939022/1552008878391033969)
+a las 17:29 UTC con títulos y descripciones idénticos al preview.
+
+Prueba: `audits/2026-09-22/manual-review-dbebd9e5/verification.json`; procedencia,
+hashes y recibo en la misma carpeta. El envío no cambió el artifact operativo,
+el ledger diario ni los gates. Verifica la entrega manual autorizada; siguen
+pendientes la ruta positiva automática y la corrida completa de la versión final.
