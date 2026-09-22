@@ -420,3 +420,35 @@ R6 sigue en scoring con código a4383af; main continúa510e9d2. El cambio nuevo 
 conserva en la rama aislada `codex/team-history-context` y no se integra mientras
 R6 esté vivo. Próximo paso: seguir sesión32992 hasta cierre, comprobar artifact y
 ledger actuales, integrar/push y verificar el contexto nuevo en ejecución real.
+
+### Cierre R6 e integración de historial por equipo
+
+R6 terminó a las15:09:29.062 UTC, wrapper15:09:30.723 y salida1. Las nueve tareas
+internas succeeded, pero el resultado diario requiere revisión y no produjo picks.
+Auditorías independientes de portfolio y research/scoring confirmaron:
+
+- 126 predicciones:117blocked+9review-required, cero promotables; doce p numéricas,
+  siete EV positivos y confianza de evidencia0.30–0.45
+- Cinco candidatos Arsenal usan cuotas y el mismo snapshot de research; se resolvió
+  el vacío original. Cero referencias inválidas de bundle/evidence/claim o mismatch
+  de snapshot en126 candidatos. Los hashes sólo se verificaron en formato y contra
+  fuentes referenciadas; no se recalcularon todos desde rawDB
+- Coverage34 fixtures obligatorios con IDs y temporadas exactos:25 con predicciones,
+  nueve sin cuotas. No hay omisión por cap ni identificación ambigua
+- Cero recomendaciones/targets/requiredSelected y estrategia sin pick elegible
+- Consulta DB READ ONLY de15:11:25.857 UTC: cero filas de publicación para fecha,
+  batch o provider; prueba `audits/2026-09-22/r6-publication-db-proof.json`
+
+Después de confirmar el proceso terminal, se integró por fast-forward y se subió
+a origin/main **3512790**. Los13 archivos de código/contrato probados coinciden
+byte por byte con ese commit. El checkout temporal de verificación se retiró;
+el worktree de desarrollo se conserva mientras se ejecuta su canary.
+
+Canary independiente iniciado15:08:46 UTC por low_odds, sesión96779,
+`arsenal-team-history-canary-366ab46f-120a-4bed-b15b-e88f5a963c6b`:
+proveedor inyectado sólo para resolver DTO/read API, persistBundle noop, databaseUrl
+vacío y credenciales DB retiradas del proceso. Sin crear runDB ni publicar.
+Ocho requests deportivos de presupuesto12; prompt capturado con Arsenal10/13,
+Køge10/20, grupos por temporada, sourceIds y63quotes. Una invocación Astra medium
+con búsqueda nativa, sin reintentos adicionales. El resultado final sigue pendiente.
+Directorio: `audits/2026-09-22/arsenal-team-history-canary-366ab46f-120a-4bed-b15b-e88f5a963c6b`.

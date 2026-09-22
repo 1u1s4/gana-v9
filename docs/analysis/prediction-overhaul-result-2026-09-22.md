@@ -3,11 +3,12 @@
 ## Estado verificable
 
 La implementación está integrada y sus pruebas pasan. Tras la reanudación del
-usuario se corrigieron tres faltantes adicionales; la suite pasa 719/719 tests.
-La última ejecución real terminada (R5) produjo **cero recomendaciones elegibles**.
-R6 está en curso desde las 14:25 UTC con las correcciones de `a4383af`. Ya recuperó
-las cuotas omitidas por el proveedor y excluyó dos fixtures iniciados antes de
-research. La comprobación de una publicación nueva sigue pendiente.
+usuario se corrigieron cuotas, elegibilidad, ligas e historial deportivo omitido.
+La suite actual pasa **734/734 tests**. La última ejecución real terminada (R6)
+produjo **cero recomendaciones elegibles**. Recuperó las cuotas omitidas por el
+proveedor y excluyó dos fixtures iniciados antes de research. El historial adicional
+se integró después, en `3512790`; la comprobación de una publicación nueva sigue
+pendiente.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
@@ -34,9 +35,12 @@ Retrospectiva: [portfolio publicado](published-portfolio-2026-09-22.md).
 - Suite integrada inicial: **707/707 tests**, 96 suites; TypeScript aprobado
 - Suite tras las tres correcciones de la reanudación: **719/719 tests**, 97 suites;
   TypeScript aprobado
+- Suite con historial adicional por equipo: **734/734 tests**, 98 suites;
+  TypeScript aprobado, sin cambios en permisos o gates
 - Notificador: **51/51**; syntax y diff check aprobados
-- Certificación conserva los 16 checks internos. Digest final:
-  `1aa8e49330218fb3b933ab83539a5b329b8ac1fb17a2b504ba1d46c54eb5cf9d`
+- Certificación conserva los 16 checks internos. Digest actual tras incorporar el
+  prompt de historial por equipo:
+  `f33cb605967076fac57fa2afd8b65a73ce7f42a3f1e15fc9f2dc6d6fc75d1c6c`
 - Histórico de 51 fechas publicadas: 162 picks únicos, 111 ganados, 49 perdidos,
   uno void y uno sin resolver; ROI plano −4.67% en los 161 con payout
 - Subconjunto estricto con trazabilidad: 145 picks, ROI −6.51%. Se conservaron las
@@ -146,7 +150,7 @@ casas de referencia; IDs, hash y fecha de captura conservados, sin writes de DB.
 Suite integrada posterior: **719/719 tests**, TypeScript aprobado. Las correcciones
 se subieron a main en `a4383af`; no se rebajaron gates ni se inventaron picks.
 
-## R6 en curso
+## R6 terminado
 
 Batch `daily-2026-09-22-r6`, provider
 `c63ea500-d40b-4351-9c22-23d4d5824dce`, inicio `2026-09-22T14:25:56.456Z`.
@@ -160,10 +164,26 @@ Batch `daily-2026-09-22-r6`, provider
 - 39 fixtures enviados a investigación, sin cap. Arsenal–Køge tiene 63 cuotas
   seleccionables en cinco mercados en el artifact real de odds
 
-Estos datos prueban descubrimiento y correcciones operativas. Research, scoring,
-portfolio y publicación todavía deben terminar; no constituyen prueba de entrega.
+Terminó a las 15:09:29 UTC; wrapper cerrado a las 15:09:30, sesión terminal con
+exit1 y las nueve tareas técnicas succeeded. Resultado final:
 
-## Historial adicional preparado durante R6
+- Research39/39 para revisión, búsqueda nativa y 135 referencias web reales
+- Scoring126 candidatos:117 bloqueados,9 para revisión,0 publicables. Doce
+  probabilidades numéricas; siete EV positivos con confianza de evidencia0.30–0.45
+- Arsenal produjo cinco candidatos con quoteIDs persistidos y el mismo snapshot
+  usado en research. No hubo referencias de bundles/evidencias/claims inválidas
+  ni diferencias de snapshot en los126 candidatos; no se afirma haber recalculado
+  todos los hashes desde los payloads crudos
+- Cobertura obligatoria25/34 con predicciones. Los nueve restantes carecen de
+  cuotas en el artifact; IDs/temporadas coinciden y no hubo recorte por cupo
+- Cero recomendaciones, targets, combinadas elegidas o apuesta del día
+- DB READ ONLY a las15:11:25 UTC: cero publicaciones para fecha/batch/provider.
+  `audits/2026-09-22/r6-publication-db-proof.json`
+
+R6 prueba las correcciones operativas previas, pero no constituye una entrega
+exitosa ni incluye el historial por equipo incorporado después.
+
+## Historial adicional integrado después de R6
 
 Research de R6 terminó con 39 bundles para revisión y 135 referencias web. Se
 comprobó otro faltante: la API ofrece resultados recientes de los mismos equipos
@@ -180,5 +200,8 @@ diez recientes de cada uno; cuatro requests, cobertura completa, cero writes DB.
 protección de rutas causaba cuatro rechazos en el primer worktree. Se conservó esa
 protección sin modificarla. Dos revisiones independientes no encontraron P1/P2.
 
-El código está preparado en `codex/team-history-context`; falta integrarlo tras
-el cierre de R6 y comprobar su recorrido real. El goal permanece activo.
+El código se integró por fast-forward y se subió a main en `3512790`, después de
+confirmar el cierre de R6. Un ensayo aislado de investigación Codex, sin writes DB
+ni publicación, ya confirmó que el prompt recibió diez antecedentes por equipo;
+su respuesta final y el E2E con el contexto nuevo siguen pendientes. El goal
+permanece activo.
