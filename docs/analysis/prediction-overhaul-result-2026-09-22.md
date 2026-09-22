@@ -14,6 +14,14 @@ siguen pendientes su verificación live completa y una publicación nueva elegib
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
+La auditoría de bloqueo del 22/09 a las 17:17 UTC confirmó tres turnos consecutivos
+sin nuevas selecciones elegibles después de cerrar la prueba transaccional. No
+queda un proceso diario en curso ni otro fallo de implementación confirmado que
+justifique repetir el mismo análisis. El cierre requiere un cambio de evidencia
+o una nueva corrida con selección válida, seguida de ledger y readback de Discord.
+El cron habitual continúa habilitado; la próxima ejecución observada es 13:15 de
+Guatemala. Los verificadores originales permanecen pendientes donde corresponde.
+
 ## Cambios principales
 
 - API: scan global paginado de ganadores estrictamente inferiores a 1.10, cuotas

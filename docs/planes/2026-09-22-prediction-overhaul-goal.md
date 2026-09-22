@@ -1,4 +1,4 @@
-# Objetivo activo: mejorar predicciones y entrega de Gana
+# Objetivo: mejorar predicciones y entrega de Gana
 
 ## Resultado pedido
 

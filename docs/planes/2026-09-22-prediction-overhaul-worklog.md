@@ -674,3 +674,21 @@ main se retiró sólo el symlink de dependencias propio, se comprobó status lim
 y se eliminó el checkout detached. No se creó rama ni se tocaron otros worktrees.
 Estos últimos cambios son documentales; la suite de 780 pruebas corresponde al
 mismo código productivo ya verificado y no se repitió por el texto nuevo.
+
+### Auditoría de bloqueo tras completar las verificaciones útiles
+
+La prueba DB fue avance real. Después hubo tres turnos consecutivos de
+revalidación sin avance, a las 17:15, 17:16 y 17:17 UTC. El último outcome conserva
+el mismo hash, cero recomendaciones y finalización a las 16:40:51; los handles
+24463/24464 no existen. Main continúa limpio y sincronizado. El job habitual está
+habilitado y programado para las 13:15 de Guatemala, pero una programación futura
+no equivale a un proceso vivo que permita clasificar esto como espera verificada.
+
+La condición externa pendiente es una recomendación nueva elegible, para poder
+comprobar la ruta positiva de la versión final, su ledger y el readback en Discord.
+No se identificó otro fallo confirmado que requiera un cambio inmediato; repetir
+research sin nueva evidencia o reducir gates no resuelve ese verificador.
+La auditoría satisface el umbral para marcar el goal bloqueado, no completado.
+Se conserva íntegro el objetivo y el cron normal. La rotación diferida por el
+usuario no se usa como motivo de este bloqueo funcional. Evidencia detallada:
+`audits/2026-09-22/completion-audit.json`, `resumedGoalBlockingAudit`.
