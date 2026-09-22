@@ -8,7 +8,8 @@ La suite actual pasa **734/734 tests**. La última ejecución real terminada (R6
 produjo **cero recomendaciones elegibles**. Recuperó las cuotas omitidas por el
 proveedor y excluyó dos fixtures iniciados antes de research. El historial adicional
 se integró después, en `3512790`; la comprobación de una publicación nueva sigue
-pendiente.
+pendiente. El canary Codex ya verificó el consumo del historial nuevo; R7 está
+ejecutando el flujo canónico completo desde las 15:16 UTC.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
@@ -112,8 +113,11 @@ mejoras y su E2E: repositorio privado https://github.com/1u1s4/gana-picks-web,
 commit inicial `d884011`, objetivo e integración documentados y tarea nueva dentro
 de gana-v9: **Portal público de fútbol de Gana**,
 `01a0c854-a360-7c42-8feb-df1bcff6be7c`. `wait_threads` confirmó ejecución activa e
-inspección de la referencia; la tarea reportó su goal activado. El desarrollo y
-su goal pertenecen a esa tarea; la publicación nueva
+inspección de la referencia inicialmente; posteriormente confirmó la tarea
+terminada. La tarea reportó su portal en main `0136341`, 28 pruebas y build
+aprobados, sin deployment. Es un resultado reportado por esa tarea, no una
+verificación independiente del padre. El desarrollo y su goal pertenecen a esa
+tarea; la publicación nueva
 permanece pendiente en el goal principal. Handoff:
 `docs/planes/2026-09-22-public-picks-web-handoff.md`.
 
@@ -201,7 +205,16 @@ protección de rutas causaba cuatro rechazos en el primer worktree. Se conservó
 protección sin modificarla. Dos revisiones independientes no encontraron P1/P2.
 
 El código se integró por fast-forward y se subió a main en `3512790`, después de
-confirmar el cierre de R6. Un ensayo aislado de investigación Codex, sin writes DB
-ni publicación, ya confirmó que el prompt recibió diez antecedentes por equipo;
-su respuesta final y el E2E con el contexto nuevo siguen pendientes. El goal
-permanece activo.
+confirmar el cierre de R6. El ensayo aislado de investigación Codex terminó a las
+15:13:03 UTC, sin writes DB ni publicación. Recibió diez antecedentes por equipo
+y los incorporó en tres evidencias y cinco claims. Las cuatro fuentes por
+temporada tienen hashes iguales a las respuestas API capturadas; usó web nativa
+con tres fuentes reales. Conservó review-required por disponibilidad, rotación y
+comparabilidad, sin confundir falta de historia en la copa con falta de historia
+del equipo. Los worktrees temporales de esta corrección fueron retirados.
+
+El E2E R7 comenzó a las 15:16:07 UTC con main `a906659`, batch
+`daily-2026-09-22-r7`, provider `5ccf8885-a1f8-454f-afbb-1551d1f63fd0`.
+Scan inicial: 127 fixtures, 13/13 páginas, 27 quotes ganadoras <1.10 en seis
+fixtures. Se enviaron 39 encuentros futuros a investigación. Sus resultados de
+scoring y publicación siguen pendientes; el goal permanece activo.

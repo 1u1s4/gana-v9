@@ -452,3 +452,32 @@ Ocho requests deportivos de presupuesto12; prompt capturado con Arsenal10/13,
 Køge10/20, grupos por temporada, sourceIds y63quotes. Una invocación Astra medium
 con búsqueda nativa, sin reintentos adicionales. El resultado final sigue pendiente.
 Directorio: `audits/2026-09-22/arsenal-team-history-canary-366ab46f-120a-4bed-b15b-e88f5a963c6b`.
+
+### Canary verificado y R7 en curso
+
+El canary terminó a las 15:13:03.755 UTC, salida 0, tras una invocación Codex
+con web nativa y ocho requests deportivos. Cuatro fuentes de historial conservan
+hashes iguales a las respuestas API capturadas; tres evidencias y cinco claims
+las citan. El modelo distingue la copa sin muestra de los diez antecedentes de
+cada equipo y cuenta una sola vez los clasificatorios repetidos. Resultado:
+review-required por disponibilidad, rotación y comparabilidad todavía inciertas.
+No ejecutó scoring ni publicó; persistBundle fue un noop y no hubo writes DB.
+Prueba: `verification.json` en el directorio del canary.
+
+Se retiraron los dos worktrees temporales de esta corrección después de confirmar
+el canary terminal y la igualdad de los archivos probados con `3512790`. La rama
+ya integrada también se eliminó; los demás worktrees se conservaron.
+
+Antes del siguiente intento, una lectura DB a las 15:15:51.685 UTC confirmó cero
+publicaciones del día. Se comprobó R6 terminal y se archivó únicamente su lock
+retryable con identidad y contenido exactos. No se usó force. Evidencia:
+`audits/2026-09-22/r7-preflight.json`.
+
+R7 comenzó a las 15:16:07.138 UTC con main `a906659` (incluye `3512790`):
+batch `daily-2026-09-22-r7`, provider
+`5ccf8885-a1f8-454f-afbb-1551d1f63fd0`, sesión raíz 60118. Astra medium, web live,
+portfolio-v2, ligas auto y umbral 1.10. Scan inicial completo: 127 fixtures,
+13/13 páginas y 27 quotes ganadoras <1.10 en seis fixtures. Unión 40 → 39 tras
+excluir Namibia U20–Seychelles U20 ya terminado; los seleccionados conservan
+kickoff futuro al control de elegibilidad. Research y scoring siguen pendientes.
+El monitor durable es `audits/2026-09-22/r7-monitor.json`.
