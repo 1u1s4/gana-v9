@@ -630,3 +630,47 @@ con main en 506e18f, hubo commits y cargas posteriores mientras corría; no se
 atribuye toda la ejecución a un SHA. Ninguno de los 18 resultados de scoring
 incluye `lowOddsPriceVariants` ni metadata nueva de variantes. El cron no verifica
 esa corrección ni resuelve la prueba pendiente de entrega nueva.
+
+### Auditoría de cierre y prueba real de persistencia de variantes
+
+El usuario indicó que rotará luego las credenciales expuestas. La auditoría local
+confirmó main limpio y subido, los procesos 24463/24464 ausentes y el cron terminal.
+Se corrigieron referencias documentales: el cron del 23/09 es posterior a R7 y el
+caché individual de todas las casas ya estaba separado desde `c65884bc`. No se
+encontró un fallo actual en ese caché; falta una regresión directa del constructor
+compartido, aunque existen pruebas de mercados y cobertura de casas.
+
+La revisión identificó una brecha de verificación concreta: el replay sólo había
+probado la persistencia en memoria. Se preparó un canary limitado a las dos
+respuestas reales, sin nuevos modelos ni probabilidades sintéticas. Checkout
+detached `/tmp/gana-low-odds-db-canary-20260922`, HEAD `d2bc5a5`; manifest de 323
+archivos. Dos revisiones comprobaron límites de escritura, IDs nuevos, rollback
+y salida sin valores sensibles. Se bloqueó la recarga privada de dotenv en Prisma
+después de obtener únicamente la conexión necesaria.
+
+Ejecución raíz única, sesión 22112, terminal 0 a las 17:10:07 UTC: PASS. Dos runs,
+nueve predicciones y tres artifacts dentro de la transacción; cero parlays/piernas.
+Las dos variantes conservan 1.07/1.09, IDs propios y quote/snapshot originales,
+evidencia/calibración iguales al origen, probabilidad ausente y estado blocked.
+La consulta productiva del perfil excluye los estados blocked antes del builder:
+cero candidatos. No certifica selección positiva ni entrega.
+
+Rollback confirmado; postcheck separado READ ONLY dio cero en los cinco conteos.
+Cero llamadas deportivas, Codex, research, red JS o procesos prohibidos. El motor
+nativo PostgreSQL de Prisma fue el acceso externo permitido. No se tocaron datos
+existentes ni artifacts productivos. Prueba:
+`audits/2026-09-22/r7-low-odds-transaction/proof-5443a16b-2b63-4462-b9a2-35c4b322142a.json`.
+
+Script ejecutado SHA `3542f29bf75cdb52633aef2dc5de894b975d560154397240996e818bc3c74e53`.
+Después se agregó sólo una línea documental sobre defaults/overrides y entorno
+depurado, SHA `f3cbc9eddbe67bdd29f8d1bb8d608c1494bd9d6d0457f863bddf9adc0d9bb4ad`.
+El proof original conserva el hash realmente ejecutado; no se repitió la prueba
+por la diferencia documental. Sigue pendiente una selección nueva elegible y su
+publicación/readback, además de la ruta positiva completa de la versión final.
+
+El paquete conserva `executed-canary-3542.mjs` con el hash exacto del proof y un
+README con el comando ejecutado y sus límites. Tras comparar los 323 archivos con
+main se retiró sólo el symlink de dependencias propio, se comprobó status limpio
+y se eliminó el checkout detached. No se creó rama ni se tocaron otros worktrees.
+Estos últimos cambios son documentales; la suite de 780 pruebas corresponde al
+mismo código productivo ya verificado y no se repitió por el texto nuevo.

@@ -8,7 +8,8 @@ La suite actual pasa **780/780 tests**. R7 y el cron habitual del 23/09 terminar
 con **cero recomendaciones elegibles**. Las 39 investigaciones de R7 usaron el
 historial adicional y se verificaron sus fuentes persistidas. Se integró después
 una corrección del ciclo de vida del run y otra para conservar alternativas reales
-de cuota para low odds. Esta última corrección tiene pruebas y replay local;
+de cuota para low odds. Esta última corrección tiene pruebas, replay local y
+verificación transaccional de persistencia y exclusión en DB;
 siguen pendientes su verificación live completa y una publicación nueva elegible.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
@@ -322,3 +323,24 @@ y cargas posteriores, no se atribuye toda la ejecución a un único commit.
 Ningún resultado de scoring contiene las variantes nuevas. La notificación figura
 declarada en el artifact; no se hizo un GET ni consulta DB adicional. Este control
 local no demuestra entrega. Prueba: `audits/2026-09-22/active-cron-2026-09-23-full.json`.
+
+## Verificación transaccional de las variantes
+
+A las 17:10:07 UTC se ejecutó una prueba acotada sobre un checkout fijo de
+`d2bc5a5`, con 323 archivos verificados por hash. Reprodujo las dos respuestas
+originales de R7 usando los repositorios productivos dentro de una transacción
+real. Creó dos runs, nueve predicciones y tres filas de artifact con IDs nuevos.
+La lectura por ID verificó las cuotas 1.07/1.09, sus snapshots, alcance, vínculo
+al origen, evidencia, calibración y estado bloqueado. No actualizó datos existentes.
+
+La consulta productiva de `low-odds-top` excluyó esas filas por su estado: cero
+candidatos y cero parlays. Esto verifica el filtro previo al builder, no la ruta
+positiva de selección. El rollback fue deliberado; una transacción READ ONLY
+posterior encontró cero runs, predicciones, artifacts, parlays o piernas de prueba.
+No hubo llamadas deportivas, web, Codex ni Discord. La configuración usa defaults
+de la versión fija y overrides explícitos, con el entorno depurado; no reproduce
+todas las variables históricas ni constituye un E2E live completo.
+
+Prueba: `audits/2026-09-22/r7-low-odds-transaction/proof-5443a16b-2b63-4462-b9a2-35c4b322142a.json`.
+El script ejecutado tiene SHA `3542f29b…`; una versión documental posterior sólo
+agrega la limitación de configuración. No se repitió la transacción por ese texto.
