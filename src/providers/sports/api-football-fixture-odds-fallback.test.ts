@@ -17,7 +17,7 @@ describe('fixture-empty odds recovery', () => {
       const url = requestUrl(input);
       requests.push(url);
       if (url.searchParams.has('fixture')) return response([]);
-      if (!url.searchParams.has('page')) return response([oddsRow('other', 1.99)], 1, 2);
+      if (url.searchParams.get('page') === '1') return response([oddsRow('other', 1.99)], 1, 2);
       return response([oddsRow('1638288', 1.07), oddsRow('other', 1.99)], 2, 2);
     }) as typeof fetch;
     const provider = new ApiFootballProvider(config({ bookmakerAllowlist: ['Bet365'] }), {
@@ -31,7 +31,7 @@ describe('fixture-empty odds recovery', () => {
 
     assert.equal(requests.length, 3);
     assert.deepEqual(Object.fromEntries(requests[1].searchParams), {
-      date: '2026-09-22', league: '525', season: '2026', timezone: 'America/Guatemala', bet: '1',
+      date: '2026-09-22', league: '525', season: '2026', timezone: 'America/Guatemala', bet: '1', page: '1',
     });
     assert.equal(requests[2].searchParams.get('page'), '2');
     assert.equal(snapshot, persisted);

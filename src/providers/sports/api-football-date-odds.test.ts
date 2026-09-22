@@ -56,7 +56,7 @@ describe('API-Football global date odds coverage', () => {
       pagesExpected: 2, pagesFetched: 2, oddsFixtureCount: 2, resolvedFixtureCount: 2,
       missingFixtureIds: [], fixturesWithoutRequestedMarkets: [], complete: true });
     const queries = requests.filter((url) => url.pathname === '/odds').map((url) => url.searchParams);
-    assert.deepEqual(queries.map((q) => q.get('page')), [null, '2']);
+    assert.deepEqual(queries.map((q) => q.get('page')), ['1', '2']);
     for (const query of queries) {
       assert.equal(query.get('date'), '2026-09-23');
       assert.equal(query.get('timezone'), 'America/Guatemala');
@@ -64,6 +64,38 @@ describe('API-Football global date odds coverage', () => {
       assert.equal(query.has('bookmaker'), false);
       assert.equal(query.has('league'), false);
     }
+  });
+
+  it('uses explicit page 1 when the implicit first page reports a different total', async () => {
+    const requests: URL[] = [];
+    const persisted: CanonicalOddsSnapshot[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = new URL(String(input)); requests.push(url);
+      if (url.pathname === '/fixtures') return response({ response: Array.from({ length: 9 }, (_, i) => fixture(i + 1)) });
+      // Observed provider divergence: the omitted page parameter reports 8 while
+      // explicit pages report 9. The implicit-only row must never escape.
+      if (!url.searchParams.has('page')) return response({ paging: { current: 1, total: 8 }, response: [odds(99, 'Implicit', '1.02')] });
+      const page = Number(url.searchParams.get('page'));
+      return response({ paging: { current: page, total: 9 }, response: [odds(page, 'Explicit', '1.09')] });
+    }) as typeof fetch;
+    const provider = new ApiFootballProvider(config(), { persistOddsSnapshot: async (snapshot) => {
+      persisted.push(snapshot); return snapshot;
+    } });
+
+    const result = await provider.getCanonicalOddsSlateForDate({ date: '2026-09-23', markets: ['h2h'] });
+
+    const queries = requests.filter((url) => url.pathname === '/odds').map((url) => Object.fromEntries(url.searchParams));
+    assert.deepEqual(queries, Array.from({ length: 9 }, (_, index) => ({
+      date: '2026-09-23', timezone: 'America/Guatemala', bet: '1', page: String(index + 1),
+    })));
+    assert.equal(result.coverage?.complete, true);
+    assert.equal(result.coverage?.pagesExpected, 9);
+    assert.equal(result.coverage?.pagesFetched, 9);
+    assert.equal(result.coverage?.oddsFixtureCount, 9);
+    assert.equal(persisted.length, 9);
+    assert.ok(persisted.every((snapshot) => snapshot.quotes.length === 1
+      && snapshot.quotes[0].bookmaker === 'Explicit' && snapshot.quotes[0].price === 1.09));
+    assert.deepEqual(result.fixtures.map((item) => item.providerFixtureId), ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
   });
 
   it('marks unresolved provider fixtures as incomplete rather than silently skipping them', async () => {

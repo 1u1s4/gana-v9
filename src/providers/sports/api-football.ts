@@ -533,7 +533,8 @@ export class ApiFootballProvider implements SportsDataProvider {
   }
 
   private async requestAllOddsPages(query: Record<string, string | number>): Promise<Array<ApiFootballResponse<unknown>>> {
-    const first = await this.request('odds', '/odds', query);
+    // Explicit page 1 keeps the first request in the same pagination form as later pages.
+    const first = await this.request('odds', '/odds', { ...query, page: 1 });
     const pages = [first];
     const total = readPagingTotal(first.payload);
     assertOddsPage(first.payload, 1, total);
