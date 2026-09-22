@@ -16,9 +16,10 @@ import type {
   TeamStatistics,
 } from '../providers/sports/types.js';
 import type { SourceRecord } from './types.js';
+import { fetchRecentTeamPerformance, buildTeamPerformanceContext } from './team-performance.js';
 
 export type ResearchSportsProvider = Pick<SportsDataProvider, 'getFixture'> &
-  Partial<Pick<SportsDataProvider, 'getFixtureStatistics' | 'getTeamStatistics' | 'getCompletedLeagueFixtures'>> & {
+  Partial<Pick<SportsDataProvider, 'getFixtureStatistics' | 'getTeamStatistics' | 'getCompletedLeagueFixtures' | 'getCompletedTeamFixtures'>> & {
     getCanonicalOddsSnapshot?(input: OddsQuery): Promise<CanonicalOddsSnapshot>;
   };
 
@@ -27,6 +28,7 @@ export interface ResearchProviderContext {
   oddsSnapshot?: CanonicalOddsSnapshot;
   teamStatistics?: Array<TeamStatistics & { sourceId: string }>;
   recentPerformance?: ReturnType<typeof buildRecentPerformanceContext>;
+  recentTeamPerformance?: ReturnType<typeof buildTeamPerformanceContext>[];
   warnings: string[];
 }
 
@@ -51,6 +53,7 @@ export async function buildResearchProviderContext(
     : await fetchFixtureStatistics(provider, fixture.providerFixtureId, warnings);
   const teamStatistics = await fetchPrematchTeamStatistics(provider, fixture, now, warnings);
   const recentPerformance = await fetchRecentPerformance(provider, fixture, now, warnings);
+  const recentTeamPerformance = await fetchRecentTeamPerformance(provider, fixture, now, warnings);
   const oddsSnapshot = inputOddsSnapshot
     ?? await fetchCanonicalOddsSnapshot(provider, fixture.providerFixtureId, warnings, markets);
 
@@ -59,6 +62,7 @@ export async function buildResearchProviderContext(
     ...(oddsSnapshot && { oddsSnapshot }),
     ...(teamStatistics.length && { teamStatistics }),
     ...(recentPerformance && { recentPerformance }),
+    ...(recentTeamPerformance.length && { recentTeamPerformance }),
     warnings: uniqueStrings(warnings),
   };
 }
@@ -321,6 +325,17 @@ export function apiFootballSources(
         from: providerContext.recentPerformance.from, cutoffDate: providerContext.recentPerformance.cutoffDate,
         coverage: providerContext.recentPerformance.coverage },
     }] : []),
+    ...(providerContext.recentTeamPerformance ?? []).flatMap((team) => team.sources.map((source): SourceRecord => ({
+      id: source.sourceId,
+      type: 'api-football',
+      externalId: `fixtures?team=${team.teamId}&season=${source.season}&from=${team.from}&to=${team.cutoffDate}&status=FT-AET-PEN&timezone=UTC`,
+      snapshotId: source.providerSnapshotId,
+      title: `API-Football team ${team.teamId} prior results, season ${source.season}, through ${team.cutoffDate}`,
+      capturedAt: source.capturedAt,
+      hash: source.payloadHash,
+      metadata: { teamId: team.teamId, season: source.season, from: team.from, cutoffDate: team.cutoffDate,
+        coverage: team.coverage },
+    }))),
   ].filter((source): source is SourceRecord => Boolean(source));
 }
 

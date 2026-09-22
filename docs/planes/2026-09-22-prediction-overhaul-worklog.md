@@ -371,3 +371,52 @@ que sus nueve archivos modificados/nuevos coincidían byte por byte con HEAD mai
 `a4383af` y no contenía archivos ignorados. Prueba de hashes y rutas:
 `audits/2026-09-22/integrated-worktree-cleanup-proof.json`. Se conservaron los
 demás worktrees, incluido el de la tarea del portal.
+
+### Historial reciente fuera de la copa: faltante observado durante R6
+
+R6 terminó research con 39/39 bundles para revisión, búsqueda nativa en todos y
+135 referencias web reales. Sus motivos permiten aislar otro faltante de ingestión:
+el historial estructurado sólo consulta la competición/temporada objetivo. Arsenal
+tenía cero partidos de Champions 2026 suministrados; numerosos equipos de copa,
+uno o dos. No se encontró un requisito universal activo de once oficial confirmado:
+los motivos incluyen muestras, bajas específicas, disponibilidad y conflictos.
+
+- Cuatro consultas reales por team/last=30 confirmaron antecedentes omitidos para
+  Arsenal 1850, Køge 13982, Truro 4699 y Merthyr 7732. Se conservaron IDs exactos,
+  localía, competición, temporada y score90; amistosos/U21 no se presentaron como
+  muestras adultas equivalentes. `audits/2026-09-22/team-cross-competition-history-canary.json`
+- Tres consultas posteriores validaron el rango: sin season, el proveedor devuelve
+  error de parámetro; con season2025 y2026 devuelve 10+3 resultados de Arsenal.
+  `audits/2026-09-22/team-history-range-canary.json`. Last30 fue sólo una prueba de
+  disponibilidad actual y no se usa como fallback para replays históricos
+- Implementación aislada en `team-history-context`: consulta por equipo, rango y
+  temporadas explícitas; ventana180d terminada el día UTC anterior a min(now,kickoff).
+  Normalmente cuatro requests adicionales por fixture, deduplicados por runtime,
+  cuenta, host, equipo y rango. Presupuesto y cobertura completa obligatorios
+- Contexto `recentTeamPerformance` adicional al historial de liga: diez resultados
+  recientes, grupos separados por competición/temporada/localía/etiquetas, fuentes
+  reales por consulta. Sin PPG global mezclado, rating de rivales ni inferencias de
+  disponibilidad. Un fixture presente en ambos historiales no cuenta dos veces
+- Canary del provider/contexto integrado, cuatro requests y cero writes de DB, a
+  `2026-09-22T14:59:34.533Z`: Arsenal13 y Køge20 resultados90m dentro del rango,
+  diez recientes de cada uno, coverage completa y sourceIds/hash/capturas válidos.
+  `audits/2026-09-22/team-history-integrated-provider-canary.json`. Un intento
+  previo usó el resumen de selección sin IDs de equipo: el guard lo rechazó sin
+  realizar requests; se conservó esa prueba y se repitió con el DTO completo
+- Provider34 tests focalizados; contexto/research44 tests; revisiones independientes
+  sin P1/P2. No se cambiaron gates ni se aseguró que más datos produzcan un pick
+- Primera suite en `.codex/worktrees`:730/734, cuatro rechazos por la protección
+  existente de rutas `.codex`. Se verificó el mismo contenido byte a byte en un
+  worktree temporal fuera de esa ruta, sin cambiar permisos o pruebas:
+  **734/734 tests**,98 suites y TypeScript aprobados. Logs
+  `/tmp/gana-team-history-verification-tests.log` y
+  `/tmp/gana-team-history-verification-types.log`; prueba de igualdad en
+  `audits/2026-09-22/team-history-verification-checkout.json`
+- Certificación: los16 checks internos permanecen; se actualizaron sólo el hash
+  del prompt versionado y el golden correspondiente tras verificar esos checks.
+  Digest nuevo `f33cb605967076fac57fa2afd8b65a73ce7f42a3f1e15fc9f2dc6d6fc75d1c6c`
+
+R6 sigue en scoring con código a4383af; main continúa510e9d2. El cambio nuevo se
+conserva en la rama aislada `codex/team-history-context` y no se integra mientras
+R6 esté vivo. Próximo paso: seguir sesión32992 hasta cierre, comprobar artifact y
+ledger actuales, integrar/push y verificar el contexto nuevo en ejecución real.

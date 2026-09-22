@@ -18,6 +18,7 @@ import type { ServiceStatusReport } from '../../filters/status.js';
 import { ApiFootballProviderError, isApiFootballProviderError, mapHttpStatusToProviderError } from './api-football-errors.js';
 import { mapApiFootballTeamStatistics, validateTeamStatisticsQuery } from './api-football-team-statistics.js';
 import { mapApiFootballCompletedLeagueFixtures, validateCompletedLeagueFixturesQuery } from './api-football-history.js';
+import { mapApiFootballCompletedTeamFixtures, validateCompletedTeamFixturesQuery, type TeamHistorySeasonResponse } from './api-football-team-history.js';
 import {
   extractApiFootballResponseArray,
   mapApiFootballFixtureStatistics,
@@ -38,6 +39,8 @@ import {
   type CanonicalOddsSnapshot,
   type CompletedLeagueFixtures,
   type CompletedLeagueFixturesQuery,
+  type CompletedTeamFixtures,
+  type CompletedTeamFixturesQuery,
   type FixtureByIdQuery,
   type FixtureQuery,
   type FixtureStatistics,
@@ -85,6 +88,7 @@ interface ApiFootballResponse<T = unknown> {
 const API_FOOTBALL_REQUEST_TIMEOUT_MS = 15_000;
 const FIXTURE_PERSISTENCE_CONCURRENCY = 3;
 const runtimeHistoryCaches = new WeakMap<RuntimeContext, Map<string, Promise<CompletedLeagueFixtures>>>();
+const runtimeTeamHistoryCaches = new WeakMap<RuntimeContext, Map<string, Promise<CompletedTeamFixtures>>>();
 const runtimePendingOddsFallbacks = new WeakMap<RuntimeContext, Map<string, Promise<ApiFootballResponse[]>>>();
 
 export function createApiFootballProvider(
@@ -99,6 +103,7 @@ export class ApiFootballProvider implements SportsDataProvider {
   readonly name: SportsProvider = API_FOOTBALL_PROVIDER;
   private readonly localRequestBudget = { providerRequestCount: 0 };
   private readonly historyCache: Map<string, Promise<CompletedLeagueFixtures>>;
+  private readonly teamHistoryCache: Map<string, Promise<CompletedTeamFixtures>>;
   private readonly pendingOddsFallbacks: Map<string, Promise<ApiFootballResponse[]>>;
 
   constructor(
@@ -109,6 +114,9 @@ export class ApiFootballProvider implements SportsDataProvider {
     const shared = runtime && runtimeHistoryCaches.get(runtime);
     this.historyCache = shared ?? new Map();
     if (runtime && !shared) runtimeHistoryCaches.set(runtime, this.historyCache);
+    const sharedTeamHistory = runtime && runtimeTeamHistoryCaches.get(runtime);
+    this.teamHistoryCache = sharedTeamHistory ?? new Map();
+    if (runtime && !sharedTeamHistory) runtimeTeamHistoryCaches.set(runtime, this.teamHistoryCache);
     const pendingOdds = runtime && runtimePendingOddsFallbacks.get(runtime);
     this.pendingOddsFallbacks = pendingOdds ?? new Map();
     if (runtime && !pendingOdds) runtimePendingOddsFallbacks.set(runtime, this.pendingOddsFallbacks);
@@ -130,6 +138,41 @@ export class ApiFootballProvider implements SportsDataProvider {
       return await pending;
     } catch (error) {
       if (this.historyCache.get(key) === pending) this.historyCache.delete(key);
+      throw error;
+    }
+  }
+
+  async getCompletedTeamFixtures(input: CompletedTeamFixturesQuery): Promise<CompletedTeamFixtures> {
+    const query = validateCompletedTeamFixturesQuery(input);
+    const account = createHash('sha256').update(this.config.apiFootballKey).digest('hex');
+    const key = JSON.stringify([this.config.apiFootballBaseUrl, account, query]);
+    const cached = this.teamHistoryCache.get(key);
+    if (cached) return cached;
+    const pending = (async () => {
+      const budget = this.runtime ?? this.localRequestBudget;
+      const limit = this.runtime?.providerRequestLimit ?? this.config.apiFootball.maxProviderRequestsPerRun;
+      if (Number.isFinite(limit) && limit > 0 && query.seasons.length > limit - (budget.providerRequestCount ?? 0)) {
+        throw new ApiFootballProviderError({ code: 'rate_limited', endpointName: 'fixture_history',
+          message: 'Complete team history exceeds the remaining provider request budget.',
+          received: { requestedSeasons: query.seasons, providerRequestCount: budget.providerRequestCount ?? 0, limit } });
+      }
+      const responses: TeamHistorySeasonResponse[] = [];
+      for (const season of query.seasons) {
+        const response = await this.request('fixture_history', '/fixtures', {
+          team: query.team, season, from: query.from, to: query.to, status: 'FT-AET-PEN', timezone: 'UTC',
+        });
+        responses.push({ ...response, season,
+          payloadHash: response.payloadHash ?? createHash('sha256').update(JSON.stringify(response.payload)).digest('hex') });
+      }
+      return mapApiFootballCompletedTeamFixtures(responses, query);
+    })();
+    this.teamHistoryCache.set(key, pending);
+    try {
+      const result = await pending;
+      if (!result.coverage.complete && this.teamHistoryCache.get(key) === pending) this.teamHistoryCache.delete(key);
+      return result;
+    } catch (error) {
+      if (this.teamHistoryCache.get(key) === pending) this.teamHistoryCache.delete(key);
       throw error;
     }
   }

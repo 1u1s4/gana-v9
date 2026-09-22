@@ -239,6 +239,7 @@ describe('runFixtureResearch', () => {
     };
     const response = JSON.parse(agentOutput());
     const historySourceId = 'source_api_football_league_history_39_2026_2026-04-24';
+    const teamHistorySourceId = 'source_api_football_team_history_42_2026_2025-10-27_2026-04-24';
     const history = { leagueId: 39, season: 2026, from: '2026-01-01', to: '2026-04-24', capturedAt: createdAt.toISOString(),
       providerSnapshotId: 'history-snapshot', payloadHash: 'b'.repeat(64),
       fixtures: [{ providerFixtureId: 'prior-match', leagueId: 39, season: 2026, scheduledAt: '2026-04-20T18:00:00Z',
@@ -252,6 +253,8 @@ describe('runFixtureResearch', () => {
     });
     response.sources.push({ id: historySourceId, type: 'web-search', url: 'https://example.com/model-history',
       externalId: 'model-history', capturedAt: createdAt.toISOString(), metadata: {} });
+    response.sources.push({ id: teamHistorySourceId, type: 'web-search', url: 'https://example.com/model-team-history',
+      externalId: 'model-team-history', capturedAt: createdAt.toISOString(), metadata: {} });
     response.evidenceItems.push({ id: 'team-evidence', sourceId: 'source_api_football_team_42', claimIds: ['team-claim'], summary: 'Three games in the supplied sample.', confidence: 0.8 });
     response.claims.push({ id: 'team-claim', statement: 'The provider sample contains three games.', subject: { type: 'team', id: '42', market: null }, supportLevel: 'supported', evidenceIds: ['team-evidence'], conflictStatus: 'none' });
     const output = JSON.stringify(response);
@@ -261,6 +264,15 @@ describe('runFixtureResearch', () => {
         getFixture: async () => ({ ...fixture, leagueId: 39, season: 2026, providerHomeTeamId: '42', providerAwayTeamId: '49' }),
         getTeamStatistics: async (query) => ({ ...statistic, teamId: query.team, providerSnapshotId: `team-snapshot-${query.team}`, date: query.date }),
         getCompletedLeagueFixtures: async () => history,
+        getCompletedTeamFixtures: async (query) => ({
+          teamId: query.team, seasons: query.seasons, from: query.from, to: query.to,
+          capturedAt: createdAt.toISOString(), payloadHash: 'c'.repeat(64),
+          providerSnapshotIds: query.seasons.map((season) => `team-history-${query.team}-${season}`),
+          snapshots: query.seasons.map((season) => ({ season, capturedAt: createdAt.toISOString(),
+            payloadHash: 'd'.repeat(64), providerSnapshotId: `team-history-${query.team}-${season}` })),
+          fixtures: history.fixtures.map((match) => ({ ...match, leagueName: 'Premier League', leagueType: 'League' })),
+          coverage: { ...history.coverage, complete: true, requestedSeasons: query.seasons, fetchedSeasons: query.seasons },
+        }),
       },
       agentRunner: async (_config, input, options) => {
         if (typeof input !== 'string') throw new Error('Expected research prompt');
@@ -288,6 +300,15 @@ describe('runFixtureResearch', () => {
     assert.equal(historySource?.hash, history.payloadHash);
     assert.equal(historySource?.url, undefined);
     assert.equal(historySource?.metadata?.cutoffDate, history.to);
+    assert.equal(promptInput.recentTeamPerformance.length, 2);
+    assert.equal(promptInput.recentTeamPerformance[0].recentMatches[0].sourceId, teamHistorySourceId);
+    assert.equal(promptInput.recentTeamPerformance[0].recentMatches[0].providerFixtureId, 'prior-match');
+    const teamHistorySource = result.bundle?.sources.find((item) => item.id === teamHistorySourceId);
+    assert.equal(teamHistorySource?.type, 'api-football');
+    assert.equal(teamHistorySource?.snapshotId, 'team-history-42-2026');
+    assert.equal(teamHistorySource?.hash, 'd'.repeat(64));
+    assert.equal(teamHistorySource?.url, undefined);
+    assert.equal(teamHistorySource?.metadata?.cutoffDate, '2026-04-24');
   });
 
   it('downgrades live web research without a web-search source to review-required', async () => {

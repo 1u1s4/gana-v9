@@ -120,6 +120,7 @@ export async function runFixtureResearch(
     fixtureStatistics: providerContext.fixtureStatistics,
     teamStatistics: providerContext.teamStatistics,
     recentPerformance: providerContext.recentPerformance,
+    recentTeamPerformance: providerContext.recentTeamPerformance,
     providerContextWarnings: providerContext.warnings,
     runId,
     createdAt,

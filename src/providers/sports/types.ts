@@ -113,6 +113,45 @@ export interface CompletedLeagueFixtures {
   };
 }
 
+export interface CompletedTeamFixturesQuery {
+  team: number;
+  from: string;
+  to: string;
+  /** Explicit provider season labels; coverage is limited to these requested seasons. */
+  seasons: number[];
+}
+
+export interface CompletedTeamFixture extends CompletedLeagueFixture {
+  leagueName: string | null;
+  leagueType: string | null;
+}
+
+export interface CompletedTeamFixtures {
+  teamId: number;
+  from: string;
+  to: string;
+  seasons: number[];
+  capturedAt: string;
+  payloadHash: string;
+  providerSnapshotIds: string[];
+  snapshots: Array<{
+    season: number;
+    capturedAt: string;
+    payloadHash: string;
+    providerSnapshotId?: string;
+  }>;
+  fixtures: CompletedTeamFixture[];
+  coverage: {
+    complete: boolean;
+    requestedSeasons: number[];
+    fetchedSeasons: number[];
+    returnedFixtures: number;
+    includedFixtures: number;
+    excludedFixtures: number;
+    unknownRegulationScoreFixtures: number;
+  };
+}
+
 export interface QuotaStatus {
   status: 'known' | 'unknown';
   lastCheckedAt: string;
@@ -181,6 +220,7 @@ export interface SportsDataProvider {
   getFixtureStatistics(input: FixtureStatisticsQuery): Promise<FixtureStatistics>;
   getTeamStatistics?(input: TeamStatisticsQuery): Promise<TeamStatistics>;
   getCompletedLeagueFixtures?(input: CompletedLeagueFixturesQuery): Promise<CompletedLeagueFixtures>;
+  getCompletedTeamFixtures?(input: CompletedTeamFixturesQuery): Promise<CompletedTeamFixtures>;
 }
 
 export interface NormalizedCompetition {

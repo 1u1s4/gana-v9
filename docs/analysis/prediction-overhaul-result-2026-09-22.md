@@ -162,3 +162,23 @@ Batch `daily-2026-09-22-r6`, provider
 
 Estos datos prueban descubrimiento y correcciones operativas. Research, scoring,
 portfolio y publicación todavía deben terminar; no constituyen prueba de entrega.
+
+## Historial adicional preparado durante R6
+
+Research de R6 terminó con 39 bundles para revisión y 135 referencias web. Se
+comprobó otro faltante: la API ofrece resultados recientes de los mismos equipos
+en otras competiciones, pero el contexto sólo suministraba la copa objetivo.
+
+La corrección aislada agrega consultas por equipo, temporadas y rango temporal,
+con fuentes individuales y diez resultados recientes separados por competición,
+temporada y localía. Mantiene aparte el historial de liga y no mezcla amistosos o
+etiquetas juveniles como muestras adultas equivalentes. No modifica gates.
+
+Canary integrado real: Arsenal13 y Køge20 resultados reglamentarios disponibles,
+diez recientes de cada uno; cuatro requests, cobertura completa, cero writes DB.
+734/734 tests y TypeScript pasan en una copia verificada fuera de `.codex`, cuya
+protección de rutas causaba cuatro rechazos en el primer worktree. Se conservó esa
+protección sin modificarla. Dos revisiones independientes no encontraron P1/P2.
+
+El código está preparado en `codex/team-history-context`; falta integrarlo tras
+el cierre de R6 y comprobar su recorrido real. El goal permanece activo.
