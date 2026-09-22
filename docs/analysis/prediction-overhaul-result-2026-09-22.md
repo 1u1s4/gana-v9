@@ -2,25 +2,26 @@
 
 ## Estado verificable
 
-La implementación está integrada y sus pruebas pasan. Tras la reanudación del
-usuario se corrigieron cuotas, elegibilidad, ligas e historial deportivo omitido.
-La suite actual pasa **780/780 tests**. R7 y el cron habitual del 23/09 terminaron
-con **cero recomendaciones elegibles**. Las 39 investigaciones de R7 usaron el
-historial adicional y se verificaron sus fuentes persistidas. Se integró después
-una corrección del ciclo de vida del run y otra para conservar alternativas reales
-de cuota para low odds. Esta última corrección tiene pruebas, replay local y
-verificación transaccional de persistencia y exclusión en DB;
-siguen pendientes su verificación live completa y una publicación nueva elegible.
-Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
-despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
+La implementación está integrada y la suite actual pasa **781/781 tests** y
+TypeScript. Se verificó una entrega manual real en Discord, a pedido del usuario,
+con confianza de evidencia 44% y el marcador «En revisión». Conserva su estado
+original y no se presenta como selección elegible automática. El repositorio
+privado del portal y su tarea posterior ya fueron creados y despachados.
 
-La auditoría de bloqueo del 22/09 a las 17:17 UTC confirmó tres turnos consecutivos
-sin nuevas selecciones elegibles después de cerrar la prueba transaccional. No
-queda un proceso diario en curso ni otro fallo de implementación confirmado que
-justifique repetir el mismo análisis. El cierre requiere un cambio de evidencia
-o una nueva corrida con selección válida, seguida de ledger y readback de Discord.
-El cron habitual continúa habilitado; la próxima ejecución observada es 13:15 de
-Guatemala. Los verificadores originales permanecen pendientes donde corresponde.
+La verificación final sigue en curso. Se inició `daily-2026-09-23-final` desde
+un checkout fijo `5cd9895`, porque las corridas anteriores precedían los últimos
+cambios o atravesaron su integración. Detectó una inconsistencia real entre la
+primera página implícita de odds y las siguientes. La corrección `ddff02d`, ya en
+main, pide `page=1` explícitamente y conserva todos los controles. Un canary con
+la API real recuperó 9/9 páginas y resolvió 84 fixtures; todavía falta la corrida
+completa de esa versión corregida. La ejecución anterior continúa aislada.
+
+La auditoría anterior exigía una selección elegible nueva para cerrar. Ese
+criterio era más fuerte que el contrato, que admite un estado sin picks cuando
+fallan los controles. El pedido posterior de envío manual ya se cumplió. El
+verificador pendiente es el E2E real íntegro de la versión final; un resultado
+sin elegibles debe conservarse como tal, junto con el límite de no haber
+ejercitado la publicación automática positiva.
 
 ## Cambios principales
 
@@ -112,15 +113,13 @@ rechazó sus fixtures terminados antes de reservar o enviar.
 
 ## Pendiente real
 
-Falta una publicación elegible nueva para verificar completamente la entrega.
-Repetir inmediatamente el mismo slate sin evidencia nueva no resuelve la ausencia
-de elegibles. Los nuevos intentos posteriores a R4 se justificaron con datos
-actualizados o fallos reproducidos y corregidos; se archivaron sus locks sólo
-después de comprobar el cierre y la ausencia de publicaciones.
+Falta cerrar la verificación real de la versión fija que contiene todos los
+cambios, incluida la recuperación de la primera página explícita. Los nuevos
+intentos se justifican por cambios concretos y fallos reproducidos; no por la
+necesidad de conseguir una selección. La entrega manual solicitada se completó
+con su preview, hashes y GET individual; no debe reenviarse ni convertirse en
+publicación automática para satisfacer un verificador.
 
-Se consultó al usuario si prefiere cerrar hoy con un resumen explícito sin picks
-y continuar el portal, o conservar la entrega pendiente para un reintento posterior.
-Sin respuesta, no se asume ese cambio del criterio de cierre ni se envía otro mensaje.
 El trabajo independiente del portal, ya autorizado, se inició tras terminar las
 mejoras y su E2E: repositorio privado https://github.com/1u1s4/gana-picks-web,
 commit inicial `d884011`, objetivo e integración documentados y tarea nueva dentro
@@ -130,8 +129,7 @@ inspección de la referencia inicialmente; posteriormente confirmó la tarea
 terminada. La tarea reportó su portal en main `0136341`, 28 pruebas y build
 aprobados, sin deployment. Es un resultado reportado por esa tarea, no una
 verificación independiente del padre. El desarrollo y su goal pertenecen a esa
-tarea; la publicación nueva
-permanece pendiente en el goal principal. Handoff:
+tarea; la verificación final del flujo permanece en el goal principal. Handoff:
 `docs/planes/2026-09-22-public-picks-web-handoff.md`.
 
 Las validaciones históricas AET/PEN y la semántica temporal de corners conservan

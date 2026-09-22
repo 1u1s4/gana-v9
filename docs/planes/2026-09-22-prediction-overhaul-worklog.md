@@ -714,3 +714,42 @@ cero recomendaciones elegibles. No se usó el ledger diario ni se cambiaron gate
 este envío manual no certifica selección elegible del flujo automático, diamante,
 low odds o apuesta del día. Sí verifica entrega real del formato conciso para el
 candidato expresamente autorizado. No se repitió el POST.
+
+
+### Corrida fija y corrección de paginación observada
+
+Se revisó el criterio de cierre contra el contrato: «cuando sea elegible» permite
+un estado explícito sin picks. El envío manual pedido después quedó confirmado;
+no es necesario fabricar una publicación elegible. Sí faltaba verificar todos
+los cambios juntos con API/Codex reales desde una versión fija.
+
+Se inició `daily-2026-09-23-final`, provider
+`2c31c8a6-3537-40fb-a88c-f57342504e6d`, el 22/09 a las 17:34:46 UTC desde
+`5cd9895`. Checkout aislado, 379 archivos de código/configuración comparados;
+artifacts persistentes bajo `.artifacts/gana-v9/final-e2e-2026-09-23` y control
+bajo `audits/2026-09-22/final-fixed-e2e`. Wrapper 35877, supervisor 35876,
+sesión 89534. El proceso siguió vivo y avanzó a scoring tras 13 investigaciones.
+
+El scan global rechazó una paginación inconsistente. Dos diagnósticos acotados
+con la misma fecha, timezone y bet confirmaron que la primera petición sin
+parámetro page informa total 8, mientras page=1 y page=2 explícitos informan 9.
+Todas respondieron 200, sin errores del proveedor, con 10 filas. No se atribuye
+la divergencia a caché ni a otra causa interna no demostrada.
+
+Corrección mínima `ddff02d`: primera página explícita, sin reintentos ni cambios
+en guards, presupuesto, whitelist o filtros. Regresión reproduce la divergencia
+y exige las nueve páginas correctas. Revisión independiente aprobada. Foco
+30/30, suite 781/781 en 109 suites y TypeScript. La primera suite bajo ~/.codex
+falló cuatro pruebas de clasificación de rutas privadas; las mismas pasaron
+11/11 con cwd neutral, y la suite completa pasó en checkout neutral del commit.
+No se modificaron las protecciones para obtener ese resultado.
+
+Canary del proveedor corregido con API real: 9/9 páginas, 84 fixtures resueltos,
+14 consultas, persistencia sólo en memoria. El hash del proveedor coincide con
+main. Verifica paginación/cobertura, no elegibilidad ni conteo de quotes low odds.
+La corrección está integrada y subida; la corrida previa continúa con su código
+fijo. Falta verificar la ejecución completa de la versión corregida después de
+confirmar que la previa terminó. No se reinició un proceso vivo.
+
+Prueba integrada: `audits/2026-09-22/final-fixed-e2e/pagination-integration-proof.json`.
+El paquete conserva diagnósticos, canary, comparación de checkout y logs de tests.
