@@ -8,6 +8,19 @@ const PREDICTION_3 = '33333333-3333-4333-8333-333333333333';
 const PARLAY_1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 describe('recommendation artifact targets', () => {
+  it('concise publication tracks only rendered selections, excluding blocked addenda and general context', () => {
+    const targets = recommendationArtifactTargets({
+      presentation: 'concise-v1', recommendations: [{ kind: 'atomic-prediction', predictionId: PREDICTION_1 }],
+      requiredLeagueRecommendations: {
+        atomicProjections: [{ predictionId: PREDICTION_2 }],
+        parlayProjections: [{ status: 'blocked', legs: [{ predictionId: PREDICTION_3 }] }],
+        generalPredictions: [{ fixtureId: 'fixture-general', market: 'h2h', selection: 'home' }],
+      },
+    });
+    assert.deepEqual(targets.predictionIds, [PREDICTION_1, PREDICTION_2]);
+    assert.deepEqual(targets.artifactSelections, []);
+    assert.equal(targets.recommendationCount, 1);
+  });
   it('keeps only UUID-backed database targets while retaining artifact-only display selections', () => {
     const targets = recommendationArtifactTargets({
       recommendations: [

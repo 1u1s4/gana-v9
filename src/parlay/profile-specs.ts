@@ -50,12 +50,12 @@ export const PORTFOLIO_PROFILES = [
 
 export const LOW_ODDS_TOP_PROFILE = {
   key: 'low-odds-top',
-  label: 'Low odds top',
+  label: 'Ganadores <1.10',
   minLegs: 2,
-  maxLegs: 2,
-  minOdds: 1.25,
+  maxLegs: 4,
+  minOdds: 1.2,
   maxOdds: 1.8,
-  targetParlays: 2,
+  targetParlays: 1,
   minConfidence: 0.7,
   maxReviewOrWarningLegs: 0,
   allowDrawExposure: false,
@@ -102,29 +102,17 @@ export interface DeterministicProfileSpec {
 }
 
 export const PARLAY_REFINADO_RETROSPECTIVE = {
-  sample: {
-    settledParlays: 513,
-    settledPredictions: 7560,
-    counterfactualRuns: 112,
-  },
-  observedParlayPatterns: [
-    'Best settled profiles by hit-rate: parlay-diamante 11/14 (0.786), low-odds-top 63/90 (0.700), low-variance 31/45 (0.689).',
-    'Two-leg parlays were materially stronger: 216/364 excluding void/push (0.593); three legs fell to 27/71 (0.380), four-plus were poor.',
-    'Combined odds 1.30-1.59 hit 65/94 (0.691), <1.30 hit 24/37 (0.649), 1.60-1.99 hit 73/118 (0.619); >=3.50 hit 8/60 (0.133).',
-    'Leg odds below 1.25 were the most stable; 1.70-1.99 legs were weak in parlays.',
-    'Double chance legs outperformed other markets in parlays; h2h away, totals, BTTS, corners and draw exposure were weaker or noisier.',
-    'Duplicate fixture exposure was observed rarely and lost; enforce exactly one leg per fixture.',
+  source: 'historical performance must come from an exact published cohort settled before the decision cutoff',
+  sample: { settledParlays: null, settledPredictions: null, counterfactualRuns: null },
+  calibrationStatus: 'unavailable-in-static-prompt; do not infer win rates or profile superiority',
+  integrityRules: [
+    'Keep unpublished candidates, review-only projections, published recommendations and unresolved outcomes in separate cohorts.',
+    'Never use later match outcomes, current season totals beyond the cutoff, or a static retrospective win-rate table when replaying an earlier decision date.',
+    'Use one leg per fixture and the product of independent leg confidence; a profile name or a lower market price cannot increase confidence.',
+    'Respect the configured odds, edge, evidence and liquidity guards. Return no parlay when no eligible combination exists.',
+    'Market diversity is a selection preference among eligible alternatives, never a reason to weaken promotion gates.',
   ],
-  failurePatterns: [
-    'Review-required, hard research warnings, negative edge, stale low-liquidity, draw exposure and parlay-ineligible legs were severe parlay failure signals.',
-    'Fragile low total over, especially low-priced over 1.5/2.5 with low edge, materially underperformed in parlays.',
-    'Over-sized parlays, high combined odds and aggressive/unknown profiles produced most of the worst losses.',
-    'Corners remained insufficiently reliable for parlay promotion without market-specific settlement evidence.',
-  ],
-  counterfactualTakeaway: [
-    'A pre-outcome selector using guarded 2-3 leg pools and 1.60-2.49 combined odds improved over loose high-odds construction but did not beat the strongest existing low-odds profiles.',
-    'Therefore refined selection should be LLM-first only after deterministic guardrails, and should prefer two independent short-price legs unless a third leg is clearly safer than omitted alternatives.',
-  ],
+  calibrationRequirement: 'No threshold tuning from a small or correlated sample; require source lineage, independent exposure groups and a later held-out cohort.',
 } as const;
 
 export function deterministicProfileSpec(profile: DeterministicParlayProfile): DeterministicProfileSpec {

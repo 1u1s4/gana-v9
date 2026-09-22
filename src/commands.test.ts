@@ -334,7 +334,7 @@ describe('headless daily-e2e command', () => {
     const names = listCommands().map((command) => command.name);
 
     assert.ok(names.includes('/daily-e2e'));
-    assert.match(output, /pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.6-terra/);
+    assert.match(output, /pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-6-astra/);
   });
 });
 
@@ -498,7 +498,7 @@ describe('low-odds command surface', () => {
   it('prints low-odds market flag usage', async () => {
     const output = await captureConsole(() => printHeadlessUsage());
 
-    assert.match(output, /pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1\.20/);
+    assert.match(output, /pnpm gana scan low-odds --date YYYY-MM-DD --threshold 1\.10/);
   });
 });
 

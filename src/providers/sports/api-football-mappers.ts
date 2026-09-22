@@ -150,6 +150,10 @@ export function mapApiFootballFixture(
   const awayTeamId = parseRequiredProviderId(item.teams?.away?.id, 'teams.away.id', 'invalid-away-team-id');
   const scheduledAt = parseRequiredFixtureDate(item.fixture);
   const rawStatus = item.fixture?.status;
+  const statusCode = optionalString(rawStatus?.short)?.trim().toUpperCase();
+  // Supported pre-match markets settle over regulation time. `goals` can
+  // include extra time after AET/PEN; never substitute it for a missing 90m score.
+  const requiresRegulationScore = statusCode === 'AET' || statusCode === 'PEN';
 
   return {
     provider: 'api-football',
@@ -177,8 +181,8 @@ export function mapApiFootballFixture(
     },
     scheduledAt,
     status: mapApiFootballStatus(rawStatus),
-    scoreHome: optionalInteger(item.goals?.home) ?? optionalInteger(item.score?.fulltime?.home),
-    scoreAway: optionalInteger(item.goals?.away) ?? optionalInteger(item.score?.fulltime?.away),
+    scoreHome: optionalInteger(item.score?.fulltime?.home) ?? (requiresRegulationScore ? null : optionalInteger(item.goals?.home)),
+    scoreAway: optionalInteger(item.score?.fulltime?.away) ?? (requiresRegulationScore ? null : optionalInteger(item.goals?.away)),
     includedByFilters: options.includedByFilters ?? [],
     metadata: stripUndefined({
       capturedAt: options.capturedAt.toISOString(),

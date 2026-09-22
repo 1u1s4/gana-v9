@@ -12,12 +12,14 @@ export interface DevigResult {
   overround: number;
 }
 
-export function proportionalDevig(selections: DevigSelection[]): DevigResult[] {
+export function proportionalDevig(selections: DevigSelection[], probabilityMass: 1 | 2 = 1): DevigResult[] {
   const implied = selections.map((selection) => ({ ...selection, impliedProbability: 1 / selection.odds }));
   const total = implied.reduce((sum, selection) => sum + selection.impliedProbability, 0);
-  const overround = total - 1;
+  // The three double-chance outcomes each contain two disjoint 1X2 results.
+  // Their fair probabilities sum to two, unlike exclusive outcome markets.
+  const overround = total / probabilityMass - 1;
   return implied.map((selection) => {
-    const fairProbability = total > 0 ? selection.impliedProbability / total : 0;
+    const fairProbability = total > 0 ? probabilityMass * selection.impliedProbability / total : 0;
     return {
       selection: selection.selection,
       impliedProbability: selection.impliedProbability,

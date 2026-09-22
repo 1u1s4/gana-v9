@@ -18,6 +18,14 @@ export interface FixtureDiscoveryResult {
   evaluations: FixtureFilterEvaluation[];
   requestedLeagues: RequestedLeaguePresetView[];
   requestedTeams: RequestedTeamPresetView[];
+  discoveredRequiredFixtures?: Fixture[];
+  requiredLeagueCoverage?: Array<{
+    providerCompetitionId: string;
+    season?: number | null;
+    fixtureCount: number;
+    eligibleFixtureCount: number;
+    source: 'provider-date-fixtures';
+  }>;
 }
 
 export interface FixtureDiscoveryDeps {
@@ -43,6 +51,14 @@ export async function discoverFixtures(
   const filters = resolveFilterConfig(config, query);
   const listFixtures = deps.listFixtures ?? listApiFootballFixtures;
   const leaguePresets = filters.useDefaultLeagues ? sortLeaguePresetsForDiscovery(await listLeaguePresets(config)) : [];
+  const requiredLeagues = query.requiredLeagues ?? [];
+  for (const league of requiredLeagues) {
+    if (!/^\d+$/.test(league.providerCompetitionId) || !Number.isSafeInteger(Number(league.providerCompetitionId)) || Number(league.providerCompetitionId) <= 0
+      || (league.season !== null && league.season !== undefined && (!Number.isInteger(league.season) || league.season < 1900))) {
+      throw new Error('Required fixture discovery leagues need positive provider IDs and valid seasons.');
+    }
+  }
+  const requiredPriorities = new Map(requiredLeagues.map((league, index) => [league.providerCompetitionId, index]));
   const leaguePriorities = leaguePriorityMap(leaguePresets);
   const teamPresets = filters.useDefaultTeams ? await listTeamPresets(config) : [];
   const requests = buildFixtureDiscoveryRequests(leaguePresets, teamPresets);
@@ -58,10 +74,10 @@ export async function discoverFixtures(
   const byProviderFixtureId = new Map<string, { fixture: Fixture; reasons: Set<FilterReason> }>();
   let dateOnlyLeagueDiscoverySucceeded = false;
   if (
-    filters.fullDay
+    requiredLeagues.length > 0 || (filters.fullDay
     && filters.combineMode === 'OR'
     && leaguePresets.length > 0
-    && teamPresets.length === 0
+    && teamPresets.length === 0)
   ) {
     try {
       const presetLeagueIds = new Set(leaguePresets.map((league) => league.providerCompetitionId));
@@ -69,17 +85,29 @@ export async function discoverFixtures(
         date: filters.date,
         timezone: filters.timezone,
         // This query contains every league for the day. Apply the configured
-        // selection cap only after removing fixtures outside the presets.
+        // selection cap only after combining presets with required leagues.
         maxFixtures: DATE_ONLY_DISCOVERY_MAX_FIXTURES,
       }, runtime);
       for (const fixture of dateFixtures) {
-        if (fixture.leagueId === undefined || !presetLeagueIds.has(String(fixture.leagueId))) continue;
         const entry = byProviderFixtureId.get(fixture.providerFixtureId) ?? { fixture, reasons: new Set<FilterReason>() };
-        entry.reasons.add('included-by-default-league');
+        if (fixture.leagueId !== undefined && presetLeagueIds.has(String(fixture.leagueId))) {
+          entry.reasons.add('included-by-default-league');
+        }
+        if (requiredLeagues.some((league) => matchesRequiredLeague(fixture, league))) {
+          entry.reasons.add('included-by-required-league');
+        }
+        const teamIds = [fixture.providerHomeTeamId ?? fixture.homeTeamId, fixture.providerAwayTeamId ?? fixture.awayTeamId];
+        if (teamPresets.some((team) => teamIds.includes(team.providerTeamId))) {
+          entry.reasons.add('included-by-default-team');
+        }
+        if (!entry.reasons.size) continue;
         byProviderFixtureId.set(fixture.providerFixtureId, entry);
       }
       dateOnlyLeagueDiscoverySucceeded = true;
     } catch (err) {
+      // A failed global query cannot prove that a required league has no games.
+      // Avoid a league-by-league fanout that would exhaust the run budget.
+      if (requiredLeagues.length) throw err;
       if (!isRecoverableSeasonAccessDiscoveryError(err)) throw err;
     }
   }
@@ -116,12 +144,14 @@ export async function discoverFixtures(
 
   const evaluations: FixtureFilterEvaluation[] = [];
   const fixtures: Fixture[] = [];
-  for (const { fixture, reasons } of sortFixtureEntriesForSelection([...byProviderFixtureId.values()], leaguePriorities)) {
+  const discoveredRequiredFixtures: Fixture[] = [];
+  for (const { fixture, reasons } of sortFixtureEntriesForSelection([...byProviderFixtureId.values()], leaguePriorities, requiredPriorities)) {
     const includedReasons = [...reasons];
     if (
       filters.combineMode === 'AND'
       && filters.useDefaultLeagues
       && filters.useDefaultTeams
+      && !reasons.has('included-by-required-league')
       && (!reasons.has('included-by-default-league') || !reasons.has('included-by-default-team'))
     ) {
       continue;
@@ -132,6 +162,7 @@ export async function discoverFixtures(
       timezone: filters.timezone,
       fullDay: filters.fullDay,
     });
+    if (!excludedReasons.length && reasons.has('included-by-required-league')) discoveredRequiredFixtures.push(fixture);
     const maxReached = excludedReasons.length === 0 && fixtures.length >= filters.maxFixturesPerRun;
     const eligible = excludedReasons.length === 0 && !maxReached;
     const finalExcludedReasons = maxReached
@@ -150,19 +181,34 @@ export async function discoverFixtures(
   return {
     fixtures,
     evaluations,
-    requestedLeagues: leaguePresets.map((league) => ({
-      providerCompetitionId: league.providerCompetitionId,
-      name: league.name,
-      country: league.country,
-      season: league.season,
-      priority: league.priority,
-    })),
+    ...(requiredLeagues.length ? { discoveredRequiredFixtures } : {}),
+    requestedLeagues: [...new Map<string, RequestedLeaguePresetView>([
+      ...leaguePresets.map((league): RequestedLeaguePresetView => ({
+        providerCompetitionId: league.providerCompetitionId,
+        name: league.name,
+        country: league.country,
+        season: league.season,
+        priority: league.priority,
+      })),
+      ...requiredLeagues.map((league): RequestedLeaguePresetView => ({
+        providerCompetitionId: league.providerCompetitionId,
+        name: league.name ?? undefined,
+        season: league.season,
+      })),
+    ].map((league) => [`${league.providerCompetitionId}:${league.season ?? ''}`, league])).values()],
     requestedTeams: teamPresets.map((team) => ({
       providerTeamId: team.providerTeamId,
       name: team.name,
       country: team.country,
       providerLeagueId: team.providerLeagueId,
     })),
+    ...(requiredLeagues.length ? { requiredLeagueCoverage: requiredLeagues.map((league) => ({
+      providerCompetitionId: league.providerCompetitionId,
+      season: league.season,
+      fixtureCount: [...byProviderFixtureId.values()].filter(({ fixture }) => matchesRequiredLeague(fixture, league)).length,
+      eligibleFixtureCount: fixtures.filter((fixture) => matchesRequiredLeague(fixture, league)).length,
+      source: 'provider-date-fixtures' as const,
+    })) } : {}),
   };
 }
 
@@ -211,8 +257,18 @@ function sortLeaguePresetsForDiscovery<T extends { providerCompetitionId: string
   });
 }
 
-function sortFixtureEntriesForSelection<T extends { fixture: Fixture }>(entries: T[], priorities: Map<string, number>): T[] {
+function matchesRequiredLeague(fixture: Fixture, league: { providerCompetitionId: string; season?: number | null }): boolean {
+  return String(fixture.leagueId ?? '') === league.providerCompetitionId
+    && (league.season === null || league.season === undefined || fixture.season === league.season);
+}
+
+function sortFixtureEntriesForSelection<T extends { fixture: Fixture; reasons: Set<FilterReason> }>(entries: T[], priorities: Map<string, number>, requiredPriorities: Map<string, number>): T[] {
+  const requiredRank = (entry: T) => entry.reasons.has('included-by-required-league')
+    ? requiredPriorities.get(String(entry.fixture.leagueId)) ?? Number.MAX_SAFE_INTEGER
+    : Number.MAX_SAFE_INTEGER;
   return [...entries].sort((a, b) => {
+    const required = requiredRank(a) - requiredRank(b);
+    if (required !== 0) return required;
     const priority = leaguePriority(a.fixture.leagueId, priorities) - leaguePriority(b.fixture.leagueId, priorities);
     if (priority !== 0) return priority;
     return Date.parse(a.fixture.scheduledAt) - Date.parse(b.fixture.scheduledAt);
@@ -266,6 +322,9 @@ export function evaluateExclusions(
   options: { date?: string; timezone?: string; now?: Date; fullDay?: boolean } = {},
 ): FilterReason[] {
   const reasons: FilterReason[] = [];
+  if (fixture.status === 'cancelled' || fixture.status === 'unknown') {
+    reasons.push('excluded-outside-window');
+  }
   if (fixture.status === 'completed' && !config.apiFootball.includeCompletedFixtures) {
     reasons.push('excluded-outside-window');
   }

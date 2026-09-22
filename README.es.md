@@ -13,7 +13,7 @@ El backend por defecto usa autenticacion local de Codex mediante `codex exec`. O
 - Ejecuta una interfaz de terminal para research y operaciones asistidas por agentes.
 - Descubre fixtures y cuotas mediante API-Football.
 - Puntua predicciones y construye candidatos analiticos de parlay.
-- Persiste datos operativos en MySQL mediante Prisma.
+- Persiste datos operativos en PostgreSQL/Supabase mediante Prisma.
 - Exporta artifacts, evidence packs, validaciones y metricas diarias.
 - Sirve un dashboard local de solo lectura para resultados persistidos.
 - Publica resumenes diarios en Discord con embeds nativos.
@@ -33,7 +33,7 @@ Mantén credenciales reales solo en `.env` o en los almacenes locales de autenti
 - `API_FOOTBALL_KEY` para datos live de futbol.
 - Migraciones Prisma aplicadas a la base de datos destino.
 
-La base de datos canonica del candidato productivo actual es DigitalOcean MySQL via Prisma. PostgreSQL queda documentado como migracion futura, no como requisito runtime actual.
+La base de datos canonica es PostgreSQL/Supabase mediante Prisma y el pooler de sesion; las migraciones estan aplicadas.
 
 ## Inicio Rapido
 
@@ -125,7 +125,7 @@ La mayoria de ajustes runtime se controla desde `agent.config.json` y `.env`.
 
 Providers principales:
 
-- `codex`: provider por defecto, con modelos como `gpt-5.5`.
+- `codex`: provider por defecto, con modelo diario `gpt-6-astra` y reasoning `medium`.
 - `openrouter`: provider OpenRouter, requiere `OPENROUTER_API_KEY`.
 
 Browser Use fallback:

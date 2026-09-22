@@ -1,6 +1,6 @@
 import type { AgentConfig } from '../config.js';
 import { isMarketKey } from '../domain/markets.js';
-import { getApiFootballDateOddsSlate, getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
+import { getApiFootballDateOddsSlate } from '../providers/sports/api-football.js';
 import { isApiFootballProviderError } from '../providers/sports/api-football-errors.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
 import type { RuntimeContext } from '../runtime/context.js';
@@ -8,7 +8,7 @@ import { getPrismaClient } from '../storage/db.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import type { JsonValue, LowOddsScanRecord, StoragePrismaClient } from '../storage/types.js';
 import { requireDatabaseUrl, resolveFilterConfig } from './config.js';
-import { discoverFixtures } from './engine.js';
+import type { FixtureDiscoveryResult } from './engine.js';
 import type {
   FilterCombineMode,
   FilterReason,
@@ -17,10 +17,7 @@ import type {
   RequestedLeaguePresetView,
   RequestedTeamPresetView,
 } from './types.js';
-import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from './low-odds-selector.js';
-
-const LOW_ODDS_GLOBAL_MAX_FIXTURES = positiveInteger(process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES)
-  ?? Number.MAX_SAFE_INTEGER;
+import { isBelowLowOddsThreshold, isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from './low-odds-selector.js';
 
 export interface LowOddsPersistenceRepositories {
   lowOddsScans: {
@@ -70,6 +67,8 @@ export interface PersistLowOddsScanInput {
   fixtureCount: number;
   hits: LowOddsHitView[];
   fixtureEvaluations: LowOddsScanView['fixtureEvaluations'];
+  providerCoverage?: LowOddsScanView['providerCoverage'];
+  scanErrors?: string[];
   requestedLeagues?: RequestedLeaguePresetView[];
   requestedTeams?: RequestedTeamPresetView[];
 }
@@ -123,59 +122,43 @@ export async function scanLowOdds(
   });
 
   const hits: LowOddsHitView[] = [];
-  let fixtureDiscovery: Awaited<ReturnType<typeof discoverFixtures>> = {
+  let fixtureDiscovery: FixtureDiscoveryResult = {
     fixtures: [],
     evaluations: [],
     requestedLeagues: [],
     requestedTeams: [],
   };
   let fixtureEvaluations: LowOddsScanView['fixtureEvaluations'] = [];
+  let providerCoverage: LowOddsScanView['providerCoverage'];
+  const scanErrors: string[] = [];
+  const quotedMarkets = new Set<string>();
 
   try {
     const slate = await getApiFootballDateOddsSlate(oddsConfig, filters.date, runtime, undefined, selectorMarketScope);
-    fixtureDiscovery = slate.fixtures.length
-      ? {
-        fixtures: slate.fixtures,
-        evaluations: slate.fixtures.map((fixture) => ({
-          fixtureId: fixture.id,
-          providerFixtureId: fixture.providerFixtureId,
-          includedReasons: ['included-by-manual-query' as const],
-          excludedReasons: [],
-          eligible: true as const,
-        })),
-        requestedLeagues: [],
-        requestedTeams: [],
-      }
-      : await discoverFixtures({
-        ...config,
-        apiFootball: {
-          ...config.apiFootball,
-          maxFixturesPerRun: LOW_ODDS_GLOBAL_MAX_FIXTURES,
-        },
-      }, {
-        date: filters.date,
-        fullDay: true,
-      }, runtime);
+    providerCoverage = slate.coverage;
+    if (providerCoverage && !providerCoverage.complete) {
+      scanErrors.push(`Incomplete provider date odds coverage: unresolved fixtures ${providerCoverage.missingFixtureIds.join(', ')}`);
+    }
+    fixtureDiscovery = {
+      fixtures: slate.fixtures,
+      evaluations: slate.fixtures.map((fixture) => ({
+        fixtureId: fixture.id,
+        providerFixtureId: fixture.providerFixtureId,
+        includedReasons: ['included-by-manual-query' as const],
+        excludedReasons: [],
+        eligible: true,
+      })),
+      requestedLeagues: [],
+      requestedTeams: [],
+    };
     fixtureEvaluations = [...fixtureDiscovery.evaluations];
-
-    const snapshots = slate.fixtures.length
-      ? slate.snapshots
-      : await mapWithConcurrency(fixtureDiscovery.fixtures, 6, async (fixture) => {
-        try {
-          return await getApiFootballOddsSnapshot(oddsConfig, fixture.providerFixtureId, runtime, selectorMarketScope);
-        } catch (err: any) {
-          return {
-            fixtureId: fixture.id,
-            providerFixtureId: fixture.providerFixtureId,
-            quoteRecordIds: undefined,
-            quotes: [],
-            error: err?.message ?? String(err),
-          };
-        }
-      });
+    const snapshots = slate.snapshots;
+    for (const snapshot of snapshots) {
+      for (const quote of snapshot.quotes) quotedMarkets.add(quote.market);
+    }
     const snapshotsByProviderFixtureId = new Map(snapshots.map((snapshot) => [snapshot.providerFixtureId, snapshot]));
 
-    for (const fixture of fixtureDiscovery.fixtures.slice(0, filters.maxFixturesPerRun)) {
+    for (const fixture of fixtureDiscovery.fixtures) {
       try {
         const snapshot = snapshotsByProviderFixtureId.get(fixture.providerFixtureId);
         if (!snapshot) {
@@ -194,7 +177,7 @@ export async function scanLowOdds(
           continue;
         }
 
-        const lowQuotes = bookmakerQuotes.filter((quote) => quote.price <= filters.threshold);
+        const lowQuotes = bookmakerQuotes.filter((quote) => isBelowLowOddsThreshold(quote.price, filters.threshold));
         if (!lowQuotes.length) {
           addEvaluationReason(fixtureEvaluations, fixture.providerFixtureId, 'excluded-above-threshold');
           continue;
@@ -236,6 +219,7 @@ export async function scanLowOdds(
           });
         }
       } catch (err) {
+        scanErrors.push(err instanceof Error ? err.message : String(err));
         addEvaluationReason(
           fixtureEvaluations,
           fixture.providerFixtureId,
@@ -247,7 +231,7 @@ export async function scanLowOdds(
     }
 
     await repositories.lowOddsScans.updateStatus(scan.id, {
-      status: 'succeeded',
+      status: scanErrors.length ? 'partial' : 'succeeded',
       completedAt: new Date(),
       fixtureCount: fixtureDiscovery.fixtures.length,
       hitCount: hits.length,
@@ -262,6 +246,8 @@ export async function scanLowOdds(
         requestedLeagues: fixtureDiscovery.requestedLeagues,
         requestedTeams: fixtureDiscovery.requestedTeams,
         fixtureEvaluations,
+        providerCoverage,
+        scanErrors,
       }),
     });
   } catch (err) {
@@ -282,12 +268,14 @@ export async function scanLowOdds(
     marketScope: [...filters.markets],
     selectorMarketScope: [...selectorMarketScope],
     analysisMarketScope: [...filters.markets],
-    marketCoverage: buildLowOddsMarketCoverage(filters.markets, selectorMarketScope, fixtureDiscovery.fixtures.length ? hits : []),
+    marketCoverage: buildLowOddsMarketCoverage(filters.markets, selectorMarketScope, [...quotedMarkets], hits),
     fixtureCount: fixtureDiscovery.fixtures.length,
     hitCount: hits.length,
     hits,
     candidateFixtures: fixtureDiscovery.fixtures,
     fixtureEvaluations,
+    providerCoverage,
+    scanErrors,
     requestedLeagues: fixtureDiscovery.requestedLeagues,
     requestedTeams: fixtureDiscovery.requestedTeams,
   };
@@ -335,7 +323,7 @@ export async function persistLowOddsScanResult(
     }
 
     await repositories.lowOddsScans.updateStatus(scan.id, {
-      status: 'succeeded',
+      status: input.scanErrors?.length || input.providerCoverage?.complete === false ? 'partial' : 'succeeded',
       completedAt: new Date(),
       fixtureCount: input.fixtureCount,
       hitCount: input.hits.length,
@@ -350,6 +338,8 @@ export async function persistLowOddsScanResult(
         requestedLeagues: input.requestedLeagues ?? [],
         requestedTeams: input.requestedTeams ?? [],
         fixtureEvaluations: input.fixtureEvaluations,
+        providerCoverage: input.providerCoverage,
+        scanErrors: input.scanErrors,
       }),
     });
   } catch (err) {
@@ -369,14 +359,15 @@ export async function persistLowOddsScanResult(
 function buildLowOddsMarketCoverage(
   analysisMarkets: readonly string[],
   selectorMarkets: readonly string[],
+  quotedMarkets: string[],
   hits: LowOddsHitView[],
 ): NonNullable<LowOddsScanView['marketCoverage']> {
   const hitMarkets = [...new Set(hits.map((hit) => hit.market))].sort();
   return {
     requestedMarkets: [...analysisMarkets],
-    quotedMarkets: hitMarkets,
+    quotedMarkets: [...quotedMarkets].sort(),
     hitMarkets,
-    missingMarkets: selectorMarkets.filter((market) => !hitMarkets.includes(market)),
+    missingMarkets: selectorMarkets.filter((market) => !quotedMarkets.includes(market)),
     selectorMarketScope: [...selectorMarkets],
     analysisMarketScope: [...analysisMarkets],
   };
@@ -393,23 +384,6 @@ function addEvaluationReason(
   evaluation.eligible = false;
 }
 
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  async function runWorker(): Promise<void> {
-    while (nextIndex < items.length) {
-      const index = nextIndex++;
-      results[index] = await worker(items[index] as T, index);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => runWorker()));
-  return results;
-}
-
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
   if (Array.isArray(value)) return value.map(toJsonValue);
@@ -421,9 +395,4 @@ function toJsonValue(value: unknown): JsonValue {
     );
   }
   return null;
-}
-
-function positiveInteger(value: string | undefined): number | undefined {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }

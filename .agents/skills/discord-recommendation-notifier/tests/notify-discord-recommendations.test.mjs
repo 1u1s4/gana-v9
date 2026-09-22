@@ -986,6 +986,99 @@ describe('discord recommendation notifier', () => {
   });
 });
 
+describe('concise published recommendation presentation', () => {
+  it('renders all published selections with plain picks and evidence confidence without technical sections', () => {
+    const artifact = {
+      ...sampleArtifactWithAtomic(), presentation: 'concise-v1',
+      requiredLeagueRecommendations: sampleRequiredLeagueRecommendations(),
+      requiredLeagueGeneralPredictions: [{ fixture: 'Not published vs Example', market: 'h2h', selection: 'home', odds: 1.8 }],
+    };
+    artifact.recommendations[1].aggregateConfidence = 0.72;
+    artifact.recommendations[1].displayConfidence = 0.98;
+    artifact.recommendations[1].harnessStatus = 'review-required';
+    artifact.recommendations[1].legs[0].scheduledAt = '2026-05-15T18:00:00Z';
+    const before = JSON.stringify(artifact);
+    const payloads = buildDiscordPayloads(artifact, { max: 1 });
+    const text = JSON.stringify(payloads);
+    assert.equal(payloads.length, 1);
+    assert.match(text, /2 parlays · 📌 2 simples/);
+    assert.match(text, /Team D gana · Cuota 1.18/);
+    assert.match(text, /Team C vs Team D · 12:00/);
+    assert.match(text, /Conf. evidencia 72% · 🟡 En revisión/);
+    assert.match(text, /Canada gana/);
+    assert.doesNotMatch(text, /Not published|Predicciones generales|Council|Stake|Edge|Expo|98%/);
+    assert.deepEqual(payloads[0].allowed_mentions, { parse: [] });
+    assert.equal(JSON.stringify(artifact), before);
+    assert.match(buildGatewayMessage(artifact, { max: 1 }), /Team D gana/);
+  });
+
+  it('paginates every published simple beyond the legacy max and respects both Discord budgets', () => {
+    const base = sampleArtifactWithAtomic().recommendations[1];
+    const artifact = { date: '2026-09-22', presentation: 'concise-v1', recommendations: Array.from({ length: 70 }, (_, index) => ({
+      ...base, predictionId: `prediction-${index}`, legs: [{ ...base.legs[0], fixtureId: `fixture-${index}`, fixture: `Equipo-${index} ${'A'.repeat(70)} vs Rival-${index}`, predictionId: `prediction-${index}` }],
+    })) };
+    const payloads = buildDiscordPayloads(artifact, { max: 1 });
+    const text = JSON.stringify(payloads);
+    assert.ok(payloads.length > 1);
+    let lastIndex = -1;
+    for (let index = 0; index < 70; index += 1) {
+      const position = text.indexOf(`Equipo-${index} `);
+      assert.ok(position > lastIndex, `published order preserved for selection ${index}`);
+      lastIndex = position;
+    }
+    for (const payload of payloads) {
+      assert.ok(payload.embeds.length <= 10);
+      const size = payload.embeds.reduce((sum, embed) => sum + (embed.title?.length ?? 0) + (embed.description?.length ?? 0) + (embed.footer?.text?.length ?? 0), 0);
+      assert.ok(size <= 6000);
+      assert.ok(payload.embeds.every((embed) => embed.description.length <= 4096));
+      assert.deepEqual(payload.allowed_mentions, { parse: [] });
+    }
+    assert.throws(() => buildDiscordSinglePayload(artifact), /multiple Discord messages/);
+    assert.throws(() => buildDiscordPayload(artifact), /multiple Discord messages/);
+  });
+
+  it('keeps all combinada and persisted strategy legs with the v2 strategy last', () => {
+    const strategy = sampleSelectedOddsFloorStrategy();
+    strategy.version = 'odds-floor-eligible-confidence-v2';
+    strategy.rule.selection = 'highest-eligible-evidence-confidence';
+    strategy.excludedPickCount = 1;
+    strategy.selectedPick.confidenceMetric = 'aggregateConfidence';
+    strategy.selectedPick.legs = Array.from({ length: 12 }, (_, index) => ({
+      ...strategy.selectedPick.legs[0], fixture: `Estrategia ${index} vs Rival`, display: undefined,
+    }));
+    const base = sampleArtifact();
+    const artifact = { ...base, presentation: 'concise-v1', dailyOddsFloorStrategy: strategy };
+    artifact.recommendations[0].legs = Array.from({ length: 12 }, (_, index) => ({
+      ...base.recommendations[0].legs[0], fixture: `Combinada ${index} vs Rival`, fixtureId: `fixture-${index}`,
+    }));
+    const payloads = buildDiscordPayloads(artifact);
+    const text = JSON.stringify(payloads);
+    const finalEmbed = payloads.at(-1).embeds.at(-1);
+    assert.equal(finalEmbed.title, '🎯 Apuesta analítica del día');
+    for (let index = 0; index < 12; index += 1) {
+      assert.match(text, new RegExp(`Combinada ${index} vs Rival`));
+      assert.match(finalEmbed.description, new RegExp(`Estrategia ${index} vs Rival`));
+    }
+    assert.match(finalEmbed.description, /Conf. evidencia 78%/);
+    assert.doesNotMatch(text, /selecciones adicionales/);
+    assert.ok(buildDailyOddsFloorStrategyEmbed(artifact));
+    strategy.selectedPick.confidenceMetric = 'displayConfidence';
+    assert.equal(buildDailyOddsFloorStrategyEmbed(artifact), null);
+  });
+
+  it('does not create empty sections for unscheduled required leagues', () => {
+    const artifact = { presentation: 'concise-v1', date: '2026-09-22', recommendations: [], requiredLeagueRecommendations: {
+      requiredLeagues: Array.from({ length: 45 }, (_, index) => ({ providerCompetitionId: String(index), name: `Empty League ${index}` })),
+      coverage: { fixtures: [] }, atomicProjections: [], parlayProjections: [],
+    } };
+    const payloads = buildDiscordPayloads(artifact);
+    assert.equal(payloads.length, 1);
+    assert.equal(payloads[0].embeds.length, 2);
+    assert.doesNotMatch(JSON.stringify(payloads), /Empty League/);
+    assert.match(JSON.stringify(payloads), /Sin selecciones publicadas/);
+  });
+});
+
 function sampleArtifact() {
   return {
     date: '2026-05-15',

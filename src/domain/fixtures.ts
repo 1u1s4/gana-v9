@@ -12,6 +12,8 @@ export interface Fixture {
   season?: number;
   homeTeamId: TeamId;
   awayTeamId: TeamId;
+  providerHomeTeamId?: string;
+  providerAwayTeamId?: string;
   homeTeamName?: string;
   awayTeamName?: string;
   scheduledAt: string;

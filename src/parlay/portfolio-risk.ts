@@ -1,3 +1,4 @@
+import { isBelowLowOddsThreshold } from '../filters/low-odds-selector.js';
 import {
   AUTOMATIC_PARLAY_MAX_LEG_ODDS,
   automaticParlayRiskReasons,
@@ -59,9 +60,12 @@ export function lowOddsTopPoolExclusionReasons(
   threshold: number,
 ): string[] {
   const reasons = portfolioPoolExclusionReasons(prediction, profile);
+  if (!['candidate', 'promotable'].includes(prediction.status)) reasons.push('winner prediction is not eligible for promotion');
+  if (prediction.blockers?.length) reasons.push('winner prediction has unresolved blockers');
   if (!isLowOddsTopStrictSelection(prediction)) reasons.push('market/selection not allowed for low-odds-top');
   if (hasRiskTag(prediction, 'low_liquidity_h2h_favorite')) reasons.push('low-liquidity h2h short favorite');
-  if (prediction.odds > threshold) reasons.push(`above low-odds threshold ${threshold}`);
+  if (!isBelowLowOddsThreshold(prediction.odds, threshold)) reasons.push(`winner odds must be >1 and strictly below ${threshold}`);
+  if (!Number.isFinite(prediction.edge) || Number(prediction.edge) <= 0) reasons.push('positive supported edge required');
   if (hasHardResearchWarning(prediction)) reasons.push('hard research warning');
   if (prediction.parlayEligible === false) reasons.push('not parlay eligible');
   return [...new Set(reasons)];
@@ -85,7 +89,6 @@ export function lowOddsTopFallbackExclusionReasons(
 
 function isLowOddsTopStrictSelection(prediction: ParlaySourcePrediction): boolean {
   if (prediction.market === 'h2h') return prediction.selection === 'home' || prediction.selection === 'away';
-  if (prediction.market === 'double_chance') return prediction.selection === 'home_or_draw' || prediction.selection === 'draw_or_away';
   return false;
 }
 

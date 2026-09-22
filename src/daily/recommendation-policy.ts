@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { jointModelProbability, modelProbabilityFor } from '../parlay/probability.js';
+import { deterministicProfileSpec } from '../parlay/profile-specs.js';
+import { LOW_ODDS_WINNER_MAX_LEG_ODDS, LOW_ODDS_WINNER_MIN_COMBINED_ODDS } from '../parlay/eligibility.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { ParlayAnalysisRecommendation } from '../parlay/analysis.js';
 import type { PredictionRecordView } from '../prediction/types.js';
@@ -10,7 +13,7 @@ import type { AtomicPredictionCandidate, AtomicPredictionRecommendation, DailyE2
 
 export type DailyRecommendationModelResolver = (provider: DailyE2EProvider) => string;
 
-export const DAILY_PARLAY_RECOMMENDATION_LIMIT = 3;
+export const DAILY_PARLAY_RECOMMENDATION_LIMIT = 4;
 export const DAILY_PARLAY_ANALYSIS_TOP = 12;
 export const DAILY_FALLBACK_PARLAY_LIMIT = 3;
 export const DAILY_FALLBACK_PARLAY_LEGS = 2;
@@ -31,7 +34,7 @@ export const ATOMIC_SAFETY_REVIEW_EDGE_FLOOR = 0.01;
 export const DAILY_STAKE_BUCKETS = [1, 5, 10, 15, 20, 25] as const;
 export const VALIDATION_FRESHNESS_MIN_COVERAGE = 0.6;
 export const VALIDATION_FRESHNESS_MAX_UNRESOLVED_RATE = 0.25;
-export const DAILY_PREFERRED_PARLAY_PROFILE_ORDER = ['parlay-diamante', 'parlay-refinado', 'low-variance'] as const;
+export const DAILY_PREFERRED_PARLAY_PROFILE_ORDER = ['low-odds-top', 'parlay-diamante', 'parlay-refinado', 'low-variance'] as const;
 export const DAILY_FINAL_PARLAY_ALLOWED_PROFILES = ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance'] as const;
 export const DAILY_FINAL_PARLAY_BLOCKED_PROFILES = ['balanced', 'high-conviction', 'market-diverse', 'parlay-oro', 'default', 'review', 'totals', 'aggressive'] as const;
 export const DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS = [
@@ -82,8 +85,17 @@ export function selectDailyParlayRecommendations(
   };
 
   for (const profile of DAILY_PREFERRED_PARLAY_PROFILE_ORDER) {
-    for (const recommendation of recommendations) {
-      if (recommendation.profile !== profile) continue;
+    // Diversify only among candidates already passing the same promotion gates.
+    // Shared fixtures are repeated exposure even when another market label is used.
+    const usedFixtures = new Set(selected.flatMap((item) => item.legs.map((leg) => leg.fixtureId)));
+    const usedMarkets = new Set(selected.flatMap((item) => item.legs.map((leg) => leg.market)));
+    const candidates = recommendations.filter((item) => item.profile === profile && isConservativeDailyParlayRecommendation(item));
+    candidates.sort((a, b) => {
+      const overlap = (item: ParlayAnalysisRecommendation) => item.legs.filter((leg) => usedFixtures.has(leg.fixtureId)).length / item.legs.length;
+      const novelty = (item: ParlayAnalysisRecommendation) => new Set(item.legs.filter((leg) => !usedMarkets.has(leg.market)).map((leg) => leg.market)).size;
+      return overlap(a) - overlap(b) || novelty(b) - novelty(a);
+    });
+    for (const recommendation of candidates) {
       add(recommendation);
       if (usedProfiles.has(profile)) break;
     }
@@ -161,7 +173,9 @@ function dailyParlayApproachBlockReasons(recommendation: ParlayAnalysisRecommend
     if (recommendation.aggregateConfidence < DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE) reasons.push('aggregate confidence below parlay-refinado daily floor');
     return reasons;
   }
-  if (recommendation.profile === 'parlay-diamante') {
+  if (recommendation.profile === 'low-odds-top') {
+    if (!isStrictLowOddsWinnerParlay(recommendation)) reasons.push('requires 2-4 distinct h2h winners below 1.10, combined odds >=1.20 and aggregate confidence >=0.70');
+  } else if (recommendation.profile === 'parlay-diamante') {
     if (recommendation.combinedOdds < 1.1 || recommendation.combinedOdds > 1.3) reasons.push('combined odds outside parlay-diamante daily window');
     if (recommendation.aggregateConfidence < DAILY_PARLAY_DIAMANTE_MIN_CONFIDENCE) reasons.push('aggregate confidence below parlay-diamante daily floor');
   } else {
@@ -199,6 +213,8 @@ function isConservativeDailyParlayRecommendation(recommendation: ParlayAnalysisR
     if (riskFlags.has('high-combined-odds') || recommendation.combinedOdds > 2.1) return false;
     return recommendation.aggregateConfidence >= DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE;
   }
+  if (recommendation.profile === 'low-odds-top') return isStrictLowOddsWinnerParlay(recommendation)
+    && !(recommendation.riskFlags ?? []).some((flag) => DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS.includes(flag as any));
   if ((recommendation.legs?.length ?? 0) > 3) return false;
   const riskFlags = new Set(recommendation.riskFlags ?? []);
   for (const flag of DAILY_FINAL_PARLAY_BLOCKED_RISK_FLAGS) {
@@ -211,6 +227,17 @@ function isConservativeDailyParlayRecommendation(recommendation: ParlayAnalysisR
   }
   if (recommendation.combinedOdds > DAILY_PARLAY_CONSERVATIVE_MAX_ODDS || riskFlags.has('high-combined-odds')) return false;
   return recommendation.aggregateConfidence >= DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE;
+}
+
+function isStrictLowOddsWinnerParlay(recommendation: ParlayAnalysisRecommendation): boolean {
+  const legs = recommendation.legs ?? [];
+  return legs.length >= 2 && legs.length <= 4
+    && new Set(legs.map((leg) => leg.fixtureId)).size === legs.length
+    && legs.every((leg) => leg.market === 'h2h' && ['home', 'away'].includes(leg.selection)
+      && Number.isFinite(leg.odds) && leg.odds > 1 && leg.odds < LOW_ODDS_WINNER_MAX_LEG_ODDS)
+    && recommendation.combinedOdds >= LOW_ODDS_WINNER_MIN_COMBINED_ODDS
+    && recommendation.combinedOdds <= DAILY_PARLAY_CONSERVATIVE_MAX_ODDS
+    && recommendation.aggregateConfidence >= DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE;
 }
 
 export function selectDailyFallbackParlayRecommendations(
@@ -324,7 +351,8 @@ export function buildFallbackParlayRecommendations(
 
     const signature = legs.map((candidate) => atomicPredictionKey(candidate.prediction)).sort().join('|');
     if (!usedSignatures.has(signature)) {
-      recommendations.push(toFallbackParlayRecommendation(legs, recommendations.length + 1));
+      const recommendation = toFallbackParlayRecommendation(legs, recommendations.length + 1);
+      if (recommendation.expectedEdge > 0) recommendations.push(recommendation);
       usedSignatures.add(signature);
     }
 
@@ -357,14 +385,7 @@ export function buildFallbackAtomicPredictionRecommendations(
     excludedSelectionKeys,
     excludedFixtureIds,
   );
-  const nonBlocked = candidates.filter((candidate) => candidate.prediction.status !== 'blocked');
-  const safetyBlocked = candidates.filter((candidate) =>
-    candidate.prediction.status === 'blocked' && atomicSafetyOverride(candidate.prediction)
-  );
-  const candidatePool = nonBlocked.length
-    ? uniqueCandidatesById([...nonBlocked, ...safetyBlocked])
-    : candidates;
-  for (const candidate of candidatePool) {
+  for (const candidate of candidates) {
     const key = atomicPredictionKey(candidate.prediction);
     groups.set(key, [...(groups.get(key) ?? []), candidate]);
   }
@@ -425,13 +446,7 @@ function collectFallbackPredictionCandidates(
 }
 
 function selectFallbackParlayCandidatePool(candidates: AtomicPredictionCandidate[]): AtomicPredictionCandidate[] {
-  const pools = [
-    candidates.filter((candidate) => candidate.prediction.parlayEligible !== false && candidate.prediction.status === 'promotable'),
-    candidates.filter((candidate) => candidate.prediction.parlayEligible !== false && candidate.prediction.status !== 'blocked'),
-    candidates.filter((candidate) => candidate.prediction.status !== 'blocked'),
-    candidates,
-  ];
-  return pools.find((pool) => uniqueFixtureCount(pool) >= DAILY_FALLBACK_PARLAY_LEGS) ?? [];
+  return candidates.filter((candidate) => candidate.prediction.parlayEligible !== false);
 }
 
 function uniqueFixtureCount(candidates: readonly AtomicPredictionCandidate[]): number {
@@ -439,7 +454,13 @@ function uniqueFixtureCount(candidates: readonly AtomicPredictionCandidate[]): n
 }
 
 export function isFallbackPredictionCandidate(prediction: PredictionRecordView): boolean {
-  return Number.isFinite(prediction.odds)
+  return ['promotable', 'candidate'].includes(prediction.status)
+    && !(prediction.blockers?.length)
+    && atomicPredictionEdge(prediction) > 0
+    && (prediction.edge === undefined || (Number.isFinite(prediction.edge) && prediction.edge > 0))
+    && !atomicRiskFlags(prediction, 1).some((flag) => ATOMIC_BLOCKED_RISK_FLAGS.includes(flag as any))
+    && !(prediction.warnings ?? []).some((warning) => /research is not promotable|fallback research|insufficient evidence/i.test(warning))
+    && Number.isFinite(prediction.odds)
     && prediction.odds > 1
     && Number.isFinite(prediction.confidence)
     && prediction.confidence > 0
@@ -492,8 +513,7 @@ function fixtureFocusSignals(candidate: Pick<AtomicPredictionCandidate, 'fixture
 function toFallbackParlayRecommendation(candidates: AtomicPredictionCandidate[], rank: number): DailyFinalRecommendation {
   const combinedOdds = round(candidates.reduce((product, candidate) => product * candidate.prediction.odds, 1), 6);
   const aggregateConfidence = round(candidates.reduce((product, candidate) => product * clamp(atomicCandidateEffectiveConfidence(candidate), 0.01, 0.99), 1), 6);
-  const providerCount = new Set(candidates.map((candidate) => candidate.provider)).size;
-  const adjustedProbability = round(clamp(aggregateConfidence * (providerCount > 1 ? 1.02 : 1), 0.01, 0.99), 6);
+  const adjustedProbability = jointModelProbability(candidates.map((candidate) => ({ probability: modelProbabilityFor(candidate.prediction) }))) ?? 0;
   const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
   const riskFlags = uniqueStrings([
     'analytical-fallback',
@@ -575,6 +595,7 @@ function parlayLegFromFallbackCandidate(candidate: AtomicPredictionCandidate): P
     line: prediction.line ?? null,
     odds: round(prediction.odds, 6),
     confidence: round(atomicCandidateEffectiveConfidence(candidate), 6),
+    probability: modelProbabilityFor(prediction),
     validationStatus: 'unvalidated',
     warnings,
     banker,
@@ -826,7 +847,7 @@ export function buildMissingDailyFocusParlayRecommendations(input: {
   const existingProfiles = new Set(input.recommendations
     .filter((recommendation) => recommendation.kind === 'parlay' && isUsableDailyFocusParlay(recommendation))
     .map((recommendation) => recommendation.profile));
-  const missingProfiles = DAILY_PREFERRED_PARLAY_PROFILE_ORDER.filter((profile) => !existingProfiles.has(profile));
+  const missingProfiles = DAILY_PREFERRED_PARLAY_PROFILE_ORDER.filter((profile): profile is DailyFocusProfile => profile !== 'low-odds-top' && !existingProfiles.has(profile));
   if (!missingProfiles.length) return [];
 
   const candidateLegs = collectDailyFocusLegCandidates([
@@ -835,12 +856,16 @@ export function buildMissingDailyFocusParlayRecommendations(input: {
   ]);
   if (candidateLegs.length < DAILY_FOCUS_FALLBACK_MIN_LEGS) return [];
 
-  const usedSelectionKeys = new Set<string>();
+  const usedSelectionKeys = recommendationLegSelectionKeys(input.recommendations);
+  const usedSignatures = new Set(input.recommendations.map(parlayLogicalSignature));
   const composed: DailyFinalRecommendation[] = [];
   for (const profile of missingProfiles) {
     const selected = selectDailyFocusLegs(profile, candidateLegs, usedSelectionKeys);
     if (selected.length < DAILY_FOCUS_FALLBACK_MIN_LEGS) continue;
     const recommendation = toDailyFocusParlayRecommendation(profile, selected, composed.length + 1);
+    const signature = parlayLogicalSignature(recommendation);
+    if (usedSignatures.has(signature)) continue;
+    usedSignatures.add(signature);
     composed.push(recommendation);
     for (const candidate of selected) {
       const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
@@ -860,7 +885,7 @@ function isUsableDailyFocusParlay(recommendation: DailyFinalRecommendation): boo
     && recommendation.expectedEdge > 0;
 }
 
-type DailyFocusProfile = typeof DAILY_PREFERRED_PARLAY_PROFILE_ORDER[number];
+type DailyFocusProfile = Exclude<typeof DAILY_PREFERRED_PARLAY_PROFILE_ORDER[number], 'low-odds-top'>;
 
 interface DailyFocusLegCandidate {
   leg: ParlayAnalysisRecommendation['legs'][number];
@@ -921,11 +946,16 @@ function isDailyFocusLegEligible(
   recommendation: DailyFinalRecommendation,
 ): boolean {
   if (!leg.predictionId || !leg.fixtureId) return false;
+  if (!['candidate', 'promotable'].includes(recommendation.harnessStatus)) return false;
+  if (recommendation.selectionMode === 'analytical-fallback') return false;
+  if (!(recommendation.expectedEdge > 0)) return false;
+  if (modelProbabilityFor(leg) === null || Number(leg.probability) * Number(leg.odds) <= 1) return false;
+  if ((leg.warnings ?? []).some((warning) => /research is not promotable|fallback research|low[-_ ]liquidity|stale|lineup[-_ ]pending|selection.*missing|parlay.ineligible/i.test(warning))) return false;
   if (!Number.isFinite(leg.odds) || Number(leg.odds) <= 1) return false;
   if (!Number.isFinite(focusLegConfidence(leg, recommendation)) || focusLegConfidence(leg, recommendation) < 0.6) return false;
   if (leg.market === 'corners_over_under') return false;
   const riskFlags = new Set(recommendation.riskFlags ?? []);
-  if (riskFlags.has('blocked-source-prediction')) return false;
+  if (['blocked-source-prediction', 'source-review-required', 'parlay-ineligible-source', 'low-liquidity', 'review-required', 'model-probability-safety-confidence'].some((flag) => riskFlags.has(flag))) return false;
   if (riskFlags.has('stale-source')) return false;
   if (riskFlags.has('corners-unverified')) return false;
   if (riskFlags.has('lineup-pending')) return false;
@@ -961,16 +991,7 @@ function selectDailyFocusLegs(
         .slice(0, DAILY_FOCUS_FALLBACK_MIN_LEGS - freshPreferred.length),
     ]
     : freshPreferred;
-  const pools = [
-    freshPreferred,
-    freshSupplemented,
-    preferred,
-    candidates.filter((candidate) => {
-      const key = legSelectionKey(candidate.leg.fixtureId, candidate.leg.market, candidate.leg.selection, candidate.leg.line);
-      return key ? !usedSelectionKeys.has(key) : true;
-    }).sort((a, b) => dailyFocusLegScore(profile, b) - dailyFocusLegScore(profile, a)),
-    [...candidates].sort((a, b) => dailyFocusLegScore(profile, b) - dailyFocusLegScore(profile, a)),
-  ];
+  const pools = [freshPreferred, freshSupplemented, preferred];
   for (const pool of pools) {
     const selected = bestDailyFocusCombination(profile, pool.slice(0, DAILY_FOCUS_FALLBACK_MAX_SOURCE_LEGS));
     if (selected.length >= DAILY_FOCUS_FALLBACK_MIN_LEGS) return selected;
@@ -980,16 +1001,12 @@ function selectDailyFocusLegs(
 
 function dailyFocusLegProfileEligible(profile: DailyFocusProfile, candidate: DailyFocusLegCandidate): boolean {
   const leg = candidate.leg;
-  if (profile === 'parlay-diamante') {
-    return ['h2h', 'double_chance', 'goals_over_under'].includes(leg.market)
-      && Number(leg.odds) <= 1.5;
-  }
-  if (profile === 'low-variance') {
-    return ['h2h', 'double_chance', 'goals_over_under'].includes(leg.market)
-      && Number(leg.odds) <= 1.6;
-  }
-  return ['h2h', 'double_chance', 'goals_over_under', 'btts'].includes(leg.market)
-    && Number(leg.odds) <= 1.8;
+  const spec = deterministicProfileSpec(profile);
+  return (!spec.markets || spec.markets.includes(leg.market as any))
+    && (!spec.maxLegOdds || Number(leg.odds) <= spec.maxLegOdds)
+    && focusLegConfidence(leg) >= spec.minConfidence
+    && !['draw', 'home_or_away'].includes(leg.selection);
+
 }
 
 function bestDailyFocusCombination(
@@ -1017,6 +1034,12 @@ function collectDailyFocusCombinations(
   if (current.length === size) {
     const fixtureIds = current.map((candidate) => candidate.leg.fixtureId);
     if (new Set(fixtureIds).size !== fixtureIds.length) return;
+    const spec = deterministicProfileSpec(profile);
+    const odds = current.reduce((product, item) => product * item.leg.odds, 1);
+    const confidence = current.reduce((product, item) => product * focusLegConfidence(item.leg), 1);
+    if (odds < spec.minOdds || odds > spec.maxOdds || confidence < (spec.minAggregateConfidence ?? DAILY_PARLAY_CONSERVATIVE_MIN_CONFIDENCE)) return;
+    const probability = jointModelProbability(current.map((candidate) => candidate.leg));
+    if (probability === null || odds * probability <= 1) return;
     visit([...current], dailyFocusCombinationScore(profile, current));
     return;
   }
@@ -1029,14 +1052,14 @@ function collectDailyFocusCombinations(
 
 function dailyFocusCombinationScore(profile: DailyFocusProfile, candidates: readonly DailyFocusLegCandidate[]): number {
   const combinedOdds = candidates.reduce((product, candidate) => product * Number(candidate.leg.odds), 1);
-  const aggregateConfidence = average(candidates.map((candidate) => focusLegConfidence(candidate.leg)));
+  const aggregateConfidence = candidates.reduce((product, candidate) => product * focusLegConfidence(candidate.leg), 1);
   const marketDiversity = new Set(candidates.map((candidate) => candidate.leg.market)).size / Math.max(1, candidates.length);
   const profileScore = candidates.reduce((sum, candidate) => sum + dailyFocusLegScore(profile, candidate), 0) / Math.max(1, candidates.length);
   return profileScore
     + (aggregateConfidence * 0.35)
     + (dailyFocusOddsFit(profile, combinedOdds) * 0.15)
     + (marketDiversity * 0.04)
-    + (Math.max(0, combinedOdds * aggregateConfidence - 1) * 0.08)
+    + (Math.max(0, combinedOdds * (jointModelProbability(candidates.map((candidate) => candidate.leg)) ?? 0) - 1) * 0.08)
     - ((candidates.length - DAILY_FOCUS_FALLBACK_MIN_LEGS) * 0.015);
 }
 
@@ -1101,8 +1124,8 @@ function toDailyFocusParlayRecommendation(
     bankerReason: `daily ${profile} fallback leg: confidence ${round(focusLegConfidence(candidate.leg), 3)}`,
   }));
   const combinedOdds = round(legs.reduce((product, leg) => product * Number(leg.odds), 1), 6);
-  const aggregateConfidence = round(average(legs.map((leg) => focusLegConfidence(leg))), 6);
-  const adjustedProbability = round(clamp(aggregateConfidence, 0.01, 0.99), 6);
+  const aggregateConfidence = round(legs.reduce((product, leg) => product * focusLegConfidence(leg), 1), 6);
+  const adjustedProbability = jointModelProbability(legs) ?? 0;
   const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
   const sourceRunIds = uniqueStrings(candidates.flatMap((candidate) => candidate.sourceRunIds));
   const providers = uniqueStrings(candidates.flatMap((candidate) => candidate.providers));
@@ -1117,7 +1140,7 @@ function toDailyFocusParlayRecommendation(
   const reasons = uniqueStrings([
     `daily focus fallback: strict ${profile} build unavailable`,
     'built from reviewed simple recommendations or candidate parlay legs',
-    'uses average leg confidence for review-only daily focus coverage',
+    'evidence confidence is separate from the independent-leg model probability baseline',
     `source profiles: ${sourceProfiles.join(', ') || 'unknown'}`,
     `providers: ${providers.join(', ') || 'unknown'}`,
     `aggregate confidence ${round(aggregateConfidence, 3)}`,
@@ -1204,7 +1227,7 @@ export function buildCouncilComposedParlayRecommendations(
 ): DailyFinalRecommendation[] {
   const atomic = recommendations
     .filter((recommendation): recommendation is AtomicPredictionRecommendation => recommendation.kind === 'atomic-prediction')
-    .filter((recommendation) => recommendation.legs.length > 0)
+    .filter((recommendation) => recommendation.legs.length > 0 && recommendation.harnessStatus === 'promotable' && recommendation.expectedEdge > 0 && recommendation.selectionMode !== 'analytical-fallback')
     .sort((a, b) =>
       b.score - a.score
       || b.expectedEdge - a.expectedEdge
@@ -1226,6 +1249,7 @@ export function buildCouncilComposedParlayRecommendations(
     );
     if (!second) break;
     const parlay = councilComposedParlay([first, second], parlays.length + 1);
+    if (parlay.expectedEdge <= 0) continue;
     parlays.push(parlay);
     for (const recommendation of [first, second]) {
       usedPredictionIds.add(recommendation.predictionId);
@@ -1248,7 +1272,7 @@ function councilComposedParlay(
   }));
   const combinedOdds = round(legs.reduce((product, leg) => product * Number(leg.odds ?? 1), 1), 6);
   const aggregateConfidence = round(legs.reduce((product, leg) => product * clamp(Number(leg.confidence ?? 0), 0.01, 0.99), 1), 6);
-  const adjustedProbability = round(clamp(aggregateConfidence, 0.01, 0.99), 6);
+  const adjustedProbability = jointModelProbability(legs) ?? 0;
   const expectedEdge = round((combinedOdds * adjustedProbability) - 1, 6);
   const sourceRunIds = uniqueStrings(recommendations.flatMap((recommendation) => recommendation.sourceRunIds));
   const providers = uniqueStrings(recommendations.flatMap((recommendation) => recommendation.providers));
@@ -1327,14 +1351,12 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
   const predictionIds = uniqueStrings(ordered.map((candidate) => candidate.prediction.id));
   const confidence = round(average(ordered.map(atomicCandidateEffectiveConfidence)), 6);
   const displayConfidence = round(average(ordered.map(atomicCandidateDisplayConfidence)), 6);
-  const edge = round(average(ordered.map(atomicCandidateEffectiveEdge)), 6);
+  const edge = round(atomicPredictionEdge(primary.prediction), 6);
   const rankingConfidence = round(average(ordered.map((candidate) => candidate.prediction.confidence)), 6);
   const rankingEdge = round(average(ordered.map((candidate) => candidate.edge)), 6);
-  const adjustedProbability = round(clamp(confidence * (providers.length > 1 ? 1.02 : 1), 0.01, 0.99), 6);
-  const safetyOverride = atomicSafetyOverride(primary.prediction);
+  const adjustedProbability = modelProbabilityFor(primary.prediction) ?? 0;
   const riskFlags = uniqueStrings([
     ...atomicRiskFlags(primary.prediction, providers.length),
-    ...(safetyOverride ? ['model-probability-safety-confidence', safetyOverride] : []),
   ]);
   const focusSignals = fixtureFocusSignals(primary);
   const leg = {
@@ -1347,6 +1369,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     line: primary.prediction.line ?? null,
     odds: round(primary.prediction.odds, 6),
     confidence: round(atomicCandidateEffectiveConfidence(primary), 6),
+    probability: modelProbabilityFor(primary.prediction),
     validationStatus: 'unvalidated',
     warnings: primary.prediction.warnings ?? [],
     banker: true,
@@ -1366,7 +1389,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
     model: primary.model,
     profile: ATOMIC_RECOMMENDATION_PROFILE,
     validationStatus: 'unvalidated',
-    harnessStatus: primary.prediction.status === 'blocked' && safetyOverride ? 'review-required' : primary.prediction.status,
+    harnessStatus: primary.prediction.status,
     combinedOdds: round(primary.prediction.odds, 6),
     aggregateConfidence: confidence,
     displayConfidence,
@@ -1394,7 +1417,6 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
       `profile ${ATOMIC_RECOMMENDATION_PROFILE}`,
       `confidence ${round(confidence, 3)}`,
       `edge ${round(edge, 3)}`,
-      safetyOverride ? `safety override: ${safetyOverride}` : '',
       providers.length > 1 ? `provider agreement: ${providers.join(', ')}` : `provider: ${primary.provider}`,
       ...focusSignals.map((signal) => `focus signal: ${signal}`),
     ].filter(Boolean),
@@ -1405,6 +1427,7 @@ function toAtomicRecommendationDraft(candidates: AtomicPredictionCandidate[]): A
 
 function isAtomicRecommendationEligible(prediction: PredictionRecordView, edge: number): boolean {
   if (prediction.status !== 'promotable') return false;
+  if (prediction.edge !== undefined && (!Number.isFinite(prediction.edge) || prediction.edge <= 0)) return false;
   if (!Number.isFinite(prediction.confidence) || prediction.confidence < ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR) return false;
   if (!Number.isFinite(prediction.odds) || prediction.odds <= 1) return false;
   if (!Number.isFinite(edge) || edge <= ATOMIC_RECOMMENDATION_EDGE_FLOOR) return false;
@@ -1414,71 +1437,20 @@ function isAtomicRecommendationEligible(prediction: PredictionRecordView, edge: 
 }
 
 export function atomicPredictionEdge(prediction: PredictionRecordView): number {
-  if (Number.isFinite(prediction.edge)) return prediction.edge as number;
-  const probability = prediction.probability ?? prediction.modelProbability ?? prediction.marketFairProbability;
-  return Number.isFinite(probability) ? prediction.odds * (probability as number) - 1 : 0;
+  const probability = modelProbabilityFor(prediction);
+  return probability === null ? 0 : prediction.odds * probability - 1;
 }
 
 function atomicCandidateEffectiveConfidence(candidate: AtomicPredictionCandidate): number {
-  const prediction = candidate.prediction;
-  const safetyOverride = atomicSafetyOverride(prediction);
-  if (!safetyOverride) return prediction.confidence;
-  return round(Math.max(prediction.confidence, atomicProbabilityConfidence(prediction)), 6);
+  return candidate.prediction.confidence;
 }
 
 function atomicCandidateDisplayConfidence(candidate: AtomicPredictionCandidate): number {
-  return round(Math.max(
-    atomicCandidateEffectiveConfidence(candidate),
-    atomicProbabilityConfidence(candidate.prediction),
-  ), 6);
+  return candidate.prediction.confidence;
 }
 
 function atomicCandidateEffectiveEdge(candidate: AtomicPredictionCandidate): number {
-  const prediction = candidate.prediction;
-  const safetyOverride = atomicSafetyOverride(prediction);
-  if (!safetyOverride) return candidate.edge;
-  const confidenceEdge = prediction.odds * atomicCandidateEffectiveConfidence(candidate) - 1;
-  return round(Math.max(candidate.edge, confidenceEdge, ATOMIC_SAFETY_REVIEW_EDGE_FLOOR), 6);
-}
-
-function atomicSafetyOverride(prediction: PredictionRecordView): 'model-probability-double-chance' | 'model-probability-conservative-total' | undefined {
-  const confidence = atomicProbabilityConfidence(prediction);
-  if (confidence < ATOMIC_SAFETY_MIN_EFFECTIVE_CONFIDENCE) return undefined;
-  const confidenceEdge = prediction.odds * confidence - 1;
-  if (confidenceEdge < ATOMIC_SAFETY_BREAK_EVEN_EDGE_FLOOR) return undefined;
-
-  if (
-    prediction.market === 'double_chance'
-    && prediction.selection !== 'home_or_away'
-    && prediction.odds >= ATOMIC_SAFETY_DOUBLE_CHANCE_MIN_ODDS
-    && prediction.odds <= ATOMIC_SAFETY_DOUBLE_CHANCE_MAX_ODDS
-  ) {
-    return 'model-probability-double-chance';
-  }
-
-  if (
-    prediction.market === 'goals_over_under'
-    && prediction.odds <= ATOMIC_SAFETY_TOTALS_MAX_ODDS
-    && Number.isFinite(prediction.line)
-    && (
-      (prediction.selection === 'over' && Number(prediction.line) <= 1.5)
-      || (prediction.selection === 'under' && Number(prediction.line) >= 3.25)
-    )
-  ) {
-    return 'model-probability-conservative-total';
-  }
-
-  return undefined;
-}
-
-function atomicProbabilityConfidence(prediction: PredictionRecordView): number {
-  return clamp(firstFinite(
-    prediction.modelProbability,
-    prediction.probability,
-    prediction.impliedProbability,
-    prediction.marketImpliedProbability,
-    prediction.confidence,
-  ), 0.01, 0.99);
+  return candidate.edge;
 }
 
 function atomicRiskFlags(prediction: PredictionRecordView, providerCount: number): string[] {
@@ -1588,8 +1560,12 @@ function displayFixturesFromArtifactDir(artifactDir: string | undefined): Fixtur
 
 function fixtureArrayFromPayload(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === 'object' && Array.isArray((payload as { fixtures?: unknown }).fixtures)) {
-    return (payload as { fixtures: unknown[] }).fixtures;
+  if (payload && typeof payload === 'object') {
+    const discovery = payload as { fixtures?: unknown; discoveredRequiredFixtures?: unknown };
+    return [
+      ...(Array.isArray(discovery.fixtures) ? discovery.fixtures : []),
+      ...(Array.isArray(discovery.discoveredRequiredFixtures) ? discovery.discoveredRequiredFixtures : []),
+    ];
   }
   return [];
 }

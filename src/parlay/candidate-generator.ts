@@ -1,3 +1,4 @@
+import { modelProbabilityFor } from './probability.js';
 import { randomUUID } from 'crypto';
 import type { ParlaySourcePrediction } from './types.js';
 import { correlationBlockers, correlationPenalty } from './correlation.js';
@@ -58,12 +59,13 @@ function collectCombinations(
 
 function buildCandidate(predictions: ParlaySourcePrediction[]): ParlayCandidate {
   const penalty = correlationPenalty(predictions);
-  const combinedFairProbability = predictions.reduce((product, prediction) => product * (prediction.estimatedProbability ?? prediction.confidence), 1) * (1 - penalty);
+  const combinedFairProbability = predictions.reduce((product, prediction) => product * (modelProbabilityFor({ probability: prediction.estimatedProbability }) ?? 0), 1) * (1 - penalty);
   const combinedMarketOdds = predictions.reduce((product, prediction) => product * prediction.odds, 1);
   const combinedFairOdds = combinedFairProbability > 0 ? 1 / combinedFairProbability : Infinity;
   const expectedEdge = (combinedMarketOdds * combinedFairProbability) - 1;
   const teams = new Set(predictions.map((prediction: any) => prediction.teamId ?? prediction.fixtureId));
   const blockers: string[] = [];
+  if (predictions.some((prediction) => modelProbabilityFor({ probability: prediction.estimatedProbability }) === null)) blockers.push('missing-model-probability');
   if (combinedFairProbability < 0.05) blockers.push('low-conviction');
   if (combinedMarketOdds > 50) blockers.push('lottery-ticket');
   if (teams.size < predictions.length) blockers.push('duplicate-team');

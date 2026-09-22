@@ -339,7 +339,7 @@ test('07:15 recovers a due retryable Daily for the slate that rolled into today'
   });
 });
 
-test('10:15 prioritizes a due rollover retry over the new next-slate initial run', () => {
+test('10:15 closes rollover recovery and prioritizes the new next-slate initial run', () => {
   withArtifacts((artifactRoot) => {
     const paths = rolloverPathsFor(artifactRoot);
     writeJson(paths.rolloverDailyLock, {
@@ -349,8 +349,26 @@ test('10:15 prioritizes a due rollover retry over the new next-slate initial run
     assert.equal(existsSync(paths.dailyLock), false);
 
     const plan = planDailyOps({ now: ROLLOVER_AT.daily, artifactRoot });
-    assert.deepEqual([plan.heavy?.flow, plan.heavy?.mode], ['daily', 'retry']);
-    assert.equal(plan.heavy?.targetDate, '2026-07-16');
+    assert.deepEqual([plan.heavy?.flow, plan.heavy?.mode], ['daily', 'initial']);
+    assert.equal(plan.heavy?.targetDate, '2026-07-17');
+    assert.equal(plan.heavy?.reason, 'daily-never-attempted');
+  });
+});
+
+test('night recovery retries tomorrow and never replays a due rollover slate', () => {
+  withArtifacts((artifactRoot) => {
+    const paths = pathsFor(artifactRoot);
+    writeJson(paths.rolloverDailyLock, { status: 'retryable', retryAfter: '2026-07-15T06:00:00.000Z' });
+    writeJson(paths.strategyLock, { status: 'published' });
+    writeJson(paths.dailyLock, { status: 'retryable', retryAfter: '2026-07-15T23:00:00.000Z' });
+    for (const now of [AT.recovery1, AT.recovery2]) {
+      const plan = planDailyOps({ now, artifactRoot });
+      assert.equal(plan.heavy?.targetDate, '2026-07-16');
+      assert.equal(plan.heavy?.reason, 'daily-retryable-due');
+      assert.equal(plan.heavy?.path, paths.dailyLock);
+    }
+    writeJson(paths.dailyLock, { status: 'published' });
+    assert.equal(planDailyOps({ now: AT.recovery2, artifactRoot }).heavy, null);
   });
 });
 

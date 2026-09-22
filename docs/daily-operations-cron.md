@@ -11,7 +11,7 @@ Esta guia deja el flujo diario de Gana v9 programable con una sola autoridad de 
 ## Horarios
 
 - `07:15` Guatemala: aplicar retencion una vez por fecha, validar primero el dia anterior contra el artifact realmente publicado y, como flujo agent-heavy, recuperar un Daily `retryable` del slate de hoy cuyo `retryAfter` vencio tras el rollover.
-- `10:15` Guatemala: correr el Daily E2E inicial del dia siguiente con Codex Terra (`gpt-5.6-terra`), reasoning `high`, sin fast tier, council gate y Discord.
+- `10:15` Guatemala: correr el Daily E2E inicial del dia siguiente con Codex Astra (`gpt-6-astra`), reasoning `medium`, sin fast tier, council gate y Discord.
 - `13:15` Guatemala: recuperar primero un Daily inicial que nunca se intento; si ya hubo intento, ejecutar strategy review antes de un Daily meramente `retryable`.
 - `18:15` y `22:15` Guatemala: reintentar el Daily normal del slate de manana solo cuando el lock exacto esta `retryable` y `retryAfter` ya vencio.
 
@@ -25,7 +25,7 @@ runnable si el lock `daily-e2e-YYYY-MM-DD.lock` esta `published` y existe exacta
 Nunca usa `--force`, no reenvia `publishing`/`publication-uncertain` y deja visibles
 en `validationBacklog` las fechas bloqueadas o sin Daily publicado. Al cambiar la
 fecha local tambien inspecciona el lock del slate de hoy: un `retryable` vencido
-conserva prioridad sobre el Daily inicial de manana, mientras un estado terminal
+se recupera solo en la ventana 07:15–10:15; desde las 10:15 se prioriza el slate de manana, mientras un estado terminal
 de hoy no lo bloquea.
 
 ## Dispatcher canonico
@@ -120,16 +120,36 @@ scripts/gana-daily-e2e-notify.sh
 Este script:
 
 1. Calcula manana en `America/Guatemala`.
-2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.6-terra --web live --parlay-profile portfolio-v2 --required-leagues 1:World Cup:World:2026`, con reasoning `high` y `service_tier=fast` desactivado.
+2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-6-astra --web live --parlay-profile portfolio-v2 --required-leagues auto`, con reasoning `medium` y `service_tier=fast` desactivado.
 3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`, `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES=10000`) para cubrir el universo diario disponible y low-odds elegibles.
-4. Usa `GANA_LOW_ODDS_THRESHOLD=1.20` por defecto; low-odds cubre `h2h` casa/visitante y `double_chance` `home_or_draw`/`draw_or_away` dentro del umbral.
-5. Genera `portfolio-v2`, que publica como enfoques diarios `parlay-diamante`, `parlay-refinado` y `low-variance` cuando sobreviven las compuertas.
-6. Genera `daily-required-league-recommendations.json` para ligas obligatorias; por defecto World Cup `1:World Cup:World:2026`. Este addendum audita cada fixture requerido, produce proyecciones atomicas cuando hay picks no bloqueados y marca los 3 enfoques de parlay (`principal`, `resultados`, `mixto-seguro`) como `selected` o `blocked` con razones. El planner obligatorio es safety-first: prioriza cobertura de doble oportunidad, pares de totales conservadores y la mejor pareja corta de doble oportunidad, con cuotas realistas y flags de revision cuando usa overrides de seguridad.
+4. Usa `GANA_LOW_ODDS_THRESHOLD=1.10`: ganador 1X2 local/visitante con cuota estrictamente menor al umbral. Barre todas las paginas y casas disponibles, con timezone Guatemala y diagnostico de cobertura; doble oportunidad no cuenta como favorito ganador.
+5. Genera `portfolio-v2`; audita diariamente `low-odds-top`, `parlay-diamante`, `parlay-refinado` y `low-variance`. Low-odds busca cuota combinada >=1.20 usando 2–4 ganadores <1.10 de partidos distintos y gates intactos. Si no hay candidatos suficientes se registra blocked con motivos, sin inventar picks.
+6. Con `--required-leagues auto`, el preflight refresca cada siete dias `.artifacts/gana-v9/weekly-leagues.json` mediante `/leagues?current=true`, verificando fechas de temporada y cobertura. Añade automaticamente competiciones principales activas a la consideracion diaria, incluyendo copas y ligas femeninas cubiertas. El addendum audita cada fixture: considerar una liga no obliga a publicar picks inseguros. Overrides explicitos por lista/off siguen disponibles. Un refresh fallido conserva la lista hasta 14 dias con advertencia, sin extender expiry; sin cache valido falla de forma visible.
 7. Hidrata nombres de partidos desde los `fixtures.json` persistidos de los runs fuente para evitar etiquetas `Fixture ...` o UUIDs en Discord.
 8. Pasa recomendaciones y parlays por el council local inspirado en Council of High Intelligence; el gate rechaza edge negativo, riesgo duro, edge inflado o score bajo antes de publicar.
-9. Si ningun parlay sobrevive pero hay simples fuertes, compone parlays de revision desde esas simples para mantener la funcionalidad diaria de parlays sin dejar pasar parlays malos.
-10. Calcula una sola `dailyOddsFloorStrategy` sobre las recomendaciones finales y el addendum obligatorio: conserva picks con cuota publicada `>=1.45`, elige la mayor confianza publicada y desempata solo por orden publicado. Persiste el mismo snapshot en `daily-e2e-summary.json`, `daily-parlay-recommendations.json` y `daily-report.md`; si no hay elegible, guarda `status=no-eligible-pick` y `selectedPick=null`.
-11. Envia `daily-parlay-recommendations.json` al canal de recomendaciones en el formato canonico de embeds nativos, deja el resumen accionable del council como control y agrega al final un mensaje independiente con la apuesta analitica del dia o la ausencia explicita de un pick elegible.
+9. La composicion desde simples conserva elegibilidad, producto de confianza de las piernas y ventanas de cada perfil. El valor esperado usa el producto de probabilidades del modelo con ajustes conservadores; la confianza de evidencia no sustituye esas probabilidades. No convierte blocked/review-only en diamante ni fuerza diversidad duplicando selecciones.
+10. Calcula la apuesta analitica del dia sobre selecciones publicadas elegibles con cuota >=1.45, confianza de evidencia (separada de probabilidad), sin overrides ni fallbacks de revision. Persiste el snapshot y su regla; si no hay elegible guarda `no-eligible-pick`.
+11. Los artifacts nuevos usan `presentation: concise-v1`: Discord incluye partido/hora, seleccion, cuota, confianza de evidencia y estado relevante, con paginacion. Omite repeticion tecnica/council y secciones vacias. El ledger incluye exactamente selecciones renderizadas; los replays legacy conservan su formato.
+12. Freshness toma la ultima publicacion anterior con validacion exacta y completa (hasta 14 dias), no el slate futuro sin liquidar. La misma cohorte descriptiva alimenta scoring, con tamaño de muestra y sin retunar umbrales automaticamente.
+13. Antes del preflight, la reserva y el envio, vuelve a consultar horarios y estados de los fixtures en DB. Solo publica partidos programados y futuros; metadata ausente o inicio vencido bloquean la entrega. Un bloqueo posterior a la reserva queda registrado como `send-blocked`, sin reenvio automatico.
+
+Las probabilidades justas de doble oportunidad se normalizan con suma 2 porque
+sus tres resultados se solapan. El consenso y el indicador de cobertura de casas
+usan todas las cuotas recibidas; la seleccion conserva la lista de casas
+habilitadas. Este indicador es un proxy de cobertura, no volumen negociado real,
+y mantiene su minimo de tres casas.
+
+La investigacion distingue inicio de ejecucion, captura del contexto y fecha
+de corte deportivo. En modo prematch, una captura segundos posterior al inicio
+es admisible antes del kickoff. En una reconstruccion historica se requiere
+disponibilidad verificable anterior al corte; consultar hoy datos antiguos no
+demuestra que estaban disponibles entonces.
+
+Research determina si los hechos están listos para scoring; no exige que ese paso
+ya haya calculado probabilidades o valor esperado. Scoring entrega una estimación
+fundada sin calibrar y el servicio aplica la calibración disponible y los gates.
+La falta de historial de calibración se conserva como incertidumbre; nunca se
+etiqueta una estimación cruda como empíricamente calibrada.
 
 Strategy review del dia anterior:
 
@@ -142,7 +162,7 @@ Este script:
 1. Calcula ayer en `America/Guatemala`.
 2. Respeta el lock `strategy-review-YYYY-MM-DD.lock` y no duplica un resultado terminal.
 3. Ejecuta `pnpm gana strategy-review --date YYYY-MM-DD --scope strategy-YYYY-MM-DD` sin recalcular validacion ni `daily-metrics`; el flujo canonico de las `07:15` es el unico propietario de esas metricas publicadas.
-4. Fuerza Codex como proveedor del analisis, con `GANA_STRATEGY_REVIEW_MODEL=gpt-5.6-terra`, `GANA_STRATEGY_REVIEW_REASONING_EFFORT=high`, fast desactivado y sin fallbacks por defecto.
+4. Fuerza Codex como proveedor del analisis, con `GANA_STRATEGY_REVIEW_MODEL=gpt-6-astra`, `GANA_STRATEGY_REVIEW_REASONING_EFFORT=medium`, fast desactivado y sin fallbacks por defecto.
 5. Genera `strategy-review.json`, `strategy-review.md` y actualiza `docs/harness-strategy-review-log.md` con propuestas de cambio al Harness.
 6. Notifica el canal de strategy review con un mensaje tecnico: resumen de rendimiento, patrones efectivos/fallidos y cambios propuestos por archivo/prioridad/verificacion.
 
@@ -168,27 +188,27 @@ Variables utiles:
 - `GANA_CRON_MAX_FIXTURES_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_FIXTURES_PER_RUN`.
 - `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN`.
 - `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN`: default operativo cron `10000`; se aplica como `GANA_MAX_PROVIDER_REQUESTS_PER_RUN`.
-- `GANA_LOW_ODDS_THRESHOLD`: default `1.20`.
+- `GANA_LOW_ODDS_THRESHOLD`: default `1.10`, comparacion estricta `<`.
 - `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES`: default `10000`; permite que el barrido low-odds revise la pizarra diaria completa.
 - `GANA_DAILY_PROVIDERS`: default `codex`.
-- `GANA_DAILY_CODEX_MODEL`: default `gpt-5.6-terra`.
-- `GANA_DAILY_REASONING_EFFORT`: default `high`; el wrapper lo mapea a `AGENT_REASONING_EFFORT` solo para la corrida diaria.
+- `GANA_DAILY_CODEX_MODEL`: default `gpt-6-astra`.
+- `GANA_DAILY_REASONING_EFFORT`: default `medium`; el wrapper lo mapea a `AGENT_REASONING_EFFORT` solo para la corrida diaria.
 - `GANA_DAILY_FAST_MODE`: default `false`; el wrapper lo mapea a `AGENT_FAST_MODE` y omite `service_tier="fast"`.
-- `GANA_DAILY_CODEX_FALLBACK_MODELS`: default vacio para mantener toda la corrida en Terra; acepta una lista de modelos separada por comas para habilitar fallback explicitamente.
+- `GANA_DAILY_CODEX_FALLBACK_MODELS`: default vacio para mantener toda la corrida en Astra; acepta una lista de modelos separada por comas para habilitar fallback explicitamente.
 - `GANA_MAINTENANCE_PAUSED`: default `false`; usar `true` solo durante una migracion/cutover para que retencion, Daily E2E, validacion y strategy review no inicien trabajo nuevo sobre la DB ni Discord. La pausa no cancela una retencion que ya tiene el lock: esperar que ese proceso termine antes de cambiar `DATABASE_URL`.
 - `GANA_DAILY_PUBLISH_EXISTING`: default `false`; habilita explicitamente el camino de publicacion de un artifact ya terminado sin volver a ejecutar E2E, providers ni busqueda web.
 - `GANA_DAILY_PUBLISH_EXISTING_MAX_AGE_HOURS`: default `36`; antiguedad maxima conjunta del artifact y su `daily-e2e-summary.json` para `publish-existing`.
 - `GANA_DAILY_PROVIDER_CONCURRENCY`: default `1`.
-- `GANA_DAILY_REQUIRED_LEAGUES`: default `1:World Cup:World:2026`; acepta lista separada por comas en formato `leagueId:name:country:season`, o `off` para desactivar el addendum obligatorio.
+- `GANA_DAILY_REQUIRED_LEAGUES`: default `auto` (descubrimiento semanal); acepta lista `leagueId:name:country:season`, o `off`.
 - `GANA_WEB_MODE`: default `live`.
-- `GANA_PARLAY_PROFILE`: default `portfolio-v2`; genera `parlay-diamante`, `parlay-refinado`, `parlay-all-in`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`; la publicacion diaria prioriza `parlay-diamante`, `parlay-refinado` y `low-variance`.
+- `GANA_PARLAY_PROFILE`: default `portfolio-v2`; genera `parlay-diamante`, `parlay-refinado`, `parlay-all-in`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`; la publicacion diaria considera `low-odds-top`, `parlay-diamante`, `parlay-refinado` y `low-variance` con firmas distintas y sin forzar picks.
 - `AGENT_CODEX_FALLBACK_MODELS`: fallback generico del agente; Daily E2E lo reemplaza con `GANA_DAILY_CODEX_FALLBACK_MODELS` (vacio por defecto).
 - `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
 - `GANA_DISCORD_MAX_SELECTIONS`: default `25` para publicar todas las recomendaciones diarias disponibles en el artifact normal; el notifier pagina mensajes nativos cuando hace falta.
 - `GANA_METRICS_PERSIST`: default `true`.
 - `GANA_STRATEGY_REVIEW_DATE`: fuerza fecha para strategy review diario.
-- `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-5.6-terra`.
-- `GANA_STRATEGY_REVIEW_REASONING_EFFORT`: esfuerzo de razonamiento. Default: `high`.
+- `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-6-astra`.
+- `GANA_STRATEGY_REVIEW_REASONING_EFFORT`: esfuerzo de razonamiento. Default: `medium`.
 - `GANA_STRATEGY_REVIEW_FAST_MODE`: default `false`; el wrapper fuerza `AGENT_FAST_MODE=false`.
 - `GANA_STRATEGY_REVIEW_CODEX_FALLBACK_MODELS`: default vacio para mantener el analisis completo en Terra.
 - `GANA_STRATEGY_REVIEW_CODEX_SANDBOX`: sandbox Codex para el analisis. Default: `read-only`.

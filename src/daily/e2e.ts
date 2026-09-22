@@ -9,6 +9,8 @@ import { runDailyMetrics, type DailyMetricsRunResult } from '../metrics/daily.js
 import { runParlayAnalysis, type ParlayAnalysisRunResult } from '../parlay/analysis.js';
 import { runParlayBuild, type ParlayBuildRunResult, type RunParlayBuildInput } from '../parlay/service.js';
 import type { ResearchWebMode } from '../prediction/prompts.js';
+import type { WeeklyLeagueDiscovery } from './league-discovery.js';
+import { readPublishedValidationMetrics } from './published-feedback.js';
 import { createStorageRepositories } from '../storage/repositories/index.js';
 import { getPrismaClient } from '../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../storage/types.js';
@@ -27,12 +29,6 @@ import {
   ATOMIC_RECOMMENDATION_CONFIDENCE_FLOOR,
   ATOMIC_RECOMMENDATION_EDGE_FLOOR,
   ATOMIC_RECOMMENDATION_PROFILE,
-  ATOMIC_SAFETY_BREAK_EVEN_EDGE_FLOOR,
-  ATOMIC_SAFETY_DOUBLE_CHANCE_MAX_ODDS,
-  ATOMIC_SAFETY_DOUBLE_CHANCE_MIN_ODDS,
-  ATOMIC_SAFETY_MIN_EFFECTIVE_CONFIDENCE,
-  ATOMIC_SAFETY_REVIEW_EDGE_FLOOR,
-  ATOMIC_SAFETY_TOTALS_MAX_ODDS,
   DAILY_ATOMIC_RECOMMENDATION_LIMIT,
   DAILY_FALLBACK_PARLAY_LEGS,
   DAILY_FALLBACK_PARLAY_LIMIT,
@@ -84,6 +80,7 @@ export interface RunDailyE2EInput {
   persistMetrics?: boolean;
   dailyBatchId?: string;
   requiredLeagues?: DailyRequiredLeagueInput[];
+  leagueDiscovery?: WeeklyLeagueDiscovery;
 }
 
 export interface DailyProviderRunResult {
@@ -175,6 +172,7 @@ export interface DailyE2EDependencies {
   buildParlay?: typeof runParlayBuild;
   analyzeParlays?: typeof runParlayAnalysis;
   buildDailyMetrics?: typeof runDailyMetrics;
+  readValidationMetrics?: typeof readPublishedValidationMetrics;
   repositories?: ReturnType<typeof createStorageRepositories>;
   sharedPipelineDeps?: RunPipelineDependencies;
   now?: () => Date;
@@ -438,7 +436,8 @@ export async function runDailyE2E(
     scope: dailyBatchId,
     persist: input.persistMetrics !== false,
   }, metricsRuntime);
-  const validationFreshness = dailyValidationFreshness(metrics, input.date);
+  const historicalMetrics = (deps.readValidationMetrics ?? readPublishedValidationMetrics)(effectiveConfig, input.date, startedAt);
+  const validationFreshness = dailyValidationFreshness(historicalMetrics, input.date);
 
   const completedAt = (deps.now ?? (() => new Date()))();
   const { comparison: providerComparison, consensus: providerConsensus } = buildDailyProviderComparison({
@@ -612,6 +611,7 @@ export async function runDailyE2E(
     requiredLeagueRecommendations: requiredLeagueArtifact,
   });
   const publishedTargets = recommendationArtifactTargets({
+    presentation: 'concise-v1',
     recommendations: finalRecommendations,
     requiredLeagueRecommendations: requiredLeagueArtifact,
   });
@@ -675,6 +675,7 @@ export async function runDailyE2E(
   );
   const summary = {
     dailyBatchId,
+    leagueDiscovery: input.leagueDiscovery ?? null,
     date: input.date,
     status: ok ? 'succeeded' : 'failed',
     verdict,
@@ -766,6 +767,8 @@ export async function runDailyE2E(
   const summaryPath = writeJsonArtifact(dailyBatchId, 'daily-e2e-summary.json', summary);
   const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', jsonValue({
     dailyBatchId,
+    presentation: 'concise-v1',
+    leagueDiscovery: input.leagueDiscovery ?? null,
     date: input.date,
     sourceRunIds: parlayAnalysisRunIds,
     councilCandidateRecommendations,
@@ -795,13 +798,9 @@ export async function runDailyE2E(
       atomicConservativeSelection: {
         enabled: true,
         sameFixtureReplacement: 'h2h home/away may be replaced only by the matching double-chance no-loss pick; goals over/under may be replaced only by a safer emitted line in the same direction',
-        displayConfidence: 'uses modelProbability/probability as the visible confidence metric when available, while ranking keeps the original confidence/edge score',
-        doubleChanceMinOdds: ATOMIC_SAFETY_DOUBLE_CHANCE_MIN_ODDS,
-        doubleChanceMaxOdds: ATOMIC_SAFETY_DOUBLE_CHANCE_MAX_ODDS,
-        totalsMaxOdds: ATOMIC_SAFETY_TOTALS_MAX_ODDS,
-        minEffectiveConfidence: ATOMIC_SAFETY_MIN_EFFECTIVE_CONFIDENCE,
-        breakEvenEdgeFloor: ATOMIC_SAFETY_BREAK_EVEN_EDGE_FLOOR,
-        reviewEdgeFloor: ATOMIC_SAFETY_REVIEW_EDGE_FLOOR,
+        displayConfidence: 'evidence confidence; probability remains separate and never overrides confidence',
+        safetyOverrides: false,
+        eligibility: 'supported candidate/promotable with positive edge and no hard-risk flags; no blocked or review-only resurrection',
       },
       parlayDiamanteOddsWindow: { min: 1.1, max: 1.3 },
       parlayAllInPolicy: {
@@ -1113,6 +1112,7 @@ export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDai
   let lowOddsDiscovery: Promise<FixtureDiscoveryResult> | undefined;
   let lowOddsSlate: Promise<Awaited<ReturnType<typeof getApiFootballDateOddsSlate>>> | undefined;
   const oddsSnapshots = new Map<string, Promise<Awaited<ReturnType<typeof getApiFootballOddsSnapshot>>>>();
+  const allBookmakerSnapshots = new Map<string, Promise<Awaited<ReturnType<typeof getApiFootballOddsSnapshot>>>>();
 
   return {
     discoverFixtures: async (runConfig, discoveryInput, runRuntime) => {
@@ -1148,12 +1148,12 @@ export function createSharedPipelineDeps(config: AgentConfig, input: Pick<RunDai
     },
     fetchLowOddsSnapshot: async (runConfig, fixtureId, runRuntime, markets) => {
       const key = oddsCacheKey(fixtureId, markets);
-      let snapshot = oddsSnapshots.get(key) ?? findCompatibleOddsSnapshot(oddsSnapshots, fixtureId, markets);
+      let snapshot = allBookmakerSnapshots.get(key) ?? findCompatibleOddsSnapshot(allBookmakerSnapshots, fixtureId, markets);
       if (!snapshot) {
         snapshot = getApiFootballOddsSnapshot(lowOddsScanProviderConfig(configForSports(runConfig, config)), fixtureId, runRuntime, markets);
-        oddsSnapshots.set(key, snapshot);
+        allBookmakerSnapshots.set(key, snapshot);
       } else {
-        oddsSnapshots.set(key, snapshot);
+        allBookmakerSnapshots.set(key, snapshot);
       }
       return snapshot;
     },

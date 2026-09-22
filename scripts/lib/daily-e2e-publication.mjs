@@ -77,7 +77,7 @@ export async function publishDailyRecommendations(input, dependencies = {}) {
       if (!advisoryLock.ok) return blocked(advisoryLock.reason);
       const existing = await inspectExistingPublicationLedger(tx, { artifact, date, dailyBatchId });
       if (existing.status !== 'empty') return existing;
-      const dbLedger = await verifyDbPersistenceLedger(artifact, { prisma: tx });
+      const dbLedger = await verifyDbPersistenceLedger(artifact, { prisma: tx, now });
       if (!dbLedger.ok) return { ...blocked(dbLedger.reason), dbLedger };
       return { status: 'ready', health, dbLedger };
     });
@@ -116,7 +116,7 @@ export async function publishDailyRecommendations(input, dependencies = {}) {
       if (!advisoryLock.ok) return blocked(advisoryLock.reason);
       const existing = await inspectExistingPublicationLedger(tx, { artifact, date, dailyBatchId });
       if (existing.status !== 'empty') return existing;
-      const dbLedger = await verifyDbPersistenceLedger(artifact, { prisma: tx });
+      const dbLedger = await verifyDbPersistenceLedger(artifact, { prisma: tx, now });
       if (!dbLedger.ok) return { ...blocked(dbLedger.reason), dbLedger };
       const publicationLedger = await reserveDiscordPublicationLedger(artifact, {
         prisma: tx,
@@ -139,6 +139,29 @@ export async function publishDailyRecommendations(input, dependencies = {}) {
         targetValidation,
         databaseGate,
         dryRun: dryRun.output,
+      };
+    }
+
+    // The dry-run and reservation may cross kickoff or a fixture status update.
+    // Read the persisted fixture relations again immediately before dispatch.
+    let sendLedger;
+    try {
+      sendLedger = await verifyDbPersistenceLedger(artifact, { prisma, now });
+    } catch (error) {
+      sendLedger = { ok: false, reason: `pre-send-db-verification-failed:${safeErrorMessage(error, databaseUrl)}` };
+    }
+    if (!sendLedger.ok) {
+      await markPublicationBlockedBeforeSend(prisma, { artifact, dailyBatchId, attemptId, reason: sendLedger.reason });
+      return {
+        ...blocked(sendLedger.reason),
+        reserved: true,
+        counts,
+        alignment,
+        targetValidation,
+        databaseGate,
+        dbLedger: sendLedger,
+        dryRun: dryRun.output,
+        publicationLedger: reservation.publicationLedger,
       };
     }
 
@@ -254,7 +277,7 @@ export async function publishDailyRecommendations(input, dependencies = {}) {
   }
 }
 
-export async function verifyDbPersistenceLedger(artifact, { prisma } = {}) {
+export async function verifyDbPersistenceLedger(artifact, { prisma, now = () => new Date() } = {}) {
   const targets = collectPublicationLedgerTargetIds(artifact);
   const plan = buildDbPublicationLedgerPlan(artifact);
   const parlayIds = plan.persistedParlayIds;
@@ -274,12 +297,13 @@ export async function verifyDbPersistenceLedger(artifact, { prisma } = {}) {
       predictionIds,
     };
   }
+  const fixtureSelection = { select: { id: true, scheduledAt: true, status: true } };
   const [parlays, predictions] = await Promise.all([
     parlayIds.length
-      ? prisma.parlay.findMany({ where: { id: { in: parlayIds } }, select: { id: true } })
+      ? prisma.parlay.findMany({ where: { id: { in: parlayIds } }, select: { id: true, legs: { select: { fixture: fixtureSelection } } } })
       : Promise.resolve([]),
     predictionIds.length
-      ? prisma.prediction.findMany({ where: { id: { in: predictionIds } }, select: { id: true } })
+      ? prisma.prediction.findMany({ where: { id: { in: predictionIds } }, select: { id: true, fixture: fixtureSelection } })
       : Promise.resolve([]),
   ]);
   const foundParlays = new Set(parlays.map((item) => item.id));
@@ -299,6 +323,8 @@ export async function verifyDbPersistenceLedger(artifact, { prisma } = {}) {
       missingPredictionIds,
     };
   }
+  const fixtureEligibility = verifyUpcomingPublicationFixtures(parlays, predictions, now());
+  if (!fixtureEligibility.ok) return { ...fixtureEligibility, parlayIds: targets.parlayIds, predictionIds };
   return {
     ok: true,
     reason: `verified-db-ledger:p=${parlayIds.length},artifact-p=${plan.artifactOnlyParlayIds.length},pred=${predictionIds.length}`,
@@ -307,7 +333,35 @@ export async function verifyDbPersistenceLedger(artifact, { prisma } = {}) {
     artifactOnlyParlayIds: plan.artifactOnlyParlayIds,
     invalidParlayIds: plan.invalidParlayIds,
     predictionIds,
+    fixtureEligibility,
   };
+}
+
+function verifyUpcomingPublicationFixtures(parlays, predictions, checkedAt) {
+  const checkedAtMs = checkedAt instanceof Date ? checkedAt.getTime() : Date.parse(checkedAt);
+  if (!Number.isFinite(checkedAtMs)) return { ok: false, reason: 'publication-invalid-current-time' };
+  const targets = [
+    ...predictions.map((prediction) => ({ targetType: 'prediction', targetId: prediction.id, fixture: prediction.fixture })),
+    ...parlays.flatMap((parlay) => (Array.isArray(parlay.legs) && parlay.legs.length ? parlay.legs : [{}])
+      .map((leg) => ({ targetType: 'parlay', targetId: parlay.id, fixture: leg.fixture }))),
+  ];
+  const failures = [];
+  for (const target of targets) {
+    const fixture = target.fixture;
+    const kickoff = fixture?.scheduledAt;
+    const kickoffMs = kickoff instanceof Date ? kickoff.getTime() : typeof kickoff === 'string' ? Date.parse(kickoff) : NaN;
+    const reason = !fixture || !Number.isFinite(kickoffMs) || typeof fixture.status !== 'string' || fixture.status === 'unknown'
+      ? 'unknown-fixture-metadata'
+      : fixture.status !== 'scheduled'
+        ? 'fixture-not-scheduled'
+        : kickoffMs <= checkedAtMs
+          ? 'fixture-already-started'
+          : null;
+    if (reason) failures.push({ targetType: target.targetType, targetId: target.targetId, fixtureId: fixture?.id ?? null, reason });
+  }
+  return failures.length
+    ? { ok: false, reason: `publication-fixtures-not-upcoming:${failures.length}`, checkedAt: new Date(checkedAtMs).toISOString(), failures }
+    : { ok: true, reason: 'publication-fixtures-upcoming', checkedAt: new Date(checkedAtMs).toISOString(), fixtureCount: targets.length };
 }
 
 export function discordMessageIds(notification) {
@@ -541,6 +595,24 @@ async function markPublicationUncertain(prisma, { artifact, dailyBatchId, attemp
     });
   } catch {
     // A durable publishing reservation is already enough to block an automatic resend.
+  }
+}
+
+async function markPublicationBlockedBeforeSend(prisma, { artifact, dailyBatchId, attemptId, reason }) {
+  const targetRows = publicationTargetRows(artifact);
+  try {
+    await prisma.publicRecommendationPublication.updateMany({
+      where: {
+        dailyBatchId,
+        channel: 'discord',
+        target: 'recommendations',
+        status: 'publishing',
+        OR: targetRows.map((row) => ({ targetType: row.targetType, targetId: row.targetId })),
+      },
+      data: { status: 'send-blocked', metadata: { attemptId, phase: 'blocked-before-send', reason } },
+    });
+  } catch {
+    // Keep the publishing reservation if marking fails; it prevents automatic sends.
   }
 }
 

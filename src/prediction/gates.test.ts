@@ -113,6 +113,16 @@ describe('prediction gates', () => {
     assert.match(result.warnings.join('\n'), /research.*not promotable/i);
   });
 
+  it('does not count explicitly unsupported, weak or conflicting claims as sufficient evidence', () => {
+    for (const supportLevel of ['unsupported', 'weak', 'conflicting', 'unknown']) {
+      const result = evaluatePredictionGates({ fixture, oddsQuotes, researchBundle: {
+        ...researchBundle, claims: researchBundle.claims.map((claim) => ({ ...claim, supportLevel })),
+      } });
+      assert.equal(result.verdict, 'review-required', supportLevel);
+      assert.match(result.reasons.join('\n'), /insufficient evidence/);
+    }
+  });
+
   it('keeps aggregate prediction gate promotable when every leg only has soft warnings', () => {
     const result = aggregatePredictionGate([{
       verdict: 'promotable',

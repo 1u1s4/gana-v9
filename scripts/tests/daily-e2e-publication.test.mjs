@@ -6,9 +6,12 @@ import {
   buildRecommendationNotifierArgs,
   publishDailyRecommendations,
   validatePublishDatabaseUrl,
+  verifyDbPersistenceLedger,
 } from '../lib/daily-e2e-publication.mjs';
 
 const DATE = '2026-07-15';
+const BEFORE_KICKOFF = '2026-07-15T17:59:00.000Z';
+const KICKOFF = '2026-07-15T18:00:00.000Z';
 const BATCH = 'daily-2026-07-15-full';
 const PREDICTION_ID = '11111111-1111-5111-8111-111111111111';
 const ARTIFACT_PATH = `/tmp/${BATCH}/daily-parlay-recommendations.json`;
@@ -111,6 +114,7 @@ describe('daily E2E publication workflow', () => {
     let notified = 0;
     const result = await publishDailyRecommendations(baseInput(), {
       createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
       runNotifier: async () => { notified += 1; },
     });
 
@@ -120,11 +124,99 @@ describe('daily E2E publication workflow', () => {
     assert.equal(fake.calls.createMany, 0);
   });
 
+  it('blocks started, non-scheduled, and unknown fixtures from canonical daily and existing publication', async () => {
+    for (const mode of ['daily-e2e', 'publish-existing']) {
+      for (const fixture of [
+        { id: 'fixture-1', scheduledAt: new Date(BEFORE_KICKOFF), status: 'scheduled' },
+        { id: 'fixture-1', scheduledAt: new Date('2026-07-15T17:58:00Z'), status: 'scheduled' },
+        ...['live', 'completed', 'cancelled', 'unknown'].map((status) => ({ id: 'fixture-1', scheduledAt: new Date(KICKOFF), status })),
+        { id: 'fixture-1', scheduledAt: null, status: 'scheduled' },
+        { id: 'fixture-1', scheduledAt: 'invalid-date', status: 'scheduled' },
+        null,
+      ]) {
+        const fake = createFakePrisma({ fixture });
+        let notified = 0;
+        const result = await publishDailyRecommendations(baseInput({ mode }), {
+          createPrismaClient: async () => fake.client,
+          now: () => new Date(BEFORE_KICKOFF),
+          runNotifier: async () => { notified++; },
+        });
+        assert.equal(result.status, 'blocked', `${mode}: ${JSON.stringify(fixture)}`);
+        assert.match(result.reason, /^publication-fixtures-not-upcoming:/);
+        assert.equal(result.sent, false);
+        assert.equal(result.reserved, false);
+        assert.equal(notified, 0);
+        assert.equal(fake.calls.createMany, 0);
+      }
+    }
+  });
+
+  it('rechecks kickoff after dry-run and blocks reservation when time reaches kickoff', async () => {
+    const fake = createFakePrisma();
+    let clock = new Date(BEFORE_KICKOFF);
+    const calls = [];
+    const result = await publishDailyRecommendations(baseInput(), {
+      createPrismaClient: async () => fake.client,
+      now: () => clock,
+      runNotifier: async (call) => {
+        calls.push(call);
+        clock = new Date(KICKOFF);
+        return dryRunOutput();
+      },
+    });
+    assert.equal(result.status, 'blocked');
+    assert.equal(result.dbLedger.failures[0].reason, 'fixture-already-started');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].dryRun, true);
+    assert.equal(fake.calls.createMany, 0);
+  });
+
+  it('rechecks persisted status after reservation and records a known unsent block', async () => {
+    const fixture = { id: 'fixture-1', scheduledAt: new Date(KICKOFF), status: 'scheduled' };
+    const fake = createFakePrisma({ fixture, onReserve: () => { fixture.status = 'live'; } });
+    const calls = [];
+    const dependencies = {
+      createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
+      runNotifier: async (call) => { calls.push(call); return dryRunOutput(); },
+    };
+    const result = await publishDailyRecommendations(baseInput(), dependencies);
+    assert.equal(result.status, 'blocked');
+    assert.equal(result.sent, false);
+    assert.equal(result.reserved, true);
+    assert.equal(result.dbLedger.failures[0].reason, 'fixture-not-scheduled');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].dryRun, true);
+    assert.equal(fake.rows[0].status, 'send-blocked');
+    assert.equal(fake.rows[0].metadata.phase, 'blocked-before-send');
+    const retry = await publishDailyRecommendations(baseInput(), dependencies);
+    assert.equal(retry.status, 'ledger-conflict');
+    assert.equal(calls.length, 1);
+  });
+
+  it('checks every persisted parlay leg even when prediction targets are absent', async () => {
+    const parlayId = '22222222-2222-5222-8222-222222222222';
+    const artifact = makeArtifact({ recommendations: [{ kind: 'parlay', parlayId }], predictionIds: [] });
+    artifact.publishedTargets.parlayIds = [parlayId];
+    const future = { id: 'fixture-future', scheduledAt: new Date(KICKOFF), status: 'scheduled' };
+    for (const legs of [[], [{ fixture: future }, { fixture: { ...future, id: 'fixture-started', scheduledAt: new Date(BEFORE_KICKOFF) } }]]) {
+      const fake = createFakePrisma({ parlayLegs: legs });
+      const result = await verifyDbPersistenceLedger(artifact, { prisma: fake.client, now: () => new Date(BEFORE_KICKOFF) });
+      assert.equal(result.ok, false);
+      assert.match(result.reason, /^publication-fixtures-not-upcoming:/);
+      assert.equal(result.failures[0].targetType, 'parlay');
+    }
+    const fake = createFakePrisma({ parlayLegs: [{ fixture: future }] });
+    const valid = await verifyDbPersistenceLedger(artifact, { prisma: fake.client, now: () => new Date(BEFORE_KICKOFF) });
+    assert.equal(valid.ok, true);
+  });
+
   it('does not send when a complete publication ledger already exists', async () => {
     const fake = createFakePrisma({ existingRows: [publishedRow()] });
     let notified = 0;
     const result = await publishDailyRecommendations(baseInput(), {
       createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
       runNotifier: async () => { notified += 1; },
     });
 
@@ -143,6 +235,7 @@ describe('daily E2E publication workflow', () => {
       let notified = 0;
       const result = await publishDailyRecommendations(baseInput(), {
         createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
         runNotifier: async () => { notified += 1; },
       });
       assert.equal(result.status, 'ledger-conflict');
@@ -155,6 +248,7 @@ describe('daily E2E publication workflow', () => {
     const notifierCalls = [];
     const result = await publishDailyRecommendations(baseInput(), {
       createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
       runNotifier: async (call) => {
         notifierCalls.push(call);
         return { ok: false, reason: 'render-failed' };
@@ -173,6 +267,7 @@ describe('daily E2E publication workflow', () => {
     let notifierCalls = 0;
     const dependencies = {
       createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
       runNotifier: async (call) => {
         notifierCalls += 1;
         return call.dryRun ? dryRunOutput() : { ok: false, reason: 'discord-timeout' };
@@ -194,6 +289,7 @@ describe('daily E2E publication workflow', () => {
     const fake = createFakePrisma();
     const result = await publishDailyRecommendations(baseInput(), {
       createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
       runNotifier: async (call) => call.dryRun
         ? dryRunOutput({ payloadCount: 2 })
         : sendOutput({ payloadCount: 2, messageIds: ['message-1'] }),
@@ -209,6 +305,7 @@ describe('daily E2E publication workflow', () => {
     const fake = createFakePrisma();
     const result = await publishDailyRecommendations(baseInput(), {
       createPrismaClient: async () => fake.client,
+      now: () => new Date(BEFORE_KICKOFF),
       runNotifier: async (call) => call.dryRun
         ? dryRunOutput({ payloadCount: 2 })
         : sendOutput({ payloadCount: 2, messageIds: ['message-1', 'message-2'] }),
@@ -306,7 +403,8 @@ function publishedRow() {
   };
 }
 
-function createFakePrisma({ existingRows = [], schemaName = 'gana_ops', advisoryLock = true } = {}) {
+function createFakePrisma({ existingRows = [], schemaName = 'gana_ops', advisoryLock = true,
+  fixture = { id: 'fixture-1', scheduledAt: new Date(KICKOFF), status: 'scheduled' }, parlayLegs, onReserve } = {}) {
   const rows = existingRows.map((row) => ({ ...row }));
   const calls = { createMany: 0, updateMany: 0, transactions: 0, disconnects: 0 };
   const client = {
@@ -329,10 +427,16 @@ function createFakePrisma({ existingRows = [], schemaName = 'gana_ops', advisory
     },
     async $disconnect() { calls.disconnects += 1; },
     parlay: {
-      async findMany({ where }) { return (where.id.in ?? []).map((id) => ({ id })); },
+      async findMany({ where, select }) {
+        assert.deepEqual(select.legs.select.fixture.select, { id: true, scheduledAt: true, status: true });
+        return (where.id.in ?? []).map((id) => ({ id, legs: parlayLegs ?? [{ fixture }] }));
+      },
     },
     prediction: {
-      async findMany({ where }) { return (where.id.in ?? []).map((id) => ({ id })); },
+      async findMany({ where, select }) {
+        assert.deepEqual(select.fixture.select, { id: true, scheduledAt: true, status: true });
+        return (where.id.in ?? []).map((id) => ({ id, fixture }));
+      },
     },
     harnessRun: {
       async findUnique() { return { id: BATCH }; },
@@ -344,6 +448,7 @@ function createFakePrisma({ existingRows = [], schemaName = 'gana_ops', advisory
       async createMany({ data }) {
         calls.createMany += 1;
         rows.push(...data.map((row) => ({ ...row })));
+        onReserve?.();
         return { count: data.length };
       },
       async updateMany({ where, data }) {

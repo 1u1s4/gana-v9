@@ -64,6 +64,7 @@ export function evaluateEvidenceGate(input: EvidenceGateInput): EvidenceGateResu
   );
   const validClaims = claims.filter((claim) => {
     if (claim.conflictStatus === 'conflict') return false;
+    if (claim.supportLevel && !['supported', 'partial'].includes(claim.supportLevel)) return false;
     const ids = jsonStringArray(claim.evidenceIds);
     return ids.some((id) => strongEvidenceIds.has(id));
   });

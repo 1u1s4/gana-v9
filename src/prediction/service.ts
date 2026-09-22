@@ -5,6 +5,7 @@ import { runAgentWithRetry } from '../agent.js';
 import { normalizeUuid } from '../domain/ids.js';
 import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import { runFixtureResearch } from '../evidence/research.js';
+import { buildPublishedFeedbackPromptContext } from '../daily/published-feedback.js';
 import { createApiFootballPersistence, createApiFootballProvider } from '../providers/sports/api-football.js';
 import { API_FOOTBALL_PROVIDER, type FixtureStatistics } from '../providers/sports/types.js';
 import { movedAgainstPick } from '../markets/line-movement.js';
@@ -323,6 +324,7 @@ export async function runFixtureScoring(
     evidenceItems: research.evidenceItems.map(evidencePromptView),
     claims: research.claims.map(claimPromptView),
     allowedQuotes,
+    historicalValidationFeedback: scoringHistoricalFeedback(config, fixture, now()),
     providerContextWarnings: [
       ...providerContextWarnings,
       ...quoteTrimWarnings,
@@ -1227,6 +1229,7 @@ function evaluateMarketSpecificEvidence(input: {
   const selectedClaims = input.claims.filter((claim) => input.selectedClaimIds.includes(claim.id));
   const marketSpecificClaims = selectedClaims.filter((claim) => {
     if (claim.marketKey !== input.pick.market) return false;
+    if (!['supported', 'partial'].includes(claim.supportLevel) || claim.conflictStatus === 'conflict') return false;
     if (claim.selectionKey && claim.selectionKey !== input.pick.selection) return false;
     const claimLine = numberOrUndefined(claim.line);
     if (claimLine !== undefined && !sameOptionalNumber(claimLine, input.pick.line)) return false;
@@ -1235,15 +1238,9 @@ function evaluateMarketSpecificEvidence(input: {
   if (marketSpecificClaims.length) return { warnings: [] };
   const fallbackText = `${input.pick.rationale} ${input.pick.warnings.join(' ')}`.toLowerCase();
   if (/fallback|fixture-level|market evidence unavailable|market-specific evidence unavailable/.test(fallbackText)) {
-    return { warnings: [`market-specific evidence fallback declared for ${input.pick.market}:${input.pick.selection}`] };
+    return { warnings: [`market-specific evidence missing for ${input.pick.market}:${input.pick.selection}: fixture-level fallback declared; requires review`] };
   }
-  const evidenceMarkets = new Set(input.evidenceItems
-    .filter((item) => selectedEvidence.has(item.id))
-    .flatMap((item) => {
-      const metadata = objectMetadata(item.metadata);
-      return typeof metadata.market === 'string' ? [metadata.market] : [];
-    }));
-  if (evidenceMarkets.has(input.pick.market)) return { warnings: [] };
+  // A market tag on an evidence item is classification, not a supported claim.
   return { warnings: [`market-specific evidence missing for ${input.pick.market}:${input.pick.selection}${input.pick.line !== undefined ? `:${input.pick.line}` : ''}`] };
 }
 
@@ -1761,4 +1758,13 @@ function round(value: number): number {
 
 function basename(path: string): string {
   return path.split('/').filter(Boolean).at(-1) ?? 'predictions.json';
+}
+
+function scoringHistoricalFeedback(config: AgentConfig, fixture: FixtureRecord, now: Date) {
+  const kickoff = fixture.scheduledAt instanceof Date ? fixture.scheduledAt.getTime() : Date.parse(String(fixture.scheduledAt ?? ''));
+  const cutoff = new Date(Number.isFinite(kickoff) ? Math.min(kickoff, now.getTime()) : now.getTime());
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Guatemala', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(cutoff);
+  return buildPublishedFeedbackPromptContext(config, date, cutoff);
 }

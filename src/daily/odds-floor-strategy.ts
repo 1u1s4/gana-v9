@@ -5,7 +5,7 @@ import type {
 } from './required-leagues.js';
 import type { DailyFinalRecommendation, RecommendationLegDisplay } from './types.js';
 
-export const DAILY_ODDS_FLOOR_STRATEGY_VERSION = 'odds-floor-highest-confidence-v1';
+export const DAILY_ODDS_FLOOR_STRATEGY_VERSION = 'odds-floor-eligible-confidence-v2';
 export const DAILY_ODDS_FLOOR_MINIMUM_PUBLISHED_ODDS = 1.45;
 
 export type DailyOddsFloorStrategySource = 'daily' | 'required-atomic' | 'required-parlay';
@@ -40,10 +40,11 @@ export interface DailyOddsFloorStrategySelection {
   status: 'selected' | 'no-eligible-pick';
   rule: {
     minimumPublishedOdds: number;
-    selection: 'highest-published-confidence';
+    selection: 'highest-eligible-evidence-confidence';
     tieBreak: readonly ['published-order-ascending'];
   };
   evaluatedPickCount: number;
+  excludedPickCount: number;
   eligiblePickCount: number;
   selectedPick: DailyOddsFloorStrategyPick | null;
   analyticalArtifactOnly: true;
@@ -75,7 +76,7 @@ export function selectDailyOddsFloorStrategy(
 ): DailyOddsFloorStrategySelection {
   const minimumPublishedOdds = finiteNumber(input.minimumPublishedOdds)
     ?? DAILY_ODDS_FLOOR_MINIMUM_PUBLISHED_ODDS;
-  const candidates = strategyCandidates(input);
+  const { candidates, evaluatedPickCount } = strategyCandidates(input);
   const eligible = candidates
     .filter((candidate) => candidate.publishedOdds >= minimumPublishedOdds)
     .sort(compareStrategyCandidates);
@@ -86,10 +87,11 @@ export function selectDailyOddsFloorStrategy(
     status: selectedPick ? 'selected' : 'no-eligible-pick',
     rule: {
       minimumPublishedOdds,
-      selection: 'highest-published-confidence',
+      selection: 'highest-eligible-evidence-confidence',
       tieBreak: ['published-order-ascending'],
     },
-    evaluatedPickCount: candidates.length,
+    evaluatedPickCount,
+    excludedPickCount: evaluatedPickCount - candidates.length,
     eligiblePickCount: eligible.length,
     selectedPick,
     analyticalArtifactOnly: true,
@@ -97,7 +99,7 @@ export function selectDailyOddsFloorStrategy(
   };
 }
 
-function strategyCandidates(input: SelectDailyOddsFloorStrategyInput): CandidateDraft[] {
+function strategyCandidates(input: SelectDailyOddsFloorStrategyInput): { candidates: CandidateDraft[]; evaluatedPickCount: number } {
   const candidates: CandidateDraft[] = [];
   let publishedOrder = 0;
   const add = (candidate: Omit<CandidateDraft, 'publishedOrder'> | null) => {
@@ -113,12 +115,18 @@ function strategyCandidates(input: SelectDailyOddsFloorStrategyInput): Candidate
   for (const projection of input.requiredLeagueRecommendations.parlayProjections) {
     if (projection.status === 'selected') add(requiredParlayCandidate(projection));
   }
-  return candidates;
+  const unique = new Map<string, CandidateDraft>();
+  for (const candidate of candidates) {
+    const key = candidate.legs.map((leg) => [leg.fixtureId, leg.market, leg.selection, leg.line ?? ""].join(":" )).sort().join("|");
+    if (key && !unique.has(key)) unique.set(key, candidate);
+  }
+  return { candidates: [...unique.values()], evaluatedPickCount: publishedOrder };
 }
 
 function dailyCandidate(
   recommendation: DailyFinalRecommendation,
 ): Omit<CandidateDraft, 'publishedOrder'> | null {
+  if (!strategyPromotionEligible(recommendation)) return null;
   const recommendationRecord = recommendation as DailyFinalRecommendation & {
     odds?: unknown;
     confidence?: unknown;
@@ -129,10 +137,8 @@ function dailyCandidate(
     recommendation.legs[0]?.odds,
   ]);
   const confidence = publishedConfidence(recommendationRecord, [
-    'displayConfidence',
     'aggregateConfidence',
     'confidence',
-    'adjustedProbability',
   ]);
   const id = recommendation.kind === 'parlay'
     ? nonEmptyString(recommendation.parlayId)
@@ -158,11 +164,12 @@ function dailyCandidate(
 function requiredAtomicCandidate(
   projection: DailyRequiredLeagueAtomicProjection,
 ): Omit<CandidateDraft, 'publishedOrder'> | null {
+  if (!strategyPromotionEligible(projection)) return null;
   const publishedOdds = finiteNumber(projection.odds);
   const confidence = publishedConfidence(projection as DailyRequiredLeagueAtomicProjection & {
     displayConfidence?: unknown;
     aggregateConfidence?: unknown;
-  }, ['displayConfidence', 'confidence', 'aggregateConfidence']);
+  }, ['confidence', 'aggregateConfidence']);
   const id = nonEmptyString(projection.predictionId);
   if (publishedOdds === null || confidence === null || !id) return null;
   return {
@@ -182,11 +189,12 @@ function requiredAtomicCandidate(
 function requiredParlayCandidate(
   projection: DailyRequiredLeagueParlayProjection,
 ): Omit<CandidateDraft, 'publishedOrder'> | null {
+  if (!strategyPromotionEligible(projection)) return null;
   const publishedOdds = finiteNumber(projection.combinedOdds);
   const confidence = publishedConfidence(projection as DailyRequiredLeagueParlayProjection & {
     displayConfidence?: unknown;
     confidence?: unknown;
-  }, ['displayConfidence', 'aggregateConfidence', 'confidence']);
+  }, ['aggregateConfidence', 'confidence']);
   const id = nonEmptyString(projection.parlayId);
   if (publishedOdds === null || confidence === null || !id) return null;
   return {
@@ -203,6 +211,20 @@ function requiredParlayCandidate(
   };
 }
 
+function strategyPromotionEligible(value: {
+  harnessStatus?: string; status?: string; expectedEdge?: number | null;
+  selectionMode?: string; riskFlags?: readonly string[]; warnings?: readonly string[];
+  safetyOverride?: unknown;
+}): boolean {
+  const status = value.harnessStatus ?? value.status;
+  if (status && !['promotable', 'candidate', 'selected'].includes(status)) return false;
+  if (value.selectionMode === 'analytical-fallback' || value.safetyOverride) return false;
+  if (!Number.isFinite(value.expectedEdge) || Number(value.expectedEdge) <= 0) return false;
+  if ((value.riskFlags ?? []).some((flag) => /review-required|fallback|blocked|stale|lineup-pending|selection-evidence-missing|inflated|negative|parlay-ineligible|model-probability-safety|low-liquidity/.test(flag))) return false;
+  if ((value.warnings ?? []).some((warning) => /research is not promotable|fallback research|stale|insufficient evidence|low[-_ ]liquidity/i.test(warning))) return false;
+  return true;
+}
+
 function publishedConfidence(
   value: Partial<Record<DailyOddsFloorStrategyPick['confidenceMetric'], unknown>>,
   metricOrder: readonly DailyOddsFloorStrategyPick['confidenceMetric'][],
@@ -212,7 +234,7 @@ function publishedConfidence(
 } | null {
   for (const metric of metricOrder) {
     const parsed = finiteNumber(value[metric]);
-    if (parsed !== null) return { value: parsed, metric };
+    if (parsed !== null && parsed > 0 && parsed <= 1) return { value: parsed, metric };
   }
   return null;
 }

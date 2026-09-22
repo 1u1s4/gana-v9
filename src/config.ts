@@ -231,7 +231,7 @@ const DEFAULTS: AgentConfig = {
     defaultLeagues: [],
     defaultTeams: [],
     defaultMarkets: DEFAULT_MARKETS,
-    lowOddsThreshold: 1.2,
+    lowOddsThreshold: 1.1,
     kickoffWindowHours: 36,
     includeLiveFixtures: false,
     includeCompletedFixtures: false,

@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { loadConfig } from '../config.js';
 import { createRuntimeContext } from '../runtime/context.js';
 import { runFixtureScoring } from './service.js';
 
 const now = new Date('2026-04-25T12:00:00.000Z');
+const testArtifactRoot = mkdtempSync(join(tmpdir(), 'gana-scoring-context-'));
+after(() => rmSync(testArtifactRoot, { recursive: true, force: true }));
 
 const fixture = {
   id: 'fixture-1',
@@ -113,6 +118,7 @@ function config(overrides: Record<string, unknown> = {}) {
     databaseUrl: 'mysql://user:pass@localhost:3306/gana',
     provider: 'codex',
     model: 'gpt-5.5',
+    artifactRoot: testArtifactRoot,
     ...overrides,
   }, { skipApiKey: true });
 }
@@ -777,6 +783,46 @@ describe('runFixtureScoring', () => {
     assert.equal(payload.allowedQuotes.length, 80);
     assert.equal(payload.allowedQuotes.some((quote: any) => quote.oddsQuoteId === 'odds-quote-1'), true);
     assert.match(payload.providerContextWarnings.join('\n'), /allowedQuotes trimmed/);
+    assert.equal(payload.historicalValidationFeedback.status, 'unavailable');
+  });
+
+  it('ingests exact published feedback only when validation completed before the analysis cutoff', async () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'gana-scoring-feedback-'));
+    const date = '2026-04-24';
+    const dailyBatchId = `daily-${date}-full`;
+    const canonical = join(artifactRoot, 'runs', dailyBatchId, 'daily-parlay-recommendations.json');
+    const metricsPath = join(artifactRoot, 'runs', `metrics-${date}`, 'daily-metrics.json');
+    const lockPath = join(artifactRoot, 'cron', 'locks', `validation-${date}.lock`);
+    const write = (path: string, value: unknown) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, JSON.stringify(value)); };
+    const counts = { total: 3, settled: 2, won: 1, lost: 1, voided: 1, blocked: 0, pending: 0, unvalidated: 0 };
+    write(canonical, { date, dailyBatchId });
+    write(join(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`), { date, dailyBatchId, status: 'published' });
+    write(metricsPath, { date, recommendationArtifact: canonical, metrics: [{ metricDate: date, predictionMetrics: { ...counts, byMarket: [{ label: 'h2h', ...counts }] }, parlayMetrics: counts }] });
+    try {
+      for (const completedAt of ['2026-04-25T11:00:00Z', '2026-04-25T13:00:00Z']) {
+        write(lockPath, { date, status: 'published', validationExit: 0, metricsExit: 0, completedAt,
+          source: { dailyBatchId, recommendationArtifact: canonical }, artifacts: { recommendation: canonical, metrics: metricsPath },
+        });
+        const cfg = config({ artifactRoot });
+        let payload: any;
+        await runFixtureScoring(cfg, { fixtureId: '1001', web: 'off' }, createRuntimeContext(cfg, 'feedback.jsonl'), {
+          now: () => now, repositories: repositories(), writeArtifact: () => '/tmp/predictions.json',
+          agentRunner: async (_config, input) => {
+            payload = JSON.parse(String(input).split('\nInput:\n')[1]);
+            return { text: '{"predictions":[]}', usage: {}, output: '' };
+          },
+          persistPredictions: async (records: any[]) => records,
+        });
+        const feedback = payload.historicalValidationFeedback;
+        assert.equal(feedback.status, completedAt.includes('T11:') ? 'available' : 'unavailable');
+        if (feedback.status === 'available') {
+          assert.equal(feedback.date, date);
+          assert.equal(feedback.predictions.settled, 2);
+          assert.equal(feedback.byMarket[0].market, 'h2h');
+          assert.match(feedback.warning, /Do not tune thresholds/);
+        }
+      }
+    } finally { rmSync(artifactRoot, { recursive: true, force: true }); }
   });
 
   it('blocks LLM outputs that omit available markets instead of adding deterministic fallback picks', async () => {
@@ -1141,7 +1187,7 @@ describe('runFixtureScoring', () => {
     assert.deepEqual(persisted[0].metadata.blockers.sort(), ['model-disagreement', 'stale-pick']);
   });
 
-  it('requires market-specific evidence or an explicit fallback before promoting a pick', async () => {
+  it('requires market-specific supported claims before promoting a pick', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const fixtureLevelClaims = claims.map(({ marketKey: _marketKey, selectionKey: _selectionKey, line: _line, ...claim }) => claim);
@@ -1189,6 +1235,43 @@ describe('runFixtureScoring', () => {
     assert.equal(persisted[0].status, 'review-required');
     assert.equal(persisted[0].metadata.promotable, false);
     assert.match(persisted[0].warnings.join('\n'), /market-specific evidence missing for h2h:home/);
+  });
+
+  it('keeps unsupported markets and declared fixture fallbacks in review while a supported market remains promotable', async () => {
+    const scenarios = [
+      { supportLevel: 'unsupported', conflictStatus: 'none', marketKey: 'btts', rationale: 'Both sides can score.' },
+      { supportLevel: 'weak', conflictStatus: 'none', marketKey: 'btts', rationale: 'Both sides can score.' },
+      { supportLevel: 'supported', conflictStatus: 'conflict', marketKey: 'btts', rationale: 'Both sides can score.' },
+      { supportLevel: 'supported', conflictStatus: 'none', marketKey: null, rationale: 'Fixture-level fallback supports this analytical angle.' },
+    ];
+    for (const scenario of scenarios) {
+      const cfg = config();
+      const bttsQuote = { ...oddsQuote, id: 'quote-btts', marketKey: 'btts', selectionKey: 'yes', price: 1.8 };
+      const picks = [oddsQuote, bttsQuote].map((quote) => ({
+        oddsQuoteId: quote.id, market: quote.marketKey, selection: quote.selectionKey, line: null,
+        odds: quote.price, modelProbability: 0.7, probability: 0.7, confidence: 0.8,
+        promotable: true, evidenceIds: ['evidence-1', 'evidence-2'],
+        claimIds: [quote.id === oddsQuote.id ? 'claim-1' : 'claim-btts'],
+        rationale: quote.id === oddsQuote.id ? 'The supported home result.' : scenario.rationale, warnings: [],
+      }));
+      const result = await runFixtureScoring(cfg, { fixtureId: '1001', markets: ['h2h', 'btts'], web: 'off' }, createRuntimeContext(cfg, 'market-support.jsonl'), {
+        now: () => now,
+        repositories: repositories({
+          oddsQuotes: { listLatest: async () => [oddsQuote, bttsQuote] },
+          claims: { list: async () => [...claims, { ...claims[0], ...scenario, id: 'claim-btts', selectionKey: 'yes' }] },
+          evidenceItems: { list: async () => evidenceItems.map((item) => ({ ...item, metadata: { market: 'btts' } })) },
+        }),
+        writeArtifact: () => '/tmp/predictions.json',
+        agentRunner: async () => ({ text: JSON.stringify({ predictions: picks }), usage: {}, output: '' }),
+        persistPredictions: async (records: any[]) => records,
+      });
+      const supported = result.predictions.find((prediction) => prediction.market === 'h2h');
+      const unsupported = result.predictions.find((prediction) => prediction.market === 'btts');
+      assert.equal(supported?.status, 'promotable');
+      assert.equal(unsupported?.status, 'review-required');
+      assert.equal(unsupported?.promotable, false);
+      assert.match(unsupported?.warnings.join('\n') ?? '', /market-specific evidence missing/);
+    }
   });
 
   it('downgrades predictions when linked research sources are stale', async () => {

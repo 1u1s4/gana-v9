@@ -17,7 +17,9 @@ import {
   RESEARCH_FIXTURE_PROMPT_VERSION,
   type ResearchWebMode,
   buildResearchFixturePrompt,
+  buildResearchTiming,
 } from '../prediction/prompts.js';
+import { isTraceableWebLocator } from '../prediction/prompt-context.js';
 import {
   type ResearchBundle,
   type ResearchGateResult,
@@ -106,7 +108,9 @@ export async function runFixtureResearch(
     });
   }
 
-  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot, marketScope);
+  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot, marketScope, new Date(createdAt));
+  const contextCapturedAt = now().toISOString();
+  const researchTiming = buildResearchTiming(fixture, createdAt, contextCapturedAt);
   const prompt = buildResearchFixturePrompt({
     fixture,
     web: input.web,
@@ -114,9 +118,12 @@ export async function runFixtureResearch(
     marketFocus: marketScope,
     oddsSnapshot: providerContext.oddsSnapshot,
     fixtureStatistics: providerContext.fixtureStatistics,
+    teamStatistics: providerContext.teamStatistics,
+    recentPerformance: providerContext.recentPerformance,
     providerContextWarnings: providerContext.warnings,
     runId,
     createdAt,
+    contextCapturedAt,
   });
 
   let rawOutput = '';
@@ -189,7 +196,7 @@ export async function runFixtureResearch(
   }
 
   const repaired = repairResearchReferences(parsed.value);
-  const baseSources = apiFootballSources(fixture, createdAt, providerContext);
+  const baseSources = apiFootballSources(fixture, contextCapturedAt, providerContext);
   const repairedSources = repairMissingEvidenceSources(
     repaired.value.evidenceItems,
     normalizeSourceRecords(ensureNativeWebSearchSource(
@@ -230,6 +237,7 @@ export async function runFixtureResearch(
     warnings: uniqueStrings([...(repaired.value.warnings ?? []), ...repairWarnings, ...providerContext.warnings]),
     metadata: {
       ...(repaired.value.metadata ?? {}),
+      researchTiming,
       providerContextWarnings: providerContext.warnings,
       marketScope,
       marketCoverage,
@@ -454,7 +462,7 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
     }
     return { ...evidence, claimIds: filteredClaimIds };
   });
-  const additionalEvidenceItems: any[] = [];
+  const unverifiedClaims: Array<{ id: unknown; statement: unknown; reason: string }> = [];
 
   const repairedClaims = claims.map((claim: any) => {
     const subject = repairClaimSubject(claim?.subject, claim?.id, claim?.statement, warnings);
@@ -481,48 +489,27 @@ function repairResearchReferences(value: any): { value: any; warnings: string[] 
     }
     const uniqueEvidenceIds = uniqueStrings(repairedEvidenceIds);
     if (uniqueEvidenceIds.length === 0) {
-      const synthesizedEvidence = synthesizeEvidenceForUnsupportedClaim(claim, subject);
-      if (synthesizedEvidence) {
-        additionalEvidenceItems.push(synthesizedEvidence);
-        evidenceIds.add(synthesizedEvidence.id);
-        uniqueEvidenceIds.push(synthesizedEvidence.id);
-        warnings.push(`synthesized provider evidence for claim "${claim.id ?? 'unknown'}" with no evidenceIds`);
-      }
+      warnings.push(`insufficient evidence: quarantined claim "${claim.id ?? 'unknown'}" with no valid evidenceIds`);
+      unverifiedClaims.push({ id: claim.id, statement: claim.statement, reason: 'No valid evidenceIds; provider support must not be inferred from claim text.' });
+      return null;
     }
     return { ...claim, subject, conflictStatus, supportLevel, evidenceIds: uniqueEvidenceIds };
-  });
+  }).filter((claim: any) => claim !== null);
+  const retainedClaimIds = new Set(repairedClaims.map((claim: any) => claim.id));
 
   return {
     value: {
       ...value,
-      evidenceItems: [...repairedEvidenceItems, ...additionalEvidenceItems],
+      evidenceItems: repairedEvidenceItems.map((evidence: any) => ({
+        ...evidence,
+        claimIds: Array.isArray(evidence.claimIds) ? evidence.claimIds.filter((id: string) => retainedClaimIds.has(id)) : [],
+      })),
       claims: repairedClaims,
+      metadata: { ...(value?.metadata ?? {}), ...(unverifiedClaims.length ? { unverifiedClaims } : {}) },
       gateResult: repairResearchGateResult(value?.gateResult, warnings),
     },
     warnings: uniqueStrings(warnings),
   };
-}
-
-function synthesizeEvidenceForUnsupportedClaim(claim: any, subject: any): any | undefined {
-  if (typeof claim?.id !== 'string') return undefined;
-  const sourceId = isOddsBackedClaim(claim, subject) ? 'source_api_football_odds_snapshot' : 'source_api_football_fixture';
-  return {
-    id: `evidence_repaired_${claim.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
-    sourceId,
-    claimIds: [claim.id],
-    summary: `Provider context supports claim: ${String(claim?.statement ?? claim.id)}`,
-    confidence: 0.5,
-    metadata: {
-      repaired: true,
-      reason: 'LLM output returned a claim without evidenceIds.',
-    },
-  };
-}
-
-function isOddsBackedClaim(claim: any, subject: any): boolean {
-  if (subject?.type === 'market') return true;
-  const text = `${claim?.statement ?? ''} ${JSON.stringify(claim?.metadata ?? {})}`.toLowerCase();
-  return /\b(odds?|bookmaker|priced?|price|line|h2h|double chance|goals?|corners?|btts)\b/.test(text);
 }
 
 function repairResearchGateResult(value: any, warnings: string[]): any {
@@ -794,7 +781,6 @@ function evaluateResearchWebCoverage(
   const nativeRequirement = deriveNativeWebSearchRequirement(config, { required: web === 'live', reason: 'research fixture' });
   const realWebSearchSourceCount = sources.filter(isRealWebSearchSource).length;
   const syntheticWebSearchSourceCount = sources.filter((source) => source.type === 'web-search' && !isRealWebSearchSource(source)).length;
-  const hasRealWebSearchSignal = realWebSearchSourceCount > 0 || trace.used || trace.browserFallbackUsed;
   const warnings: string[] = [];
 
   if (web === 'live' && nativeRequirement.supported && !trace.used) {
@@ -807,7 +793,7 @@ function evaluateResearchWebCoverage(
       `web live requested for provider ${config.provider}, which has no native web-search tool in this harness. Use OpenRouter/browser fallback with BROWSER_USE_API_KEY or switch to codex native web before promoting research.`,
     );
   }
-  if (!hasRealWebSearchSignal) {
+  if (realWebSearchSourceCount === 0) {
     warnings.push('web research requested but no real web-search source was linked; synthetic/repaired web sources do not count as sufficient evidence');
   }
   return {
@@ -822,7 +808,7 @@ function isRealWebSearchSource(source: SourceRecord): boolean {
   if (source.type !== 'web-search') return false;
   const metadata = source.metadata && typeof source.metadata === 'object' ? source.metadata as Record<string, unknown> : {};
   if (metadata.synthesized === true || metadata.repaired === true) return false;
-  return Boolean(source.url || source.externalId);
+  return isTraceableWebLocator(source.url) || isTraceableWebLocator(source.externalId);
 }
 
 function buildResearchMarketCoverage(
@@ -840,6 +826,7 @@ function buildResearchMarketCoverage(
   const quotedMarkets = [...new Set((oddsSnapshot?.quotes ?? []).map((quote) => quote.market).filter(isMarketKey))].sort();
   const evidenceIds = new Set(evidenceItems.map((item) => typeof item.id === 'string' ? item.id : '').filter(Boolean));
   const evidenceMarkets = [...new Set(claims.flatMap((claim) => {
+    if (!['supported', 'partial'].includes(claim?.supportLevel) || claim?.conflictStatus === 'conflict') return [];
     const market = claim?.subject?.type === 'market' ? claim.subject.market : claim?.metadata?.market;
     const ids = Array.isArray(claim?.evidenceIds) ? claim.evidenceIds : [];
     return isMarketKey(market) && ids.some((id: unknown) => typeof id === 'string' && evidenceIds.has(id)) ? [market] : [];
@@ -908,9 +895,11 @@ function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMod
   const reasons = uniqueStrings(bundle.gateResult.reasons);
   const hasLiveWebEvidence = web === 'off' || bundleHasWebSearchCoverage(bundle);
   const fallback = bundle.metadata?.fallback === true || warnings.some(isHardResearchWarning) || reasons.some(isHardResearchWarning);
-  const sufficientEvidence = hasSufficientIndependentEvidence(bundle);
   const agentPromotable = bundle.gateResult.verdict === 'promotable';
-  const verdict = !fallback && hasLiveWebEvidence && (agentPromotable || sufficientEvidence) ? 'promotable' : 'review-required';
+  // Never turn a model's explicit uncertainty into approval merely by counting
+  // claims. Reasons can be in any language and two claims can repeat one source.
+  const materialConflict = bundle.claims.some((claim) => claim.conflictStatus === 'conflict');
+  const verdict = !fallback && !materialConflict && hasLiveWebEvidence && agentPromotable ? 'promotable' : 'review-required';
   const normalizedReasons = verdict === 'promotable'
     ? uniqueStrings([...reasons.filter((reason) => !/not promotable|insufficient for promotion/i.test(reason)), 'objective research gate passed with current web evidence'])
     : reasons;
@@ -928,55 +917,9 @@ function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMod
 }
 
 function bundleHasWebSearchCoverage(bundle: ResearchBundle): boolean {
-  if (bundle.sources.some(isRealWebSearchSource)) return true;
-  const coverage = bundle.metadata?.webSearchCoverage;
-  if (!coverage || typeof coverage !== 'object') return false;
-  const record = coverage as Record<string, unknown>;
-  return record.nativeToolUsed === true || record.browserFallbackUsed === true;
-}
-
-function hasSufficientIndependentEvidence(bundle: ResearchBundle): boolean {
-  const strongEvidenceIds = new Set(bundle.evidenceItems
-    .filter((evidence) => evidenceConfidence(evidence.confidence) >= 0.65)
-    .map((evidence) => evidence.id));
-  const linkedStrongEvidenceIds = new Set<string>();
-  let supportedClaimCount = 0;
-
-  for (const claim of bundle.claims) {
-    if (claim.conflictStatus === 'conflict' && !isNonMaterialScheduleConflictClaim(claim, bundle)) return false;
-    if (claim.supportLevel !== 'supported') continue;
-    const claimStrongEvidence = claim.evidenceIds.filter((id) => strongEvidenceIds.has(id));
-    if (!claimStrongEvidence.length) continue;
-    supportedClaimCount += 1;
-    claimStrongEvidence.forEach((id) => linkedStrongEvidenceIds.add(id));
-  }
-
-  return supportedClaimCount >= 2 && linkedStrongEvidenceIds.size >= 2;
-}
-
-function isNonMaterialScheduleConflictClaim(claim: ResearchBundle['claims'][number], bundle: ResearchBundle): boolean {
-  const subjectType = claim.subject?.type;
-  if (subjectType !== 'fixture') return false;
-  const claimText = claim.statement.toLowerCase();
-  const evidenceText = claim.evidenceIds
-    .map((id) => bundle.evidenceItems.find((evidence) => evidence.id === id)?.summary ?? '')
-    .join(' ')
-    .toLowerCase();
-  const combined = `${claimText} ${evidenceText}`;
-  const mentionsSchedule = /\b(kickoff|start\s*time|scheduled|schedule|timestamp|fixture\s*time|date)\b/.test(combined);
-  const mentionsMinorDisagreement = /\b(differs?|different|provisional|time\s+zone|timezone|rescheduled|postponed)\b/.test(combined);
-  const mentionsMarketOrAvailability = /\b(odds|market|price|line|injur|suspend|lineup|home|away|winner|draw|goals?|corners?|btts)\b/.test(combined);
-
-  return mentionsSchedule && mentionsMinorDisagreement && !mentionsMarketOrAvailability;
-}
-
-function evidenceConfidence(value: unknown): number {
-  if (typeof value === 'number') return value;
-  if (value && typeof (value as { toNumber?: unknown }).toNumber === 'function') {
-    return (value as { toNumber: () => number }).toNumber();
-  }
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
+  const sourceIds = new Set(bundle.sources.filter(isRealWebSearchSource).map((source) => source.id));
+  const linkedEvidenceIds = new Set(bundle.claims.flatMap((claim) => claim.evidenceIds));
+  return bundle.evidenceItems.some((evidence) => sourceIds.has(evidence.sourceId) && linkedEvidenceIds.has(evidence.id));
 }
 
 function isHardResearchWarning(message: string): boolean {
@@ -992,8 +935,10 @@ function redactErrorMessage(error: string): string {
 
 function prependMissingSources(sources: SourceRecord[] | undefined, requiredSources: SourceRecord[]): SourceRecord[] {
   const existing = Array.isArray(sources) ? sources : [];
-  const missing = requiredSources.filter((source) => !existing.some((item) => item.id === source.id));
-  return [...missing, ...existing];
+  const canonicalIds = new Set(requiredSources.map((source) => source.id));
+  // The model can cite provider IDs, but cannot replace their captured locator,
+  // snapshot, hash or cutoff metadata with a schema-limited generated record.
+  return [...requiredSources, ...existing.filter((source) => !canonicalIds.has(source.id))];
 }
 
 function repairMissingEvidenceSources(
@@ -1123,6 +1068,9 @@ function normalizeSourceRecords(sources: SourceRecord[], defaultCapturedAt?: str
     if (normalized.snapshotId == null) delete normalized.snapshotId;
     if (normalized.artifactPath == null) delete normalized.artifactPath;
     if (normalized.externalId == null) delete normalized.externalId;
+    if (normalized.type === 'web-search' && !normalized.url && isTraceableWebLocator(normalized.externalId)) {
+      normalized.url = normalized.externalId;
+    }
     if (!normalized.url && !normalized.snapshotId && !normalized.artifactPath && !normalized.externalId) {
       normalized.externalId = sourceExternalIdFallback(normalized);
     }

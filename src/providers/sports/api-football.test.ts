@@ -4,7 +4,7 @@ import { afterEach, describe, it } from 'node:test';
 import type { Fixture } from '../../domain/fixtures.js';
 import type { RuntimeContext } from '../../runtime/context.js';
 import type { ApiFootballPersistence, ApiFootballProviderConfig, CanonicalOddsSnapshot, NormalizedFixture } from './types.js';
-import { createApiFootballProvider } from './api-football.js';
+import { ApiFootballProvider, buildOddsMarketAnalytics, createApiFootballProvider } from './api-football.js';
 import { isApiFootballProviderError } from './api-football-errors.js';
 
 const originalFetch = globalThis.fetch;
@@ -107,6 +107,8 @@ describe('api-football provider', () => {
     assert.equal(fixtures.length, 1);
     assert.equal(fixtures[0].homeTeamName, 'Manchester United');
     assert.equal(fixtures[0].awayTeamName, 'Liverpool');
+    assert.equal(fixtures[0].providerHomeTeamId, '33');
+    assert.equal(fixtures[0].providerAwayTeamId, '40');
   });
 
   it('blocks provider calls after the per-run request limit is reached', async () => {
@@ -324,6 +326,39 @@ describe('api-football provider', () => {
     assert.equal(results[0].quotes[0].bookmaker, 'Regional Book');
     assert.equal(persistedSnapshots[0].bookmakerCount, 1);
     assert.equal((persistedSnapshots[0].metadata as any).bookmakerAllowlistFallback, true);
+  });
+
+  it('preserves all observed bookmakers for consensus while keeping selectable quotes allowlisted', async () => {
+    const requests: string[] = [];
+    const persisted: CanonicalOddsSnapshot[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      requests.push(url.pathname);
+      if (url.pathname === '/fixtures') return jsonResponse({ response: [apiFixture({ providerFixtureId: 1001 })] });
+      return jsonResponse({ paging: { current: 1, total: 1 }, response: [{ bookmakers:
+        ['Bet365', 'Pinnacle', 'Third Book', 'Fourth Book'].map((name, index) => ({
+          id: index + 1, name, bets: [{ id: 1, name: 'Match Winner', values: [
+            { value: 'Home', odd: '2.10' }, { value: 'Draw', odd: '3.40' }, { value: 'Away', odd: '3.60' },
+          ] }],
+        })),
+      }] });
+    }) as typeof fetch;
+    const provider = new ApiFootballProvider(testConfig({ bookmakerAllowlist: ['Bet365', 'Stake', 'Pinnacle'] }), {
+      persistOddsSnapshot: async (snapshot) => { persisted.push(snapshot); return snapshot; },
+    });
+    await provider.getCanonicalOddsSnapshot({ fixtureId: '1001', markets: ['h2h'] });
+    const snapshot = persisted[0];
+    assert.deepEqual(requests, ['/fixtures', '/odds']);
+    assert.deepEqual([...new Set(snapshot.quotes.map((quote) => quote.bookmaker))], ['Bet365', 'Pinnacle']);
+    assert.equal(snapshot.bookmakerCount, 2);
+    assert.equal(snapshot.marketReferenceQuotes?.length, 12);
+    assert.equal((snapshot.metadata as any).marketReferenceBookmakerCount, 4);
+    assert.equal((snapshot.metadata as any).selectedBookmakerCount, 2);
+    assert.equal((snapshot.metadata as any).marketReferenceScope, 'all-returned-bookmakers');
+    const restrictedAnalytics = buildOddsMarketAnalytics(snapshot.quotes);
+    const observedAnalytics = buildOddsMarketAnalytics(snapshot.marketReferenceQuotes!);
+    assert.ok([...restrictedAnalytics.values()].every((value) => value.lowLiquidity));
+    assert.ok([...observedAnalytics.values()].every((value) => !value.lowLiquidity && value.marketBookmakerCount === 4));
   });
 });
 

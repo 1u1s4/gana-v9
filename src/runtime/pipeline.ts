@@ -333,15 +333,23 @@ export async function executeRunPipeline(
         teamsDefault: true,
         combineMode: 'OR',
         fullDay: true,
+        ...(input.priorityLeagues?.length ? { requiredLeagues: input.priorityLeagues } : {}),
       }, runtime);
       writeJsonArtifact(config, runId, 'fixtures.json', result);
       return result;
     });
+    const selectedPrimaryIds = new Set(fixtureDiscovery.fixtures.map((fixture) => fixture.providerFixtureId));
+    const unselectedRequiredFixtures = (fixtureDiscovery.discoveredRequiredFixtures ?? [])
+      .filter((fixture) => !selectedPrimaryIds.has(fixture.providerFixtureId));
+    const discoveryWarnings = [
+      ...(fixtureDiscovery.fixtures.length ? [] : ['no eligible fixtures found']),
+      ...(unselectedRequiredFixtures.length ? [`required league discovery capped: ${unselectedRequiredFixtures.length} eligible fixtures were not selected`] : []),
+    ];
     steps.push({
       name: 'fetch fixtures',
       ok: fixtureDiscovery.fixtures.length > 0,
-      verdict: fixtureDiscovery.fixtures.length > 0 ? 'promotable' : 'blocked',
-      warnings: fixtureDiscovery.fixtures.length > 0 ? [] : ['no eligible fixtures found'],
+      verdict: fixtureDiscovery.fixtures.length > 0 ? (discoveryWarnings.length ? 'review-required' : 'promotable') : 'blocked',
+      warnings: discoveryWarnings,
     });
     writeStepSpan(config, runtime, 'fixtures.fetch', 'provider', fixtureDiscovery.fixtures.length > 0 ? 'ok' : 'blocked', fixtureDiscovery);
   } catch (err: any) {
@@ -421,7 +429,7 @@ export async function executeRunPipeline(
       const providerDateSlate = useProviderDateSlate
         ? await retryStorageConnection(() => (deps.fetchLowOddsSlate ?? getApiFootballDateOddsSlate)(lowOddsOddsConfig, input.date, runtime, undefined, lowOddsSelectorMarkets))
         : undefined;
-      const hasProviderDateSlate = Boolean(providerDateSlate?.fixtures.length);
+      const hasProviderDateSlate = providerDateSlate !== undefined;
       const lowOddsDiscovery = hasProviderDateSlate
         ? {
           fixtures: providerDateSlate!.fixtures,
@@ -469,6 +477,14 @@ export async function executeRunPipeline(
         ...('error' in snapshot && typeof snapshot.error === 'string' ? { error: snapshot.error } : {}),
       }));
       const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots, marketScope);
+      scan.providerCoverage = providerDateSlate?.coverage;
+      scan.scanErrors = lowOddsSnapshots.flatMap((snapshot) => snapshot.error ? [snapshot.error] : []);
+      if (scan.providerCoverage && !scan.providerCoverage.complete) {
+        scan.scanErrors.push(`Incomplete provider date odds coverage: unresolved fixtures ${scan.providerCoverage.missingFixtureIds.join(', ')}`);
+      }
+      if (lowOddsDiscovery.evaluations.some((evaluation) => evaluation.excludedReasons.includes('excluded-max-fixtures-reached'))) {
+        scan.scanErrors.push('Low-odds fixture discovery was capped before every fixture could be checked.');
+      }
       if (repositories.lowOddsScans && repositories.lowOddsHits) {
         try {
           scan.scanId = await persistLowOddsScanResult(repositories as LowOddsPersistenceRepositories, {
@@ -484,6 +500,8 @@ export async function executeRunPipeline(
             fixtureEvaluations: scan.fixtureEvaluations,
             requestedLeagues: lowOddsDiscovery.requestedLeagues,
             requestedTeams: lowOddsDiscovery.requestedTeams,
+            providerCoverage: scan.providerCoverage,
+            scanErrors: scan.scanErrors,
           });
         } catch (err) {
           if (config.databaseUrl) throw err;
@@ -505,6 +523,9 @@ export async function executeRunPipeline(
   }
   if (!lowOddsCandidateFixtures.length && lowOddsScan.candidateFixtures?.length) {
     lowOddsCandidateFixtures = lowOddsScan.candidateFixtures;
+  }
+  if (!lowOddsScanStepWarning && lowOddsScan.scanErrors?.length) {
+    lowOddsScanStepWarning = lowOddsScan.scanErrors.join('; ');
   }
   steps.push({
     name: 'scan low odds',

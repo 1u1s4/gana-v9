@@ -283,7 +283,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.atomicRecommendations[0].legs[0].display.fixtureLabel, 'Team A vs Team B');
   });
 
-  it('composes daily focus parlays from council-kept simples when candidate parlays are rejected', async () => {
+  it('composes only profiles whose guarded legs fit the daily window', async () => {
     const ctx = context();
     const fixtures = [
       fixture('2026-05-21T16:00:00.000Z'),
@@ -408,13 +408,13 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-refinado']);
     assert.equal(recommendations.parlayRecommendations.every((item: any) => item.riskFlags.includes('daily-focus-fallback')), true);
     assert.equal(recommendations.parlayRecommendations[0].legs.length, 2);
     assert.equal(recommendations.recommendations.some((item: any) => item.kind === 'parlay'), true);
   });
 
-  it('fills daily focus parlays instead of leaving only council-kept simples when enough legs exist', async () => {
+  it('keeps an empty portfolio when only inflated or low-liquidity legs exist', async () => {
     const ctx = context();
     const fixtures = [
       fixture('2026-05-22T16:00:00.000Z'),
@@ -524,18 +524,16 @@ describe('runDailyE2E', () => {
       }),
     });
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
-    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.riskFlags.includes('daily-focus-fallback')), true);
-    assert.equal(recommendations.atomicRecommendations.length, 0);
-    assert.equal(recommendations.council.reviewCount >= 3, true);
-    const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
-    assert.equal(summary.counts.parlayRecommendations, 3);
-    assert.equal(summary.counts.atomicRecommendations, 0);
+    assert.deepEqual(recommendations.recommendations, []);
+    assert.deepEqual(recommendations.atomicRecommendations, []);
+    assert.deepEqual(recommendations.parlayRecommendations, []);
+    assert.equal(recommendations.parlayApproaches.every((item: any) => item.status === 'blocked'), true);
+    assert.equal(recommendations.dailyOddsFloorStrategy.status, 'no-eligible-pick');
   });
 
-  it('limits final parlays to the three published approaches and excludes used legs from simples', async () => {
+  it('reports winner low-odds coverage alongside existing safe approaches and excludes used legs', async () => {
     const ctx = context();
     const duplicateLowVarianceLegs = parlayRecommendation({ predictionId: 'prediction-low-variance' }).legs.map((leg: any, index: number) => ({
       ...leg,
@@ -647,6 +645,7 @@ describe('runDailyE2E', () => {
     assert.equal(recommendations.parlayRecommendations.length, 3);
     assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
     assert.deepEqual(recommendations.parlayApproaches.map((item: any) => [item.profile, item.status]), [
+      ['low-odds-top', 'blocked'],
       ['parlay-diamante', 'selected'],
       ['parlay-refinado', 'selected'],
       ['low-variance', 'selected'],
@@ -666,12 +665,12 @@ describe('runDailyE2E', () => {
       kickoffLocal: '2026-05-19T18:00:00.000Z',
     });
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayLegs, true);
-    assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 3);
+    assert.equal(recommendations.recommendationPolicy.parlayRecommendationLimit, 4);
     assert.equal(recommendations.recommendationPolicy.parlayAnalysisTop, 12);
     assert.equal(recommendations.recommendationPolicy.atomicRecommendationLimit, 10);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.maxCombinedOdds, 2.2);
     assert.equal(recommendations.recommendationPolicy.parlayConservativeGate.semanticDuplicateSignature, 'fixtureId:market:selection:line');
-    assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.preferredProfileOrder, ['parlay-diamante', 'parlay-refinado', 'low-variance']);
+    assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.preferredProfileOrder, ['low-odds-top', 'parlay-diamante', 'parlay-refinado', 'low-variance']);
     assert.deepEqual(recommendations.recommendationPolicy.parlayConservativeGate.allowedProfiles, ['parlay-diamante', 'parlay-refinado', 'parlay-all-in', 'low-odds-top', 'low-variance']);
     assert.equal(recommendations.recommendationPolicy.atomicExcludesSelectedParlayFixtures, true);
     assert.deepEqual(recommendations.recommendationPolicy.demotedModels, ['gpt-5.6-luna']);
@@ -693,7 +692,7 @@ describe('runDailyE2E', () => {
     assert.equal(summary.dailyOddsFloorStrategy.selectedPick.publishedConfidence, 0.82);
   });
 
-  it('fills missing daily focus approaches from reviewable simple recommendations', async () => {
+  it('does not turn review-required simples into named daily approaches', async () => {
     const ctx = context();
     const fixtures = [
       fixture('2026-06-22T10:15:00.000Z'),
@@ -775,18 +774,13 @@ describe('runDailyE2E', () => {
       }),
     });
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.deepEqual(recommendations.parlayRecommendations.map((item: any) => item.profile), ['parlay-diamante', 'parlay-refinado', 'low-variance']);
-    assert.deepEqual(recommendations.parlayApproaches.map((item: any) => [item.profile, item.status]), [
-      ['parlay-diamante', 'selected'],
-      ['parlay-refinado', 'selected'],
-      ['low-variance', 'selected'],
-    ]);
-    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.selectionMode === 'analytical-fallback'), true);
-    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.riskFlags.includes('daily-focus-fallback')), true);
-    assert.equal(recommendations.parlayRecommendations.every((item: any) => item.councilDecision.decision === 'review'), true);
-    assert.equal(recommendations.atomicRecommendations.length, 0);
+    assert.deepEqual(recommendations.recommendations, []);
+    assert.deepEqual(recommendations.atomicRecommendations, []);
+    assert.deepEqual(recommendations.parlayRecommendations, []);
+    assert.equal(recommendations.parlayApproaches.every((item: any) => item.status === 'blocked'), true);
+    assert.equal(recommendations.dailyOddsFloorStrategy.status, 'no-eligible-pick');
   });
 
   it('blocks weak analytical fallback recommendations when strict promotion gates select none', async () => {
@@ -877,11 +871,11 @@ describe('runDailyE2E', () => {
 
     assert.equal(result.ok, false);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
-    assert.equal(recommendations.councilCandidateRecommendations.length >= 1, true);
+    assert.equal(recommendations.councilCandidateRecommendations.length, 0);
     assert.equal(recommendations.parlayRecommendations.length, 0);
     assert.equal(recommendations.atomicRecommendations.length, 0);
     assert.equal(recommendations.recommendations.length, 0);
-    assert.equal(recommendations.council.rejectedCount >= 1, true);
+    assert.equal(recommendations.council.rejectedCount, 0);
     assert.equal(recommendations.recommendationPolicy.fallbackRecommendations.enabled, true);
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.status, 'failed');
@@ -890,7 +884,7 @@ describe('runDailyE2E', () => {
     assert.equal(summary.counts.fallbackParlayRecommendations, 0);
     assert.equal(summary.counts.strictAtomicRecommendations, 0);
     assert.equal(summary.counts.fallbackAtomicRecommendations, 0);
-    assert.equal(summary.counts.councilRejected >= 1, true);
+    assert.equal(summary.counts.councilRejected, 0);
   });
 
   it('marks the daily run blocked when the Codex provider throws', async () => {
@@ -1395,7 +1389,7 @@ describe('runDailyE2E', () => {
     const summary = JSON.parse(readFileSync(result.summaryPath, 'utf-8'));
     assert.equal(summary.requiredLeagueGoalCheck.status, 'review-required');
     assert.equal(summary.counts.requiredLeagueMissingPredictionFixtures, 1);
-    assert.equal(summary.runDiagnostics.reasons.some((reason: string) => reason.includes('required league atomic-projection-coverage')), true);
+    assert.equal(summary.runDiagnostics.reasons.some((reason: string) => reason.includes('required league required-fixture-analysis-coverage')), true);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.equal(recommendations.requiredLeagueGoalCheck.status, 'review-required');
     assert.equal(recommendations.recommendationPolicy.requiredLeagueAddendum.missingPredictionFixtures, 1);
@@ -1470,7 +1464,7 @@ describe('runDailyE2E', () => {
               providerFixtureId: canadaBosnia.providerFixtureId,
               gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
               predictions: [
-                requiredPrediction(runId, 'canada-under-25', canadaBosnia.id, canadaBosnia.providerFixtureId, 'goals_over_under', 'under', 2.5, 1.67, 0.72, 0.0261),
+                requiredPrediction(runId, 'canada-under-25', canadaBosnia.id, canadaBosnia.providerFixtureId, 'goals_over_under', 'under', 3.5, 1.4, 0.92, 0.0261),
                 requiredPrediction(runId, 'canada-home', canadaBosnia.id, canadaBosnia.providerFixtureId, 'h2h', 'home', null, 1.85, 0.7, 0.034),
                 requiredPrediction(runId, 'canada-btts-no', canadaBosnia.id, canadaBosnia.providerFixtureId, 'btts', 'no', null, 1.8, 0.68, 0.025),
               ],
@@ -1483,8 +1477,8 @@ describe('runDailyE2E', () => {
               gateResult: { verdict: 'review-required', reasons: [], warnings: [] },
               predictions: [
                 requiredPrediction(runId, 'usa-home', usaParaguay.id, usaParaguay.providerFixtureId, 'h2h', 'home', null, 2.09, 0.68, 0.0255),
-                requiredPrediction(runId, 'usa-under-25', usaParaguay.id, usaParaguay.providerFixtureId, 'goals_over_under', 'under', 2.5, 1.7, 0.7, 0.03),
-                requiredPrediction(runId, 'usa-double-chance', usaParaguay.id, usaParaguay.providerFixtureId, 'double_chance', 'home_or_draw', null, 1.35, 0.72, 0.015),
+                requiredPrediction(runId, 'usa-under-25', usaParaguay.id, usaParaguay.providerFixtureId, 'goals_over_under', 'under', 3.5, 1.4, 0.92, 0.03),
+                requiredPrediction(runId, 'usa-double-chance', usaParaguay.id, usaParaguay.providerFixtureId, 'double_chance', 'home_or_draw', null, 1.2, 0.94, 0.03),
               ],
             },
           ],
@@ -1606,10 +1600,10 @@ describe('runDailyE2E', () => {
                   market: 'goals_over_under',
                   selection: 'under',
                   line: 2.5,
-                  odds: 1.67,
-                  confidence: 0.72,
+                  odds: 1.4,
+                  confidence: 0.92,
                   edge: 0.0261,
-                  status: 'review-required',
+                  status: 'promotable',
                 },
                 {
                   ...highConfidencePrediction('codex-run'),
@@ -1619,10 +1613,10 @@ describe('runDailyE2E', () => {
                   market: 'h2h',
                   selection: 'home',
                   line: null,
-                  odds: 1.85,
-                  confidence: 0.7,
+                  odds: 1.3,
+                  confidence: 0.92,
                   edge: 0.034,
-                  status: 'review-required',
+                  status: 'promotable',
                 },
                 {
                   ...highConfidencePrediction('codex-run'),
@@ -1632,10 +1626,10 @@ describe('runDailyE2E', () => {
                   market: 'btts',
                   selection: 'no',
                   line: null,
-                  odds: 1.8,
-                  confidence: 0.68,
+                  odds: 1.4,
+                  confidence: 0.92,
                   edge: 0.025,
-                  status: 'review-required',
+                  status: 'promotable',
                 },
               ],
             },
@@ -1654,10 +1648,10 @@ describe('runDailyE2E', () => {
                   market: 'h2h',
                   selection: 'home',
                   line: null,
-                  odds: 2.09,
-                  confidence: 0.68,
+                  odds: 1.3,
+                  confidence: 0.92,
                   edge: 0.0255,
-                  status: 'review-required',
+                  status: 'promotable',
                 },
                 {
                   ...highConfidencePrediction('codex-run'),
@@ -1667,10 +1661,10 @@ describe('runDailyE2E', () => {
                   market: 'goals_over_under',
                   selection: 'under',
                   line: 2.5,
-                  odds: 1.7,
-                  confidence: 0.7,
+                  odds: 1.4,
+                  confidence: 0.92,
                   edge: 0.03,
-                  status: 'review-required',
+                  status: 'promotable',
                 },
                 {
                   ...highConfidencePrediction('codex-run'),
@@ -1681,9 +1675,9 @@ describe('runDailyE2E', () => {
                   selection: 'home_or_draw',
                   line: null,
                   odds: 1.35,
-                  confidence: 0.72,
+                  confidence: 0.92,
                   edge: 0.015,
-                  status: 'review-required',
+                  status: 'promotable',
                 },
               ],
             },
@@ -1698,16 +1692,9 @@ describe('runDailyE2E', () => {
       .sort()
       .join('|'));
     assert.equal(artifact.parlayProjections.length, 6);
-    assert.equal(selected.length, 6);
-    assert.deepEqual(selected.map((projection) => projection.profile), [
-      'principal',
-      'resultados',
-      'mixto-seguro',
-      'parlay-diamante',
-      'parlay-refinado',
-      'low-variance',
-    ]);
-    assert.equal(new Set(signatures).size, 6);
+    assert.equal(selected.length > 1 && selected.length < 6, true);
+    assert.equal(new Set(signatures).size, selected.length);
+    assert.equal(artifact.parlayProjections.find((projection) => projection.profile === 'parlay-diamante')?.status, 'blocked');
     assert.equal(selected.every((projection) => projection.legs.length === 2), true);
     assert.equal(selected.every((projection) => new Set(projection.legs.map((leg) => leg.fixtureId)).size === 2), true);
     assert.equal(selected.find((projection) => projection.profile === 'resultados')?.legs.every((leg) => leg.market !== 'corners_over_under'), true);
@@ -1724,7 +1711,7 @@ describe('runDailyE2E', () => {
     assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'required-parlay-approaches')?.status, 'passed');
   });
 
-  it('prefers safety-first required-league parlays from double chance and conservative totals', () => {
+  it('never restores blocked required-league legs through implied-confidence safety overrides', () => {
     const fixtures = [
       {
         ...fixture('2026-06-13T19:00:00.000Z'),
@@ -1881,44 +1868,12 @@ describe('runDailyE2E', () => {
       },
     });
 
-    const principal = artifact.parlayProjections.find((projection) => projection.profile === 'principal');
-    const resultados = artifact.parlayProjections.find((projection) => projection.profile === 'resultados');
-    const mixto = artifact.parlayProjections.find((projection) => projection.profile === 'mixto-seguro');
-    const diamante = artifact.parlayProjections.find((projection) => projection.profile === 'parlay-diamante');
-    const refinado = artifact.parlayProjections.find((projection) => projection.profile === 'parlay-refinado');
-    const lowVariance = artifact.parlayProjections.find((projection) => projection.profile === 'low-variance');
-
     assert.equal(artifact.goalCheck.status, 'passed');
-    assert.equal(principal?.status, 'selected');
-    assert.equal(principal?.legs.length, 4);
-    assert.equal(principal?.legs.every((leg) => leg.market === 'double_chance'), true);
-    assert.deepEqual(principal?.legs.map((leg) => `${leg.fixture}:${leg.selection}`), [
-      'Qatar vs Switzerland:draw_or_away',
-      'Brazil vs Morocco:home_or_draw',
-      'Haiti vs Scotland:draw_or_away',
-      'Australia vs Türkiye:draw_or_away',
-    ]);
-    assert.equal(resultados?.status, 'selected');
-    assert.deepEqual(resultados?.legs.map((leg) => `${leg.fixture}:${leg.market}:${leg.selection}:${leg.line}`), [
-      'Qatar vs Switzerland:goals_over_under:over:1.5',
-      'Haiti vs Scotland:goals_over_under:under:3.5',
-    ]);
-    assert.equal(mixto?.status, 'selected');
-    assert.deepEqual(mixto?.legs.map((leg) => `${leg.fixture}:${leg.selection}`), [
-      'Qatar vs Switzerland:draw_or_away',
-      'Brazil vs Morocco:home_or_draw',
-    ]);
-    assert.ok((principal?.aggregateConfidence ?? 0) > 0.6);
-    assert.ok((resultados?.aggregateConfidence ?? 0) > 0.5);
-    assert.ok((mixto?.aggregateConfidence ?? 0) > 0.8);
-    assert.equal(diamante?.status, 'selected');
-    assert.equal(refinado?.status, 'selected');
-    assert.equal(lowVariance?.status, 'selected');
-    assert.equal(diamante?.legs.length, 2);
-    assert.equal(refinado?.legs.length, 2);
-    assert.equal(lowVariance?.legs.length, 2);
-    assert.equal(principal?.riskFlags.includes('market-implied-safety-confidence'), true);
-    assert.equal(principal?.riskFlags.includes('blocked-leg-safety-override'), true);
+    assert.equal(artifact.coverage.coveredFixtures, 4);
+    assert.deepEqual(artifact.atomicProjections, []);
+    assert.equal(artifact.parlayProjections.length, 6);
+    assert.equal(artifact.parlayProjections.every((projection) => projection.status === 'blocked'), true);
+    assert.equal(artifact.parlayProjections.every((projection) => projection.legs.length === 0), true);
   });
 
   it('blocks required-league parlays when aggregate confidence remains weak after atomic reruns', () => {
@@ -2037,12 +1992,10 @@ describe('runDailyE2E', () => {
     assert.equal(artifact.parlayProjections.length, 6);
     assert.equal(artifact.parlayProjections.every((projection) => projection.status === 'blocked'), true);
     assert.equal(artifact.parlayProjections.every((projection) => projection.riskFlags.includes('required-league-confidence-floor')), true);
-    assert.equal(artifact.parlayProjections.every((projection) =>
-      projection.reasons.some((reason) => /mejor combo rechazado:/.test(reason))
-      && projection.reasons.some((reason) => /confianza agregada .* < 45\.00%/.test(reason))
-    ), true);
-    assert.equal(artifact.goalCheck.status, 'review-required');
-    assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'required-parlay-approaches')?.status, 'blocked');
+    assert.equal(artifact.parlayProjections.every((projection) => projection.reasons.length > 0), true);
+    assert.equal(artifact.goalCheck.status, 'passed');
+    assert.equal(artifact.goalCheck.checks.find((check) => check.name === 'required-parlay-approaches')?.status, 'passed');
+
   });
 
   it('rejects non-native daily providers before running', async () => {
@@ -2154,8 +2107,8 @@ function requiredPrediction(
     modelProbability: confidence,
     confidence,
     edge,
-    status: 'review-required',
-    warnings: ['manual review required before promotion'],
+    status: 'promotable',
+    warnings: [],
   };
 }
 

@@ -37,7 +37,8 @@ export function recommendationArtifactTargets(artifact: unknown, sourcePath?: st
   const payload = objectRecord(artifact);
   const recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
   const requiredLeague = objectRecord(payload.requiredLeagueRecommendations);
-  const generalPredictions = [
+  const concise = payload.presentation === 'concise-v1';
+  const generalPredictions = concise ? [] : [
     ...(Array.isArray(requiredLeague.generalPredictions) ? requiredLeague.generalPredictions : []),
     ...(Array.isArray(payload.requiredLeagueGeneralPredictions) ? payload.requiredLeagueGeneralPredictions : []),
   ];
@@ -74,6 +75,7 @@ export function recommendationArtifactTargets(artifact: unknown, sourcePath?: st
 
   for (const projection of Array.isArray(requiredLeague.parlayProjections) ? requiredLeague.parlayProjections : []) {
     const item = objectRecord(projection);
+    if (concise && stringValue(item.status) !== 'selected') continue;
     const projectionParlayId = normalizeUuid(item.parlayId);
     if (stringValue(item.status) === 'selected' && projectionParlayId) {
       parlayIds.add(projectionParlayId);

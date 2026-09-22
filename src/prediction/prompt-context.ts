@@ -8,6 +8,7 @@ import type {
   ResearchBundleRecord,
   SourceRecordRecord,
 } from '../storage/types.js';
+import type { OddsQuote } from '../domain/odds.js';
 
 export const MAX_ALLOWED_QUOTES_IN_SCORE_PROMPT = 80;
 
@@ -47,9 +48,49 @@ export function selectScoringPromptQuotes(
     }
   }
 
-  return [...grouped.values()]
-    .sort(comparePromptQuotes)
-    .slice(0, maxQuotes);
+  return selectBalancedMarketQuotes([...grouped.values()].sort(comparePromptQuotes), maxQuotes, (quote) => quote.marketKey);
+}
+
+// A large totals ladder must not consume the context budget before other markets.
+// This balances available evidence for analysis, not final recommendation quotas.
+function selectBalancedMarketQuotes<T>(quotes: T[], maxQuotes: number, market: (quote: T) => string): T[] {
+  const limit = Math.max(0, Math.floor(maxQuotes));
+  if (quotes.length <= limit) return quotes;
+  const buckets = new Map<string, T[]>();
+  for (const quote of quotes) {
+    const key = market(quote);
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(quote);
+    buckets.set(key, bucket);
+  }
+  const selected = new Set<T>();
+  for (let round = 0; selected.size < limit; round += 1) {
+    let added = false;
+    for (const bucket of buckets.values()) {
+      const quote = bucket[round];
+      if (quote === undefined) continue;
+      selected.add(quote);
+      added = true;
+      if (selected.size >= limit) break;
+    }
+    if (!added) break;
+  }
+  return quotes.filter((quote) => selected.has(quote));
+}
+
+export function selectResearchPromptQuotes(quotes: OddsQuote[], maxQuotes = 40): OddsQuote[] {
+  const grouped = new Map<string, OddsQuote>();
+  for (const quote of quotes) {
+    const key = `${quote.market}:${quote.selection}:${quote.line ?? 'null'}`;
+    const current = grouped.get(key);
+    if (!current || quote.price > current.price) grouped.set(key, quote);
+  }
+  const ordered = [...grouped.values()].sort((a, b) =>
+    marketPriority(a.market) - marketPriority(b.market)
+    || linePriority({ marketKey: a.market, line: a.line }) - linePriority({ marketKey: b.market, line: b.line })
+    || a.selection.localeCompare(b.selection)
+    || b.price - a.price);
+  return selectBalancedMarketQuotes(ordered, maxQuotes, (quote) => quote.market);
 }
 
 function comparePromptQuotes(a: OddsQuoteRecord, b: OddsQuoteRecord): number {
@@ -71,7 +112,7 @@ function marketPriority(market: string | null | undefined): number {
   }
 }
 
-function linePriority(quote: OddsQuoteRecord): number {
+function linePriority(quote: { marketKey: string; line: unknown }): number {
   const line = numberOrNull(quote.line);
   if (line === null) return 0;
   const preferred = quote.marketKey === 'corners_over_under'
@@ -198,7 +239,17 @@ export function isRealWebSourceRecord(source: SourceRecordRecord): boolean {
   if (source.sourceType !== 'web-search') return false;
   const metadata = objectMetadata(source.metadata);
   if (metadata.synthesized === true || metadata.repaired === true) return false;
-  return Boolean(source.url || source.externalId);
+  return isTraceableWebLocator(source.url) || isTraceableWebLocator(source.externalId);
+}
+
+export function isTraceableWebLocator(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function numberValue(value: unknown): number {

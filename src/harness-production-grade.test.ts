@@ -63,7 +63,7 @@ describe('production-grade tool registry and certification', () => {
     const runtime = createRuntimeContext(config, join(root, 'session.jsonl'));
     const result = await runCertification(config, runtime, 'ci-certification');
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, true, JSON.stringify(result.checks.filter((check) => !check.ok)));
     const manifest = JSON.parse(readFileSync(result.manifestPath, 'utf-8'));
     assert.equal(manifest.deterministic, true);
     assert.equal(manifest.hash, result.hash);

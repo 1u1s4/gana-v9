@@ -67,6 +67,14 @@ When a matching recommendations artifact exists for the validation date, the dai
 
 ## Message Rules
 
+Artifacts with root `presentation: "concise-v1"` use the concise contract below. The legacy rules that follow remain unchanged for artifacts without that marker and historical replays.
+
+- Render every published daily recommendation, every required atomic projection, and every selected required parlay in persisted array order. Do not rerank, deduplicate, silently cap with `--max`, or add general provider predictions that were not published.
+- Show fixture, Guatemala kickoff time, a plain Spanish pick, quoted odds, evidence confidence (`aggregateConfidence` / `confidence`, never model probability or `displayConfidence`), and an explicit review/blocked marker when applicable.
+- Group consecutive simple selections into compact native boxes and keep each combinada profile with a friendly name. Omit empty league sections, raw council diagnostics, edge, stake and exposure. Keep one concise analytical-only note.
+- Paginate all selections and all legs without loss at Discord's 4096-character description, 6000-total-character and 10-embed message limits. `--single-message` must fail clearly if all selections do not fit. Mentions remain disabled.
+- Place the persisted daily strategy snapshot last, preserving its exact selected legs, odds and confidence without reconstructing a pick. Support both legacy `odds-floor-highest-confidence-v1` and `odds-floor-eligible-confidence-v2` (rule `highest-eligible-evidence-confidence`); only v2 confidence is labelled evidence confidence. The final strategy box may share the final message when it fits.
+
 - Keep native Discord embeds/cajas for Discord delivery unless the user explicitly asks for plain text.
 - Header embed format: `🏆 Gana v9 · Recomendaciones`, parlay/simple counts, and artifact date as `DD/MM/YYYY`.
 - Per-parlay embed format: title, blockquote selection lines, and one compact metrics line with odds/confidence/edge/analytical stake/exposure.

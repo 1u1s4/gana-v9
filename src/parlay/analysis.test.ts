@@ -51,6 +51,7 @@ function leg(input: {
   line?: number;
   odds: number;
   confidence?: number;
+  probability?: number | null;
   validation?: string;
   warnings?: string[];
 }) {
@@ -69,6 +70,7 @@ function leg(input: {
     },
     prediction: {
       confidence: input.confidence ?? 0.8,
+      estimatedProbability: input.probability === undefined ? input.confidence ?? 0.8 : input.probability,
       warnings: input.warnings ?? [],
       metadata: {},
       validationArtifacts: input.validation ? [{ status: input.validation }] : [],
@@ -173,6 +175,7 @@ describe('runParlayAnalysis', () => {
     assert.equal(query.where.AND[0].legs.some.fixture.scheduledAt.lt.toISOString(), '2026-05-14T06:00:00.000Z');
     assert.equal(query.where.AND[1].legs.every.fixture.scheduledAt.gte.toISOString(), '2026-05-13T06:00:00.000Z');
     assert.equal(query.where.AND[1].legs.every.fixture.scheduledAt.lt.toISOString(), '2026-05-14T06:00:00.000Z');
+    assert.equal(query.include.legs.include.prediction.select.estimatedProbability, true);
     assert.deepEqual(result.top.map((item) => item.parlayId), ['parlay-low-odds-top', 'parlay-low-variance']);
     assert.equal(result.top.every((item) => item.validationStatus === 'won'), true);
     assert.equal(result.diagnostics.universe.hitRate, 0.6);
@@ -216,9 +219,10 @@ describe('runParlayAnalysis', () => {
         validation: 'unvalidated',
         odds: 1.207,
         confidence: 0.88,
+        status: 'promotable',
         legs: [
-          leg({ id: 'core-a', market: 'double_chance', selection: 'home_or_draw', odds: 1.1, confidence: 0.9 }),
-          leg({ id: 'core-b', market: 'double_chance', selection: 'draw_or_away', odds: 1.097, confidence: 0.86 }),
+          leg({ id: 'core-a', market: 'double_chance', selection: 'home_or_draw', odds: 1.1, confidence: 0.9, probability: 0.95 }),
+          leg({ id: 'core-b', market: 'double_chance', selection: 'draw_or_away', odds: 1.097, confidence: 0.86, probability: 0.95 }),
         ],
       }),
       parlay({
@@ -264,7 +268,7 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.top.some((item) => item.profile === 'balanced' || item.profile === 'high-conviction' || item.profile === 'low-odds-top' || item.profile === 'parlay-oro'), false);
   });
 
-  it('keeps parlay-diamante in core recommendations despite low-liquidity h2h favorite flags', async () => {
+  it('does not manufacture positive edge with a diamante profile multiplier', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const rows = [
@@ -307,12 +311,8 @@ describe('runParlayAnalysis', () => {
     assert.equal(result.ok, true);
     assert.equal(result.diagnostics.profileScope, 'core');
     assert.equal(result.diagnostics.profileScopedAnalyzed, 1);
-    assert.equal(result.top[0]?.parlayId, 'parlay-diamante-safe');
-    assert.equal(result.top[0]?.profile, 'parlay-diamante');
-    assert.equal(result.top[0]?.riskFlags.includes('low-liquidity-h2h-favorite'), true);
-    assert.equal(result.top[0]?.riskFlags.includes('low-liquidity'), true);
-    assert.equal((result.top[0]?.expectedEdge ?? 0) > 0, true);
-    assert.equal(result.diagnostics.rejected.some((item) => item.parlayId === 'parlay-diamante-safe'), false);
+    assert.equal(result.top.length, 0);
+    assert.equal(result.diagnostics.rejected.some((item) => item.parlayId === 'parlay-diamante-safe'), true);
   });
 
   it('quarantines balanced parlays from final analysis recommendations', async () => {
@@ -346,6 +346,46 @@ describe('runParlayAnalysis', () => {
 
     assert.equal(result.top.length, 0);
     assert.match(JSON.stringify(result.diagnostics.rejected), /profile balanced is purged from final recommendations/);
+  });
+
+  it('uses persisted model probabilities for joint probability and EV, independently of evidence confidence', async () => {
+    const cfg = config();
+    const legs = ['prob-a', 'prob-b'].map((id) => leg({ id, market: 'h2h', selection: 'home', odds: 1.4, confidence: 0.95, probability: 0.72 }));
+    for (const item of legs) item.prediction.metadata = { modelProbability: 0.99 };
+    const row = parlay({ id: 'probability-row', profile: 'parlay-diamante', status: 'promotable', validation: 'unvalidated', odds: 1.96, confidence: 0.9025, legs });
+    const result = await runParlayAnalysis(cfg, { runId: 'run-probability', profileScope: 'all' }, {}, {
+      now: () => now, db: { parlay: { findMany: async () => [row] } }, writeArtifact: () => '/tmp/probability-analysis.json',
+    });
+    assert.equal(result.top.length, 1);
+    assert.deepEqual(result.top[0].legs.map((item) => item.probability), [0.72, 0.72]);
+    assert.equal(result.top[0].aggregateConfidence, 0.9025);
+    assert.equal(result.top[0].adjustedProbability, 0.5184);
+    assert.equal(result.top[0].expectedEdge, 0.016064);
+  });
+
+  it('rejects missing or invalid model probabilities instead of using high evidence confidence', async () => {
+    for (const probability of [null, NaN, 1.2]) {
+      const cfg = config();
+      const row = parlay({ id: 'missing-probability', profile: 'parlay-diamante', status: 'promotable', validation: 'unvalidated', odds: 1.96, confidence: 0.99,
+        legs: [leg({ id: 'missing-a', market: 'h2h', selection: 'home', odds: 1.4, confidence: 0.99, probability }), leg({ id: 'missing-b', market: 'h2h', selection: 'home', odds: 1.4, confidence: 0.99, probability: 0.99 })],
+      });
+      const result = await runParlayAnalysis(cfg, { runId: 'missing-run', profileScope: 'all' }, {}, {
+        now: () => now, db: { parlay: { findMany: async () => [row] } }, writeArtifact: () => '/tmp/probability-analysis.json',
+      });
+      assert.equal(result.top.length, 0);
+      assert.match(result.diagnostics.rejected[0].reasons.join('\n'), /missing or invalid model probability/);
+    }
+  });
+
+  it('allows legacy explicit modelProbability only when the calibrated storage field is absent', async () => {
+    const cfg = config();
+    const legs = ['legacy-a', 'legacy-b'].map((id) => leg({ id, market: 'h2h', selection: 'home', odds: 1.4, confidence: 0.95, probability: null }));
+    for (const item of legs) item.prediction.metadata = { modelProbability: 0.72 };
+    const row = parlay({ id: 'legacy-probability', profile: 'low-variance', status: 'promotable', validation: 'unvalidated', odds: 1.96, confidence: 0.9025, legs });
+    const result = await runParlayAnalysis(cfg, { runId: 'legacy-run', profileScope: 'all' }, {}, {
+      now: () => now, db: { parlay: { findMany: async () => [row] } }, writeArtifact: () => '/tmp/probability-analysis.json',
+    });
+    assert.equal(result.top[0]?.adjustedProbability, 0.5184);
   });
 
   it('requires a persisted parlay scope', async () => {

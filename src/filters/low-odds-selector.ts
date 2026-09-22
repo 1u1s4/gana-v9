@@ -4,8 +4,12 @@ import {
   type MarketKey,
 } from '../domain/markets.js';
 
-export const LOW_ODDS_SELECTOR_MARKETS = ['h2h', 'double_chance'] as const satisfies readonly MarketKey[];
-export const LOW_ODDS_SELECTOR_SELECTIONS = ['home', 'away', 'home_or_draw', 'draw_or_away'] as const;
+export const LOW_ODDS_SELECTOR_MARKETS = ['h2h'] as const satisfies readonly MarketKey[];
+export const LOW_ODDS_SELECTOR_SELECTIONS = ['home', 'away'] as const;
+
+export function isBelowLowOddsThreshold(price: number, threshold: number): boolean {
+  return Number.isFinite(price) && price > 1 && Number.isFinite(threshold) && price < threshold;
+}
 
 export function lowOddsSelectorMarketScope(_markets?: readonly MarketKey[]): MarketKey[] {
   return [...LOW_ODDS_SELECTOR_MARKETS];
@@ -19,6 +23,5 @@ export function isLowOddsFixtureSelectorQuote(
   if (!markets.includes(quote.market)) return false;
   if (!isValidMarketSelection(quote.market, quote.selection)) return false;
   if (quote.market === 'h2h') return quote.selection === 'home' || quote.selection === 'away';
-  if (quote.market === 'double_chance') return quote.selection === 'home_or_draw' || quote.selection === 'draw_or_away';
   return false;
 }

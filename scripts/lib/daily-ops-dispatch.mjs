@@ -727,10 +727,10 @@ function chooseHeavyAction({
   if (minuteOfDay < MORNING_MINUTE) return null;
 
   // A retry scheduled after midnight belongs to the slate that is now `today`.
-  // Recover it at the first morning checkpoint before considering tomorrow's
-  // new slate. Other rollover states are historical and must not block it.
+  // Recover it only during the morning window. Once tomorrow's slate is due,
+  // retrying today's expired evidence must not starve the next daily cycle.
   const rolloverRetry = inspectDueDailyRetry(rolloverDaily, now);
-  if (rolloverRetry.due) {
+  if (rolloverRetry.due && minuteOfDay < DAILY_MINUTE) {
     return {
       flow: 'daily',
       mode: 'retry',

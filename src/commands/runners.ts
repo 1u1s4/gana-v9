@@ -9,6 +9,7 @@ import { runValidation, type ValidationRunResult } from '../validation/service.j
 import { runDailyMetrics, type DailyMetricsRunResult } from '../metrics/daily.js';
 import { runDailyE2E, type DailyE2ERunResult } from '../daily/e2e.js';
 import { applyDailyRuntimeDefaults, resolveDailyRuntimeDefaults } from '../daily/runtime-defaults.js';
+import { refreshWeeklyLeagues } from '../daily/league-discovery.js';
 import { runStrategyReview, type StrategyReviewResult } from '../strategy-review/daily.js';
 import {
   exportRunArtifacts as runServiceExportRunArtifacts,
@@ -202,9 +203,15 @@ export async function runDailyE2ECommand(ctx: CommandRunnerContext, flags: Comma
     : !['false', 'off', 'no', '0'].includes(persistMetricsFlag.toLowerCase());
   const dailyRuntime = resolveDailyRuntimeDefaults();
   const explicitModels = optionalDailyProviderModelsFlag(flags);
+  const providers = optionalDailyProvidersFlag(flags);
+  const requiredLeagueValue = optionalStringFlag(flags, 'required-leagues') ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? 'auto';
+  const explicitRequiredLeagues = optionalDailyRequiredLeaguesFlag({ ...flags, 'required-leagues': requiredLeagueValue });
+  const leagueDiscovery = explicitRequiredLeagues === undefined
+    ? await refreshWeeklyLeagues(ctx.config, requireDateFlag(flags), { runtime: ctx.runtime })
+    : undefined;
   return runDailyE2E(applyDailyRuntimeDefaults(ctx.config, dailyRuntime), {
     date: requireDateFlag(flags),
-    providers: optionalDailyProvidersFlag(flags),
+    providers,
     providerConcurrency: optionalPositiveIntegerFlag(flags, 'provider-concurrency'),
     models: explicitModels ?? { codex: dailyRuntime.codexModel },
     maxFixtures: optionalPositiveIntegerFlag(flags, 'max-fixtures'),
@@ -213,7 +220,8 @@ export async function runDailyE2ECommand(ctx: CommandRunnerContext, flags: Comma
     validate: optionalRunValidationMode(flags) as DailyE2EValidationMode | undefined,
     markets: optionalMarketsFlag(flags),
     parlayProfile: optionalDailyParlayProfileFlag(flags),
-    requiredLeagues: optionalDailyRequiredLeaguesFlag(flags),
+    requiredLeagues: explicitRequiredLeagues ?? leagueDiscovery?.leagues,
+    leagueDiscovery,
     persistMetrics,
     dailyBatchId: optionalStringFlag(flags, 'daily-batch-id'),
   }, ctx.runtime);

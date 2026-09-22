@@ -18,12 +18,13 @@ import type {
   PredictionRecord,
   StoragePrismaClient,
 } from '../storage/types.js';
+import { modelProbabilityFor } from './probability.js';
 import { buildParlay } from './builder.js';
 import { generateParlayCandidatesForLegRange, type ParlayCandidate } from './candidate-generator.js';
 import { correlationBlockers, correlationPenalty } from './correlation.js';
 import { diversifyParlays } from './diversifier.js';
 import {
-  LOW_ODDS_TOP_MAX_LEG_ODDS,
+  LOW_ODDS_WINNER_MAX_LEG_ODDS,
   automaticParlayRiskReasons,
 } from './eligibility.js';
 import { rankParlayCandidates } from './ranker.js';
@@ -46,7 +47,6 @@ import { marketFamily } from '../domain/markets.js';
 import {
   deterministicFallbackProfileSpec,
   deterministicProfileSpec,
-  LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS,
   LOW_ODDS_TOP_PROFILE,
   PARLAY_REFINADO_RETROSPECTIVE,
   PORTFOLIO_PROFILES,
@@ -61,7 +61,6 @@ import {
   hasHardResearchWarning,
   hasRiskTag,
   isPortfolioPoolEligible,
-  lowOddsTopFallbackExclusionReasons,
   lowOddsTopPoolExclusionReasons,
   portfolioPoolExclusionReasons,
 } from './portfolio-risk.js';
@@ -628,7 +627,7 @@ async function runLowOddsTopPortfolio(
     });
   }
 
-  const threshold = Math.min(config.apiFootball.lowOddsThreshold, LOW_ODDS_TOP_MAX_LEG_ODDS);
+  const threshold = Math.min(config.apiFootball.lowOddsThreshold, LOW_ODDS_WINNER_MAX_LEG_ODDS);
   const records = await repositories.predictions.list({
     ...sourcePredictionScopeQuery(sourceRunIds),
     status: PORTFOLIO_PREDICTION_STATUSES,
@@ -640,15 +639,8 @@ async function runLowOddsTopPortfolio(
     .map((prediction) => ({ predictionId: prediction.id, reasons: lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold) }))
     .filter((item) => item.reasons.length > 0);
   const strictPool = decoratedPredictions.filter((prediction) => lowOddsTopPoolExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, threshold).length === 0);
-  const fallbackEnabled = strictPool.length < LOW_ODDS_TOP_PROFILE.minLegs;
-  const excludedReasons = fallbackEnabled
-    ? decoratedPredictions
-      .map((prediction) => ({ predictionId: prediction.id, reasons: lowOddsTopFallbackExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS) }))
-      .filter((item) => item.reasons.length > 0)
-    : strictExcludedReasons;
-  const pool = fallbackEnabled
-    ? decoratedPredictions.filter((prediction) => lowOddsTopFallbackExclusionReasons(prediction, LOW_ODDS_TOP_PROFILE, LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS).length === 0)
-    : strictPool;
+  const excludedReasons = strictExcludedReasons;
+  const pool = strictPool;
   const portfolioId = randomUUID();
   const usedSignatures = new Set<string>();
   const fills = generateDeterministicPortfolioFills({
@@ -665,12 +657,8 @@ async function runLowOddsTopPortfolio(
     builds.push({ profile: validation.profile, build: validation.build });
   }
   const warnings = builds.length
-    ? [
-      fallbackEnabled
-        ? `deterministic low-odds-top fallback selected ${builds.length} parlay(s) from h2h/double_chance/goals_over_under predictions with odds <= ${LOW_ODDS_TOP_FALLBACK_MAX_LEG_ODDS}`
-        : `deterministic low-odds-top selected ${builds.length} parlay(s) from h2h home/away and safe double-chance predictions with odds <= ${threshold}`,
-    ]
-    : [`low-odds-top pool has ${pool.length} eligible prediction(s); ${LOW_ODDS_TOP_PROFILE.minLegs} required`];
+    ? [`deterministic low-odds-top selected ${builds.length} parlay(s): h2h winners with odds < ${threshold}, combined odds >= ${LOW_ODDS_TOP_PROFILE.minOdds}`]
+    : [`low-odds-top has ${new Set(pool.map((prediction) => prediction.fixtureId)).size} eligible distinct fixtures; no ${LOW_ODDS_TOP_PROFILE.minLegs}-${LOW_ODDS_TOP_PROFILE.maxLegs} leg combination reached odds ${LOW_ODDS_TOP_PROFILE.minOdds} with supported positive edge and aggregate confidence >= 0.7`];
   const portfolio: ParlayPortfolio = {
     id: portfolioId,
     sourceRunId,
@@ -692,11 +680,6 @@ async function runLowOddsTopPortfolio(
         eligible: pool.length,
         excluded: excludedReasons.length,
         excludedReasons,
-        ...(fallbackEnabled ? {
-          strictEligible: strictPool.length,
-          strictExcluded: strictExcludedReasons.length,
-          fallback: true,
-        } : {}),
       }],
       agentOutputs: [{
         profile: LOW_ODDS_TOP_PROFILE.key,
@@ -1070,6 +1053,7 @@ function deterministicCandidateBlockers(
   const families = new Set(legs.map((prediction) => marketFamily(prediction.market)));
   const markets = new Set(legs.map((prediction) => prediction.market));
   const blockers = correlationBlockers(legs);
+  if (legs.some((prediction) => modelProbabilityFor({ probability: prediction.estimatedProbability }) === null)) blockers.push('missing-model-probability');
   if (spec.allInSafeMode) {
     if (legs.length < spec.minLegs) blockers.push(`leg count below ${spec.minLegs}`);
     return [...new Set(blockers.filter((blocker) => !/same-fixture|correlation/.test(blocker)))];
@@ -1401,11 +1385,12 @@ function buildParlayRefinadoSelectionPrompt(input: {
 
   return [
     `System prompt - Parlay refinado (${PARLAY_REFINADO_PROMPT_VERSION})`,
-    'You select exactly one refined analytical soccer parlay from already-scored atomic predictions.',
+    'You select at most one refined analytical soccer parlay from already-scored atomic predictions.',
+    'Return an empty parlays array and explain noParlayReason when no supported combination passes the guardrails.',
     'Use the retrospective summary as decision context, but select only from today/run predictionPool. Do not use outcomes or future information.',
     'Return JSON only. Do not include Markdown or commentary outside JSON.',
     'Use only predictionIds from the provided pool.',
-    `Create exactly 1 parlay with ${input.spec.minLegs}-${input.spec.maxLegs} legs; prefer 2 legs unless the third is clearly as safe as the first two.`,
+    `Create at most 1 parlay with ${input.spec.minLegs}-${input.spec.maxLegs} legs; prefer 2 legs unless the third is clearly as safe as the first two.`,
     `Combined decimal odds must stay between ${input.spec.minOdds} and ${input.spec.maxOdds}; prefer 1.30-1.99.`,
     'Use at most one leg per fixture. Duplicate fixture selections will be rejected.',
     'Do not choose corners, draw-only h2h, home_or_away double chance, stale/research-warning legs, negative-edge legs, hard blockers, inflated double-chance edge, or fragile low total over legs.',
@@ -1957,7 +1942,7 @@ function buildRejectedParlayOroCandidate(pool: readonly ParlaySourcePrediction[]
 }
 
 function probabilityForParlayOroLeg(prediction: ParlaySourcePrediction): number {
-  return prediction.marketFairProbability ?? prediction.estimatedProbability ?? prediction.confidence;
+  return modelProbabilityFor({ probability: prediction.estimatedProbability }) ?? 0;
 }
 
 function rankParlayOroCandidates(candidates: ParlayCandidate[]): ParlayCandidate[] {
@@ -2349,12 +2334,16 @@ function validateParsedPortfolioParlay(
     ? CONSERVATIVE_MIN_AGGREGATE_CONFIDENCE
     : profile.key === 'balanced'
       ? BALANCED_MIN_AGGREGATE_CONFIDENCE
-      : 0;
+      : profile.key === 'low-odds-top' ? 0.7 : 0;
   if (aggregateConfidence < minAggregateConfidence) {
     return {
       ok: false,
       reasons: [`aggregate confidence ${round(aggregateConfidence)} below ${profile.label} floor ${minAggregateConfidence}`],
     };
+  }
+  const modelProbability = selected.reduce((product, prediction) => product * probabilityForParlayOroLeg(prediction), 1) * (1 - correlationPenalty(selected));
+  if (selected.some((prediction) => modelProbabilityFor({ probability: prediction.estimatedProbability }) === null) || !(Number(combinedOdds) * modelProbability > 1)) {
+    return { ok: false, reasons: ['missing model probability or non-positive expected edge; evidence confidence cannot substitute probability'] };
   }
   const constraintWarnings = [
     ...(duplicateFixtures.length ? [`duplicate fixture override: ${duplicateJustification}`] : []),
@@ -2427,10 +2416,14 @@ function generateDeterministicPortfolioFills(input: {
   const combinations: ParlaySourcePrediction[][] = [];
   const sortedPool = [...input.pool].sort(comparePortfolioPredictions);
   for (let size = input.profile.minLegs; size <= input.profile.maxLegs; size++) {
-    collectCombinations(sortedPool, size, 0, [], combinations, 500);
+    const forSize: ParlaySourcePrediction[][] = [];
+    if (input.profile.key === 'low-odds-top') collectLowOddsWinnerCombinations(sortedPool, size, 0, [], forSize);
+    else collectCombinations(sortedPool, size, 0, [], forSize, 500);
+    combinations.push(...forSize);
   }
   const validations = combinations
-    .sort((a, b) => scorePortfolioCombination(b) - scorePortfolioCombination(a))
+    .sort((a, b) => (input.profile.key === 'low-odds-top' ? a.length - b.length : 0)
+      || scorePortfolioCombination(b) - scorePortfolioCombination(a))
     .map((combination) => validateParsedPortfolioParlay({
       title: `Deterministic ${input.profile.label}`,
       predictionIds: combination.map((prediction) => prediction.id),
@@ -2438,6 +2431,39 @@ function generateDeterministicPortfolioFills(input: {
     }, input.profile, new Map(input.pool.map((prediction) => [prediction.id, prediction])), input.usedSignatures, input.generatedAt, input.sourceRunId))
     .filter((validation): validation is Extract<PortfolioValidationResult, { ok: true }> => validation.ok);
   return selectPortfolioBuildsWithExposureCap(validations, input.needed);
+}
+
+function collectLowOddsWinnerCombinations(
+  pool: readonly ParlaySourcePrediction[],
+  size: number,
+  start: number,
+  current: ParlaySourcePrediction[],
+  output: ParlaySourcePrediction[][],
+): void {
+  // Count feasible combinations, not the first 500 pairs: sub-1.10 winners
+  // commonly need three or four legs before the 1.20 target is reachable.
+  if (output.length >= 500) return;
+  const odds = current.reduce((product, leg) => product * leg.odds, 1);
+  const confidence = calculateAggregateConfidence(current);
+  if (current.length && confidence < 0.7) return;
+  const missing = size - current.length;
+  if (!missing) {
+    const probability = current.reduce((product, prediction) => product * probabilityForParlayOroLeg(prediction), 1) * (1 - correlationPenalty(current));
+    if (odds >= LOW_ODDS_TOP_PROFILE.minOdds && odds <= LOW_ODDS_TOP_PROFILE.maxOdds && odds * probability > 1) output.push([...current]);
+    return;
+  }
+  const usedFixtures = new Set(current.map((leg) => leg.fixtureId));
+  const remaining = pool.slice(start).filter((leg) => !usedFixtures.has(leg.fixtureId));
+  if (new Set(remaining.map((leg) => leg.fixtureId)).size < missing) return;
+  const maxOdds = remaining.map((leg) => leg.odds).sort((a, b) => b - a).slice(0, missing).reduce((product, value) => product * value, odds);
+  if (maxOdds < LOW_ODDS_TOP_PROFILE.minOdds) return;
+  for (let index = start; index < pool.length && output.length < 500; index++) {
+    const leg = pool[index];
+    if (usedFixtures.has(leg.fixtureId)) continue;
+    current.push(leg);
+    collectLowOddsWinnerCombinations(pool, size, index + 1, current, output);
+    current.pop();
+  }
 }
 
 function selectPortfolioBuildsWithExposureCap(
@@ -2621,7 +2647,7 @@ function toSourcePrediction(prediction: PredictionRecord): ParlaySourcePredictio
     line: numberOrUndefined(prediction.line),
     odds: numberValue(prediction.odds),
     impliedProbability: numberOrUndefined(prediction.impliedProbability),
-    estimatedProbability: numberOrUndefined(prediction.estimatedProbability),
+    estimatedProbability: modelProbabilityFor({ probability: prediction.estimatedProbability, modelProbability: metadataNumber(prediction.metadata, 'modelProbability') }) ?? undefined,
     edge: numberOrUndefined(prediction.edge),
     blockers: metadataStringArray(prediction.metadata, 'blockers'),
     marketFairProbability: metadataNumber(prediction.metadata, 'marketFairProbability'),

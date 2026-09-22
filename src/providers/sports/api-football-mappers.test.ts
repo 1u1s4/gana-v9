@@ -123,6 +123,36 @@ describe('api-football mappers', () => {
     assert.equal(mapApiFootballFixtureStatus(null), 'unknown');
   });
 
+  it('uses the 90-minute score after extra time or penalties instead of the overall goals', () => {
+    for (const short of ['FT', 'AET', 'PEN']) {
+      const result = mapApiFootballFixture(apiFixture({
+        fixture: { id: 1001, date: '2026-05-01T18:30:00Z', status: { short } },
+        goals: { home: 2, away: 1 },
+        score: { fulltime: { home: 1, away: 1 } },
+      }));
+      assert.equal(result.status, 'completed');
+      assert.equal(result.scoreHome, 1, short);
+      assert.equal(result.scoreAway, 1, short);
+    }
+  });
+
+  it('leaves a missing 90-minute score unknown after extra time rather than settling with 120-minute goals', () => {
+    for (const short of ['AET', 'PEN']) {
+      const result = mapApiFootballFixture(apiFixture({
+        fixture: { id: 1001, date: '2026-05-01T18:30:00Z', status: { short } },
+        goals: { home: 2, away: 1 }, score: { fulltime: { home: null, away: null } },
+      }));
+      assert.equal(result.scoreHome, null);
+      assert.equal(result.scoreAway, null);
+    }
+    const fulltime = mapApiFootballFixture(apiFixture({
+      fixture: { id: 1001, date: '2026-05-01T18:30:00Z', status: { short: 'FT' } },
+      goals: { home: 2, away: 1 }, score: {},
+    }));
+    assert.equal(fulltime.scoreHome, 2);
+    assert.equal(fulltime.scoreAway, 1);
+  });
+
   it('falls back to timestamp when fixture date is missing', () => {
     const result = mapApiFootballFixture(apiFixture({ fixture: { id: 1001, timestamp: 1777660200 } }), {
       capturedAt,

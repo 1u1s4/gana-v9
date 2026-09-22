@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Fixture } from '../domain/fixtures.js';
+import type { AgentConfig } from '../config.js';
+import type { RuntimeContext } from '../runtime/context.js';
 import { settleMarket } from './settlement-rules.js';
-import { fetchValidationResult } from './result-fetcher.js';
+import { createApiFootballValidationResultFetcher, fetchValidationResult } from './result-fetcher.js';
 
 const fixture = {
   id: 'fixture-1',
@@ -21,6 +23,25 @@ const fixture = {
 } satisfies Fixture;
 
 describe('validation result fetcher', () => {
+  it('respects the shared run request budget before making a result API call', async () => {
+    const config = {
+      apiFootballKey: 'test-key', apiFootballBaseUrl: 'https://v3.football.api-sports.io',
+      apiFootball: { maxProviderRequestsPerRun: 500 },
+    } as AgentConfig;
+    const runtime = { providerRequestCount: 1, providerRequestLimit: 1 } as RuntimeContext;
+    const fetcher = await createApiFootballValidationResultFetcher(config, runtime);
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => { calls++; throw new Error('must not make a network call'); }) as typeof fetch;
+    try {
+      await assert.rejects(() => fetcher.fetch({ fixtureId: 'fixture-1', providerFixtureId: '1001', market: 'h2h' }), /Provider request limit reached/);
+      assert.equal(calls, 0);
+      assert.equal(runtime.providerRequestCount, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('fetches final fixture results for non-corner markets', async () => {
     const result = await fetchValidationResult({
       getFixture: async () => fixture,

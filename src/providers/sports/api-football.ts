@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { AgentConfig } from '../../config.js';
 import { evaluateEgress } from '../../permissions/egress-policy.js';
 import type { Fixture } from '../../domain/fixtures.js';
@@ -15,6 +16,8 @@ import { getPrismaClient } from '../../storage/db.js';
 import type { JsonValue, StoragePrismaClient } from '../../storage/types.js';
 import type { ServiceStatusReport } from '../../filters/status.js';
 import { ApiFootballProviderError, isApiFootballProviderError, mapHttpStatusToProviderError } from './api-football-errors.js';
+import { mapApiFootballTeamStatistics, validateTeamStatisticsQuery } from './api-football-team-statistics.js';
+import { mapApiFootballCompletedLeagueFixtures, validateCompletedLeagueFixturesQuery } from './api-football-history.js';
 import {
   extractApiFootballResponseArray,
   mapApiFootballFixtureStatistics,
@@ -33,6 +36,8 @@ import {
   type ApiFootballPersistence,
   type ApiFootballProviderConfig,
   type CanonicalOddsSnapshot,
+  type CompletedLeagueFixtures,
+  type CompletedLeagueFixturesQuery,
   type FixtureByIdQuery,
   type FixtureQuery,
   type FixtureStatistics,
@@ -45,11 +50,27 @@ import {
   type ProviderStatus,
   type QuotaStatus,
   type SportsDataProvider,
+  type TeamStatistics,
+  type TeamStatisticsQuery,
 } from './types.js';
 
 export interface ApiFootballDateOddsSlate {
   fixtures: Fixture[];
   snapshots: CanonicalOddsSnapshot[];
+  coverage?: ApiFootballDateOddsCoverage;
+}
+
+export interface ApiFootballDateOddsCoverage {
+  scope: 'provider-date-odds' | 'requested-fixtures';
+  date: string;
+  timezone: string;
+  pagesExpected: number;
+  pagesFetched: number;
+  oddsFixtureCount: number;
+  resolvedFixtureCount: number;
+  missingFixtureIds: string[];
+  fixturesWithoutRequestedMarkets: string[];
+  complete: boolean;
 }
 
 interface ApiFootballResponse<T = unknown> {
@@ -63,6 +84,7 @@ interface ApiFootballResponse<T = unknown> {
 
 const API_FOOTBALL_REQUEST_TIMEOUT_MS = 15_000;
 const FIXTURE_PERSISTENCE_CONCURRENCY = 3;
+const runtimeHistoryCaches = new WeakMap<RuntimeContext, Map<string, Promise<CompletedLeagueFixtures>>>();
 
 export function createApiFootballProvider(
   config: ApiFootballProviderConfig,
@@ -74,12 +96,38 @@ export function createApiFootballProvider(
 
 export class ApiFootballProvider implements SportsDataProvider {
   readonly name: SportsProvider = API_FOOTBALL_PROVIDER;
+  private readonly localRequestBudget = { providerRequestCount: 0 };
+  private readonly historyCache: Map<string, Promise<CompletedLeagueFixtures>>;
 
   constructor(
     private readonly config: ApiFootballProviderConfig,
     private readonly persistence: ApiFootballPersistence = {},
     private readonly runtime?: RuntimeContext,
-  ) {}
+  ) {
+    const shared = runtime && runtimeHistoryCaches.get(runtime);
+    this.historyCache = shared ?? new Map();
+    if (runtime && !shared) runtimeHistoryCaches.set(runtime, this.historyCache);
+  }
+
+  async getCompletedLeagueFixtures(input: CompletedLeagueFixturesQuery): Promise<CompletedLeagueFixtures> {
+    const query = validateCompletedLeagueFixturesQuery(input);
+    const account = createHash('sha256').update(this.config.apiFootballKey).digest('hex');
+    const key = JSON.stringify([this.config.apiFootballBaseUrl, account, query]);
+    const cached = this.historyCache.get(key);
+    if (cached) return cached;
+    const pending = (async () => {
+      const response = await this.request('fixture_history', '/fixtures', { ...query, status: 'FT-AET-PEN', timezone: 'UTC' });
+      return mapApiFootballCompletedLeagueFixtures(response.payload, query, response.capturedAt,
+        response.payloadHash ?? createHash('sha256').update(JSON.stringify(response.payload)).digest('hex'), response.providerSnapshotId);
+    })();
+    this.historyCache.set(key, pending);
+    try {
+      return await pending;
+    } catch (error) {
+      if (this.historyCache.get(key) === pending) this.historyCache.delete(key);
+      throw error;
+    }
+  }
 
   async getStatus(): Promise<ProviderStatus> {
     const checkedAt = new Date();
@@ -139,6 +187,8 @@ export class ApiFootballProvider implements SportsDataProvider {
       ...fixture,
       homeTeamName: normalized.homeTeam?.name,
       awayTeamName: normalized.awayTeam?.name,
+      providerHomeTeamId: normalized.homeTeam?.providerTeamId,
+      providerAwayTeamId: normalized.awayTeam?.providerTeamId,
       ...(response.providerSnapshotId && { providerSnapshotId: response.providerSnapshotId }),
     };
   }
@@ -208,9 +258,16 @@ export class ApiFootballProvider implements SportsDataProvider {
     });
   }
 
+  async getTeamStatistics(input: TeamStatisticsQuery): Promise<TeamStatistics> {
+    const query = validateTeamStatisticsQuery(input);
+    const response = await this.request('team_statistics', '/teams/statistics', { ...query });
+    return mapApiFootballTeamStatistics(response.payload, query, response.capturedAt, response.providerSnapshotId);
+  }
+
   async getCanonicalOddsSnapshot(input: OddsQuery): Promise<CanonicalOddsSnapshot> {
     const fixture = await this.resolveFixtureForOdds(input.fixtureId);
-    const pages = await this.requestPagedOdds(input.fixtureId);
+    const markets = input.markets ?? this.config.apiFootball.defaultMarkets;
+    const pages = await this.requestPagedOdds(input.fixtureId, markets);
     const mappedQuotes = pages.flatMap((page) => mapApiFootballOdds(page.payload, {
       fixtureId: fixture.id,
       providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
@@ -220,7 +277,7 @@ export class ApiFootballProvider implements SportsDataProvider {
       fixture,
       providerFixtureId: input.fixtureId,
       pages,
-      mappedQuotes: filterQuotesByMarkets(mappedQuotes, input.markets ?? this.config.apiFootball.defaultMarkets),
+      mappedQuotes: filterQuotesByMarkets(mappedQuotes, markets),
       extraMetadata: {},
     });
   }
@@ -230,7 +287,8 @@ export class ApiFootballProvider implements SportsDataProvider {
   }
 
   async getCanonicalOddsSlateForDate(input: { date: string; fixtures?: Fixture[]; markets?: MarketKey[] }): Promise<ApiFootballDateOddsSlate> {
-    const pages = await this.requestPagedDateOdds(input.date);
+    const markets = input.markets ?? this.config.apiFootball.defaultMarkets;
+    const pages = await this.requestPagedDateOdds(input.date, markets);
     const fixtureIds = uniqueStrings(pages.flatMap((page) => extractApiFootballResponseArray(page.payload, 'odds')
       .map((fixtureOdds) => stringifyFixtureProviderId((fixtureOdds as any)?.fixture?.id))
       .filter((value): value is string => Boolean(value))));
@@ -239,6 +297,7 @@ export class ApiFootballProvider implements SportsDataProvider {
       : await this.resolveFixturesByProviderIds(fixtureIds);
     const fixturesByProviderId = new Map(fixtures.map((fixture) => [fixture.providerFixtureId, fixture]));
     const snapshots: CanonicalOddsSnapshot[] = [];
+    const groupedOdds = new Map<string, { fixture: Fixture; pages: ApiFootballResponse[]; quotes: OddsQuote[] }>();
 
     for (const page of pages) {
       for (const fixtureOdds of extractApiFootballResponseArray(page.payload, 'odds')) {
@@ -251,17 +310,38 @@ export class ApiFootballProvider implements SportsDataProvider {
           providerSnapshotId: page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`,
           capturedAt: page.capturedAt,
         });
-        snapshots.push(await this.buildAndPersistOddsSnapshot({
-          fixture,
-          providerFixtureId,
-          pages: [page],
-          mappedQuotes: filterQuotesByMarkets(mappedQuotes, input.markets ?? this.config.apiFootball.defaultMarkets),
-          extraMetadata: { source: 'api-football.odds.date', date: input.date },
-        }));
+        const group = groupedOdds.get(providerFixtureId) ?? { fixture, pages: [], quotes: [] };
+        if (!group.pages.includes(page)) group.pages.push(page);
+        group.quotes.push(...filterQuotesByMarkets(mappedQuotes, markets));
+        groupedOdds.set(providerFixtureId, group);
       }
     }
+    const requestedFixtureIds = input.fixtures?.length ? input.fixtures.map((fixture) => fixture.providerFixtureId) : fixtureIds;
+    const missingFixtureIds = requestedFixtureIds.filter((id) => !fixturesByProviderId.has(id));
+    const fixturesWithoutRequestedMarkets = requestedFixtureIds.filter((id) => !groupedOdds.get(id)?.quotes.length);
+    const coverage: ApiFootballDateOddsCoverage = {
+      scope: input.fixtures?.length ? 'requested-fixtures' : 'provider-date-odds',
+      date: input.date,
+      timezone: this.config.apiFootball.timezone,
+      pagesExpected: readPagingTotal(pages[0]?.payload),
+      pagesFetched: pages.length,
+      oddsFixtureCount: fixtureIds.length,
+      resolvedFixtureCount: fixtures.length,
+      missingFixtureIds,
+      fixturesWithoutRequestedMarkets,
+      complete: missingFixtureIds.length === 0,
+    };
+    for (const [providerFixtureId, group] of groupedOdds) {
+      snapshots.push(await this.buildAndPersistOddsSnapshot({
+        fixture: group.fixture,
+        providerFixtureId,
+        pages: group.pages,
+        mappedQuotes: group.quotes,
+        extraMetadata: { source: 'api-football.odds.date', date: input.date, coverage: { ...coverage } },
+      }));
+    }
 
-    return { fixtures, snapshots };
+    return { fixtures, snapshots, coverage };
   }
 
   private async buildAndPersistOddsSnapshot(input: {
@@ -285,9 +365,14 @@ export class ApiFootballProvider implements SportsDataProvider {
       bookmakerCount: countBookmakersFromQuotes(quotes),
       payloadHash: firstPage?.payloadHash ?? 'unknown',
       quotes,
+      marketReferenceQuotes: dedupedQuotes,
       metadata: {
         ...input.extraMetadata,
+        providerSnapshotIds: input.pages.map((page) => page.providerSnapshotId ?? `provider-snapshot:${page.payloadHash ?? 'unknown'}`),
         bookmakerAllowlist: this.config.apiFootball.bookmakerAllowlist ?? [],
+        marketReferenceScope: 'all-returned-bookmakers',
+        marketReferenceBookmakerCount: countBookmakersFromQuotes(dedupedQuotes),
+        selectedBookmakerCount: countBookmakersFromQuotes(quotes),
         bookmakerAllowlistFallback: quotes.length > 0 && dedupedQuotes.length > 0 && quotes.length === dedupedQuotes.length
           && normalizeBookmakerAllowlist(this.config.apiFootball.bookmakerAllowlist).size > 0
           && filterQuotesByBookmakerAllowlist(dedupedQuotes, this.config.apiFootball.bookmakerAllowlist).length === 0,
@@ -346,22 +431,34 @@ export class ApiFootballProvider implements SportsDataProvider {
     return fixtures;
   }
 
-  private async requestPagedOdds(providerFixtureId: string): Promise<Array<ApiFootballResponse<unknown>>> {
-    const first = await this.request('odds', '/odds', { fixture: providerFixtureId });
-    const pages = [first];
-    const total = readPagingTotal(first.payload);
-    for (let page = 2; page <= total; page++) {
-      pages.push(await this.request('odds', '/odds', { fixture: providerFixtureId, page }));
-    }
-    return pages;
+  private async requestPagedOdds(providerFixtureId: string, markets: readonly MarketKey[]): Promise<Array<ApiFootballResponse<unknown>>> {
+    return this.requestAllOddsPages({ fixture: providerFixtureId, ...oddsMarketQuery(markets) });
   }
 
-  private async requestPagedDateOdds(date: string): Promise<Array<ApiFootballResponse<unknown>>> {
-    const first = await this.request('odds', '/odds', { date });
+  private async requestPagedDateOdds(date: string, markets: readonly MarketKey[]): Promise<Array<ApiFootballResponse<unknown>>> {
+    return this.requestAllOddsPages({ date, timezone: this.config.apiFootball.timezone, ...oddsMarketQuery(markets) });
+  }
+
+  private async requestAllOddsPages(query: Record<string, string | number>): Promise<Array<ApiFootballResponse<unknown>>> {
+    const first = await this.request('odds', '/odds', query);
     const pages = [first];
     const total = readPagingTotal(first.payload);
+    assertOddsPage(first.payload, 1, total);
+    const budget = this.runtime ?? this.localRequestBudget;
+    const limit = this.runtime?.providerRequestLimit ?? this.config.apiFootball.maxProviderRequestsPerRun;
+    if (Number.isFinite(limit) && limit > 0 && total - 1 > limit - (budget.providerRequestCount ?? 0)) {
+      throw new ApiFootballProviderError({
+        code: 'rate_limited',
+        endpointName: 'odds',
+        message: `Incomplete odds coverage: ${total} pages exceed the remaining provider request budget.`,
+        received: { pagesFetched: 1, pagesExpected: total, providerRequestCount: budget.providerRequestCount ?? 0, limit },
+        nextAction: 'Review provider quota and the run request budget before retrying the complete scan.',
+      });
+    }
     for (let page = 2; page <= total; page++) {
-      pages.push(await this.request('odds', '/odds', { date, page }));
+      const next = await this.request('odds', '/odds', { ...query, page });
+      assertOddsPage(next.payload, page, total);
+      pages.push(next);
     }
     return pages;
   }
@@ -383,7 +480,6 @@ export class ApiFootballProvider implements SportsDataProvider {
     }
 
     const url = buildApiFootballUrl(this.config.apiFootballBaseUrl, path, query);
-    reserveProviderRequest(this.config, this.runtime, endpointName);
     const egress = evaluateEgress({ url, config: this.config });
     if (!egress.allowed) {
       throw new ApiFootballProviderError({
@@ -395,6 +491,7 @@ export class ApiFootballProvider implements SportsDataProvider {
         nextAction: 'Set API_FOOTBALL_BASE_URL to an allowlisted provider URL.',
       });
     }
+    reserveProviderRequest(this.config, this.runtime ?? this.localRequestBudget, endpointName);
     const headers = { 'x-apisports-key': apiKey };
     const started = Date.now();
     let response: Response;
@@ -434,7 +531,7 @@ export class ApiFootballProvider implements SportsDataProvider {
       responsePayload: payload,
       responseHeaders: response.headers,
       capturedAt,
-      includeRawPayload: false,
+      includeRawPayload: endpointName === 'fixture_history',
     });
     const capturedSnapshot = await this.captureSnapshot(snapshot);
     await this.recordQuota(endpointName, response, snapshot, responseMs, capturedSnapshot?.id);
@@ -674,10 +771,9 @@ export async function getApiFootballDateOddsSlate(
 
 function reserveProviderRequest(
   config: ApiFootballProviderConfig,
-  runtime: RuntimeContext | undefined,
+  runtime: Pick<RuntimeContext, 'providerRequestCount' | 'providerRequestLimit'>,
   endpointName: ApiFootballEndpointName,
 ): void {
-  if (!runtime) return;
   const limit = runtime.providerRequestLimit ?? config.apiFootball.maxProviderRequestsPerRun;
   if (!Number.isFinite(limit) || limit <= 0) return;
   const nextCount = (runtime.providerRequestCount ?? 0) + 1;
@@ -727,6 +823,8 @@ export async function createApiFootballPersistence(
         ]);
         const raw = rawFixtureMetadata(record.metadata);
         return fixtureFromStoredRecord(record, {
+          providerHomeTeamId: homeTeam?.providerTeamId ?? rawNestedString(raw, 'teams', 'home', 'id'),
+          providerAwayTeamId: awayTeam?.providerTeamId ?? rawNestedString(raw, 'teams', 'away', 'id'),
           homeTeamName: homeTeam?.name ?? rawNestedString(raw, 'teams', 'home', 'name'),
           awayTeamName: awayTeam?.name ?? rawNestedString(raw, 'teams', 'away', 'name'),
           competitionName: competition?.name ?? rawNestedString(raw, 'league', 'name'),
@@ -734,7 +832,7 @@ export async function createApiFootballPersistence(
         });
       },
       persistOddsSnapshot: async (snapshot) => {
-        const marketAnalytics = buildOddsMarketAnalytics(snapshot.quotes);
+        const marketAnalytics = buildOddsMarketAnalytics(snapshot.marketReferenceQuotes ?? snapshot.quotes);
         const oddsSnapshot = await repositories.oddsSnapshots.createWithQuotes({
           snapshot: {
             fixtureId: snapshot.fixtureId,
@@ -772,7 +870,9 @@ export async function createApiFootballPersistence(
               capturedAt: new Date(quote.capturedAt),
               metadata: {
                 sourceSnapshotId: quote.sourceSnapshotId,
-                lowLiquidity: analytics?.lowLiquidity ?? false,
+                lowLiquidity: analytics?.lowLiquidity ?? true,
+                lowLiquidityBasis: 'observed-market-bookmaker-coverage-proxy',
+                marketReferenceBookmakerCount: analytics?.marketBookmakerCount ?? 0,
               },
             };
           }),
@@ -871,7 +971,33 @@ export async function createApiFootballPersistence(
 function readPagingTotal(payload: unknown): number {
   if (!payload || typeof payload !== 'object') return 1;
   const total = (payload as any).paging?.total;
-  return typeof total === 'number' && Number.isInteger(total) && total > 1 ? total : 1;
+  if (total === undefined) return 1;
+  if (typeof total === 'number' && Number.isSafeInteger(total) && total >= 1) return total;
+  throw new ApiFootballProviderError({
+    code: 'invalid_provider_response', endpointName: 'odds',
+    message: 'API-Football returned invalid odds pagination; full coverage cannot be verified.',
+    received: { total },
+  });
+}
+
+function assertOddsPage(payload: unknown, expectedPage: number, expectedTotal: number): void {
+  const total = readPagingTotal(payload);
+  const current = payload && typeof payload === 'object' ? (payload as any).paging?.current : undefined;
+  if (total !== expectedTotal || (current !== undefined && current !== expectedPage)
+    || (expectedPage > 1 && current === undefined)
+    || (expectedTotal > 1 && extractApiFootballResponseArray(payload, 'odds').length === 0)) {
+    throw new ApiFootballProviderError({
+      code: 'invalid_provider_response', endpointName: 'odds',
+      message: 'API-Football odds pagination changed or skipped a page; full coverage cannot be verified.',
+      received: { expectedPage, current: current ?? null, expectedTotal, total },
+      nextAction: 'Retry the complete date scan before claiming complete odds coverage.',
+    });
+  }
+}
+
+function oddsMarketQuery(markets: readonly MarketKey[]): Record<string, number> {
+  // Pre-match bet 1 is Match Winner (full-time 1X2), not a live bet ID.
+  return markets.length === 1 && markets[0] === 'h2h' ? { bet: 1 } : {};
 }
 
 function countBookmakersFromQuotes(quotes: OddsQuote[]): number {
@@ -954,6 +1080,7 @@ function normalizeBookmakerName(value: string): string {
 }
 
 interface OddsMarketAnalytics {
+  marketBookmakerCount: number;
   marketImpliedProbability: number;
   marketFairProbability: number;
   consensusFairOdds: number;
@@ -962,7 +1089,7 @@ interface OddsMarketAnalytics {
   lowLiquidity: boolean;
 }
 
-function buildOddsMarketAnalytics(quotes: OddsQuote[]): Map<string, OddsMarketAnalytics> {
+export function buildOddsMarketAnalytics(quotes: OddsQuote[]): Map<string, OddsMarketAnalytics> {
   const groups = new Map<string, OddsQuote[]>();
   for (const quote of quotes) {
     const key = [quote.market, quote.line ?? 'null'].join(':');
@@ -975,7 +1102,7 @@ function buildOddsMarketAnalytics(quotes: OddsQuote[]): Map<string, OddsMarketAn
       selection: quote.selection,
       odds: quote.price,
       bookmaker: quote.bookmaker,
-    })));
+    })), group[0]?.market);
     const dispersion = averageSelectionDispersion(group);
     for (const fair of fairPrices) {
       const efficiency = marketEfficiencyScore({
@@ -992,6 +1119,7 @@ function buildOddsMarketAnalytics(quotes: OddsQuote[]): Map<string, OddsMarketAn
       });
       for (const quote of group.filter((item) => item.selection === fair.selection)) {
         result.set(marketAnalyticsKey(quote), {
+          marketBookmakerCount: fair.bookmakerCount,
           marketImpliedProbability: round6(fair.marketImpliedProbability),
           marketFairProbability: round6(fair.marketFairProbability),
           consensusFairOdds: Number.isFinite(fair.consensusFairOdds) ? round6(fair.consensusFairOdds) : 0,
@@ -1158,6 +1286,8 @@ function fixtureFromRecord(record: {
     awayTeamId: record.awayTeamId ?? normalized.awayTeam?.providerTeamId ?? 'unknown-away-team',
     homeTeamName: normalized.homeTeam?.name,
     awayTeamName: normalized.awayTeam?.name,
+    providerHomeTeamId: normalized.homeTeam?.providerTeamId,
+    providerAwayTeamId: normalized.awayTeam?.providerTeamId,
     scheduledAt: (record.scheduledAt ?? normalized.scheduledAt ?? new Date(0)).toISOString(),
     status: normalized.status,
     scoreHome: record.scoreHome ?? undefined,
@@ -1176,10 +1306,14 @@ function fixtureWithNormalizedNames(fixture: Fixture, normalized: NormalizedFixt
     competitionName: fixture.competitionName ?? normalized.competition?.name,
     homeTeamName: fixture.homeTeamName ?? normalized.homeTeam?.name,
     awayTeamName: fixture.awayTeamName ?? normalized.awayTeam?.name,
+    providerHomeTeamId: fixture.providerHomeTeamId ?? normalized.homeTeam?.providerTeamId,
+    providerAwayTeamId: fixture.providerAwayTeamId ?? normalized.awayTeam?.providerTeamId,
   };
 }
 
 interface StoredFixtureRelations {
+  providerHomeTeamId?: string;
+  providerAwayTeamId?: string;
   homeTeamName?: string;
   awayTeamName?: string;
   competitionName?: string;
@@ -1214,6 +1348,8 @@ function fixtureFromStoredRecord(record: {
     awayTeamId: record.awayTeamId ?? 'unknown-away-team',
     homeTeamName: relations.homeTeamName,
     awayTeamName: relations.awayTeamName,
+    providerHomeTeamId: relations.providerHomeTeamId,
+    providerAwayTeamId: relations.providerAwayTeamId,
     scheduledAt: (record.scheduledAt ?? new Date(0)).toISOString(),
     status: toFixtureStatus(record.status),
     scoreHome: record.scoreHome ?? undefined,
@@ -1245,6 +1381,8 @@ function fallbackFixtureFromNormalized(normalized: NormalizedFixture): Fixture {
     awayTeamId: normalized.awayTeam?.providerTeamId ?? 'unknown-away-team',
     homeTeamName: normalized.homeTeam?.name,
     awayTeamName: normalized.awayTeam?.name,
+    providerHomeTeamId: normalized.homeTeam?.providerTeamId,
+    providerAwayTeamId: normalized.awayTeam?.providerTeamId,
     scheduledAt: (normalized.scheduledAt ?? new Date(0)).toISOString(),
     status: normalized.status,
     scoreHome: normalized.scoreHome ?? undefined,

@@ -8,7 +8,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "type", "externalId", "title", "capturedAt", "metadata"],
+        "required": ["id", "type", "url", "externalId", "title", "capturedAt", "metadata"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "type": {
@@ -16,6 +16,7 @@
             "enum": ["api-football", "provider-snapshot", "web-search", "db", "artifact"]
           },
           "externalId": { "type": "string", "minLength": 1 },
+          "url": { "type": ["string", "null"] },
           "title": { "type": "string", "minLength": 1 },
           "capturedAt": { "type": "string", "minLength": 1 },
           "metadata": {

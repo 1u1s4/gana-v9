@@ -251,6 +251,7 @@ export function optionalDailyParlayProfileFlag(flags: CommandFlags): DailyParlay
 export function optionalDailyRequiredLeaguesFlag(flags: CommandFlags): DailyRequiredLeagueInput[] | undefined {
   const value = optionalStringFlag(flags, 'required-leagues');
   if (value === undefined) return undefined;
+  if (value.toLowerCase() === 'auto') return undefined;
   if (/^(off|false|none|disabled|0)$/i.test(value)) return [];
   return value.split(',')
     .map((token) => token.trim())

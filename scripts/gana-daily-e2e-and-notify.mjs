@@ -127,7 +127,7 @@ const providers = args.providers ?? process.env.GANA_DAILY_PROVIDERS ?? 'codex';
 const codexModel = dailyRuntime.codexModel;
 const providerConcurrency = args.providerConcurrency ?? Number(process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? 1);
 const parlayProfile = args.parlayProfile ?? process.env.GANA_PARLAY_PROFILE ?? 'portfolio-v2';
-const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? '1:World Cup:World:2026';
+const requiredLeagues = args.requiredLeagues ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? 'auto';
 const webMode = args.web ?? process.env.GANA_WEB_MODE ?? 'live';
 if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
   throw new Error('--provider-concurrency must be a positive integer.');
@@ -183,7 +183,7 @@ const command = [
   '--providers', providers,
   '--provider-concurrency', String(providerConcurrency),
   ...(args.maxFixtures ? ['--max-fixtures', String(args.maxFixtures)] : []),
-  '--threshold', String(args.threshold ?? 1.2),
+  '--threshold', String(args.threshold ?? process.env.GANA_LOW_ODDS_THRESHOLD ?? 1.1),
   '--web', webMode,
   '--parlay-profile', parlayProfile,
   '--required-leagues', requiredLeagues,
@@ -204,7 +204,7 @@ const env = {
   GANA_TIMEZONE: process.env.GANA_TIMEZONE ?? TIMEZONE,
   GANA_DAILY_PROVIDER_CONCURRENCY: process.env.GANA_DAILY_PROVIDER_CONCURRENCY ?? String(providerConcurrency),
   GANA_DAILY_REQUIRED_LEAGUES: process.env.GANA_DAILY_REQUIRED_LEAGUES ?? requiredLeagues,
-  GANA_LOW_ODDS_THRESHOLD: process.env.GANA_LOW_ODDS_THRESHOLD ?? String(args.threshold ?? 1.2),
+  GANA_LOW_ODDS_THRESHOLD: String(args.threshold ?? process.env.GANA_LOW_ODDS_THRESHOLD ?? 1.1),
   GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES: process.env.GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? process.env.GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES ?? '10000',
   GANA_MAX_FIXTURES_PER_RUN: process.env.GANA_MAX_FIXTURES_PER_RUN ?? '10000',
   GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN: process.env.GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN ?? '10000',

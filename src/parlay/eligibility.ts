@@ -1,6 +1,9 @@
 import type { ParlaySourcePrediction } from './types.js';
 
 export const LOW_ODDS_TOP_MAX_LEG_ODDS = 1.2;
+/** Strict winner-only daily approach; separate from the general short-price risk bucket. */
+export const LOW_ODDS_WINNER_MAX_LEG_ODDS = 1.1;
+export const LOW_ODDS_WINNER_MIN_COMBINED_ODDS = 1.2;
 export const AUTOMATIC_PARLAY_MAX_LEG_ODDS = 2.2;
 export const FRAGILE_TOTAL_OVER_MAX_ODDS = 1.4;
 export const OVERINFLATED_EDGE_FLOOR = 0.2;

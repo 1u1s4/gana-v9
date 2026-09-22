@@ -32,6 +32,7 @@ export async function createApiFootballValidationResultFetcher(
   const provider = providerOverride ?? createApiFootballProvider(
     config,
     await createApiFootballPersistence(config, runtime),
+    runtime,
   );
 
   return {

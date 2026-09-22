@@ -2,7 +2,7 @@ import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import { isMarketKey, normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import { type FixtureDiscoveryResult } from '../filters/engine.js';
-import { isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from '../filters/low-odds-selector.js';
+import { isBelowLowOddsThreshold, isLowOddsFixtureSelectorQuote, lowOddsSelectorMarketScope } from '../filters/low-odds-selector.js';
 import type { LowOddsHitView, LowOddsScanView } from '../filters/types.js';
 import type { FixtureScoringResult } from '../prediction/service.js';
 import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js';
@@ -59,7 +59,7 @@ export function buildLowOddsScan(
     if (!fixture) continue;
     for (const quote of snapshot.quotes) {
       if (!isLowOddsFixtureSelectorQuote(quote, selectorMarketScope)) continue;
-      if (quote.price > config.apiFootball.lowOddsThreshold) continue;
+      if (!isBelowLowOddsThreshold(quote.price, config.apiFootball.lowOddsThreshold)) continue;
       hits.push({
         fixtureId: fixture.id,
         providerFixtureId: fixture.providerFixtureId,

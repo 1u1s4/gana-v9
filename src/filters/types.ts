@@ -16,6 +16,7 @@ export type FilterCombineMode = 'OR' | 'AND';
 export type FilterReason =
   | 'included-by-default-league'
   | 'included-by-default-team'
+  | 'included-by-required-league'
   | 'included-by-low-odds-threshold'
   | 'included-by-manual-query'
   | 'excluded-missing-odds'
@@ -31,6 +32,7 @@ export interface FixtureFilterQuery {
   teamsDefault?: boolean;
   combineMode?: FilterCombineMode;
   fullDay?: boolean;
+  requiredLeagues?: Array<{ providerCompetitionId: string; name?: string | null; season?: number | null }>;
 }
 
 export interface FixtureFilterEvaluation {
@@ -77,6 +79,8 @@ export interface LowOddsScanView {
   marketScope?: string[];
   selectorMarketScope?: string[];
   analysisMarketScope?: string[];
+  providerCoverage?: import('../providers/sports/api-football.js').ApiFootballDateOddsCoverage;
+  scanErrors?: string[];
   marketCoverage?: {
     requestedMarkets: string[];
     quotedMarkets: string[];

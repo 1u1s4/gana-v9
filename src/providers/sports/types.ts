@@ -13,6 +13,8 @@ export type ApiFootballEndpointName =
   | 'odds'
   | 'fixture_result'
   | 'fixture_statistics'
+  | 'fixture_history'
+  | 'team_statistics'
   | 'leagues'
   | 'teams';
 
@@ -48,6 +50,67 @@ export interface ResultQuery {
 
 export interface FixtureStatisticsQuery {
   providerFixtureId: string;
+}
+
+export interface TeamStatisticsQuery {
+  team: number;
+  league: number;
+  season: number;
+  date: string;
+}
+
+export interface TeamStatistics {
+  teamId: number;
+  leagueId: number;
+  season: number;
+  date: string;
+  capturedAt: string;
+  providerSnapshotId?: string;
+  form: string | null;
+  fixtures: JsonValue;
+  goals: JsonValue;
+  cleanSheet: JsonValue;
+  failedToScore: JsonValue;
+}
+
+export interface CompletedLeagueFixturesQuery {
+  league: number;
+  season: number;
+  from: string;
+  to: string;
+}
+
+export interface CompletedLeagueFixture {
+  providerFixtureId: string;
+  leagueId: number;
+  season: number;
+  scheduledAt: string;
+  providerHomeTeamId: string;
+  providerAwayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  providerStatus: 'FT' | 'AET' | 'PEN';
+  scoreHome90: number | null;
+  scoreAway90: number | null;
+  venue: string | null;
+  round: string | null;
+}
+
+export interface CompletedLeagueFixtures {
+  leagueId: number;
+  season: number;
+  from: string;
+  to: string;
+  capturedAt: string;
+  providerSnapshotId?: string;
+  payloadHash: string;
+  fixtures: CompletedLeagueFixture[];
+  coverage: {
+    returnedFixtures: number;
+    includedFixtures: number;
+    excludedFixtures: number;
+    unknownRegulationScoreFixtures: number;
+  };
 }
 
 export interface QuotaStatus {
@@ -100,6 +163,8 @@ export interface CanonicalOddsSnapshot {
   bookmakerCount: number;
   payloadHash: string;
   quotes: OddsQuote[];
+  /** Unfiltered provider quotes for market consensus, not selectable quote inventory. */
+  marketReferenceQuotes?: OddsQuote[];
   metadata?: JsonValue;
   quoteRecordIds?: Record<string, string>;
 }
@@ -114,6 +179,8 @@ export interface SportsDataProvider {
   scanOdds(input: OddsScanQuery): Promise<OddsScanResult[]>;
   getFinalResult(input: ResultQuery): Promise<FinalResult>;
   getFixtureStatistics(input: FixtureStatisticsQuery): Promise<FixtureStatistics>;
+  getTeamStatistics?(input: TeamStatisticsQuery): Promise<TeamStatistics>;
+  getCompletedLeagueFixtures?(input: CompletedLeagueFixturesQuery): Promise<CompletedLeagueFixtures>;
 }
 
 export interface NormalizedCompetition {

@@ -60,7 +60,7 @@ export function redactHeaders(headers: Record<string, string>): Record<string, s
   return redacted;
 }
 
-function redactUnknown(value: unknown, seen: WeakSet<object>): unknown {
+function redactUnknown(value: unknown, ancestors: WeakSet<object>): unknown {
   if (typeof value === 'string') {
     return redactText(value);
   }
@@ -69,21 +69,25 @@ function redactUnknown(value: unknown, seen: WeakSet<object>): unknown {
     return value;
   }
 
-  if (seen.has(value)) {
+  if (ancestors.has(value)) {
     return CIRCULAR;
   }
-  seen.add(value);
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return value.map((item) => redactUnknown(item, ancestors));
+    }
 
-  if (Array.isArray(value)) {
-    return value.map((item) => redactUnknown(item, seen));
+    const source = value as Record<string, unknown>;
+    const redacted: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(source)) {
+      redacted[key] = isSensitiveKey(key) ? REDACTED : redactUnknown(item, ancestors);
+    }
+    return redacted;
+  } finally {
+    // Aliases in sibling fields are valid JSON data; only an ancestor is a cycle.
+    ancestors.delete(value);
   }
-
-  const source = value as Record<string, unknown>;
-  const redacted: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(source)) {
-    redacted[key] = isSensitiveKey(key) ? REDACTED : redactUnknown(item, seen);
-  }
-  return redacted;
 }
 
 function redactText(value: string): string {

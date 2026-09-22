@@ -6,6 +6,8 @@ import { describe, it } from 'node:test';
 import { loadConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { OddsQuote } from '../domain/odds.js';
+import { discoverFixtures } from '../filters/engine.js';
+import { buildRequiredLeagueRecommendations, normalizeRequiredLeagues } from '../daily/required-leagues.js';
 import { createRuntimeContext } from './context.js';
 import { computeAgentFixtureTimeoutMs, executeRunPipeline, exportRunArtifacts, type RunPipelineDependencies } from './pipeline.js';
 
@@ -23,7 +25,7 @@ function testConfig() {
       defaultLeagues: [],
       defaultTeams: [],
       defaultMarkets: ['h2h'],
-      lowOddsThreshold: 1.2,
+      lowOddsThreshold: 1.1,
       kickoffWindowHours: 36,
       includeLiveFixtures: true,
       includeCompletedFixtures: true,
@@ -53,8 +55,8 @@ function lowOddsQuote(target: Fixture): OddsQuote {
     fixtureId: target.id,
     market: 'h2h',
     selection: 'home',
-    price: 1.18,
-    impliedProbability: 1 / 1.18,
+    price: 1.08,
+    impliedProbability: 1 / 1.08,
     bookmaker: 'test-book',
     capturedAt: '2026-04-29T12:00:00.000Z',
     sourceSnapshotId: 'provider-snapshot-1',
@@ -86,8 +88,8 @@ function predictionRecord(input: {
     market: input.market ?? 'h2h',
     selection: input.selection ?? 'home',
     line: input.line,
-    odds: 1.18,
-    impliedProbability: 1 / 1.18,
+    odds: 1.08,
+    impliedProbability: 1 / 1.08,
     oddsSnapshotId: 'odds-snapshot-1',
     oddsQuoteId,
     evidenceIds: ['evidence-1'],
@@ -644,6 +646,53 @@ describe('executeRunPipeline', () => {
     assert.equal(result.handoffPath, '/tmp/custom-handoff.md');
   });
 
+  it('keeps a successfully empty provider odds slate without triggering fixture-by-fixture fallback', async () => {
+    const config = testConfig();
+    const target = fixture();
+    const deps = successfulPipelineDeps({ target, calls: [], runId: 'run-empty-date-odds', date: '2026-04-29' });
+    deps.fetchLowOddsSlate = async () => ({ fixtures: [], snapshots: [], coverage: {
+      scope: 'provider-date-odds', date: '2026-04-29', timezone: 'America/Guatemala', pagesExpected: 1,
+      pagesFetched: 1, oddsFixtureCount: 0, resolvedFixtureCount: 0, missingFixtureIds: [],
+      fixturesWithoutRequestedMarkets: [], complete: true,
+    } });
+    deps.discoverLowOddsFixtures = async () => { throw new Error('must not fan out empty date odds'); };
+    const result = await executeRunPipeline(config, { date: '2026-04-29', validate: false }, createRuntimeContext(config, 'session.jsonl'), deps);
+    assert.equal(result.lowOddsScan.fixtureCount, 0);
+    assert.equal(result.lowOddsScan.providerCoverage?.complete, true);
+    assert.deepEqual(result.lowOddsScan.scanErrors, []);
+  });
+
+  it('retains incomplete provider coverage in artifacts and marks the scan review-required', async () => {
+    const config = testConfig();
+    const target = fixture();
+    const deps = successfulPipelineDeps({ target, calls: [], runId: 'run-incomplete-date-odds', date: '2026-04-29' });
+    deps.fetchLowOddsSlate = async () => ({ fixtures: [target], snapshots: [], coverage: {
+      scope: 'provider-date-odds', date: '2026-04-29', timezone: 'America/Guatemala', pagesExpected: 2,
+      pagesFetched: 2, oddsFixtureCount: 2, resolvedFixtureCount: 1, missingFixtureIds: ['missing-2'],
+      fixturesWithoutRequestedMarkets: [], complete: false,
+    } });
+    const result = await executeRunPipeline(config, { date: '2026-04-29', validate: false }, createRuntimeContext(config, 'session.jsonl'), deps);
+    const scan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(scan.providerCoverage.complete, false);
+    assert.deepEqual(scan.providerCoverage.missingFixtureIds, ['missing-2']);
+    const step = evaluation.steps.find((step: { name: string }) => step.name === 'scan low odds');
+    assert.equal(step.verdict, 'review-required');
+    assert.match(step.warnings.join(' '), /unresolved fixtures missing-2/);
+  });
+
+  it('marks individual odds fetch errors as incomplete scan coverage', async () => {
+    const config = testConfig();
+    const target = fixture();
+    const deps = successfulPipelineDeps({ target, calls: [], runId: 'run-individual-odds-error', date: '2026-04-29',
+      fetchLowOddsSnapshot: async () => { throw new Error('provider quota exhausted'); },
+    });
+    const result = await executeRunPipeline(config, { date: '2026-04-29', validate: false }, createRuntimeContext(config, 'session.jsonl'), deps);
+    assert.deepEqual(result.lowOddsScan.scanErrors, ['provider quota exhausted']);
+    const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
+    assert.equal(evaluation.steps.find((step: { name: string }) => step.name === 'scan low odds').verdict, 'review-required');
+  });
+
   it('continues with primary slate when low-odds scan fails', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
@@ -936,7 +985,7 @@ describe('executeRunPipeline', () => {
         const target = isFijiTarget ? fijiTarget : defaultTarget;
         const quoteRecordIds: Record<string, string> = isFijiTarget
           ? { 'test-book|h2h|away|': 'odds-quote-fiji-ba' }
-          : { 'test-book|double_chance|home_or_draw|': 'odds-quote-default-dc' };
+          : { 'test-book|h2h|home|': 'odds-quote-default-home' };
         return {
           fixtureId: target.id,
           providerFixtureId: target.providerFixtureId,
@@ -947,13 +996,13 @@ describe('executeRunPipeline', () => {
           bookmakerCount: 1,
           payloadHash: `hash-${target.providerFixtureId}`,
           quotes: isFijiTarget
-            ? [lowOddsQuoteFor(fijiTarget, { selection: 'away', price: 1.14, impliedProbability: 1 / 1.14 })]
+            ? [lowOddsQuoteFor(fijiTarget, { selection: 'away', price: 1.06, impliedProbability: 1 / 1.06 })]
             : [
               lowOddsQuoteFor(defaultTarget, {
-                market: 'double_chance',
-                selection: 'home_or_draw',
-                price: 1.1,
-                impliedProbability: 1 / 1.1,
+                market: 'h2h',
+                selection: 'home',
+                price: 1.09,
+                impliedProbability: 1 / 1.09,
               }),
             ],
         };
@@ -972,9 +1021,9 @@ describe('executeRunPipeline', () => {
               runId: 'run-global-low-odds-slate',
               fixtureId: target.id,
               providerFixtureId: target.providerFixtureId,
-              oddsQuoteId: isFijiTarget ? 'odds-quote-fiji-ba' : 'odds-quote-default-dc',
-              market: isFijiTarget ? 'h2h' : 'double_chance',
-              selection: isFijiTarget ? 'away' : 'home_or_draw',
+              oddsQuoteId: isFijiTarget ? 'odds-quote-fiji-ba' : 'odds-quote-default-home',
+              market: 'h2h',
+              selection: isFijiTarget ? 'away' : 'home',
             })],
         };
       },
@@ -992,7 +1041,7 @@ describe('executeRunPipeline', () => {
     assert.equal(result.lowOddsScan.fixtureCount, 2);
     assert.equal(result.lowOddsScan.hitCount, 2);
     assert.deepEqual(result.lowOddsScan.hits.map((hit) => hit.providerFixtureId), ['1001', '9001']);
-    assert.deepEqual(result.lowOddsScan.hits.map((hit) => hit.market), ['double_chance', 'h2h']);
+    assert.deepEqual(result.lowOddsScan.hits.map((hit) => hit.market), ['h2h', 'h2h']);
     assert.equal(result.lowOddsScan.hits[1]?.oddsQuoteId, 'odds-quote-fiji-ba');
 
     const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
@@ -1063,7 +1112,7 @@ describe('executeRunPipeline', () => {
     assert.match(handoff, /lowOddsPredicted: 0\/1/);
   });
 
-  it('uses safe double-chance quotes for low-odds expansion when h2h home or away is absent', async () => {
+  it('does not expand low odds from double chance or a draw when a winner quote is absent', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const target = fixture();
@@ -1106,7 +1155,7 @@ describe('executeRunPipeline', () => {
           payloadHash: 'hash',
           quotes: [
             lowOddsQuoteFor(target, { selection: 'draw', price: 1.1, impliedProbability: 1 / 1.1 }),
-            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.07, impliedProbability: 1 / 1.07 }),
           ],
         };
       },
@@ -1136,7 +1185,7 @@ describe('executeRunPipeline', () => {
         payloadHash: 'hash',
         quotes: [
           lowOddsQuoteFor(target, { selection: 'draw', price: 1.1, impliedProbability: 1 / 1.1 }),
-          lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+          lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.07, impliedProbability: 1 / 1.07 }),
         ],
       }),
       researchFixture: async () => {
@@ -1194,11 +1243,11 @@ describe('executeRunPipeline', () => {
     });
 
     assert.deepEqual(calls, ['fixtures', 'odds', 'research', 'score', 'parlay']);
-    assert.equal(result.lowOddsScan.hitCount, 1);
+    assert.equal(result.lowOddsScan.hitCount, 0);
 
     const lowOddsScan = JSON.parse(readFileSync(join(result.artifactDir, 'low-odds-scan.json'), 'utf-8'));
     const evaluation = JSON.parse(readFileSync(join(result.artifactDir, 'evaluation.json'), 'utf-8'));
-    assert.equal(lowOddsScan.hitCount, 1);
+    assert.equal(lowOddsScan.hitCount, 0);
     const lowOddsStep = evaluation.steps.find((step: { name: string }) => step.name === 'scan low odds');
     assert.equal(lowOddsStep.ok, true);
     assert.equal(lowOddsStep.verdict, 'promotable');
@@ -1206,7 +1255,7 @@ describe('executeRunPipeline', () => {
     assert.equal(evaluation.counts.predictions, 1);
   });
 
-  it('uses h2h favorites and safe double chance as low-odds selector while preserving requested analysis scope', async () => {
+  it('uses h2h winner favorites as low-odds selector while preserving requested analysis scope', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
     const target = fixture();
@@ -1246,7 +1295,7 @@ describe('executeRunPipeline', () => {
           bookmakerCount: 1,
           payloadHash: 'hash',
           quotes: [
-            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.12, impliedProbability: 1 / 1.12 }),
+            lowOddsQuoteFor(target, { market: 'double_chance', selection: 'home_or_draw', price: 1.07, impliedProbability: 1 / 1.07 }),
           ],
         };
       },
@@ -1276,7 +1325,7 @@ describe('executeRunPipeline', () => {
           bookmakerCount: 1,
           payloadHash: 'hash',
           quotes: [
-            lowOddsQuoteFor(target, { market: 'h2h', selection: 'home', price: 1.12, impliedProbability: 1 / 1.12 }),
+            lowOddsQuoteFor(target, { market: 'h2h', selection: 'home', price: 1.07, impliedProbability: 1 / 1.07 }),
           ],
         };
       },
@@ -1344,12 +1393,12 @@ describe('executeRunPipeline', () => {
     });
 
     assert.deepEqual(observed.odds, ['double_chance']);
-    assert.deepEqual(observed.lowOdds, ['h2h', 'double_chance']);
+    assert.deepEqual(observed.lowOdds, ['h2h']);
     assert.deepEqual(observed.research, ['double_chance']);
     assert.deepEqual(observed.score, ['double_chance']);
     assert.equal(result.lowOddsScan.hitCount, 1);
     assert.equal(result.lowOddsScan.hits[0]?.market, 'h2h');
-    assert.deepEqual(result.lowOddsScan.selectorMarketScope, ['h2h', 'double_chance']);
+    assert.deepEqual(result.lowOddsScan.selectorMarketScope, ['h2h']);
     assert.deepEqual(result.lowOddsScan.analysisMarketScope, ['double_chance']);
 
     const inputArtifact = JSON.parse(readFileSync(join(result.artifactDir, 'input.json'), 'utf-8'));
@@ -1358,12 +1407,12 @@ describe('executeRunPipeline', () => {
     const manifest = JSON.parse(readFileSync(result.evidencePackPath, 'utf-8'));
     const handoff = readFileSync(result.handoffPath, 'utf-8');
     assert.deepEqual(inputArtifact.marketScope, ['double_chance']);
-    assert.deepEqual(lowOddsScan.selectorMarketScope, ['h2h', 'double_chance']);
+    assert.deepEqual(lowOddsScan.selectorMarketScope, ['h2h']);
     assert.deepEqual(lowOddsScan.analysisMarketScope, ['double_chance']);
     assert.equal(evaluation.lowOddsPredictionCoverage.complete, true);
     assert.equal(evaluation.lowOddsPredictionCoverage.predictedHitOddsQuoteIds, 1);
     assert.deepEqual(evaluation.marketCoverage.requestedMarkets, ['double_chance']);
-    assert.deepEqual(evaluation.marketCoverage.lowOddsSelectorMarkets, ['h2h', 'double_chance']);
+    assert.deepEqual(evaluation.marketCoverage.lowOddsSelectorMarkets, ['h2h']);
     assert.deepEqual(evaluation.marketCoverage.lowOddsAnalysisMarkets, ['double_chance']);
     assert.equal(evaluation.webSearchCoverage.required, false);
     assert.deepEqual(manifest.marketCoverage.requestedMarkets, ['double_chance']);
@@ -1441,7 +1490,7 @@ describe('executeRunPipeline', () => {
         capturedAt: '2026-04-29T12:00:00.000Z',
         bookmakerCount: 1,
         payloadHash: 'hash',
-        quotes: [lowOddsQuoteFor(lowOnly, { price: 1.18, impliedProbability: 1 / 1.18 })],
+        quotes: [lowOddsQuoteFor(lowOnly, { price: 1.08, impliedProbability: 1 / 1.08 })],
       }),
       researchFixture: async (_config, input) => {
         researched.push(input.fixtureId);
@@ -1501,6 +1550,57 @@ describe('executeRunPipeline', () => {
     assert.match(selected.warnings.join('\n'), /selected fixtures capped from 3 to 2/);
     assert.equal(evaluation.counts.selectedFixtures, 2);
     assert.equal(evaluation.fixtureSelection.capped, true);
+  });
+
+  it('discovers weekly required leagues outside presets and keeps unscored capped fixtures explicit even with no odds', async () => {
+    const config = testConfig();
+    config.apiFootball.maxFixturesPerRun = 1;
+    config.apiFootball.maxAgenticResearchCallsPerRun = 1;
+    const first = fixture({ id: 'required-cl', providerFixtureId: '2001', leagueId: 2, season: 2026, competitionName: 'Champions League' });
+    const capped = fixture({ id: 'required-el', providerFixtureId: '3001', leagueId: 3, season: 2026, competitionName: 'Europa League' });
+    const required = [{ providerCompetitionId: '2', name: 'Champions League', season: 2026 }, { providerCompetitionId: '3', name: 'Europa League', season: 2026 }];
+    const deps = successfulPipelineDeps({ target: first, calls: [], runId: 'run-required-no-odds', date: '2026-04-29' });
+    let globalCalls = 0;
+    deps.discoverFixtures = (cfg, query, runtime) => {
+      assert.deepEqual(query.requiredLeagues, required);
+      // This integration exercises date discovery without a database of team presets.
+      return discoverFixtures(cfg, { ...query, teamsDefault: false }, runtime, {
+      listFixtures: async (_config, providerQuery) => {
+        globalCalls++;
+        assert.equal(providerQuery.league, undefined);
+        assert.equal(providerQuery.maxFixtures, Number.MAX_SAFE_INTEGER);
+        return [first, capped];
+      },
+      });
+    };
+    deps.fetchLowOddsSlate = async () => ({ fixtures: [], snapshots: [] });
+    deps.fetchOddsSnapshot = async () => ({ fixtureId: first.id, providerFixtureId: first.providerFixtureId,
+      providerSnapshotId: 'provider-empty', capturedAt: '2026-04-29T12:00:00Z', bookmakerCount: 0, payloadHash: 'empty', quotes: [] });
+    const researched: string[] = [];
+    deps.researchFixture = async (_config, input) => {
+      researched.push(input.fixtureId);
+      return { ok: true, gateResult: { verdict: 'promotable', reasons: [], warnings: [] } };
+    };
+    deps.scoreFixture = async () => ({ ok: false, runId: 'run-required-no-odds', fixtureId: first.id,
+      providerFixtureId: first.providerFixtureId, predictions: [], gateResult: { verdict: 'blocked', reasons: ['no odds available'], warnings: [] } });
+    const result = await executeRunPipeline(config, { date: '2026-04-29', priorityLeagues: required, validate: false, web: 'off' }, createRuntimeContext(config, 'session.jsonl'), deps);
+    assert.equal(globalCalls, 1);
+    assert.deepEqual(result.fixtures.map((item) => item.providerFixtureId), ['2001']);
+    assert.deepEqual(researched, ['2001']);
+    assert.equal(result.lowOddsScan.hitCount, 0);
+    const discovered = JSON.parse(readFileSync(join(result.artifactDir, 'fixtures.json'), 'utf8'));
+    assert.deepEqual(discovered.discoveredRequiredFixtures.map((item: Fixture) => item.providerFixtureId), ['2001', '3001']);
+    assert.deepEqual(discovered.requiredLeagueCoverage.map((item: { eligibleFixtureCount: number }) => item.eligibleFixtureCount), [1, 0]);
+    const coverage = buildRequiredLeagueRecommendations({
+      dailyBatchId: 'daily-required-no-odds', date: '2026-04-29', generatedAt: '2026-04-29T12:00:00Z', providers: ['codex'],
+      providerPipelineResults: { codex: result }, timezone: 'America/Guatemala', resolveModel: () => config.model,
+      requiredLeagues: normalizeRequiredLeagues(required),
+    });
+    assert.equal(coverage.coverage.status, 'review-required');
+    assert.equal(coverage.coverage.fixtureCount, 2);
+    assert.equal(coverage.coverage.missingPredictionFixtures, 2);
+    assert.equal(coverage.goalCheck.status, 'review-required');
+    assert.match(result.steps.find((step) => step.name === 'fetch fixtures')?.warnings.join(' ') ?? '', /required league discovery capped/);
   });
 
   it('prioritizes required league fixtures before selected and agentic fixture caps', async () => {
@@ -1737,7 +1837,7 @@ describe('executeRunPipeline', () => {
           capturedAt: '2026-04-29T12:00:00.000Z',
           bookmakerCount: 1,
           payloadHash: `hash-${target.providerFixtureId}`,
-          quotes: [lowOddsQuoteFor(target, { price: 1.18, impliedProbability: 1 / 1.18 })],
+          quotes: [lowOddsQuoteFor(target, { price: 1.08, impliedProbability: 1 / 1.08 })],
         };
       },
       researchFixture: async (_config, input) => {

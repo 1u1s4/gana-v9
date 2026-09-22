@@ -9,6 +9,7 @@ import type { Fixture } from '../domain/fixtures.js';
 import type { CanonicalOddsSnapshot, FixtureStatistics } from '../providers/sports/types.js';
 import { runFixtureResearch } from './research.js';
 import type { ResearchBundle } from './types.js';
+import { hashPayload } from '../runtime/artifacts.js';
 
 const createdAt = new Date('2026-04-25T12:00:00.000Z');
 
@@ -115,12 +116,48 @@ function emitNativeWebSearch(options: any, query = 'fixture 1001 team news injur
 }
 
 describe('runFixtureResearch', () => {
+  it('timestamps provider context after collection without backdating capture or freezing live research at startup', async () => {
+    const cfg = config();
+    const runtime = createRuntimeContext(cfg, 'session.jsonl');
+    let current = createdAt;
+    let capturedPrompt: any;
+    const contextCapturedAt = '2026-04-25T12:00:03.000Z';
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
+      now: () => current,
+      provider: {
+        getFixture: async () => fixture,
+        getCanonicalOddsSnapshot: async () => {
+          current = new Date(contextCapturedAt);
+          return { ...oddsSnapshot, capturedAt: contextCapturedAt };
+        },
+      },
+      agentRunner: async (_config, prompt, options) => {
+        assert.equal(typeof prompt, 'string');
+        if (typeof prompt !== 'string') throw new Error('Research prompt must be a string');
+        capturedPrompt = JSON.parse(prompt.split('\nInput:\n')[1]);
+        emitNativeWebSearch(options);
+        return { text: agentOutput(), usage: {}, output: agentOutput() };
+      },
+      persistBundle: async () => {},
+    });
+    assert.equal(capturedPrompt.createdAt, createdAt.toISOString());
+    assert.equal(capturedPrompt.researchTiming.contextCapturedAt, contextCapturedAt);
+    assert.equal(capturedPrompt.researchTiming.mode, 'live-prematch');
+    assert.equal(capturedPrompt.researchTiming.historicalAsOf, null);
+    assert.deepEqual(result.bundle?.metadata?.researchTiming, capturedPrompt.researchTiming);
+    assert.equal(result.bundle?.sources.find((source) => source.id === 'source_api_football_fixture')?.capturedAt, contextCapturedAt);
+    assert.equal(result.bundle?.sources.find((source) => source.id === 'source_api_football_odds_snapshot')?.capturedAt, contextCapturedAt);
+  });
+
   it('keeps the Codex response schema strict-compatible for claim subjects', () => {
     const schema = JSON.parse(readFileSync('skills/research-fixture-v2/output.schema.json', 'utf8'));
     const subject = schema.properties.claims.items.properties.subject;
 
     assert.deepEqual(subject.required, ['type', 'id', 'market']);
     assert.deepEqual(subject.properties.market.type, ['string', 'null']);
+    const sourceSchema = schema.properties.sources.items;
+    assert.ok(sourceSchema.required.includes('url'));
+    assert.deepEqual(sourceSchema.properties.url.type, ['string', 'null']);
   });
 
   it('persists a promotable research bundle from strict agent JSON', async () => {
@@ -149,9 +186,12 @@ describe('runFixtureResearch', () => {
     assert.equal(result.bundle?.sources.some((source) => source.type === 'web-search'), true);
     assert.equal(persisted.length, 1);
     assert.ok(result.artifactPath);
+    const artifact = JSON.parse(readFileSync(result.artifactPath!, 'utf8'));
+    assert.ok(Array.isArray(artifact.warnings));
+    assert.deepEqual(artifact.warnings, artifact.gateResult.warnings);
   });
 
-  it('passes API-Football statistics and odds context into the research prompt', async () => {
+  it('passes completed-fixture statistics and odds into an audit research prompt', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     let prompt = '';
@@ -161,7 +201,7 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: {
-        getFixture: async () => fixture,
+        getFixture: async () => ({ ...fixture, status: 'completed', scheduledAt: '2026-04-24T18:00:00.000Z' }),
         getFixtureStatistics: async () => {
           statisticsRequested = true;
           return fixtureStatistics;
@@ -188,6 +228,66 @@ describe('runFixtureResearch', () => {
     assert.match(prompt, /"market": "goals_over_under"/);
     assert.equal(result.bundle?.sources.some((source) => source.id === 'source_api_football_fixture_statistics'), true);
     assert.equal(result.bundle?.sources.some((source) => source.id === 'source_api_football_odds_snapshot'), true);
+  });
+
+  it('passes recent results to the prompt and preserves canonical statistics provenance when the model reuses source IDs', async () => {
+    const cfg = config();
+    const statistic = {
+      teamId: 42, leagueId: 39, season: 2026, date: '2026-04-24',
+      providerSnapshotId: 'team-snapshot-42', capturedAt: createdAt.toISOString(),
+      form: 'WWD', fixtures: { played: { total: 3 } }, goals: {}, cleanSheet: {}, failedToScore: {},
+    };
+    const response = JSON.parse(agentOutput());
+    const historySourceId = 'source_api_football_league_history_39_2026_2026-04-24';
+    const history = { leagueId: 39, season: 2026, from: '2026-01-01', to: '2026-04-24', capturedAt: createdAt.toISOString(),
+      providerSnapshotId: 'history-snapshot', payloadHash: 'b'.repeat(64),
+      fixtures: [{ providerFixtureId: 'prior-match', leagueId: 39, season: 2026, scheduledAt: '2026-04-20T18:00:00Z',
+        providerHomeTeamId: '42', providerAwayTeamId: '49', homeTeamName: 'Home', awayTeamName: 'Away',
+        providerStatus: 'FT' as const, scoreHome90: 1, scoreAway90: 0, venue: null, round: null }],
+      coverage: { returnedFixtures: 1, includedFixtures: 1, excludedFixtures: 0, unknownRegulationScoreFixtures: 0 } };
+    let promptInput: any;
+    response.sources.push({ id: 'source_api_football_team_42', type: 'web-search',
+      url: 'https://example.com/model-locator', externalId: 'model-locator', title: 'Model replacement',
+      capturedAt: createdAt.toISOString(), metadata: {},
+    });
+    response.sources.push({ id: historySourceId, type: 'web-search', url: 'https://example.com/model-history',
+      externalId: 'model-history', capturedAt: createdAt.toISOString(), metadata: {} });
+    response.evidenceItems.push({ id: 'team-evidence', sourceId: 'source_api_football_team_42', claimIds: ['team-claim'], summary: 'Three games in the supplied sample.', confidence: 0.8 });
+    response.claims.push({ id: 'team-claim', statement: 'The provider sample contains three games.', subject: { type: 'team', id: '42', market: null }, supportLevel: 'supported', evidenceIds: ['team-evidence'], conflictStatus: 'none' });
+    const output = JSON.stringify(response);
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, createRuntimeContext(cfg, 'source-provenance.jsonl'), {
+      now: () => createdAt,
+      provider: {
+        getFixture: async () => ({ ...fixture, leagueId: 39, season: 2026, providerHomeTeamId: '42', providerAwayTeamId: '49' }),
+        getTeamStatistics: async (query) => ({ ...statistic, teamId: query.team, providerSnapshotId: `team-snapshot-${query.team}`, date: query.date }),
+        getCompletedLeagueFixtures: async () => history,
+      },
+      agentRunner: async (_config, input, options) => {
+        if (typeof input !== 'string') throw new Error('Expected research prompt');
+        promptInput = JSON.parse(input.split('\nInput:\n')[1]);
+        assert.match(input, /descriptive records, not an official table/);
+        emitNativeWebSearch(options); return { text: output, usage: {}, output };
+      },
+      persistBundle: async () => {},
+    });
+    assert.equal(result.ok, true);
+    const source = result.bundle?.sources.find((item) => item.id === 'source_api_football_team_42');
+    assert.equal(source?.type, 'api-football');
+    assert.equal(source?.snapshotId, statistic.providerSnapshotId);
+    assert.equal(source?.externalId, 'teams/statistics?team=42&league=39&season=2026&date=2026-04-24');
+    assert.equal(source?.metadata?.cutoffDate, '2026-04-24');
+    assert.equal(source?.hash, hashPayload({ ...statistic, sourceId: 'source_api_football_team_42' }));
+    assert.equal(source?.url, undefined);
+    assert.equal(result.bundle?.evidenceItems.find((item) => item.id === 'team-evidence')?.sourceId, source?.id);
+    assert.equal(promptInput.recentPerformance.sourceId, historySourceId);
+    assert.equal(promptInput.recentPerformance.teams[0].sample.home.played, 1);
+    assert.equal(promptInput.recentPerformance.teams[0].recentMatches[0].opponentBeforeMatch.pointsPerMatch, null);
+    const historySource = result.bundle?.sources.find((item) => item.id === historySourceId);
+    assert.equal(historySource?.type, 'api-football');
+    assert.equal(historySource?.snapshotId, history.providerSnapshotId);
+    assert.equal(historySource?.hash, history.payloadHash);
+    assert.equal(historySource?.url, undefined);
+    assert.equal(historySource?.metadata?.cutoffDate, history.to);
   });
 
   it('downgrades live web research without a web-search source to review-required', async () => {
@@ -305,7 +405,7 @@ describe('runFixtureResearch', () => {
     assert.equal(result.bundle?.sources.find((source) => source.id === 'source-web-2')?.capturedAt, createdAt.toISOString());
   });
 
-  it('adds a synthetic web-search source when native web search was used but omitted from JSON', async () => {
+  it('keeps native search without a cited web page review-required', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const output = agentOutput({
@@ -346,11 +446,11 @@ describe('runFixtureResearch', () => {
     });
 
     const synthetic = result.bundle?.sources.find((source) => source.id === 'source_native_web_search');
-    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
     assert.equal(synthetic?.type, 'web-search');
     assert.equal(synthetic?.metadata?.synthesized, true);
     assert.deepEqual(synthetic?.metadata?.queries, ['fixture 1001 team news injuries']);
-    assert.doesNotMatch(result.bundle?.gateResult.warnings.join('\n') ?? '', /no web-search source/);
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no real web-search source/);
   });
 
   it('retries live web research when the agent returns an empty tool-not-performed payload', async () => {
@@ -441,7 +541,7 @@ describe('runFixtureResearch', () => {
           id: 'evidence_2',
           sourceId: 'source_2',
           claimIds: ['claim_2'],
-          summary: 'Fixture statistics show a 10-2 corner split and 12 total corners.',
+          summary: 'Fixture statistics show a 4-6 corner split and 10 total corners.',
           confidence: 0.99,
         },
         {
@@ -463,7 +563,7 @@ describe('runFixtureResearch', () => {
         },
         {
           id: 'claim_2',
-          statement: 'Fixture statistics list 12 total corners.',
+          statement: 'Fixture statistics list 10 total corners.',
           subject: { type: 'fixture', id: 'fixture-1' },
           supportLevel: 'supported',
           evidenceIds: ['evidence_2'],
@@ -488,7 +588,7 @@ describe('runFixtureResearch', () => {
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: {
-        getFixture: async () => fixture,
+        getFixture: async () => ({ ...fixture, status: 'completed', scheduledAt: '2026-04-24T18:00:00.000Z' }),
         getFixtureStatistics: async () => fixtureStatistics,
         getCanonicalOddsSnapshot: async () => oddsSnapshot,
       },
@@ -500,7 +600,7 @@ describe('runFixtureResearch', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
     assert.equal(result.bundle?.sources.some((source) => source.id === 'source_4' && source.type === 'web-search'), true);
     assert.equal(result.bundle?.evidenceItems.find((item) => item.id === 'evidence_2')?.sourceId, 'source_api_football_fixture_statistics');
     assert.equal(result.bundle?.evidenceItems.find((item) => item.id === 'evidence_3')?.sourceId, 'source_api_football_odds_snapshot');
@@ -552,7 +652,7 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /synthesized omitted web-search source "web_source_3"/);
   });
 
-  it('synthesizes provider evidence for odds claims without evidence ids', async () => {
+  it('quarantines an unverified odds claim without manufacturing provider evidence', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const output = agentOutput({
@@ -584,9 +684,58 @@ describe('runFixtureResearch', () => {
     const claim = result.bundle?.claims.find((item) => item.id === 'claim_h2h_home_odds');
     const evidence = result.bundle?.evidenceItems.find((item) => item.id === 'evidence_repaired_claim_h2h_home_odds');
     assert.equal(result.ok, true);
-    assert.deepEqual(claim?.evidenceIds, ['evidence_repaired_claim_h2h_home_odds']);
-    assert.equal(evidence?.sourceId, 'source_api_football_odds_snapshot');
-    assert.match(result.bundle?.warnings.join('\n') ?? '', /synthesized provider evidence for claim "claim_h2h_home_odds"/);
+    assert.equal(claim, undefined);
+    assert.equal(evidence, undefined);
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.equal((result.bundle?.metadata?.unverifiedClaims as any[])?.[0]?.id, 'claim_h2h_home_odds');
+    assert.match(result.bundle?.warnings.join('\n') ?? '', /quarantined claim "claim_h2h_home_odds"/);
+  });
+
+  it('does not count an unsupported market claim as researched coverage', async () => {
+    const cfg = config();
+    const output = agentOutput({ claims: [{
+      id: 'claim-1', statement: 'No reliable goal sample was found.',
+      subject: { type: 'market', market: 'goals_over_under' }, supportLevel: 'unsupported',
+      evidenceIds: ['evidence-1'], conflictStatus: 'none',
+    }] });
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live', markets: ['goals_over_under'], oddsSnapshot }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => createdAt, provider: { getFixture: async () => fixture }, persistBundle: async () => {},
+      agentRunner: async (_config, _input, options) => { emitNativeWebSearch(options); return { text: output, usage: {}, output }; },
+    });
+    const coverage = result.bundle?.metadata?.marketCoverage as any;
+    assert.deepEqual(coverage.evidenceMarkets, []);
+    assert.deepEqual(coverage.skippedMarkets, [{ market: 'goals_over_under', reason: 'missing market-specific research evidence' }]);
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+  });
+
+  it('requires cited evidence even when a real URL and native search are present', async () => {
+    const cfg = config();
+    const output = agentOutput({
+      evidenceItems: [{ id: 'evidence-1', sourceId: 'source_api_football_fixture', claimIds: ['claim-1'], summary: 'Fixture identity only.', confidence: 0.8 }],
+      gateResult: { verdict: 'promotable', reasons: ['Source listed'], warnings: [] },
+    });
+    const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, createRuntimeContext(cfg, 'session.jsonl'), {
+      now: () => createdAt, provider: { getFixture: async () => fixture }, persistBundle: async () => {},
+      agentRunner: async (_config, _input, options) => { emitNativeWebSearch(options); return { text: output, usage: {}, output }; },
+    });
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /no real web-search source/);
+  });
+
+  it('restores a web URL from a real externalId, but rejects opaque placeholder locators', async () => {
+    for (const externalId of ['https://example.com/real-page', 'web-search:source-web-1']) {
+      const cfg = config();
+      const output = agentOutput({
+        sources: [{ id: 'source-web-1', type: 'web-search', url: null, externalId, capturedAt: createdAt.toISOString() }],
+        gateResult: { verdict: 'promotable', reasons: ['Structured source'], warnings: [] },
+      });
+      const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, createRuntimeContext(cfg, 'session.jsonl'), {
+        now: () => createdAt, provider: { getFixture: async () => fixture }, persistBundle: async () => {},
+        agentRunner: async (_config, _input, options) => { emitNativeWebSearch(options); return { text: output, usage: {}, output }; },
+      });
+      assert.equal(result.bundle?.gateResult.verdict, externalId.startsWith('https:') ? 'promotable' : 'review-required');
+      assert.equal(result.bundle?.sources.find((source) => source.id === 'source-web-1')?.url, externalId.startsWith('https:') ? externalId : undefined);
+    }
   });
 
   it('repairs blank and null source locators before validation', async () => {
@@ -870,7 +1019,7 @@ describe('runFixtureResearch', () => {
     assert.match(result.bundle?.warnings.join('\n') ?? '', /inferred market subject "h2h"/);
   });
 
-  it('promotes objectively sufficient live research despite soft LLM review warnings', async () => {
+  it('preserves review-required for objectively sufficient live research despite soft LLM review warnings', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     const output = agentOutput({
@@ -917,7 +1066,7 @@ describe('runFixtureResearch', () => {
       }],
       gateResult: {
         verdict: 'review-required',
-        reasons: ['structured research was generated and web-search evidence is present'],
+        reasons: ['Hay evidencia descriptiva de cuotas, pero evidencia estadística insuficiente para promover conclusiones predictivas'],
         warnings: ['fixture-statistics context is incomplete, so tactical confidence remains limited', 'odds-led lean'],
       },
       warnings: ['fixture-statistics context is incomplete, so tactical confidence remains limited', 'odds-led lean'],
@@ -934,11 +1083,11 @@ describe('runFixtureResearch', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /odds-led lean/);
   });
 
-  it('promotes live research with positive no-conflict reasons and reference repair warnings', async () => {
+  it('preserves review-required for live research with positive no-conflict reasons and reference repair warnings', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session-research-no-conflict');
     const output = agentOutput({
@@ -1001,12 +1150,12 @@ describe('runFixtureResearch', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
-    assert.match(result.bundle?.gateResult.reasons.join('\n') ?? '', /objective research gate passed/);
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
+    assert.doesNotMatch(result.bundle?.gateResult.reasons.join('\n') ?? '', /objective research gate passed/);
     assert.match(result.bundle?.gateResult.warnings.join('\n') ?? '', /mapped market subject id "h2h"/);
   });
 
-  it('promotes otherwise sufficient research when only the schedule claim has a kickoff-time conflict', async () => {
+  it('preserves review-required for otherwise sufficient research when only the schedule claim has a kickoff-time conflict', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session-research-schedule-conflict');
     const output = agentOutput({
@@ -1083,9 +1232,9 @@ describe('runFixtureResearch', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(result.bundle?.gateResult.verdict, 'promotable');
+    assert.equal(result.bundle?.gateResult.verdict, 'review-required');
     assert.match(result.bundle?.warnings.join('\n') ?? '', /Kickoff time differs across sources/);
-    assert.match(result.bundle?.gateResult.reasons.join('\n') ?? '', /objective research gate passed/);
+    assert.doesNotMatch(result.bundle?.gateResult.reasons.join('\n') ?? '', /objective research gate passed/);
   });
 
   it('emits a review-required API-Football fallback bundle when the agent runner fails', async () => {

@@ -3,6 +3,7 @@ import type { AgentConfig } from '../config.js';
 import { writeArtifact } from '../runtime/artifacts.js';
 import { getPrismaClient } from '../storage/db.js';
 import { fixtureDateRange } from '../storage/repositories/helpers.js';
+import { jointModelProbability, modelProbabilityFor } from './probability.js';
 
 export interface RunParlayAnalysisInput {
   date?: string;
@@ -83,6 +84,7 @@ export interface ParlayAnalysisLeg {
   line: number | null;
   odds: number;
   confidence: number | null;
+  probability?: number | null;
   validationStatus: string;
   warnings: string[];
   banker: boolean;
@@ -289,6 +291,7 @@ function buildParlayQuery(config: AgentConfig, input: RunParlayAnalysisInput): u
           prediction: {
             select: {
               confidence: true,
+              estimatedProbability: true,
               warnings: true,
               metadata: true,
               validationArtifacts: { orderBy: { evaluatedAt: 'desc' }, take: 1 },
@@ -317,10 +320,12 @@ function toCandidate(row: unknown): Candidate {
   const validationStatus = latestStatus(parlay.validationArtifacts);
   const legs = Array.isArray(parlay.legs) ? parlay.legs.map(toLeg) : [];
   const riskFlags = riskFlagsFor(parlay, profile, legs);
-  const adjustedProbability = adjustedProbabilityFor(aggregateConfidence, combinedOdds, profile, riskFlags, legs.length);
+  const jointProbability = jointModelProbability(legs);
+  const adjustedProbability = jointProbability === null ? 0 : adjustedProbabilityFor(jointProbability, combinedOdds, profile, riskFlags, legs.length);
   const expectedEdge = combinedOdds * adjustedProbability - 1;
   const rawStakeFraction = kellyFraction(adjustedProbability, combinedOdds);
   const rejectedReasons = rejectionReasonsFor(profile, combinedOdds, aggregateConfidence, expectedEdge, riskFlags, legs.length);
+  if (jointProbability === null) rejectedReasons.push('missing or invalid model probability on parlay leg; evidence confidence cannot substitute probability');
   const reasons = reasonsFor(profile, combinedOdds, aggregateConfidence, adjustedProbability, expectedEdge, riskFlags);
 
   return {
@@ -410,6 +415,7 @@ function toLeg(leg: any): ParlayAnalysisLeg {
     line,
     odds,
     confidence,
+    probability: modelProbabilityFor({ probability: prediction.estimatedProbability, modelProbability: prediction.metadata?.modelProbability }),
     validationStatus: latestStatus(prediction.validationArtifacts),
     warnings,
     banker: Boolean(bankerReason),
@@ -453,9 +459,9 @@ function riskFlagsFor(parlay: any, profile: string, legs: ParlayAnalysisLeg[]): 
   return [...new Set(flags)];
 }
 
-function adjustedProbabilityFor(confidence: number, combinedOdds: number, profile: string, riskFlags: string[], legs: number): number {
-  let probability = confidence * profileMultiplier(profile);
-  if (combinedOdds <= 1.5) probability *= 1.03;
+function adjustedProbabilityFor(jointProbability: number, combinedOdds: number, profile: string, riskFlags: string[], legs: number): number {
+  // Profile names and low prices cannot manufacture probability or edge.
+  let probability = jointProbability * Math.min(1, profileMultiplier(profile));
   if (combinedOdds > 2.2) probability *= 0.92;
   if (combinedOdds > 3.0) probability *= 0.84;
   if (legs > 4) probability *= 0.9;
@@ -469,7 +475,7 @@ function adjustedProbabilityFor(confidence: number, combinedOdds: number, profil
     if (flag === 'many-legs') probability *= 0.92;
     if (flag === 'high-combined-odds') probability *= 0.92;
   }
-  return round(clamp(probability, 0.01, 0.99), 6);
+  return clamp(probability, 0, 1);
 }
 
 function profileMultiplier(profile: string): number {

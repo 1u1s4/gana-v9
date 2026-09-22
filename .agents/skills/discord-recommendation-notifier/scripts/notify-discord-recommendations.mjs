@@ -14,11 +14,13 @@ const DEFAULT_HERMES_PYTHON = '/Users/luisalvarado/.hermes/hermes-agent/venv/bin
 const DISCORD_FIELD_LIMIT = 1024;
 const DISCORD_DESCRIPTION_LIMIT = 4096;
 const DISCORD_EMBED_LIMIT = 10;
+const DISCORD_TOTAL_EMBED_CHARACTERS = 6000;
 const DISCORD_NON_SELECTION_EMBEDS = 2;
 const DISCORD_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - DISCORD_NON_SELECTION_EMBEDS;
 const DISCORD_PAGINATED_SELECTION_EMBEDS_PER_MESSAGE = DISCORD_EMBED_LIMIT - 1;
 const REQUIRED_GENERAL_HIGH_PROBABILITY_FLOOR = 0.7;
 const DAILY_ODDS_FLOOR_STRATEGY_VERSION = 'odds-floor-highest-confidence-v1';
+const DAILY_ODDS_FLOOR_EVIDENCE_STRATEGY_VERSION = 'odds-floor-eligible-confidence-v2';
 const DAILY_ODDS_FLOOR_MINIMUM_PUBLISHED_ODDS = 1.45;
 const DAILY_ODDS_FLOOR_TIE_BREAK = ['published-order-ascending'];
 const GUATEMALA_TIMEZONE = 'America/Guatemala';
@@ -103,6 +105,7 @@ export function loadRecommendations(path, { strictSources = false } = {}) {
 }
 
 export function buildDiscordPayload(artifact, options = {}) {
+  if (artifact?.presentation === 'concise-v1') return singleConcisePayload(artifact, options);
   const requiredLeagueEmbeds = requiredLeagueDiscordEmbeds(artifact);
   if (requiredLeagueEmbeds.length + DISCORD_NON_SELECTION_EMBEDS > DISCORD_EMBED_LIMIT) {
     const payload = buildDiscordPayloads(artifact, options)[0];
@@ -116,6 +119,7 @@ export function buildDiscordPayload(artifact, options = {}) {
 }
 
 export function buildDiscordPayloads(artifact, options = {}) {
+  if (artifact?.presentation === 'concise-v1') return buildConciseDiscordPayloads(artifact, options);
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const requiredLeagueEmbeds = requiredLeagueDiscordEmbeds(artifact);
@@ -135,6 +139,151 @@ export function buildDiscordPayloads(artifact, options = {}) {
   }
   const strategyPayload = buildDailyOddsFloorStrategyPayload(artifact, options);
   return strategyPayload ? [...payloads, strategyPayload] : payloads;
+}
+
+// Presentation consumes the published arrays verbatim: no reranking, deduping,
+// artificial selection cap, or unselected provider-comparison candidates.
+function concisePublishedRecommendations(artifact) {
+  const required = requiredLeagueData(artifact);
+  const fixtures = requiredLeagueFixtureMetaByKey(required?.coverage?.fixtures ?? []);
+  const hydrateLeg = (leg) => {
+    const fixture = requiredLeagueFixtureKeys(leg).map((key) => fixtures.get(key)).find(Boolean);
+    return fixture ? { ...fixture, ...leg, display: { ...fixture.display, ...leg.display } } : leg;
+  };
+  return hydrateRecommendationDisplayLabels([
+    ...selectRecommendations(artifact),
+    ...(Array.isArray(required?.atomicProjections) ? required.atomicProjections : []).map((item) => ({
+      ...item, kind: 'atomic-prediction', profile: 'required-atomic', combinedOdds: item.odds,
+      aggregateConfidence: item.confidence, legs: [hydrateLeg(item)],
+    })),
+    ...(Array.isArray(required?.parlayProjections) ? required.parlayProjections : [])
+      .filter((item) => item.status === 'selected')
+      .map((item) => ({ ...item, kind: 'parlay', legs: (item.legs ?? []).map(hydrateLeg) })),
+  ]);
+}
+
+const CONCISE_PROFILE_NAMES = {
+  principal: 'Principal', resultados: 'Resultados', 'mixto-seguro': 'Mixta',
+  'market-diverse': 'Mercados variados', 'parlay-diamante': 'Diamante',
+  'parlay-refinado': 'Selección del día', 'low-variance': 'Menor variación',
+  'low-odds-top': 'Favoritos de cuota baja', 'parlay-all-in': 'Combinada ampliada',
+  'parlay-oro': 'Oro', balanced: 'Equilibrada', 'high-conviction': 'Mayor confianza',
+  totales: 'Goles', totals: 'Goles', conservative: 'Conservadora', review: 'En revisión',
+};
+
+function conciseReviewLabel(item) {
+  const statuses = [item?.harnessStatus, item?.status, ...(item?.legs ?? []).map((leg) => leg?.status)];
+  if (statuses.includes('blocked')) return ' · 🚫 Bloqueada';
+  const riskFlags = Array.isArray(item?.riskFlags) ? item.riskFlags : [];
+  return statuses.includes('review-required') || item?.promotable === false || item?.safetyOverride
+    || riskFlags.some((flag) => /review-required|safety-override|model-probability-safety/i.test(flag))
+    ? ' · 🟡 En revisión' : '';
+}
+
+function conciseConfidence(item) {
+  const value = [item?.evidenceConfidence, item?.aggregateConfidence, item?.confidence]
+    .find((candidate) => typeof candidate === 'number' && Number.isFinite(candidate));
+  return value === undefined ? 'n/d' : formatPercent(value);
+}
+
+function conciseLegLine(leg) {
+  return `> ${formatMarketIcon(leg)} ${displayFixtureNameWithOptions(leg, { includeKickoff: true })}: ${formatRequiredPick(leg)} · Cuota ${formatMetricNumber(leg.odds, 2)}`;
+}
+
+function conciseDescriptionEmbeds(title, blocks, color) {
+  const descriptions = [];
+  let description = '';
+  for (const block of blocks) {
+    if (block.length > DISCORD_DESCRIPTION_LIMIT) throw new Error('A published selection exceeds the Discord description limit; shorten its display label before sending.');
+    const next = description ? `${description}\n${block}` : block;
+    if (next.length > DISCORD_DESCRIPTION_LIMIT) {
+      descriptions.push(description);
+      description = block;
+    } else description = next;
+  }
+  if (description) descriptions.push(description);
+  return descriptions.map((text, index) => ({
+    title: index ? `${title} · continuación ${index + 1}` : title,
+    description: text,
+    color,
+  }));
+}
+
+function conciseStrategyEmbeds(artifact) {
+  const snapshot = validDailyOddsFloorStrategySnapshot(artifact?.dailyOddsFloorStrategy);
+  if (!snapshot) return [];
+  const pick = snapshot.selectedPick;
+  const lines = pick ? [
+    ...pick.legs.map(conciseLegLine),
+    `> Cuota ${formatMetricNumber(pick.publishedOdds, 4)} · 🍀 Conf. ${snapshot.version.endsWith('-v2') ? 'evidencia' : 'publicada'} ${formatPercent(pick.publishedConfidence)}`,
+  ] : ['> Hoy no hay una selección elegible con la cuota mínima'];
+  lines.push(`Cuota mínima ${formatMetricNumber(snapshot.rule.minimumPublishedOdds, 2)} · mayor confianza ${snapshot.version.endsWith('-v2') ? 'de evidencia elegible' : 'publicada'}`, 'Análisis sin garantías · sin ejecución monetaria');
+  return conciseDescriptionEmbeds('🎯 Apuesta analítica del día', lines, pick ? 0xf2c94c : 0x828282);
+}
+
+function discordEmbedCharacters(embed) {
+  return String(embed.title ?? '').length + String(embed.description ?? '').length
+    + String(embed.footer?.text ?? '').length + String(embed.author?.name ?? '').length
+    + (embed.fields ?? []).reduce((sum, field) => sum + String(field.name ?? '').length + String(field.value ?? '').length, 0);
+}
+
+function buildConciseDiscordPayloads(artifact, options) {
+  const recommendations = concisePublishedRecommendations(artifact);
+  const counts = recommendationCounts(recommendations);
+  const embeds = [{
+    title: '🏆 Gana v9 · Recomendaciones',
+    description: `${formatArtifactDate(artifact?.date)} · Horarios de Guatemala\n${recommendationCountLine(counts)}`,
+    color: 0x2f80ed,
+    footer: { text: 'Análisis sin garantías · revisión manual · sin ejecución monetaria' },
+  }];
+  let atomicBlocks = [];
+  const flushAtomic = () => {
+    if (atomicBlocks.length) embeds.push(...conciseDescriptionEmbeds('📌 Simples', atomicBlocks, 0x9b51e0));
+    atomicBlocks = [];
+  };
+  for (const recommendation of recommendations) {
+    const legs = Array.isArray(recommendation.legs) ? recommendation.legs : [];
+    if (recommendationKind(recommendation) === 'atomic-prediction') {
+      atomicBlocks.push([
+        ...legs.map(conciseLegLine),
+        `> 🍀 Conf. evidencia ${conciseConfidence(recommendation)}${conciseReviewLabel(recommendation)}`,
+      ].join('\n'));
+      continue;
+    }
+    flushAtomic();
+    const profile = recommendation.profile;
+    const title = `${parlayProfileEmoji(profile)} Combinada · ${CONCISE_PROFILE_NAMES[profile] ?? 'Selección analítica'}`;
+    embeds.push(...conciseDescriptionEmbeds(title, [
+      ...legs.map(conciseLegLine),
+      `> Cuota combinada ${formatMetricNumber(recommendation.combinedOdds, 4)} · 🍀 Conf. evidencia ${conciseConfidence(recommendation)}${conciseReviewLabel(recommendation)}`,
+    ], profile === 'parlay-diamante' || profile === 'principal' ? 0xf2c94c : 0x27ae60));
+  }
+  flushAtomic();
+  if (!recommendations.length) embeds.push({ title: 'Sin selecciones publicadas', description: 'Hoy no hay recomendaciones que cumplan los requisitos', color: 0x828282 });
+  embeds.push(...conciseStrategyEmbeds(artifact));
+
+  const pages = [];
+  let page = [];
+  let characters = 0;
+  for (const embed of embeds) {
+    const size = discordEmbedCharacters(embed);
+    if (size > DISCORD_TOTAL_EMBED_CHARACTERS || (embed.title?.length ?? 0) > 256) throw new Error('Published recommendation embed exceeds Discord limits.');
+    if (page.length && (page.length >= DISCORD_EMBED_LIMIT || characters + size > DISCORD_TOTAL_EMBED_CHARACTERS)) {
+      pages.push(discordPayloadFromEmbeds(page, options));
+      page = [];
+      characters = 0;
+    }
+    page.push(embed);
+    characters += size;
+  }
+  if (page.length) pages.push(discordPayloadFromEmbeds(page, options));
+  return pages;
+}
+
+function singleConcisePayload(artifact, options) {
+  const payloads = buildConciseDiscordPayloads(artifact, options);
+  if (payloads.length !== 1) throw new Error('Published selections require multiple Discord messages; use automatic pagination without --single-message.');
+  return payloads[0];
 }
 
 function buildDiscordOverflowPayloads(recommendations, requiredLeagueEmbeds, options = {}) {
@@ -239,7 +388,8 @@ function appendDailyOddsFloorStrategyEmbedIfRoom(payload, artifact) {
 }
 
 function formatDailyOddsFloorStrategyLines(snapshot) {
-  const ruleLine = `> 📐 Regla: cuota publicada ≥${formatMetricNumber(snapshot.rule.minimumPublishedOdds, 2)} · mayor confianza publicada`;
+  const evidenceStrategy = snapshot.version === DAILY_ODDS_FLOOR_EVIDENCE_STRATEGY_VERSION;
+  const ruleLine = `> 📐 Regla: cuota publicada ≥${formatMetricNumber(snapshot.rule.minimumPublishedOdds, 2)} · mayor confianza ${evidenceStrategy ? 'de evidencia elegible' : 'publicada'}`;
   const safetyLine = '🛡️ Selección analítica · sin ejecución monetaria ni garantía.';
   if (snapshot.status === 'no-eligible-pick') {
     return [
@@ -277,11 +427,13 @@ function dailyOddsFloorPickLabel(pick) {
 }
 
 function validDailyOddsFloorStrategySnapshot(value) {
+  const evidenceStrategy = value?.version === DAILY_ODDS_FLOOR_EVIDENCE_STRATEGY_VERSION;
   if (!isPlainRecord(value)
-    || value.version !== DAILY_ODDS_FLOOR_STRATEGY_VERSION
+    || (!evidenceStrategy && value.version !== DAILY_ODDS_FLOOR_STRATEGY_VERSION)
     || value.analyticalArtifactOnly !== true
     || value.executionCapability !== 'none'
-    || !validDailyOddsFloorRule(value.rule)
+    || !validDailyOddsFloorRule(value.rule, evidenceStrategy)
+    || (evidenceStrategy && !nonNegativeInteger(value.excludedPickCount))
     || !nonNegativeInteger(value.evaluatedPickCount)
     || !nonNegativeInteger(value.eligiblePickCount)
     || value.eligiblePickCount > value.evaluatedPickCount) {
@@ -292,25 +444,27 @@ function validDailyOddsFloorStrategySnapshot(value) {
   }
   if (value.status !== 'selected'
     || value.eligiblePickCount < 1
-    || !validDailyOddsFloorPick(value.selectedPick, value.rule.minimumPublishedOdds)) {
+    || !validDailyOddsFloorPick(value.selectedPick, value.rule.minimumPublishedOdds, evidenceStrategy)) {
     return null;
   }
   return value;
 }
 
-function validDailyOddsFloorRule(value) {
+function validDailyOddsFloorRule(value, evidenceStrategy = false) {
   return isPlainRecord(value)
     && value.minimumPublishedOdds === DAILY_ODDS_FLOOR_MINIMUM_PUBLISHED_ODDS
-    && value.selection === 'highest-published-confidence'
+    && value.selection === (evidenceStrategy ? 'highest-eligible-evidence-confidence' : 'highest-published-confidence')
     && Array.isArray(value.tieBreak)
     && value.tieBreak.length === DAILY_ODDS_FLOOR_TIE_BREAK.length
     && value.tieBreak.every((item, index) => item === DAILY_ODDS_FLOOR_TIE_BREAK[index]);
 }
 
-function validDailyOddsFloorPick(value, minimumPublishedOdds) {
+function validDailyOddsFloorPick(value, minimumPublishedOdds, evidenceStrategy = false) {
   const validSources = new Set(['daily', 'required-atomic', 'required-parlay']);
   const validKinds = new Set(['parlay', 'atomic-prediction']);
-  const validConfidenceMetrics = new Set(['displayConfidence', 'aggregateConfidence', 'confidence', 'adjustedProbability']);
+  const validConfidenceMetrics = new Set(evidenceStrategy
+    ? ['aggregateConfidence', 'confidence']
+    : ['displayConfidence', 'aggregateConfidence', 'confidence', 'adjustedProbability']);
   return isPlainRecord(value)
     && validSources.has(value.source)
     && validKinds.has(value.kind)
@@ -363,6 +517,7 @@ function positiveIntegerValue(value) {
 }
 
 export function buildDiscordSinglePayload(artifact, options = {}) {
+  if (artifact?.presentation === 'concise-v1') return singleConcisePayload(artifact, options);
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const counts = recommendationCounts(recommendations);
@@ -619,6 +774,10 @@ function formatArtifactDate(value) {
 }
 
 export function buildGatewayMessage(artifact, options = {}) {
+  if (artifact?.presentation === 'concise-v1') {
+    return buildConciseDiscordPayloads(artifact, options).flatMap((payload) => payload.embeds)
+      .map((embed) => [embed.title, embed.description, embed.footer?.text].filter(Boolean).join('\n')).join('\n\n');
+  }
   const max = parseMax(String(options.max ?? DEFAULT_MAX_SELECTIONS));
   const recommendations = hydrateRecommendationDisplayLabels(selectRecommendations(artifact).slice(0, max));
   const counts = recommendationCounts(recommendations);
@@ -2624,6 +2783,8 @@ async function main() {
   } = loadRecommendations(artifactPath, {
     strictSources: Boolean(options.expectedSourceManifestSha256 || options.preparedPayload),
   });
+  const renderedSelectionCount = artifact?.presentation === 'concise-v1'
+    ? concisePublishedRecommendations(artifact).length : recommendations.length;
   if (options.expectedSourceManifestSha256
     && options.expectedSourceManifestSha256 !== sourceManifestSha256) {
     throw new Error('Recommendation source manifest does not match the expected dry-run snapshot.');
@@ -2665,6 +2826,7 @@ async function main() {
       payloadCount: payloads.length,
       sourceManifestSha256,
       selectionCount: recommendations.length,
+      renderedSelectionCount,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
       hermesPython: options.hermesPython,
@@ -2684,6 +2846,7 @@ async function main() {
       payloadCount: payloads.length,
       sourceManifestSha256,
       selectionCount: recommendations.length,
+      renderedSelectionCount,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
       gatewayResult: result,
@@ -2700,6 +2863,7 @@ async function main() {
       payloadCount: payloads.length,
       sourceManifestSha256,
       selectionCount: recommendations.length,
+      renderedSelectionCount,
       transport: options.transport,
       gatewayTarget: options.gatewayTarget,
       discordResult: results[0],
@@ -2719,6 +2883,7 @@ async function main() {
     payloadCount: payloads.length,
     sourceManifestSha256,
     selectionCount: recommendations.length,
+    renderedSelectionCount,
     transport: options.transport,
     discordStatus: results[0]?.status,
     discordStatuses: results.map((result) => result.status),
