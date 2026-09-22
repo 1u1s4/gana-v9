@@ -4,11 +4,12 @@
 
 La implementación está integrada y sus pruebas pasan. Tras la reanudación del
 usuario se corrigieron cuotas, elegibilidad, ligas e historial deportivo omitido.
-La suite actual pasa **780/780 tests**. La última ejecución real terminada (R7)
-produjo **cero recomendaciones elegibles**. Las 39 investigaciones usaron el
+La suite actual pasa **780/780 tests**. R7 y el cron habitual del 23/09 terminaron
+con **cero recomendaciones elegibles**. Las 39 investigaciones de R7 usaron el
 historial adicional y se verificaron sus fuentes persistidas. Se integró después
 una corrección del ciclo de vida del run y otra para conservar alternativas reales
-de cuota para low odds. Sigue pendiente la prueba de una publicación nueva.
+de cuota para low odds. Esta última corrección tiene pruebas y replay local;
+siguen pendientes su verificación live completa y una publicación nueva elegible.
 Tras integrar y subir las mejoras se creó el repositorio privado del portal y se
 despachó su tarea separada; ese avance no sustituye la prueba de entrega pendiente.
 
