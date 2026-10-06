@@ -7,6 +7,7 @@ import { normalizeMarketScope, type MarketKey } from '../domain/markets.js';
 import { getApiFootballDateOddsSlate, getApiFootballOddsSnapshot } from '../providers/sports/api-football.js';
 import { selectDefaultModelForProvider } from '../providers/agentic/helpers.js';
 import { runDailyMetrics, type DailyMetricsRunResult } from '../metrics/daily.js';
+import { PRE_MATCH_REVIEW_POLICY } from './pre-match-policy.js';
 import { runParlayAnalysis, type ParlayAnalysisRunResult } from '../parlay/analysis.js';
 import { runParlayBuild, type ParlayBuildRunResult, type RunParlayBuildInput } from '../parlay/service.js';
 import type { ResearchWebMode } from '../prediction/prompts.js';
@@ -772,6 +773,7 @@ export async function runDailyE2E(
     buildDailyModelEvidence(effectiveConfig.artifactRoot, input.date, parlayAnalysisRunIds),
   ));
   const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', jsonValue({
+    preMatchReview: { ...PRE_MATCH_REVIEW_POLICY, status: 'scheduled' },
     modelEvidencePath,
     dailyBatchId,
     presentation: 'concise-v1',

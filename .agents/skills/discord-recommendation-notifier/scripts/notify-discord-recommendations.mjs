@@ -231,11 +231,15 @@ function discordEmbedCharacters(embed) {
 function buildConciseDiscordPayloads(artifact, options) {
   const recommendations = concisePublishedRecommendations(artifact);
   const counts = recommendationCounts(recommendations);
+  const automaticReview = artifact?.preMatchReview?.version === 'astra-prematch-v1' && artifact.preMatchReview.enabled === true
+    && artifact.preMatchReview.model === 'gpt-6-astra' && artifact.preMatchReview.reasoningEffort === 'medium';
+  const reviewLine = automaticReview ? (artifact.preMatchReview.status === 'evaluated'
+    ? '\nReevaluado por Astra medium con evidencia nueva' : '\nReevaluación automática con Astra medium en las últimas 2 h') : '';
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones',
-    description: `${formatArtifactDate(artifact?.date)} · Horarios de Guatemala\n${recommendationCountLine(counts)}${artifact?.revisionOfDailyBatchId ? '\nActualización con evidencia nueva · el envío anterior se conserva' : ''}`,
+    description: `${formatArtifactDate(artifact?.date)} · Horarios de Guatemala\n${recommendationCountLine(counts)}${reviewLine}${artifact?.revisionOfDailyBatchId ? '\nActualización con evidencia nueva · el envío anterior se conserva' : ''}`,
     color: 0x2f80ed,
-    footer: { text: 'Análisis sin garantías · revisión manual · sin ejecución monetaria' },
+    footer: { text: automaticReview ? 'Análisis sin garantías · gates de evidencia vigentes · sin ejecución monetaria' : 'Análisis sin garantías · revisión manual · sin ejecución monetaria' },
   }];
   let atomicBlocks = [];
   const flushAtomic = () => {

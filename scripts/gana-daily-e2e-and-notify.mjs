@@ -295,7 +295,9 @@ try {
         `Log: ${compactPath(logPath)}`,
         `Outcome: ${compactPath(outcomePath)}`,
       ].filter(Boolean),
-      footer: '🛡️ Revisión manual requerida antes de promoción · sin ejecución monetaria',
+      footer: artifactState.artifact?.preMatchReview?.enabled
+        ? '🛡️ Reevaluación automática con Astra medium · gates de evidencia vigentes · sin ejecución monetaria'
+        : '🛡️ Revisión manual requerida antes de promoción · sin ejecución monetaria',
     });
     writeLock(lockPath, {
       date,
@@ -453,7 +455,9 @@ try {
           messageIds.length ? `Discord recomendaciones: ${messageIds.join(', ')}` : 'Discord: entrega ya registrada',
           `Artifact: ${compactPath(reviewPublication.artifactPath)}`,
         ],
-        footer: '🟡 No son picks aprobados · revisión manual requerida · sin ejecución monetaria',
+        footer: artifactState.artifact?.preMatchReview?.enabled
+          ? '🟡 No son picks aprobados · reevaluación automática con Astra medium · sin ejecución monetaria'
+          : '🟡 No son picks aprobados · revisión manual requerida · sin ejecución monetaria',
       });
       process.exitCode = 0;
       handled = true;

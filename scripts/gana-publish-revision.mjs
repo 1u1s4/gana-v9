@@ -11,7 +11,7 @@ const date=args['--date'],batch=args['--daily-batch-id'];
 if(!/^\d{4}-\d{2}-\d{2}$/.test(date??'')||!String(batch).startsWith(`daily-${date}-`)||!/^[A-Za-z0-9_-]+$/.test(batch??''))throw new Error('Exact date and safe daily batch ID required');
 const root=resolve(process.env.GANA_ARTIFACT_ROOT??'.artifacts/gana-v9');
 const parent=resolveCanonicalPublishedRecommendation({artifactRoot:root,date});
-if(!parent.ok||parent.dailyLock.status!=='published'||parent.dailyBatchId!==args['--parent-batch-id']||parent.dailyBatchId===batch)throw new Error('Parent must be the exact confirmed published Daily');
+if(!parent.ok||!['published','review-delivered'].includes(parent.dailyLock.status)||parent.dailyBatchId!==args['--parent-batch-id']||parent.dailyBatchId===batch)throw new Error('Parent must be the exact confirmed published Daily');
 const path=join(root,'runs',batch,'daily-parlay-recommendations.json');
 const receiptPath=join(root,'cron','revisions',`${batch}.lock`);mkdirSync(join(root,'cron','revisions'),{recursive:true});
 if(existsSync(receiptPath)){

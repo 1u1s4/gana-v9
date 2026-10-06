@@ -11,6 +11,21 @@ import {
 } from '../lib/daily-review-candidates.mjs';
 
 describe('daily review candidates', () => {
+  it('carries the automatic review contract without implying promotion', () => {
+    const fixture = makeFixture();
+    try {
+      fixture.input.recommendationArtifact.preMatchReview = {
+        version: 'astra-prematch-v1', enabled: true, model: 'gpt-6-astra', reasoningEffort: 'medium', status: 'scheduled',
+      };
+      const artifact = buildDailyReviewCandidates(fixture.input);
+      assert.deepEqual(artifact.preMatchReview, fixture.input.recommendationArtifact.preMatchReview);
+      const payload = buildDailyReviewCandidatePayloads(artifact)[0];
+      assert.match(payload.embeds[0].description, /No son picks aprobados/);
+      assert.match(payload.embeds[0].description, /automática con Astra medium/);
+      artifact.preMatchReview.model = 'another-model';
+      assert.doesNotMatch(buildDailyReviewCandidatePayloads(artifact)[0].embeds[0].description, /automática/);
+    } finally { fixture.cleanup(); }
+  });
   it('never retries an uncertain delivery, even when the displayed cohort changes', async () => {
     const fixture = makeFixture();
     try {

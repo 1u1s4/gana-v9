@@ -7,6 +7,8 @@ HERMES_SCRIPTS_DIR="${HERMES_SCRIPTS_DIR:-$HOME/.hermes/scripts}"
 
 JOB_NAME="gana-v9-daily-operations"
 SCHEDULE="15 7,10,13,18,22 * * *"
+PREMATCH_JOB_NAME="gana-v9-prematch-refresh"
+PREMATCH_SCHEDULE="*/15 * * * *"
 LEGACY_JOB_NAMES=(
   "gana-v9-raw-retention"
   "gana-v9-validate-yesterday-discord"
@@ -40,6 +42,10 @@ require_command() {
 write_wrapper() {
   local name="$1"
   local path="$HERMES_SCRIPTS_DIR/$name"
+  local command="node \"$REPO_ROOT/scripts/gana-daily-ops-dispatch.mjs\""
+  if [[ "$name" == "gana_v9_prematch_refresh.sh" ]]; then
+    command="node --import tsx \"$REPO_ROOT/scripts/gana-prematch-refresh-and-notify.mjs\""
+  fi
   cat > "$path" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -53,7 +59,7 @@ export GANA_DISCORD_STRATEGY_TARGET="\${GANA_DISCORD_STRATEGY_TARGET:-discord:15
 export GANA_DISCORD_ALERTS_TARGET="\${GANA_DISCORD_ALERTS_TARGET:-discord:1510041125614915756}"
 export GANA_CRON_DIRECT_TELEGRAM="\${GANA_CRON_DIRECT_TELEGRAM:-0}"
 export GANA_CRON_TELEGRAM_TARGET="\${GANA_CRON_TELEGRAM_TARGET:-discord:1510041125614915756}"
-exec node "$REPO_ROOT/scripts/gana-daily-ops-dispatch.mjs"
+exec $command
 EOF
   chmod +x "$path"
   echo "$name"
@@ -130,6 +136,8 @@ done
 
 if (( UNINSTALL == 1 )); then
   remove_jobs_by_name "$JOB_NAME"
+  remove_jobs_by_name "$PREMATCH_JOB_NAME"
+  rm -f "$HERMES_SCRIPTS_DIR/gana_v9_prematch_refresh.sh"
   rm -f "$HERMES_SCRIPTS_DIR/gana_v9_daily_operations.sh"
   echo "Hermes Gana cron jobs uninstalled."
   exit 0
@@ -137,5 +145,7 @@ fi
 
 wrapper="$(write_wrapper gana_v9_daily_operations.sh)"
 upsert_job "$JOB_NAME" "$SCHEDULE" "$wrapper"
+prematch_wrapper="$(write_wrapper gana_v9_prematch_refresh.sh)"
+upsert_job "$PREMATCH_JOB_NAME" "$PREMATCH_SCHEDULE" "$prematch_wrapper"
 
 hermes cron list --all | grep -A5 -F "Name:      $JOB_NAME" || true

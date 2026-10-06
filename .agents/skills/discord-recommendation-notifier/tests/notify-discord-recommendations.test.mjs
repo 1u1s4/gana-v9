@@ -1559,3 +1559,15 @@ function generalRequiredPrediction(fixture, providerFixtureId, leagueName, marke
     },
   };
 }
+
+it('announces scheduled Astra reevaluation without claiming it already happened or changing risk markers', () => {
+  const artifact={...sampleArtifact(),presentation:'concise-v1',preMatchReview:{version:'astra-prematch-v1',enabled:true,model:'gpt-6-astra',reasoningEffort:'medium',status:'scheduled'}};
+  const scheduled=buildDiscordPayloads(artifact)[0];
+  assert.match(scheduled.embeds[0].description,/Reevaluación automática con Astra medium/);
+  assert.doesNotMatch(scheduled.embeds[0].description,/Reevaluado por/);
+  assert.doesNotMatch(scheduled.embeds[0].footer.text,/manual/);
+  const evaluated=buildDiscordPayloads({...artifact,preMatchReview:{...artifact.preMatchReview,status:'evaluated'}})[0];
+  assert.match(evaluated.embeds[0].description,/Reevaluado por Astra medium/);
+  const legacy=buildDiscordPayloads({...artifact,preMatchReview:undefined})[0];
+  assert.match(legacy.embeds[0].footer.text,/manual/);
+});

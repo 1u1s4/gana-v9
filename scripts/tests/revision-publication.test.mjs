@@ -51,3 +51,20 @@ test('model documentary evidence participates in immutable source proof even whe
   const second=readRecommendationSourceSnapshot(path,{strict:true});assert.equal(first.sourceArtifactSha256,second.sourceArtifactSha256);assert.notEqual(first.sourceManifestSha256,second.sourceManifestSha256);
  }finally{rmSync(root,{recursive:true,force:true})}
 });
+
+test('a review-delivered parent requires an exact confirmed receipt, never a caller claim', async () => {
+ const {confirmedReviewRevisionParent}=await import('../lib/daily-e2e-publication.mjs');
+ const root=mkdtempSync(join(tmpdir(),'review-parent-'));
+ const write=(path,value)=>{mkdirSync(join(path,'..'),{recursive:true});writeFileSync(path,JSON.stringify(value));};
+ const artifactPath=join(root,'runs',batch,'daily-parlay-recommendations.json');
+ const review={date,dailyBatchId:parent,kind:'daily-review-candidates',status:'published',displayedPredictionIds:['p'],candidates:[{predictionId:'p',status:'review-required'}],discord:{messageIds:['123']}};
+ try {
+  const input={artifactPath,date,parentBatchId:parent};assert.equal(confirmedReviewRevisionParent(input),false);
+  const path=join(root,'runs',parent,'daily-review-candidates.json');write(path,review);
+  write(join(root,'cron/locks',`daily-e2e-${date}.lock`),{date,dailyBatchId:parent,status:'review-delivered',reviewArtifactSha256:sha256Json(review),messageIds:['123']});
+  assert.equal(confirmedReviewRevisionParent(input),true);
+  assert.equal(scopeRevisionLedgerRows([],{date,dailyBatchId:batch,mode:'daily-revision',parentBatchId:parent,confirmedReviewParent:confirmedReviewRevisionParent(input)}).ok,true);
+  write(path,{...review,discord:{messageIds:['changed']}});assert.equal(confirmedReviewRevisionParent(input),false);
+  assert.equal(scopeRevisionLedgerRows([],{date,dailyBatchId:batch,mode:'daily-revision',parentBatchId:parent}).ok,false);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

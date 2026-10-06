@@ -72,6 +72,7 @@ When a matching recommendations artifact exists for the validation date, the dai
 Artifacts with root `presentation: "concise-v1"` use the concise contract below. The legacy rules that follow remain unchanged for artifacts without that marker and historical replays.
 
 - Render every published daily recommendation, every required atomic projection, and every selected required parlay in persisted array order. Do not rerank, deduplicate, silently cap with `--max`, or add general provider predictions that were not published.
+- With validated `preMatchReview.version: "astra-prematch-v1"`, state that Astra medium reevaluation is scheduled in the last two hours. Only `status: "evaluated"` may say it already happened. Keep every review/blocked marker and existing publication gates; this metadata never promotes a selection. Preserve the legacy manual-review footer when this contract is absent.
 - Show fixture, Guatemala kickoff time, a plain Spanish pick, quoted odds, evidence confidence (`aggregateConfidence` / `confidence`, never model probability or `displayConfidence`), and an explicit review/blocked marker when applicable.
 - Group consecutive simple selections into compact native boxes and keep each combinada profile with a friendly name. Omit empty league sections, raw council diagnostics, edge, stake and exposure. Keep one concise analytical-only note.
 - Paginate all selections and all legs without loss at Discord's 4096-character description, 6000-total-character and 10-embed message limits. `--single-message` must fail clearly if all selections do not fit. Mentions remain disabled.
@@ -120,11 +121,12 @@ Use `scripts/notify-discord-daily-stats.mjs` for validation/day-after statistics
 
 Repo-level cron wrappers:
 
+- `scripts/gana-prematch-refresh-and-notify.mjs`: automatic Astra medium reevaluation of confirmed Daily cohorts, sharing the dispatcher mutex; every 15 minutes, separate guarded revisions. Run with `node --import tsx`.
 - `scripts/gana-daily-ops-dispatch.mjs`: single deterministic entrypoint for retention, validation, Daily E2E, strategy review, and due Daily recovery checkpoints.
 - `scripts/gana-daily-e2e-and-notify.mjs`: runs full daily E2E for tomorrow's Guatemala date, applies the recommendation council gate, and sends recommendations with the council summary included in the final control embed.
 - `scripts/gana-validate-metrics-and-notify.mjs`: validates the previous Guatemala date scoped to the published recommendations artifact, builds daily metrics scoped to those same published targets, and sends stats.
-- `scripts/install-gana-hermes-cron.sh`: installs one dormant-capable Hermes fallback job at 07:15/10:15/13:15/18:15/22:15 America/Guatemala.
-- `scripts/install-gana-cron.mjs`: installs the same single dispatcher job as a system crontab fallback.
+- `scripts/install-gana-hermes-cron.sh`: installs the dispatcher at 07:15/10:15/13:15/18:15/22:15 America/Guatemala and the Astra prematch worker every 15 minutes.
+- `scripts/install-gana-cron.mjs`: installs those same two jobs as a system crontab fallback; do not activate both schedulers.
 - `.agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs`: centralizes flow-specific Discord target resolution for notifiers and repo-level cron wrappers.
 
 Useful commands:

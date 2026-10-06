@@ -4,6 +4,7 @@ export interface MonetaryActionDetection {
   matches: string[];
 }
 
+const GUARANTEE_PATTERN = /\b(guarantee|guaranteed|garant[ií]a|garantizado)\b.*\b(result|profit|win|resultado|ganancia)\b/i;
 const MONETARY_PATTERNS = [
   /\b(place|submit|execute|auto(?:mate)?|confirm)\s+(a\s+)?(bet|wager|parlay|stake)\b/i,
   /\b(bet|wager|stake)\s+(\$|usd|eur|gtq|quetzales?|\d)/i,
@@ -14,7 +15,7 @@ const MONETARY_PATTERNS = [
   /\b(retirar|depositar|transferir|mover)\s+(fondos|dinero|saldo)\b/i,
   /\b(buy|purchase|sell|short|trade|swap)\b.{0,80}\b(stock|stocks|share|shares|crypto|btc|eth|coin|token|option|options|futures|forex|usd|eur|\$)\b/i,
   /\b(bookmaker|sportsbook|bet365|draftkings|fanduel|stake\.com)\b.*\b(login|submit|place|wager|bet)\b/i,
-  /\b(guarantee|guaranteed|garant[ií]a|garantizado)\b.*\b(result|profit|win|resultado|ganancia)\b/i,
+  GUARANTEE_PATTERN,
   /\b(credit\s+card|debit\s+card|routing|account\s+number)\b/i,
 ];
 
@@ -25,8 +26,16 @@ export const NO_MONETARY_ACTIONS_PROMPT = [
 
 export function detectMonetaryAction(value: unknown): MonetaryActionDetection {
   const text = flatten(value).join('\n');
+  // A factual dossier may explicitly deny a guaranteed result. Exclude only
+  // that negated promise token, never payment/execution commands or the rest of
+  // the sentence: a subsequent affirmative promise must still be detected.
+  const promiseText = text.replace(
+    /\b(?:not|never|no|without|cannot|can't|sin)[ \t]+(?:(?:a|an|any|un|una|ninguna)[ \t]+)?(?:guarantee|guaranteed|garant[ií]a|garantizado)\b/gi,
+    (denial, offset) => /\b(?:not|never|no)\s+$/i.test(text.slice(0, offset))
+      ? denial : denial.replace(/\b(?:guarantee|guaranteed|garant[ií]a|garantizado)\b/i, 'non-promissory'),
+  );
   const matches = MONETARY_PATTERNS
-    .filter((pattern) => pattern.test(text))
+    .filter((pattern) => pattern.test(pattern === GUARANTEE_PATTERN ? promiseText : text))
     .map((pattern) => pattern.source);
   return {
     blocked: matches.length > 0,

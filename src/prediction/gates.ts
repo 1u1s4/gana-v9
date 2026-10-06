@@ -211,7 +211,7 @@ export function aggregatePredictionGate(results: PredictionGateResult[]): Predic
 }
 
 function isHardPredictionWarning(message: string): boolean {
-  return /research is not promotable|research bundle is blocked|missing research|insufficient evidence|web research required|no web-search|stale (news|source|odds) source|fallback research|timed out|canonicalized from persisted odds quote|mismatch|invalid|line movement|model disagreement|not included in the structured output/i.test(message);
+  return /research is not promotable|research bundle is blocked|missing research|insufficient evidence|web research required|no web-search|stale (news|source|odds|historical-statistics) source|fallback research|timed out|canonicalized from persisted odds quote|mismatch|invalid|line movement|model disagreement|not included in the structured output/i.test(message);
 }
 
 function researchBundleStatus(bundle: EvidenceGateInput['researchBundle']): string | undefined {

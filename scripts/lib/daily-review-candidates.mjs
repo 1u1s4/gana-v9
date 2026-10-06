@@ -67,6 +67,7 @@ export function buildDailyReviewCandidates({
     sourceRunIds,
     sourceRecommendationsPath: recommendationsPath,
     modelEvidencePath: recommendationArtifact?.modelEvidencePath ?? null,
+    preMatchReview: recommendationArtifact?.preMatchReview ?? null,
     fingerprint,
     counts: {
       evaluated,
@@ -97,7 +98,10 @@ export function buildDailyReviewCandidatePayloads(artifact, { username = 'Gana H
         description: [
           `📅 ${artifact.date} · Horarios de Guatemala`,
           `Mostrando ${artifact.counts.displayed} de ${artifact.counts.candidates} candidatas con probabilidad y edge positivos`,
-          '⚠️ No son picks aprobados: requieren revisión manual',
+          artifact?.preMatchReview?.version === 'astra-prematch-v1' && artifact.preMatchReview.enabled
+            && artifact.preMatchReview.model === 'gpt-6-astra' && artifact.preMatchReview.reasoningEffort === 'medium'
+            ? '⚠️ No son picks aprobados · reevaluación automática con Astra medium en las últimas 2 h'
+            : '⚠️ No son picks aprobados: requieren revisión manual',
         ].join('\n'),
         color: 0xf2c94c,
       },

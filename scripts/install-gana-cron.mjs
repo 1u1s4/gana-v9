@@ -24,6 +24,7 @@ const jobName = 'gana-v9-daily-operations';
 const dispatcher = 'scripts/gana-daily-ops-dispatch.mjs';
 const managedJobNames = [
   jobName,
+  'gana-v9-prematch-refresh',
   'gana-v9-raw-retention',
   'gana-v9-validate-yesterday-discord',
   'gana-v9-daily-e2e-discord',
@@ -32,6 +33,7 @@ const managedJobNames = [
 ];
 const managedScripts = [
   dispatcher,
+  'scripts/gana-prematch-refresh-and-notify.mjs',
   'scripts/gana-raw-retention-apply.sh',
   'scripts/gana-previous-day-validation-notify.sh',
   'scripts/gana-daily-e2e-notify.sh',
@@ -43,6 +45,8 @@ const block = [
   'MAILTO=""',
   'TZ=America/Guatemala',
   cronLine('15 7,10,13,18,22 * * *'),
+  '# gana-v9-prematch-refresh',
+  cronLine('*/15 * * * *', 'scripts/gana-prematch-refresh-and-notify.mjs', '--import tsx '),
   end,
 ].join('\n');
 
@@ -118,10 +122,10 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
-function cronLine(schedule) {
+function cronLine(schedule, script = dispatcher, nodeOptions = '') {
   const logDir = join(REPO_ROOT, '.artifacts/gana-v9/cron');
-  const logPath = join(logDir, 'cron-daily-operations.log');
-  return `${schedule} cd ${shellQuote(REPO_ROOT)} && mkdir -p ${shellQuote(logDir)} && /usr/bin/env ${cronEnvPrefix}node ${shellQuote(dispatcher)} >> ${shellQuote(logPath)} 2>&1`;
+  const logPath = join(logDir, script === dispatcher ? 'cron-daily-operations.log' : 'cron-prematch-refresh.log');
+  return `${schedule} cd ${shellQuote(REPO_ROOT)} && mkdir -p ${shellQuote(logDir)} && /usr/bin/env ${cronEnvPrefix}node ${nodeOptions}${shellQuote(script)} >> ${shellQuote(logPath)} 2>&1`;
 }
 
 function cronEnvAssignmentPrefix(assignments) {

@@ -282,14 +282,17 @@ No mantener simultaneamente Codex Scheduled, Hermes, `launchd` y `crontab`.
 Los locks son defensa en profundidad, no una autorizacion para duplicar la
 autoridad.
 
-En este host la unica autoridad activa es Hermes cron con un job no-agent:
+En este host la unica autoridad activa es Hermes cron con dos jobs no-agent:
 
 ```text
 gana-v9-daily-operations
 15 7,10,13,18,22 * * *
+gana-v9-prematch-refresh
+*/15 * * * *
 ```
 
-Su wrapper ejecuta unicamente `node scripts/gana-daily-ops-dispatch.mjs`. La
+El wrapper principal ejecuta `node scripts/gana-daily-ops-dispatch.mjs` y el segundo
+ejecuta `node --import tsx scripts/gana-prematch-refresh-and-notify.mjs`. La
 automatizacion equivalente de Codex Scheduled esta retirada, el bloque Gana de
 `crontab` esta ausente y no hay LaunchAgents Gana cargados.
 
@@ -307,21 +310,24 @@ Retiro seguro de canonical y nombres legacy, sin tocar jobs ajenos:
 scripts/install-gana-hermes-cron.sh --uninstall
 ```
 
-Esto crea un wrapper bajo `~/.hermes/scripts/`, elimina nombres legacy de Gana
-y registra un solo job `--no-agent`:
+Esto crea los wrappers bajo `~/.hermes/scripts/`, elimina nombres legacy de Gana
+y registra dos jobs `--no-agent`:
 
 ```text
 gana-v9-daily-operations  15 7,10,13,18,22 * * *
+gana-v9-prematch-refresh */15 * * * *
 ```
 
 Hermes cron muestra los `Next run` en la zona local configurada; en este host debe verse con offset `-06:00`.
 
 El fallback de sistema instalado por `scripts/install-gana-cron.mjs` crea el
-directorio de logs antes de redirigir y agrega exactamente una linea con el mismo
-dispatcher/horario. `--uninstall` retira solo el bloque administrado y conserva
+directorio de logs antes de redirigir y agrega las dos líneas con los mismos
+scripts y horarios. `--uninstall` retira solo el bloque administrado y conserva
 cualquier entrada ajena del usuario.
 
-En macOS tambien se puede instalar el fallback de usuario con `launchd`, util cuando `/usr/bin/crontab` no responde o queda bloqueado:
+El instalador legacy de `launchd` sólo cubre el dispatcher; no reemplaza el flujo
+completo con reevaluación. Para ese flujo, usar Hermes o system cron. Su comando
+de instalación se conserva para operaciones anteriores:
 
 ```bash
 node scripts/install-gana-launchd.mjs
@@ -414,8 +420,8 @@ pnpm gana refresh --source-run-id RUN_ID --date YYYY-MM-DD
 
 El comando opera sobre fallos transitorios y sobre partidos que entraron en las
 últimas dos horas antes del kickoff desde el análisis anterior. Revalida estado y
-cuotas, conserva el run original y produce una revisión separada. No envía por sí
-solo ni cambia los horarios de cron. Un intento incierto en `refresh-ledger` debe
+cuotas, conserva el run original y produce una revisión separada. La invocación directa no envía por sí
+sola; el worker automático descrito más abajo se encarga del disparo y la publicación. Un intento incierto en `refresh-ledger` debe
 conciliarse; no se borra para repetir ciegamente una operación.
 
 Para un E2E nuevo solicitado después de que ya se publicó el día, usá otro
@@ -481,7 +487,41 @@ usada el 06/10 se solicita invocando directamente `pnpm gana daily-e2e`
 con un run de origen explícito. El cache de estadísticas históricas FT mantiene
 su política de 24 h; cuotas y scoring siempre se obtienen nuevamente.
 
-La reevaluación mediante `pnpm gana refresh` permanece manual. Las revisiones
-publicadas se validan automáticamente en su propia cohorte. Las pruebas
+La reevaluación previa al partido queda automatizada con Codex `gpt-6-astra`,
+razonamiento `medium`, web `live`, sin fast ni fallback. Cada E2E persiste este
+contrato como `preMatchReview`; el mensaje inicial informa que la reevaluación
+está programada, sin afirmar que ya ocurrió. El modelo inicial del Daily se
+mantiene en 5.6 Sol high.
+
+El job `gana-v9-prematch-refresh` consulta cada 15 minutos los Daily confirmados
+y sus revisiones publicadas. Usa el mismo mutex global que el dispatcher, respeta
+`GANA_MAINTENANCE_PAUSED` y sólo toma partidos programados dentro de las últimas
+dos horas, con más de 20 minutos para iniciar la revisión. Revalida el estado real
+antes de llamar al modelo. Los experimentos y artefactos no publicados no se
+incorporan al scheduler.
+
+Cada partido admite dos intentos automáticos como máximo: uno al entrar en la
+ventana y otro si aparecen alineaciones confirmadas nuevas. Los cambios de precio
+solos no disparan otra llamada. Los intentos inciertos se conservan para
+conciliación; no se borran ni se repiten ciegamente. Se revisan como máximo cuatro
+partidos por pasada, rotando el orden para no monopolizar las consultas.
+
+Las selecciones que pasan los gates y tienen evidencia documental completa se
+publican como revisiones separadas, mediante el mismo publisher con reserva DB,
+preview, manifiesto de fuentes y comprobación previa al kickoff. Una reevaluación
+sin selecciones promovibles se registra como resultado operativo; no se convierte
+en un pick aprobado. El job no emite salida en pasadas sin cambios. Las revisiones
+publicadas se validan automáticamente en su propia cohorte.
+
+Instalación y comprobación del scheduler activo (Hermes):
+
+```bash
+bash scripts/install-gana-hermes-cron.sh
+node --import tsx scripts/gana-prematch-refresh-and-notify.mjs --dry-run
+```
+
+El instalador de system cron incorpora el mismo worker como fallback. No activar
+ambos schedulers a la vez. `pnpm gana refresh` sigue disponible para inspección o
+recuperación explícita y también fija Astra medium; no publica por sí solo. Las pruebas
 `scripts/tests/daily-scheduled-contract.test.mjs` ejecutan el wrapper en aislamiento
 y verifican los argumentos y el entorno que recibe el proceso E2E real.

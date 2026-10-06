@@ -16,6 +16,7 @@ const MAX_AGE_BY_TYPE: Record<string, number> = {
   lineup: 30,
   injury: 360,
   news: 720,
+  'historical-statistics': 24 * 60,
 };
 
 export function evaluateFreshness(input: FreshnessInput): FreshnessGate {

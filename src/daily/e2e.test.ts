@@ -173,6 +173,10 @@ describe('runDailyE2E', () => {
     assert.match(report, /Artifact analitico\. No ejecuta apuestas/);
     const recommendations = JSON.parse(readFileSync(join(result.artifactDir, 'daily-parlay-recommendations.json'), 'utf-8'));
     assert.deepEqual(summary.dailyOddsFloorStrategy, recommendations.dailyOddsFloorStrategy);
+    assert.equal(recommendations.preMatchReview.model, 'gpt-6-astra');
+    assert.equal(recommendations.preMatchReview.reasoningEffort, 'medium');
+    assert.equal(recommendations.preMatchReview.status, 'scheduled');
+    assert.equal(recommendations.preMatchReview.windowMinutes, 120);
     assert.equal(recommendations.executionCapability, 'none');
     assert.equal(recommendations.runDiagnostics.emptyRun, false);
     assert.equal(recommendations.recommendations[0].kind, 'atomic-prediction');

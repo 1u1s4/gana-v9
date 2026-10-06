@@ -1361,7 +1361,7 @@ function evaluatePostScoringRiskControls(input: {
   let parlayIneligible = false;
   const warningText = input.warnings.join('\n');
   const lowLiquidity = metadataBool(input.quote?.metadata, 'lowLiquidity') || /low[-_ ]liquidity|low liquidity/i.test(warningText);
-  const staleOdds = /stale (?:news|source|odds) source|stale odds/i.test(warningText);
+  const staleOdds = /stale (?:news|source|odds|historical-statistics) source|stale odds/i.test(warningText);
 
   if (staleOdds && lowLiquidity) {
     const nextConfidence = Math.min(confidence, 0.49);
@@ -1630,7 +1630,7 @@ function isParlayEligibleResearch(researchBundle: ResearchBundleRecord | undefin
   return !!researchBundle
     && researchBundleVerdict(researchBundle) !== 'blocked'
     && !warnings.some((warning) =>
-      /fallback research|stale (news|source|odds) source|timed out|insufficient evidence/i.test(warning),
+      /fallback research|stale (news|source|odds|historical-statistics) source|timed out|insufficient evidence/i.test(warning),
     );
 }
 
@@ -1705,7 +1705,7 @@ function evaluateRetrievalQuality(input: {
 
   for (const source of input.sources) {
     const freshness = evaluateFreshness({
-      sourceType: freshnessSourceType(source.sourceType),
+      sourceType: freshnessSourceType(source, input.now),
       availableAt: source.capturedAt instanceof Date ? source.capturedAt.toISOString() : String(source.capturedAt ?? ''),
       fixtureStatus: input.fixtureStatus ?? undefined,
       now: input.now,
@@ -1715,7 +1715,17 @@ function evaluateRetrievalQuality(input: {
   return [...new Set(warnings)];
 }
 
-function freshnessSourceType(sourceType: string): string {
+function freshnessSourceType(source: SourceRecordRecord, now: Date): string {
+  const sourceType = source.sourceType;
+  const metadata = source.metadata && typeof source.metadata === 'object' && !Array.isArray(source.metadata)
+    ? source.metadata as Record<string, unknown> : {};
+  // Canonical finished-match statistics use the existing 24h factual cache.
+  // Never infer this exemption from a model-written title or a generic API tag.
+  if (sourceType === 'api-football'
+    && /(?:^|:)source_api_football_corners_\d+$/.test(source.id)
+    && /^fixtures\/statistics\?fixture=\d+$/.test(source.externalId ?? '')
+    && metadata.status === 'FT' && typeof metadata.scheduledAt === 'string'
+    && Date.parse(metadata.scheduledAt) < now.getTime()) return 'historical-statistics';
   if (sourceType === 'provider-snapshot' || sourceType === 'api-football') return 'odds';
   if (sourceType === 'web-search') return 'news';
   return sourceType;

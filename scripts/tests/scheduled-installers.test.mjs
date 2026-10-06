@@ -68,6 +68,8 @@ test('system cron install and uninstall preserve unrelated entries while pruning
     assert.match(installed, /5 4 \* \* \* \/usr\/local\/bin\/backup-database/);
     assert.match(installed, /45 23 \* \* \* \/usr\/local\/bin\/archive-gana-report/);
     assert.equal(countOccurrences(installed, DISPATCHER), 1);
+    assert.equal(countOccurrences(installed, 'scripts/gana-prematch-refresh-and-notify.mjs'), 1);
+    assert.match(installed, /^\*\/15 \* \* \* \* .*node --import tsx/m);
     assert.match(installed, new RegExp(`^${escapeRegex(CRON_SCHEDULE)} `, 'm'));
     for (const legacyScript of LEGACY_SCRIPTS) assert.doesNotMatch(installed, new RegExp(escapeRegex(legacyScript)));
 
@@ -131,6 +133,9 @@ test('Hermes installer removes exact legacy names and canonical duplicates befor
     assert.match(log, new RegExp(`^cron\\tedit\\t--schedule\\t${escapeRegex(CRON_SCHEDULE)}(?:\\t|$)`, 'm'));
     assert.doesNotMatch(log, /^cron\t(?:resume|run)\t/m);
 
+    const prematchWrapper = readFileSync(join(scriptsDir, 'gana_v9_prematch_refresh.sh'), 'utf8');
+    assert.match(prematchWrapper, /exec node --import tsx .*scripts\/gana-prematch-refresh-and-notify\.mjs/);
+    assert.match(log, /cron\tcreate\t\*\/15 \* \* \* \*\t--name\tgana-v9-prematch-refresh/);
     const wrapperPath = join(scriptsDir, 'gana_v9_daily_operations.sh');
     assert.equal(existsSync(wrapperPath), true);
     const wrapper = readFileSync(wrapperPath, 'utf8');
@@ -149,6 +154,7 @@ test('Hermes installer removes exact legacy names and canonical duplicates befor
     assert.equal(afterUninstall.some((job) => LEGACY_HERMES_JOBS.includes(job.name)), false);
     assert.equal(afterUninstall.some((job) => job.name === 'unrelated-nightly-job'), true);
     assert.equal(existsSync(wrapperPath), false);
+    assert.equal(existsSync(join(scriptsDir, 'gana_v9_prematch_refresh.sh')), false);
   });
 });
 

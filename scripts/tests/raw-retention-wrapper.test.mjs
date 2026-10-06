@@ -105,7 +105,7 @@ test('wrapper cleanup never removes a lock whose ownership token changed', () =>
   });
 });
 
-test('system cron preview delegates all daily operations through one dispatcher', () => {
+test('system cron preview preserves the daily dispatcher and adds the isolated prematch worker', () => {
   withHarness(({ env }) => {
     const child = spawnSync(process.execPath, [CRON_INSTALLER, '--print'], {
       cwd: REPO_ROOT,
@@ -115,7 +115,10 @@ test('system cron preview delegates all daily operations through one dispatcher'
     assert.equal(child.status, 0, child.stderr);
 
     const jobLines = child.stdout.split(/\r?\n/).filter((line) => /^\S.* \* \* \*/.test(line));
-    assert.equal(jobLines.length, 1);
+    assert.equal(jobLines.length, 2);
+    assert.match(jobLines[1], /^\*\/15 \* \* \* \*/);
+    assert.ok(jobLines[1].includes('node --import tsx'));
+    assert.ok(jobLines[1].includes('scripts/gana-prematch-refresh-and-notify.mjs'));
     assert.match(jobLines[0], /^15 7,10,13,18,22 \* \* \*/);
     assert.equal(jobLines[0].includes('scripts/gana-daily-ops-dispatch.mjs'), true);
     for (const line of jobLines) {

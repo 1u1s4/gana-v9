@@ -1285,6 +1285,39 @@ describe('runFixtureScoring', () => {
     }
   });
 
+  it('uses the factual 24h cache for canonical FT statistics while retaining stale-source gates', async () => {
+    const canonical = { ...sourceRecords[0], id: 'bundle:source_api_football_corners_99',
+      sourceType: 'api-football', externalId: 'fixtures/statistics?fixture=99',
+      capturedAt: new Date('2026-04-25T06:00:00Z'),
+      metadata: { status: 'FT', scheduledAt: '2026-04-20T18:00:00Z' } };
+    const cases = [
+      { source: canonical, expected: 'promotable', warning: null },
+      { source: { ...canonical, capturedAt: new Date('2026-04-24T11:00:00Z') }, expected: 'review-required', warning: /stale historical-statistics source/ },
+      { source: { ...canonical, metadata: { ...canonical.metadata, status: '1H' } }, expected: 'review-required', warning: /stale odds source/ },
+      { source: { ...canonical, id: 'model-invented-id' }, expected: 'review-required', warning: /stale odds source/ },
+      { source: { ...canonical, externalId: 'odds?fixture=99' }, expected: 'review-required', warning: /stale odds source/ },
+      { source: { ...canonical, metadata: { ...canonical.metadata, scheduledAt: '2026-04-26T18:00:00Z' } }, expected: 'review-required', warning: /stale odds source/ },
+    ];
+    for (const scenario of cases) {
+      const cfg = config();
+      const result = await runFixtureScoring(cfg, { fixtureId: '1001' }, createRuntimeContext(cfg, 'session.jsonl'), {
+        now: () => now,
+        repositories: repositories({ sourceRecords: { list: async () => [...sourceRecords, scenario.source] } }),
+        writeArtifact: () => '/tmp/predictions.json',
+        agentRunner: async () => ({ text: JSON.stringify({ predictions: [{ oddsQuoteId: 'odds-quote-1',
+          market: 'h2h', selection: 'home', line: null, odds: 2.1, probability: 0.56, confidence: 0.75,
+          evidenceIds: ['evidence-1', 'evidence-2'], claimIds: ['claim-1'],
+          rationale: 'Home selection is supported by the supplied evidence.', warnings: [] }] }), usage: {}, output: '' }),
+        persistPredictions: async (records: any[]) => records,
+      });
+      assert.equal(result.predictions[0].status, scenario.expected);
+      if (scenario.warning) {
+        assert.match(result.predictions[0].warnings.join('\n'), scenario.warning);
+        assert.equal(result.predictions[0].parlayEligible, false);
+      } else assert.doesNotMatch(result.predictions[0].warnings.join('\n'), /stale .* source/);
+    }
+  });
+
   it('downgrades predictions when linked research sources are stale', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
