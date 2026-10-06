@@ -1,3 +1,5 @@
+import { reusableResearch } from './research-reuse.js';
+import { discoverByMarketCoverage } from './coverage-discovery.js';
 import { withRunLifecycleOwnership } from './run-lifecycle.js';
 import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
@@ -194,6 +196,7 @@ export interface RunPipelineDependencies {
   repositories?: PipelineRepositories;
   discoverFixtures?: typeof discoverFixtures;
   fetchOddsSnapshot?: typeof getApiFootballOddsSnapshot;
+  refreshOddsSnapshot?: typeof getApiFootballOddsSnapshot;
   discoverLowOddsFixtures?: typeof discoverFixtures;
   fetchLowOddsSnapshot?: typeof getApiFootballOddsSnapshot;
   fetchLowOddsSnapshotsForDate?: typeof getApiFootballDateOddsSnapshots;
@@ -206,6 +209,7 @@ export interface RunPipelineDependencies {
   writeArtifact?: typeof writeArtifact;
   writeRunJson?: typeof writeRunJson;
   exportArtifacts?: (config: AgentConfig, input: ExportRunInput, runtime: RuntimeContext, deps?: RunPipelineDependencies) => Promise<ExportRunResult>;
+  storageRetryDelayMs?: number;
 }
 
 const STORAGE_RETRY_ATTEMPTS = 3;
@@ -219,8 +223,15 @@ const AGENT_FIXTURE_ABORT_GRACE_MS = positiveInteger(process.env.GANA_AGENT_FIXT
 const RESEARCH_AGENT_TIMEOUT_MS = positiveInteger(process.env.GANA_RESEARCH_AGENT_TIMEOUT_MS)
   ?? positiveInteger(process.env.GANA_AGENT_TIMEOUT_MS)
   ?? 300_000;
-const RESEARCH_AGENT_JSON_ATTEMPTS = positiveInteger(process.env.GANA_RESEARCH_AGENT_JSON_ATTEMPTS) ?? 2;
+const RESEARCH_AGENT_JSON_ATTEMPTS = positiveInteger(process.env.GANA_RESEARCH_AGENT_JSON_ATTEMPTS) ?? 3;
 const LOW_ODDS_SCAN_TIMEOUT_MS = positiveInteger(process.env.GANA_LOW_ODDS_SCAN_TIMEOUT_MS) ?? 180_000;
+const SCORING_AGENT_TIMEOUT_MS = positiveInteger(process.env.GANA_SCORING_AGENT_TIMEOUT_MS)
+  ?? positiveInteger(process.env.GANA_AGENT_TIMEOUT_MS) ?? 300_000;
+const SCORING_AGENT_JSON_ATTEMPTS = positiveInteger(process.env.GANA_SCORING_AGENT_JSON_ATTEMPTS) ?? 3;
+
+export function computeScoringFixtureTimeoutMs(baseTimeoutMs: number, attemptTimeoutMs: number, attempts: number, abortGraceMs: number): number {
+  return Math.max(baseTimeoutMs, attemptTimeoutMs * attempts + abortGraceMs);
+}
 
 export function computeAgentFixtureTimeoutMs(input: {
   baseTimeoutMs: number;
@@ -285,7 +296,18 @@ async function executeOwnedRunPipeline(
     validate: input.validate ?? 'auto',
     markets: marketScope,
   }, repositories);
-  const runDurableTask = createPipelineTaskRunner(config, runtime, runId, durableTasks, repositories);
+  const resolveTaskRepositories = deps.repositories
+    ? () => repositories
+    : () => defaultRepositories(config);
+  const runDurableTask = createPipelineTaskRunner(
+    config,
+    runtime,
+    runId,
+    durableTasks,
+    repositories,
+    resolveTaskRepositories,
+    deps.storageRetryDelayMs ?? STORAGE_RETRY_DELAY_MS,
+  );
 
   writeRun(config, runId, {
     id: runId,
@@ -489,6 +511,10 @@ async function executeOwnedRunPipeline(
         ...('error' in snapshot && typeof snapshot.error === 'string' ? { error: snapshot.error } : {}),
       }));
       const scan = buildLowOddsScan(input.date, config, lowOddsDiscovery, lowOddsSnapshots, marketScope);
+      const primaryIds = new Set([...fixtureDiscovery.fixtures.map(fixture => fixture.id), ...scan.hits.map(hit => hit.fixtureId)]);
+      scan.coverageDiscovery = discoverByMarketCoverage(lowOddsDiscovery.fixtures.filter(fixture =>
+        fixtureLocalDateKey(fixture.scheduledAt, config.apiFootball.timezone) === input.date), lowOddsSnapshots, primaryIds, now(),
+        Number(process.env.GANA_COVERAGE_DISCOVERY_MAX_FIXTURES ?? 12));
       scan.providerCoverage = providerDateSlate?.coverage;
       scan.scanErrors = lowOddsSnapshots.flatMap((snapshot) => snapshot.error ? [snapshot.error] : []);
       if (scan.providerCoverage && !scan.providerCoverage.complete) {
@@ -548,10 +574,12 @@ async function executeOwnedRunPipeline(
   writeStepSpan(config, runtime, 'low_odds.scan', 'gate', lowOddsScanStepWarning ? 'blocked' : 'ok', lowOddsScanStepWarning ? { ...lowOddsScan, error: lowOddsScanStepWarning } : lowOddsScan);
 
   const lowOddsHitFixtures = selectLowOddsHitFixtures(lowOddsCandidateFixtures, lowOddsScan);
+  const coverageIds = new Set(lowOddsScan.coverageDiscovery?.selectedFixtureIds ?? []);
+  const coverageFixtures = lowOddsCandidateFixtures.filter(fixture => coverageIds.has(fixture.id));
   const mergedSelectedFixtures = mergeFixtureSlates(
-    lowOddsHitFixtures,
-    fixtureDiscovery.fixtures,
+    mergeFixtureSlates(lowOddsHitFixtures, fixtureDiscovery.fixtures), coverageFixtures,
   );
+  writeJsonArtifact(config, runId, 'coverage-discovery.json', lowOddsScan.coverageDiscovery ?? { selectedFixtureIds: [], reason: 'scan-unavailable' });
   const localDateEligibleFixtures = mergedSelectedFixtures.filter((fixture) => (
     fixtureLocalDateKey(fixture.scheduledAt, config.apiFootball.timezone) === input.date
   ));
@@ -600,6 +628,7 @@ async function executeOwnedRunPipeline(
       : []),
   ];
   const fixtureSelection = {
+    coverageExpansionFixtures: coverageFixtures.length,
     primaryFixtures: fixtureDiscovery.fixtures.length,
     lowOddsUniqueFixtures: uniqueFixtureCount(lowOddsHitFixtures),
     mergedFixtures: mergedSelectedFixtures.length,
@@ -645,8 +674,24 @@ async function executeOwnedRunPipeline(
     abortGraceMs: AGENT_FIXTURE_ABORT_GRACE_MS,
   });
 
+  // Reserve the majority of the existing provider quota for discovery, current odds
+  // and the remaining fixtures. Cached historical records do not consume this budget.
+  const historicalBudget = Math.max(0, Math.min(Math.floor(config.apiFootball.maxProviderRequestsPerRun * 0.30),
+    config.apiFootball.maxProviderRequestsPerRun - (runtime.providerRequestCount ?? 0) - agenticFixtures.length * 6));
+  runtime.historicalStatisticsBudget = { remaining: historicalBudget,
+    perFixture: Math.min(20, Math.floor(historicalBudget / Math.max(1, agenticFixtures.length))) };
+  writeJsonArtifact(config, runId, 'historical-statistics-budget.json', { ...runtime.historicalStatisticsBudget,
+    providerLimit: config.apiFootball.maxProviderRequestsPerRun, providerRequestsUsed: runtime.providerRequestCount ?? 0 });
+
+  const reuse = reusableResearch(config.artifactRoot, process.env.GANA_RESEARCH_REUSE_RUN_ID, agenticFixtures, now(), config.model, marketScope);
+  writeJsonArtifact(config, runId, 'research-reuse.json', { sourceRunId: process.env.GANA_RESEARCH_REUSE_RUN_ID ?? null,
+    reused: reuse.proof, freshFixtureIds: agenticFixtures.filter(fixture => !reuse.results.has(fixture.providerFixtureId)).map(fixture => fixture.providerFixtureId),
+    policy: 'Explicit same-model same-fixture factual research within 12h, outside lineup window; always fresh scoring odds and model calls' });
+
   const researchPayload = await runDurableTask('research.fixture', 'research-results.json', async () => {
     const results = await mapWithConcurrency(agenticFixtures, RESEARCH_CONCURRENCY, async (fixture) => {
+      const existing = reuse.results.get(fixture.providerFixtureId);
+      if (existing) return existing;
       try {
         runtime.agenticResearchCallCount = (runtime.agenticResearchCallCount ?? 0) + 1;
         return await withAbortableTimeout(
@@ -685,9 +730,54 @@ async function executeOwnedRunPipeline(
   writeStepSpan(config, runtime, 'research.agent_call', 'llm', research.some((item) => item.ok) ? 'ok' : 'blocked', research);
 
   const scoringPayload = await runDurableTask('score.fixture', 'scoring-results.json', async () => {
+    const scoringFixtureTimeoutMs = computeScoringFixtureTimeoutMs(
+      AGENT_FIXTURE_TIMEOUT_MS, SCORING_AGENT_TIMEOUT_MS, SCORING_AGENT_JSON_ATTEMPTS, AGENT_FIXTURE_ABORT_GRACE_MS,
+    );
+    // Research can take long enough for the discovery-time odds snapshot to
+    // become stale. Refresh each fixture immediately before scoring so the
+    // model, fair-price checks and persisted prediction all use the same
+    // current quote. Injected scoring implementations opt in explicitly so
+    // deterministic tests and offline callers never make an unexpected API
+    // request.
+    const refreshOddsSnapshot = deps.refreshOddsSnapshot
+      ?? (deps.scoreFixture ? undefined : getApiFootballOddsSnapshot);
+    const oddsRefresh: Array<{
+      fixtureId: string;
+      providerFixtureId: string;
+      ok: boolean;
+      oddsSnapshotId?: string;
+      quoteCount?: number;
+      error?: string;
+    }> = [];
     const results = await mapWithConcurrency(agenticFixtures, SCORING_CONCURRENCY, async (fixture) => {
+      let refreshError: string | undefined;
+      if (refreshOddsSnapshot) {
+        try {
+          const refreshed = await retryStorageConnection(() => refreshOddsSnapshot(
+            config,
+            fixture.providerFixtureId,
+            runtime,
+            marketScope,
+          ));
+          oddsRefresh.push({
+            fixtureId: fixture.id,
+            providerFixtureId: fixture.providerFixtureId,
+            ok: true,
+            oddsSnapshotId: refreshed.oddsSnapshotId,
+            quoteCount: refreshed.quotes.length,
+          });
+        } catch (err: any) {
+          refreshError = `pre-score odds refresh failed: ${err?.message ?? String(err)}`;
+          oddsRefresh.push({
+            fixtureId: fixture.id,
+            providerFixtureId: fixture.providerFixtureId,
+            ok: false,
+            error: refreshError,
+          });
+        }
+      }
       try {
-        return await withAbortableTimeout(
+        const result = await withAbortableTimeout(
           (signal) => retryStorageConnection(() => (deps.scoreFixture ?? runFixtureScoring)(isolatedAgentConfig(config), {
             fixtureId: fixture.providerFixtureId,
             web: input.web ?? defaultWebMode(config),
@@ -695,14 +785,23 @@ async function executeOwnedRunPipeline(
             researchBundle: researchBundleByProviderFixtureId.get(fixture.providerFixtureId),
             signal,
           }, runtime)),
-          AGENT_FIXTURE_TIMEOUT_MS,
-          `score fixture ${fixture.providerFixtureId} timed out after ${AGENT_FIXTURE_TIMEOUT_MS}ms`,
+          scoringFixtureTimeoutMs,
+          `score fixture ${fixture.providerFixtureId} timed out after ${scoringFixtureTimeoutMs}ms`,
         );
+        if (!refreshError) return result;
+        return {
+          ...result,
+          retrievalWarnings: [...new Set([...(result.retrievalWarnings ?? []), refreshError])],
+          gateResult: {
+            ...result.gateResult,
+            warnings: [...new Set([...result.gateResult.warnings, refreshError])],
+          },
+        };
       } catch (err: any) {
         return blockedScoringResult(config, runId, fixture, err);
       }
     });
-    const payload = { runId, results };
+    const payload = { runId, oddsRefresh, results };
     writeJsonArtifact(config, runId, 'scoring-results.json', payload);
     return payload;
   });
@@ -1089,6 +1188,8 @@ function createPipelineTaskRunner(
   runId: string,
   tasks: DurableTask[],
   repositories: PipelineRepositories,
+  resolveRepositories: () => PipelineRepositories,
+  storageRetryDelayMs: number,
 ) {
   return async function runDurableTask<T>(type: CanonicalTaskType, checkpointName: string | undefined, handler: () => Promise<T>): Promise<T> {
     const task = tasks.find((candidate) => candidate.type === type);
@@ -1105,7 +1206,21 @@ function createPipelineTaskRunner(
 
     const previousTaskId = runtime.taskId;
     const leaseExpiresAt = new Date(Date.now() + 15 * 60_000);
-    const updatePersistedStatus = repositories.harnessTasks?.updateStatus;
+    const hasPersistedTaskStore = Boolean(repositories.harnessTasks?.updateStatus);
+    const updatePersistedStatus = hasPersistedTaskStore
+      ? (id: string, update: {
+          status: string;
+          leaseExpiresAt?: Date | null;
+          attempts?: number;
+          lastErrorRedacted?: string | null;
+        }) => (
+          retryStorageConnection(async () => {
+            const updateStatus = resolveRepositories().harnessTasks?.updateStatus;
+            if (!updateStatus) throw new Error('persisted harness task status store became unavailable');
+            return updateStatus(id, update);
+          }, storageRetryDelayMs)
+        )
+      : undefined;
     const leaseStore = updatePersistedStatus ? { updateStatus: updatePersistedStatus } : undefined;
     if (updatePersistedStatus) {
       const nextAttempts = task.attempts + 1;
@@ -1721,7 +1836,7 @@ function isolatedAgentConfig(config: AgentConfig): AgentConfig {
   };
 }
 
-async function retryStorageConnection<T>(operation: () => Promise<T>): Promise<T> {
+async function retryStorageConnection<T>(operation: () => Promise<T>, retryDelayMs = STORAGE_RETRY_DELAY_MS): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= STORAGE_RETRY_ATTEMPTS; attempt += 1) {
     try {
@@ -1730,7 +1845,7 @@ async function retryStorageConnection<T>(operation: () => Promise<T>): Promise<T
       lastError = err;
       if (!isStorageConnectionError(err) || attempt === STORAGE_RETRY_ATTEMPTS) throw err;
       await disconnectDb().catch(() => undefined);
-      await sleep(STORAGE_RETRY_DELAY_MS * attempt);
+      await sleep(retryDelayMs * attempt);
     }
   }
   throw lastError;
@@ -1746,7 +1861,8 @@ function isStorageConnectionError(err: unknown): boolean {
     || message.includes('Server has closed the connection')
     || message.includes("Can't reach database server")
     || message.includes('Connection terminated')
-    || message.includes('Timed out fetching a new connection');
+    || message.includes('Timed out fetching a new connection')
+    || message.includes('Engine is not yet connected');
 }
 
 function sleep(ms: number): Promise<void> {

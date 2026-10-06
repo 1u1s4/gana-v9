@@ -11,7 +11,12 @@ import type { OddsQuote } from '../domain/odds.js';
 import { discoverFixtures } from '../filters/engine.js';
 import { buildRequiredLeagueRecommendations, normalizeRequiredLeagues } from '../daily/required-leagues.js';
 import { createRuntimeContext } from './context.js';
-import { computeAgentFixtureTimeoutMs, executeRunPipeline, exportRunArtifacts, type RunPipelineDependencies } from './pipeline.js';
+import { computeAgentFixtureTimeoutMs, computeScoringFixtureTimeoutMs, executeRunPipeline, exportRunArtifacts, type RunPipelineDependencies } from './pipeline.js';
+
+it('budgets every scoring attempt before the outer timeout aborts the fixture', () => {
+  assert.equal(computeScoringFixtureTimeoutMs(420_000, 300_000, 3, 30_000), 930_000);
+  assert.equal(computeScoringFixtureTimeoutMs(420_000, 10_000, 2, 30_000), 420_000);
+});
 
 function testConfig() {
   return loadConfig({
@@ -118,6 +123,7 @@ function successfulPipelineDeps(input: {
   analyzeParlays?: RunPipelineDependencies['analyzeParlays'];
   discoverLowOddsFixtures?: RunPipelineDependencies['discoverLowOddsFixtures'];
   fetchLowOddsSnapshot?: RunPipelineDependencies['fetchLowOddsSnapshot'];
+  refreshOddsSnapshot?: RunPipelineDependencies['refreshOddsSnapshot'];
   primaryDiscoveryQueries?: unknown[];
 }): RunPipelineDependencies {
   const evaluatedAt = input.now ?? '2026-04-29T12:00:00.000Z';
@@ -177,6 +183,7 @@ function successfulPipelineDeps(input: {
       payloadHash: 'hash',
       quotes: [lowOddsQuote(input.target)],
     })),
+    ...(input.refreshOddsSnapshot ? { refreshOddsSnapshot: input.refreshOddsSnapshot } : {}),
     researchFixture: input.researchFixture ?? (async () => {
       input.calls.push('research');
       return {
@@ -288,9 +295,9 @@ describe('computeAgentFixtureTimeoutMs', () => {
       baseTimeoutMs: 180_000,
       web: 'live',
       researchAgentTimeoutMs: 300_000,
-      researchJsonAttempts: 2,
+      researchJsonAttempts: 3,
       abortGraceMs: 30_000,
-    }), 630_000);
+    }), 930_000);
   });
 
   it('preserves longer explicit fixture timeout budgets', () => {
@@ -315,6 +322,49 @@ describe('computeAgentFixtureTimeoutMs', () => {
 });
 
 describe('executeRunPipeline', () => {
+  it('refreshes persisted odds after research and immediately before scoring', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const calls: string[] = [];
+    const runId = 'run-pre-score-odds-refresh';
+    const deps = successfulPipelineDeps({
+      target,
+      calls,
+      runId,
+      date: '2026-04-29',
+      refreshOddsSnapshot: async (_config, providerFixtureId, _runtime, markets) => {
+        calls.push('odds-refresh');
+        assert.equal(providerFixtureId, target.providerFixtureId);
+        assert.deepEqual(markets, ['h2h']);
+        return {
+          fixtureId: target.id,
+          providerFixtureId: target.providerFixtureId,
+          oddsSnapshotId: 'odds-snapshot-refreshed',
+          providerSnapshotId: 'provider-snapshot-refreshed',
+          quoteRecordIds: { 'test-book|h2h|home|': 'odds-quote-refreshed' },
+          capturedAt: '2026-04-29T12:00:00.000Z',
+          bookmakerCount: 1,
+          payloadHash: 'refreshed-hash',
+          quotes: [lowOddsQuote(target)],
+        };
+      },
+    });
+
+    const result = await executeRunPipeline(config, { date: '2026-04-29' }, runtime, deps);
+
+    assert.ok(calls.indexOf('research') < calls.indexOf('odds-refresh'));
+    assert.ok(calls.indexOf('odds-refresh') < calls.indexOf('score'));
+    const scoring = JSON.parse(readFileSync(join(result.artifactDir, 'scoring-results.json'), 'utf8'));
+    assert.deepEqual(scoring.oddsRefresh, [{
+      fixtureId: target.id,
+      providerFixtureId: target.providerFixtureId,
+      ok: true,
+      oddsSnapshotId: 'odds-snapshot-refreshed',
+      quoteCount: 1,
+    }]);
+  });
+
   it('writes canonical run, evidence pack, and handoff artifacts with injected services', async () => {
     const config = testConfig();
     const runtime = createRuntimeContext(config, 'session.jsonl');
@@ -935,6 +985,68 @@ describe('executeRunPipeline', () => {
     assert.equal(tasks.find((task: { type: string }) => task.type === 'fixtures.fetch').attempts, 1);
     assert.equal(persistedTasks.get('task-fixtures.fetch')?.status, 'succeeded');
     assert.equal(persistedTasks.get('task-odds.fetch')?.status, 'succeeded');
+  });
+
+  it('retries a persisted task claim when Prisma reconnects after research', async () => {
+    const config = testConfig();
+    const runtime = createRuntimeContext(config, 'session.jsonl');
+    const target = fixture();
+    const calls: string[] = [];
+    const persistedTasks = new Map<string, Record<string, unknown>>();
+    let researchCompleted = false;
+    let injectedDisconnect = false;
+    const deps = successfulPipelineDeps({
+      target,
+      calls,
+      runId: 'run-task-reconnect-after-research',
+      date: '2026-04-29',
+      researchFixture: async () => {
+        calls.push('research');
+        researchCompleted = true;
+        return { ok: true, gateResult: { verdict: 'review-required' as const, reasons: [], warnings: [] } };
+      },
+    });
+
+    const result = await executeRunPipeline(config, {
+      date: '2026-04-29',
+      validate: false,
+    }, runtime, {
+      ...deps,
+      storageRetryDelayMs: 0,
+      repositories: {
+        harnessRuns: { upsertForRun: async () => ({}) },
+        harnessTasks: {
+          enqueue: async (input) => {
+            const id = `task-${input.type}`;
+            persistedTasks.set(id, {
+              id,
+              runId: input.runId,
+              type: input.type,
+              status: input.status ?? 'queued',
+              attempts: input.attempts ?? 0,
+              maxAttempts: input.maxAttempts ?? 3,
+            });
+            return { id };
+          },
+          updateStatus: async (id, update) => {
+            if (researchCompleted && id === 'task-score.fixture' && update.status === 'running' && !injectedDisconnect) {
+              injectedDisconnect = true;
+              throw new Error('Engine is not yet connected.');
+            }
+            const existing = persistedTasks.get(id);
+            assert.ok(existing, `missing persisted task ${id}`);
+            const next = { ...existing, ...update };
+            persistedTasks.set(id, next);
+            return next as any;
+          },
+        },
+      },
+    });
+
+    assert.equal(injectedDisconnect, true);
+    assert.equal(result.status, 'succeeded');
+    assert.ok(calls.includes('score'));
+    assert.equal(persistedTasks.get('task-score.fixture')?.status, 'succeeded');
   });
 
   it('scans low odds across the full date slate instead of only default league fixtures', async () => {

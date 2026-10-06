@@ -211,6 +211,23 @@ describe('daily E2E publication workflow', () => {
     assert.equal(valid.ok, true);
   });
 
+  it('publishes an explicit revision exactly once and retains the confirmed parent rows', async () => {
+    const fake = createFakePrisma({ existingRows: [publishedRow()] });
+    const revision = `${BATCH}-revision`;
+    const artifact = { ...makeArtifact(), dailyBatchId: revision, revisionOfDailyBatchId: BATCH };
+    const input = baseInput({ artifact, dailyBatchId: revision, mode: 'daily-revision' });
+    let sends = 0;
+    const dependencies = { createPrismaClient: async () => fake.client, now: () => new Date(BEFORE_KICKOFF),
+      runNotifier: async ({ dryRun }) => { if (dryRun) return dryRunOutput(); sends += 1; return sendOutput({ messageIds: ['revision-message'] }); } };
+    const result = await publishDailyRecommendations(input, dependencies);
+    assert.equal(result.status, 'published');
+    const retry = await publishDailyRecommendations(input, dependencies);
+    assert.equal(retry.status, 'already-published');
+    assert.equal(sends, 1);
+    const rows = await fake.client.publicRecommendationPublication.findMany({ where: { dailyBatchId: BATCH } });
+    assert.deepEqual(rows, [publishedRow()]);
+  });
+
   it('does not send when a complete publication ledger already exists', async () => {
     const fake = createFakePrisma({ existingRows: [publishedRow()] });
     let notified = 0;

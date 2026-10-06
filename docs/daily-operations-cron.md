@@ -11,7 +11,7 @@ Esta guia deja el flujo diario de Gana v9 programable con una sola autoridad de 
 ## Horarios
 
 - `07:15` Guatemala: aplicar retencion una vez por fecha, validar primero el dia anterior contra el artifact realmente publicado y, como flujo agent-heavy, recuperar un Daily `retryable` del slate de hoy cuyo `retryAfter` vencio tras el rollover.
-- `10:15` Guatemala: correr el Daily E2E inicial del dia siguiente con Codex Astra (`gpt-6-astra`), reasoning `medium`, sin fast tier, council gate y Discord.
+- `10:15` Guatemala: correr el Daily E2E inicial del dia siguiente con Codex Sol (`gpt-5.6-sol`), reasoning `high`, sin fast tier, council gate y Discord.
 - `13:15` Guatemala: recuperar primero un Daily inicial que nunca se intento; si ya hubo intento, ejecutar strategy review antes de un Daily meramente `retryable`.
 - `18:15` y `22:15` Guatemala: reintentar el Daily normal del slate de manana solo cuando el lock exacto esta `retryable` y `retryAfter` ya vencio.
 
@@ -120,7 +120,7 @@ scripts/gana-daily-e2e-notify.sh
 Este script:
 
 1. Calcula manana en `America/Guatemala`.
-2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-6-astra --web live --parlay-profile portfolio-v2 --required-leagues auto`, con reasoning `medium` y `service_tier=fast` desactivado.
+2. Ejecuta `pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.6-sol --web live --parlay-profile portfolio-v2 --required-leagues auto`, con reasoning `high` y `service_tier=fast` desactivado.
 3. Usa limites altos por defecto (`GANA_CRON_MAX_FIXTURES_PER_RUN=10000`, `GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN=10000`, `GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN=10000`, `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES=10000`) para cubrir el universo diario disponible y low-odds elegibles.
 4. Usa `GANA_LOW_ODDS_THRESHOLD=1.10`: ganador 1X2 local/visitante con cuota estrictamente menor al umbral. Barre todas las paginas y casas disponibles, con timezone Guatemala y diagnostico de cobertura; doble oportunidad no cuenta como favorito ganador.
 5. Genera `portfolio-v2`; audita diariamente `low-odds-top`, `parlay-diamante`, `parlay-refinado` y `low-variance`. Low-odds busca cuota combinada >=1.20 usando 2–4 ganadores <1.10 de partidos distintos y gates intactos. Si no hay candidatos suficientes se registra blocked con motivos, sin inventar picks.
@@ -132,6 +132,8 @@ Este script:
 11. Los artifacts nuevos usan `presentation: concise-v1`: Discord incluye partido/hora, seleccion, cuota, confianza de evidencia y estado relevante, con paginacion. Omite repeticion tecnica/council y secciones vacias. El ledger incluye exactamente selecciones renderizadas; los replays legacy conservan su formato.
 12. Freshness toma la ultima publicacion anterior con validacion exacta y completa (hasta 14 dias), no el slate futuro sin liquidar. La misma cohorte descriptiva alimenta scoring, con tamaño de muestra y sin retunar umbrales automaticamente.
 13. Antes del preflight, la reserva y el envio, vuelve a consultar horarios y estados de los fixtures en DB. Solo publica partidos programados y futuros; metadata ausente o inicio vencido bloquean la entrega. Un bloqueo posterior a la reserva queda registrado como `send-blocked`, sin reenvio automatico.
+14. Si no sobrevive ningun pick oficial, crea `daily-review-candidates.json` con todas las predicciones `review-required` que todavia tienen probabilidad de modelo, edge positivo y cuota fresca. Publica en el canal de recomendaciones hasta `GANA_DISCORD_MAX_SELECTIONS`, rotuladas como posibles predicciones en revision; nunca mezcla blocked, edge no positivo o probabilidad ausente con recomendaciones aprobadas.
+15. Una entrega de candidatas queda en lock terminal `review-delivered`, con todos los message IDs. El dispatcher no repite providers ni Discord para ese slate; una entrega parcial queda `publication-uncertain` y exige revision manual.
 
 Las probabilidades justas de doble oportunidad se normalizan con suma 2 porque
 sus tres resultados se solapan. El consenso y el indicador de cobertura de casas
@@ -168,6 +170,23 @@ Este script:
 
 ## Variables
 
+### Corrección de cohorte y evidencia (2026-10-06)
+
+La validación también acepta el estado terminal `review-delivered`: usa solamente
+los `displayedPredictionIds` del `daily-review-candidates.json` del batch exacto,
+comprueba sus message IDs contra el lock y conserva la etiqueta de candidatas en
+revisión. Los locks nuevos guardan además el hash del artifact. La cohorte de
+aprobadas y su feedback histórico siguen separados. Un resultado pendiente vuelve
+a la fase de validación con backoff; no se publica como cierre definitivo.
+
+Cada Daily genera `daily-model-evidence.json`, enlazado desde el artifact principal,
+con justificaciones, referencias, fuentes y gates por predicción. El contrato de
+research registra decisiones por mercado y bloqueos compartidos. Los artifacts
+legacy mantienen su abstención global. El timeout externo de scoring abarca sus
+intentos configurados; cada reintento abre una sesión estructurada independiente.
+
+Investigación y verificación: `docs/planes/23-recuperacion-recomendaciones-validaciones.md`.
+
 Los scripts operativos cargan el `.env` del repo si existe. El runtime canonico usa
 `DATABASE_URL` PostgreSQL/Supabase mediante el pooler de sesion. Las variables
 temporales `SOURCE_DATABASE_URL` y `TARGET_DATABASE_URL` pertenecen solo a la
@@ -191,10 +210,11 @@ Variables utiles:
 - `GANA_LOW_ODDS_THRESHOLD`: default `1.10`, comparacion estricta `<`.
 - `GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES`: default `10000`; permite que el barrido low-odds revise la pizarra diaria completa.
 - `GANA_DAILY_PROVIDERS`: default `codex`.
-- `GANA_DAILY_CODEX_MODEL`: default `gpt-6-astra`.
-- `GANA_DAILY_REASONING_EFFORT`: default `medium`; el wrapper lo mapea a `AGENT_REASONING_EFFORT` solo para la corrida diaria.
+- `GANA_DAILY_CODEX_MODEL`: default `gpt-5.6-sol`.
+- `GANA_DAILY_REASONING_EFFORT`: default `high`; el wrapper lo mapea a `AGENT_REASONING_EFFORT` solo para la corrida diaria.
 - `GANA_DAILY_FAST_MODE`: default `false`; el wrapper lo mapea a `AGENT_FAST_MODE` y omite `service_tier="fast"`.
-- `GANA_DAILY_CODEX_FALLBACK_MODELS`: default vacio para mantener toda la corrida en Astra; acepta una lista de modelos separada por comas para habilitar fallback explicitamente.
+- `GANA_DAILY_CODEX_FALLBACK_MODELS`: default vacio para mantener toda la corrida en Sol; acepta una lista de modelos separada por comas para habilitar fallback explicitamente.
+- `--provider-run-id RUN_ID`: recuperacion manual; reutiliza los checkpoints de un provider run del mismo slate en vez de repetir fixtures, cuotas y research ya completados.
 - `GANA_MAINTENANCE_PAUSED`: default `false`; usar `true` solo durante una migracion/cutover para que retencion, Daily E2E, validacion y strategy review no inicien trabajo nuevo sobre la DB ni Discord. La pausa no cancela una retencion que ya tiene el lock: esperar que ese proceso termine antes de cambiar `DATABASE_URL`.
 - `GANA_DAILY_PUBLISH_EXISTING`: default `false`; habilita explicitamente el camino de publicacion de un artifact ya terminado sin volver a ejecutar E2E, providers ni busqueda web.
 - `GANA_DAILY_PUBLISH_EXISTING_MAX_AGE_HOURS`: default `36`; antiguedad maxima conjunta del artifact y su `daily-e2e-summary.json` para `publish-existing`.
@@ -204,7 +224,7 @@ Variables utiles:
 - `GANA_PARLAY_PROFILE`: default `portfolio-v2`; genera `parlay-diamante`, `parlay-refinado`, `parlay-all-in`, `low-odds-top`, `low-variance`, `balanced`, `market-diverse`, `high-conviction` y `parlay-oro`; la publicacion diaria considera `low-odds-top`, `parlay-diamante`, `parlay-refinado` y `low-variance` con firmas distintas y sin forzar picks.
 - `AGENT_CODEX_FALLBACK_MODELS`: fallback generico del agente; Daily E2E lo reemplaza con `GANA_DAILY_CODEX_FALLBACK_MODELS` (vacio por defecto).
 - `AGENT_CODEX_SANDBOX`: default cron `danger-full-access`.
-- `GANA_DISCORD_MAX_SELECTIONS`: default `25` para publicar todas las recomendaciones diarias disponibles en el artifact normal; el notifier pagina mensajes nativos cuando hace falta.
+- `GANA_DISCORD_MAX_SELECTIONS`: default `25` para publicar recomendaciones diarias o, cuando no hay picks aprobados, las candidatas en revision mejor ordenadas. El artifact de candidatas conserva el universo completo y Discord pagina mensajes nativos cuando hace falta.
 - `GANA_METRICS_PERSIST`: default `true`.
 - `GANA_STRATEGY_REVIEW_DATE`: fuerza fecha para strategy review diario.
 - `GANA_STRATEGY_REVIEW_MODEL`: modelo Codex para el analisis. Default: `gpt-6-astra`.
@@ -374,3 +394,66 @@ node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recom
   --latest \
   --dry-run
 ```
+
+### Cobertura adicional, reevaluación y publicaciones de revisión
+
+El pipeline incorpora hasta 12 fixtures fuera de la selección de ligas/low-odds,
+priorizados por cantidad de casas con 1X2 completo y margen razonable. La variable
+`GANA_COVERAGE_DISCOVERY_MAX_FIXTURES` ajusta ese presupuesto (0 lo desactiva).
+`coverage-discovery.json` conserva elegibilidad, exclusiones y selección; research
+sigue determinando si existen hechos suficientes. No se cambia el umbral low-odds.
+El historial de córners FT con trazabilidad se conserva en research y usa cache
+local en `cache/historical-corners`; los valores ausentes nunca se imputan a cero.
+
+Reevaluación acotada, primero inspeccionable sin efectos externos:
+
+```bash
+pnpm gana refresh --source-run-id RUN_ID --date YYYY-MM-DD --dry-run
+pnpm gana refresh --source-run-id RUN_ID --date YYYY-MM-DD
+```
+
+El comando opera sobre fallos transitorios y sobre partidos que entraron en las
+últimas dos horas antes del kickoff desde el análisis anterior. Revalida estado y
+cuotas, conserva el run original y produce una revisión separada. No envía por sí
+solo ni cambia los horarios de cron. Un intento incierto en `refresh-ledger` debe
+conciliarse; no se borra para repetir ciegamente una operación.
+
+Para un E2E nuevo solicitado después de que ya se publicó el día, usá otro
+`--daily-batch-id`. La publicación explícita conserva el envío original:
+
+```bash
+node scripts/gana-publish-revision.mjs --date YYYY-MM-DD --daily-batch-id NUEVO_BATCH --parent-batch-id BATCH_PUBLICADO --dry-run
+node .agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs --artifact PATH_NUEVO/daily-parlay-recommendations.json --dry-run
+node scripts/gana-publish-revision.mjs --date YYYY-MM-DD --daily-batch-id NUEVO_BATCH --parent-batch-id BATCH_PUBLICADO
+```
+
+El padre debe ser el Daily canónico confirmado. Una publicación anterior incierta
+bloquea la revisión. La reserva DB, el hash de fuentes, el payload preparado y la
+comprobación previa al kickoff permanecen obligatorios. El mensaje identifica la
+actualización, y cada revisión conserva su cohorte y precio publicados. El
+checkpoint normal valida una revisión pendiente por ejecución cuando su fecha ya
+pasó; no mezcla sus métricas con el envío inicial:
+
+```bash
+node scripts/gana-validate-metrics-and-notify.mjs --date YYYY-MM-DD --revision-batch-id NUEVO_BATCH --dry-run
+```
+
+Dentro de la ventana previa, la reevaluación consulta alineaciones del proveedor.
+Una alineación nueva cambia el trigger aunque no cambien las cuotas. Deben existir
+los dos equipos exactos y once titulares distintos por equipo; cuando el proveedor
+publica un nombre sin ID, esa identidad queda explícitamente sin resolver. No se
+infiere que los jugadores ausentes del once estén lesionados ni disponibilidad
+completa. Los payloads publicados incluyen la evidencia documental en su manifiesto
+para impedir que se altere sin invalidar la comprobación de integridad.
+
+La recopilación histórica comparte el límite existente del proveedor: reserva
+como máximo 30% para estadísticas de córners, reparte el presupuesto entre
+fixtures y alterna ambos equipos. Los registros completos de cache no consumen
+consultas; los faltantes por presupuesto quedan explícitos.
+
+Una recuperación operativa puede usar `GANA_RESEARCH_REUSE_RUN_ID=RUN_ID` al
+lanzar un nuevo E2E. Reutiliza exclusivamente research válido del mismo fixture,
+modelo y versión de prompt, con web documental y mercados completos, de hasta
+12 h de antigüedad y fuera de la ventana de alineaciones. `research-reuse.json`
+registra origen y hash de cada bundle. Las cuotas y el scoring se vuelven a
+obtener; esta opción no copia predicciones ni modifica el run original.

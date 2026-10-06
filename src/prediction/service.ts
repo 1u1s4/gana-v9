@@ -53,7 +53,9 @@ import { SCORE_PREDICTION_PROMPT_VERSION, buildScorePredictionPrompt, type Resea
 import { SCORING_RULE_VERSION, type PredictionRecordView } from './types.js';
 
 const SCORING_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_SCORING_AGENT_TIMEOUT_MS', positiveIntegerFromEnv('GANA_AGENT_TIMEOUT_MS', 300_000));
-const SCORING_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_SCORING_AGENT_JSON_ATTEMPTS', 2);
+// Keep one additional structured attempt available for transient truncated
+// output without relaxing any scoring or promotion gate.
+const SCORING_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_SCORING_AGENT_JSON_ATTEMPTS', 3);
 const SCORING_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/score-prediction-v2/output.schema.json');
 const WEB_RESEARCH_MAX_AGE_MS = positiveIntegerFromEnv('GANA_WEB_RESEARCH_MAX_AGE_HOURS', 12) * 60 * 60 * 1000;
 const CALIBRATION_MIN_SAMPLE = positiveIntegerFromEnv('GANA_CALIBRATION_MIN_SAMPLE', 50);
@@ -331,7 +333,8 @@ export async function runFixtureScoring(
   let scoringError = '';
   for (let attempt = 1; attempt <= SCORING_AGENT_JSON_ATTEMPTS; attempt += 1) {
     try {
-      const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, config, scoringPromptForAttempt(prompt, attempt), {
+      const attemptConfig: AgentConfig = { ...config, codexThreadId: undefined };
+      const result = await runScoringAgent(deps.agentRunner ?? runAgentWithRetry, attemptConfig, scoringPromptForAttempt(prompt, attempt), {
         runtime,
         signal: input.signal,
       });
@@ -407,6 +410,7 @@ export async function runFixtureScoring(
       claims: research.claims,
     });
     const gate = evaluatePredictionGates({
+      market: pick.market,
       fixture,
       hasOddsSnapshot: true,
       hasOddsQuote: Boolean(quote),

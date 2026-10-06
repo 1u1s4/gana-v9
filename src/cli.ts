@@ -583,6 +583,7 @@ async function main() {
     || command === 'strategy-review'
     || command === 'run'
     || command === 'daily-e2e'
+    || command === 'refresh'
     || command === 'certify'
     || command === 'leaderboard'
     || command === 'stats'

@@ -14,6 +14,7 @@ export function parseValidationArgs(argv) {
     const arg = argv[index];
     if (arg === '--date') parsed.date = requireValue(argv, ++index, arg);
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
+    else if (arg === '--revision-batch-id') parsed.revisionBatchId = requireValue(argv, ++index, arg);
     else if (arg === '--scope') parsed.scope = requireValue(argv, ++index, arg);
     else if (arg === '--recommendation-artifact') parsed.recommendationArtifact = requireValue(argv, ++index, arg);
     else if (arg === '--validation-artifact') parsed.validationArtifact = requireValue(argv, ++index, arg);

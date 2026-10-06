@@ -234,6 +234,31 @@ test('failed validation artifacts never advance a retry directly to metrics or n
   );
 });
 
+test('review-delivered resolves only its exact, fully delivered review cohort', (t) => {
+  const batch = `daily-${DATE}-full`;
+  const fixture = validationFixture(t, { date: DATE, dailyBatchId: batch, dailyStatus: 'review-delivered' });
+  const path = join(fixture.artifactRoot, 'runs', batch, 'daily-review-candidates.json');
+  const lock = join(fixture.artifactRoot, 'cron', 'locks', `daily-e2e-${DATE}.lock`);
+  writeJson(lock, { date: DATE, dailyBatchId: batch, status: 'review-delivered', messageIds: ['sent-1'] });
+  const artifact = { date: DATE, dailyBatchId: batch, kind: 'daily-review-candidates', status: 'published',
+    candidates: [{ predictionId: 'p1', status: 'review-required' }], displayedPredictionIds: ['p1'],
+    discord: { messageIds: ['sent-1'] } };
+  writeJson(path, artifact);
+  const resolveSource = () => resolveCanonicalPublishedRecommendation({ artifactRoot: fixture.artifactRoot, date: DATE });
+  assert.equal(resolveSource().ok, true);
+  assert.equal(resolveSource().recommendationArtifact, path);
+  for (const changed of [
+    { status: 'publication-uncertain' }, { discord: { messageIds: ['other'] } },
+    { displayedPredictionIds: ['missing'] }, { dailyBatchId: undefined },
+  ]) {
+    writeJson(path, { ...artifact, ...changed });
+    assert.equal(resolveSource().ok, false);
+  }
+  writeJson(path, artifact);
+  writeJson(lock, { date: DATE, dailyBatchId: batch, status: 'review-delivered', messageIds: ['sent-1'], reviewArtifactSha256: 'tampered' });
+  assert.equal(resolveSource().reason, 'canonical-review-delivery-invalid');
+});
+
 function validationFixture(t, {
   date,
   dailyBatchId,

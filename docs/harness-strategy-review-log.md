@@ -3088,3 +3088,332 @@ Automated reviews are analytical only. They create a proposed change backlog; so
 - Adversarial follow-up: parlay EV now uses the product of model estimates (`probability` / persisted `estimatedProbability`, with raw model metadata only when absent), preserving downward risk adjustments. Evidence confidence remains a separate conservative quality metric; missing probability never falls back to confidence or market price. Atomic EV is computed from the same primary probability and odds. Required-fixture caps remain visible and failed discovery means unknown coverage. Verification: focused daily policy/required/E2E/parlay suite 100 passed, 0 failed; typecheck and diff check passed
 - Live odds follow-up: fixture `1549802` exposed double-chance devig normalized to mass one despite overlapping outcomes. Correct mass two changes the archived Bet365 home-or-draw benchmark from 0.369325 to 0.738650 and normalized margin to 0.057673. Incomplete/incoherent books supply no benchmark. Consensus now considers all already-returned provider books, while selectable prices retain the bookmaker allowlist; metadata identifies the coverage proxy. The minimum three-bookmaker gate is unchanged. Regression covers exclusive vs overlapping outcome mass, incomplete/incoherent books and the exact live prices
 - Still needs-more-data: any performance calibration or market/odds threshold tuning. Counterfactual eligible highlight cohort has zero historical picks; no claimed ROI improvement or profile superiority. Cohort overlap, model changes and tiny market samples remain material limits
+
+## 2026-09-22 · strategy-2026-09-21
+
+- Run: strategy-review-2026-09-21-53c5d0a8
+- Dates: 2026-09-21
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-21-53c5d0a8/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-21-53c5d0a8/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 1-3 hit 25.0% (40 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separate published outcomes from candidate research outcomes (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Gate performance conclusions on sample maturity and fixture diversity (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Explain settlement backlog before requesting validation reruns (proposed) — src/strategy-review/daily.ts, src/validation/service.ts
+- [high] Expose the recommendation rejection funnel to strategy review (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [medium] Defer threshold and portfolio tuning until evaluable history exists (needs-more-data) — src/scoring/edge-gate.ts, src/parlay/eligibility.ts, src/parlay/ranker.ts, src/parlay/rules.ts, src/filters/low-odds-selector.ts
+
+## 2026-09-23 · strategy-2026-09-22
+
+- Run: strategy-review-2026-09-22-46ec225e
+- Dates: 2026-09-22
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-22-46ec225e/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-22-46ec225e/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (356 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separate publication scope, eligibility and settlement status (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Make validation feedback depend on settlement readiness (proposed) — src/strategy-review/daily.ts, scripts/lib/validation-workflow.mjs
+- [high] Measure confidence on estimable and eligible candidates separately (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Carry upstream rejection and coverage diagnostics into strategy review (ready-for-implementation) — src/daily/e2e.ts, src/strategy-review/daily.ts
+- [medium] Require mature evidence before changing market or portfolio thresholds (needs-more-data) — src/strategy-review/daily.ts, src/parlay/ranker.ts, src/parlay/rules.ts, src/parlay/eligibility.ts, src/filters/low-odds-selector.ts
+
+## 2026-09-24 · strategy-2026-09-23
+
+- Run: strategy-review-2026-09-23-a005d7f2
+- Dates: 2026-09-23
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-23-a005d7f2/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-23-a005d7f2/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (309 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separar estado de generación, liquidación y pertenencia a publicaciones (ready-for-implementation) — src/strategy-review/daily.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [high] Explicar el embudo de selección por mercado y portfolio (ready-for-implementation) — src/daily/e2e.ts, src/strategy-review/daily.ts, src/daily/e2e.test.ts
+- [high] Medir deuda de validación únicamente sobre registros elegibles para liquidación (proposed) — src/strategy-review/daily.ts, src/validation/service.ts, src/validation/service.test.ts
+- [medium] Desglosar abstenciones y soporte efectivo por mercado (ready-for-implementation) — src/strategy-review/daily.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [medium] Condicionar cambios de umbrales y pesos a evidencia liquidada suficiente (needs-more-data) — src/strategy-review/daily.ts, src/scoring/edge-gate.ts, src/parlay/rules.ts, src/parlay/ranker.ts, src/filters/low-odds-selector.ts
+
+## 2026-09-25 · strategy-2026-09-24
+
+- Run: strategy-review-2026-09-24-5cf6eca1
+- Dates: 2026-09-24
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-24-5cf6eca1/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-24-5cf6eca1/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (240 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separar cohortes, promoción y liquidación en el review (ready-for-implementation) — src/strategy-review/daily.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [high] Comprobar antigüedad del feedback independientemente de su cobertura (ready-for-implementation) — src/daily/e2e.ts, src/daily/e2e.test.ts
+- [high] Exportar motivos estructurados de exclusión por etapa y mercado (ready-for-implementation) — src/prediction/service.ts, src/daily/e2e.ts, src/strategy-review/daily.ts, src/daily/e2e.test.ts
+- [medium] Condicionar ajustes de estrategia a resultados y atribución suficientes (needs-more-data) — src/strategy-review/daily.ts, src/parlay/rules.ts, src/parlay/ranker.ts, src/parlay/eligibility.ts, src/scoring/edge-gate.ts
+
+## 2026-09-26 · strategy-2026-09-25
+
+- Run: strategy-review-2026-09-25-0237368f
+- Dates: 2026-09-25
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-25-0237368f/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-25-0237368f/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (697 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separate research coverage from published validation coverage (ready-for-implementation) — src/strategy-review/daily.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [high] Include a reconciled rejection funnel in strategy-review input (ready-for-implementation) — src/daily/e2e.ts, src/strategy-review/daily.ts, src/daily/e2e.test.ts, scripts/tests/strategy-review-runtime.test.mjs
+- [high] Expose confidence provenance and promotion status separately from settlement (proposed) — src/prediction/service.ts, src/strategy-review/daily.ts, skills/score-prediction-v2/prompt.md
+- [medium] Measure usable market coverage instead of candidate volume (proposed) — src/strategy-review/daily.ts, src/prediction/service.ts, src/parlay/eligibility.ts, skills/research-fixture-v2/prompt.md
+- [medium] Require settled cohort evidence before tuning thresholds or portfolio weights (needs-more-data) — src/strategy-review/daily.ts, src/scoring/edge-gate.ts, src/parlay/rules.ts, src/parlay/ranker.ts
+
+## 2026-09-27 · strategy-2026-09-26
+
+- Run: strategy-review-2026-09-26-b8f5d557
+- Dates: 2026-09-26
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-26-b8f5d557/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-26-b8f5d557/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 2-3 hit 40.0% (1019 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separate published performance from candidate diagnostics (ready-for-implementation) — src/strategy-review/daily.ts, src/daily/e2e.ts
+- [high] Gate performance conclusions on mature, independent evidence (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Expose the complete rejection funnel without lowering gates (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/parlay/portfolio-risk.ts, src/strategy-review/daily.ts
+- [high] Make validation feedback aware of fixture readiness and scope (proposed) — src/strategy-review/daily.ts, scripts/lib/validation-workflow.mjs, scripts/lib/validation-runtime.mjs
+- [medium] Measure market-specific evidence gaps before changing coverage (proposed) — src/prediction/service.ts, src/parlay/eligibility.ts, src/strategy-review/daily.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+
+## 2026-09-28 · strategy-2026-09-27
+
+- Run: strategy-review-2026-09-27-67a1c4d0
+- Dates: 2026-09-27
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-27-67a1c4d0/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-27-67a1c4d0/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 13-34 hit 27.7% (731 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Impedir que snapshots antiguos o mínimos certifiquen frescura (ready-for-implementation) — src/daily/e2e.ts
+- [high] Separar intentos, selecciones únicas y recomendaciones publicadas (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Condicionar las conclusiones estratégicas a madurez y muestra efectiva (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Registrar el embudo de elegibilidad y sus bloqueos por perfil (ready-for-implementation) — src/daily/e2e.ts, src/parlay/service.ts, src/strategy-review/daily.ts
+- [high] Clasificar la deuda de validación antes de pedir reprocesamientos (proposed) — src/validation/service.ts, src/strategy-review/daily.ts
+- [medium] Evaluar ajustes de mercados y perfiles mediante replay maduro (needs-more-data) — src/parlay/profile-specs.ts, src/parlay/eligibility.ts, src/parlay/ranker.ts, skills/score-prediction-v2/prompt.md
+
+## 2026-09-29 · strategy-2026-09-28
+
+- Run: strategy-review-2026-09-28-3b3055c8
+- Dates: 2026-09-28
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-28-3b3055c8/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-28-3b3055c8/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (282 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separar estado de promoción, publicación y resultado (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Condicionar el feedback de rendimiento a resultados y alcance verificables (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Registrar pérdidas de candidatos por etapa y perfil (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [medium] Medir cobertura utilizable por mercado (ready-for-implementation) — src/strategy-review/daily.ts
+- [medium] Posponer ajustes de umbrales y ranking hasta disponer de resultados (needs-more-data) — src/scoring/edge-gate.ts, src/parlay/rules.ts, src/parlay/ranker.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts
+
+## 2026-09-30 · strategy-2026-09-29
+
+- Run: strategy-review-2026-09-29-15fea31d
+- Dates: 2026-09-29
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-29-15fea31d/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-29-15fea31d/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (302 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separar elegibilidad de scoring y deuda real de validación (ready-for-implementation) — src/strategy-review/daily.ts, src/metrics/daily.ts, src/validation/service.ts
+- [high] Reconciliar universos y exponer el embudo de rechazo (ready-for-implementation) — src/daily/e2e.ts, src/strategy-review/daily.ts, src/prediction/service.ts, src/daily/recommendation-policy.ts
+- [high] Medir cobertura utilizable por mercado y fixture requerido (proposed) — src/prediction/service.ts, src/daily/e2e.ts, skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md
+- [medium] Separar abstenciones y estimaciones en las métricas de confianza (ready-for-implementation) — src/strategy-review/daily.ts, src/metrics/daily.ts, src/prediction/service.ts
+- [medium] Exigir evidencia resuelta antes de modificar thresholds o perfiles (needs-more-data) — src/strategy-review/daily.ts, src/daily/published-feedback.ts, src/scoring/edge-gate.ts, src/parlay/ranker.ts, src/parlay/rules.ts
+
+## 2026-10-01 · strategy-2026-09-30
+
+- Run: strategy-review-2026-09-30-f61c2c35
+- Dates: 2026-09-30
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-30-f61c2c35/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-09-30-f61c2c35/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: blocked
+- Predictions: 0-1 hit 0.0% (627 total)
+- Parlays: 0-0 hit n/a (3 total)
+- Diagnostics: recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-10-02 · strategy-2026-10-01
+
+- Run: strategy-review-2026-10-01-d03c786b
+- Dates: 2026-10-01
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-01-d03c786b/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-01-d03c786b/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: blocked
+- Predictions: 0-0 hit n/a (246 total)
+- Parlays: 0-0 hit n/a (1 total)
+- Diagnostics: recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-10-03 · strategy-2026-10-02
+
+- Run: strategy-review-2026-10-02-8a75071d
+- Dates: 2026-10-02
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-02-8a75071d/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-02-8a75071d/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: blocked
+- Predictions: 0-0 hit n/a (175 total)
+- Parlays: 0-0 hit n/a (2 total)
+- Diagnostics: recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- None generated.
+
+## 2026-10-04 · strategy-2026-10-03
+
+- Run: strategy-review-2026-10-03-1378a441
+- Dates: 2026-10-03
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-03-1378a441/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-03-1378a441/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 0-0 hit n/a (370 total)
+- Parlays: 0-0 hit n/a (1 total)
+- Diagnostics: recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separar candidatos analíticos y publicaciones en la revisión histórica (ready-for-implementation) — src/strategy-review/daily.ts, src/daily/published-feedback.ts
+- [high] Agregar un estado explícito de suficiencia para feedback de desempeño (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Exponer motivos de exclusión por etapa, mercado y perfil (ready-for-implementation) — src/prediction/service.ts, src/daily/e2e.ts, src/strategy-review/daily.ts
+- [medium] Auditar cobertura por fixture y mercado separando candidatos sin estimación (proposed) — src/daily/required-leagues.ts, src/daily/e2e.ts, src/strategy-review/daily.ts, skills/score-prediction-v2/prompt.md
+- [medium] Condicionar cambios de umbrales y perfiles a evaluación temporal con resultados (needs-more-data) — src/prediction/service.ts, src/scoring/edge-gate.ts, src/parlay/rules.ts, src/parlay/ranker.ts, src/parlay/eligibility.ts, src/filters/low-odds-selector.ts
+
+## 2026-10-05 · strategy-2026-10-04
+
+- Run: strategy-review-2026-10-04-24d09ff8
+- Dates: 2026-10-04
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-04-24d09ff8/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-04-24d09ff8/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 1-1 hit 50.0% (244 total)
+- Parlays: 0-0 hit n/a (2 total)
+- Diagnostics: recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Require exact recommendation-artifact date attribution (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Separate candidate research from published-performance cohorts (ready-for-implementation) — src/strategy-review/daily.ts, src/recommendations/artifact.ts
+- [high] Gate strategy feedback on settlement maturity (proposed) — src/strategy-review/daily.ts, src/validation/service.ts
+- [medium] Expose rejection reasons by market and portfolio stage (ready-for-implementation) — src/strategy-review/daily.ts, src/daily/e2e.ts
+- [medium] Make portfolio attribution explicit without inventing legacy profiles (proposed) — src/parlay/service.ts, src/strategy-review/daily.ts
+- [medium] Defer threshold and ranking changes until evaluable history exists (needs-more-data) — src/scoring/edge-gate.ts, src/parlay/ranker.ts, src/parlay/rules.ts, src/daily/recommendation-policy.ts
+
+## 2026-10-06 · Ampliación de cobertura solicitada por el usuario
+
+- Estado: implementación verificada, E2E real completado y revisión confirmada en Discord el 06/10/2026
+- Base: `.artifacts/gana-v9/recovery-2026-10-06/prediction-volume-analysis.json`
+- Descubrimiento adicional en `src/runtime/coverage-discovery.ts`: conserva ligas y low-odds; selecciona hasta 12 partidos adicionales (`GANA_COVERAGE_DISCOVERY_MAX_FIXTURES`, 0 desactiva), con al menos dos casas distintas, 1X2 completo, cuotas observadas hace ≤60 min, margen entre 0 y 15%, kickoff futuro e identificadores para investigar historial. Es elegibilidad para investigación, no aprobación predictiva
+- Córners en `src/evidence/corner-history.ts`: recupera hasta diez FT anteriores por equipo, sin prórroga ni target/futuro, conserva fuente/snapshot, competición/sede/fecha y faltantes. Cache de 24 h sólo para registros completos. El modelo recibe los registros y conserva sus propios gates
+- `pnpm gana refresh --source-run-id RUN_ID --date YYYY-MM-DD --dry-run` planifica fallos operativos recuperables y el cruce a la ventana de 120 min previa al kickoff. Sin `--dry-run`, refresca fixture/cuotas/research/scoring, guarda revisión independiente y evita repetir el mismo trigger con los mismos precios. No reintenta rechazos de política ni convierte abstenciones en fallos técnicos. No envía automáticamente
+- `scripts/gana-publish-revision.mjs` publica una revisión explícita de un Daily confirmado, conserva el padre y exige los mismos checks de DB, fixture, fuente y payload del publicador canónico. El padre y cualquier otra publicación deben estar confirmados; los intentos inciertos requieren conciliación
+- Recibos en `cron/revisions/BATCH.lock`; validación con `--revision-batch-id BATCH`, hash de artifact y manifiesto de fuentes, mutex, scope de métricas y payload independientes. El dispatcher incorpora una cohorte de revisión pendiente por checkpoint posterior a la fecha del partido
+- No se bajan thresholds, no se crean probabilidades por cuotas, no se usa un número de combinadas como sustituto de selecciones distintas. Las alternativas conservadoras que ya permite el scorer mantienen evidencia y precio por línea
+- Verificaciones: 84 pruebas iniciales de pipeline/evidencia; suite de 802 pruebas tras cobertura/reevaluación; 73 pruebas de publicación/validación; prueba de CLI `refresh --dry-run` real y tests de idempotencia/aislamiento. Resultado final del E2E y pruebas de cierre se registrarán al finalizar
+- Ampliación de reevaluación: el trigger incluye alineaciones, además de precios. Se consulta `/fixtures/lineups` sólo en ventana previa de 120 min; el contexto conserva los dos equipos exactos y once titulares distintos. Los nombres publicados sin ID permanecen identificados como identidad no resuelta. Prueba real Albania–San Marino: 22 nombres, seis IDs faltantes explícitos, sin inferir disponibilidad completa
+- La evidencia documental `modelEvidencePath` también integra el manifiesto de fuentes del payload. Una modificación posterior de esa evidencia invalida el proof de la revisión, aunque el JSON principal no cambie
+- El primer E2E ampliado (`daily-2026-10-07-coverage-v1`) investigó 22 fixtures frente a 10 del selector anterior. Se detuvo explícitamente al comprobar que agotó las 500 consultas del proveedor; conservó 19 bundles válidos. Tres investigaciones fallaron: dos por cuota y una por campos documentales largos
+- Corrección operativa: estadísticas históricas acotadas al 30% del presupuesto existente, muestra equilibrada entre equipos y cache compartido. Persistencia de fuentes limita columnas conservando el valor completo en metadata. No se aumenta la cuota ni se altera la evidencia
+- Recuperación explícita por `GANA_RESEARCH_REUSE_RUN_ID`: sólo research reciente, mismo modelo/prompt/fixture y fuera de ventana de alineaciones; proof SHA-256 por bundle. Las 19 investigaciones compatibles se conservan y el E2E `coverage-v2` vuelve a ejecutar cuotas y scoring
+- Verificación de cierre local: 815 tests pasaron; typecheck y `git diff --check` limpios. Pruebas de recuperación cubren antigüedad, identidad, errores de persistencia, mercados, modelo y proximidad al kickoff
+
+## 2026-10-06 · strategy-2026-10-05
+
+- Run: strategy-review-2026-10-05-0fc2669d
+- Dates: 2026-10-05
+- Artifact: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-05-0fc2669d/strategy-review.json
+- Report: /Users/luisalvarado/Documents/GitHub/gana-v9/.artifacts/gana-v9/runs/strategy-review-2026-10-05-0fc2669d/strategy-review.md
+- Model: gpt-6-astra
+- Reasoning: medium
+- Agent status: ok
+- Predictions: 13-12 hit 52.0% (95 total)
+- Parlays: 0-0 hit n/a (0 total)
+- Diagnostics: 1 reviewed date(s) had zero persisted parlays; recommendation artifacts contributed zero published recommendations
+
+### Proposed Modifications
+
+- [high] Separate published, eligible and research-only review cohorts (ready-for-implementation) — src/strategy-review/daily.ts, src/validation/service.ts
+- [high] Replace weakest-bucket labels with sample-aware performance diagnostics (ready-for-implementation) — src/strategy-review/daily.ts
+- [high] Carry gate attrition and empty-output causes into strategy review (ready-for-implementation) — src/daily/e2e.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- [medium] Distinguish ordinary lineup timing from material lineup uncertainty (proposed) — skills/research-fixture-v2/prompt.md, skills/score-prediction-v2/prompt.md, src/prediction/service.ts, src/parlay/eligibility.ts, src/daily/recommendation-policy.ts
+- [medium] Make corners coverage and settlement readiness explicit (ready-for-implementation) — src/strategy-review/daily.ts, src/prediction/gates.ts, src/parlay/eligibility.ts
+- [medium] Evaluate conservative profiles before changing market weights or thresholds (needs-more-data) — src/parlay/ranker.ts, src/parlay/rules.ts, src/daily/recommendation-policy.ts, src/strategy-review/daily.ts
+- E2E final completado: `daily-2026-10-07-coverage-v2`, provider run `2fe04a31-43c1-4685-b057-e266f0a5aee2`. Universo de 101 fixtures con cuotas; 22 investigados (10 originales + 12 nuevos). Research 22/22 válido: 19 reutilizados con proof y tres nuevos, estos últimos con tres bundles y 45 fuentes comprobados en DB
+- Scoring nuevo: 113 predicciones, 11 promotable en seis partidos distintos, 78 en revisión y 24 bloqueadas. Nueve de las 11 promotable provienen de la ampliación. El fixture `1638581` no tuvo scoring porque el refresh devolvió cero cuotas; quedó excluido, sin precios inventados
+- Entrega real: tres simples y una combinada de cuatro selecciones, siete predicciones/partidos únicos con trazabilidad documental completa. La combinada y dos simples conservan revisión del council; la simple de liga requerida conserva su estado promotable. No confundir las 11 aprobaciones de scoring con selecciones finales ni con aprobación del council
+- Discord confirmó el mensaje `1557109798112333828` en `1510040973218939022`; ledger confirmado 8/8 (siete predicciones y una combinada). Recibo `cron/revisions/daily-2026-10-07-coverage-v2.lock`. Hashes del artifact y lock del padre `daily-2026-10-07-full` permanecen iguales
+- Resolver de fuente publicada verificado; dry-run de validación usa exclusivamente la nueva revisión y ejecutó cero comandos, escrituras DB, API, envíos o locks. El dispatcher simulado del 08/10 a las 07:15 Guatemala incluye su validación. Los resultados deportivos futuros siguen pendientes; el comando de reevaluación previa permanece manual
+- Evidencia de cierre: `.artifacts/gana-v9/recovery-2026-10-06/final-e2e-audit.json`, `revision-discord-preview.json`, `revision-publish-result.json`, `revision-validation-preview.log` y `revision-next-day-dispatch-preview.json`. Suite 815/815, notificadores 46/46, typecheck y diff-check aprobados

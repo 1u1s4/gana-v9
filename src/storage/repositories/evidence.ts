@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   ClaimInput,
   ClaimRecord,
@@ -164,6 +165,7 @@ export function createResearchBundleRepository(
           const localSourceId = String(source.id);
           const sourceId = scopedResearchId(bundle.id, localSourceId);
           sourceIds.set(localSourceId, sourceId);
+          const storageFields = boundedSourceFields(source);
           await tx.sourceRecord.create({
             data: compactData({
               id: sourceId,
@@ -172,13 +174,14 @@ export function createResearchBundleRepository(
               fixtureId: input.bundle.fixtureId,
               providerSnapshotId: providerSnapshotId(source.snapshotId, source.sourceType ?? source.type),
               sourceType: source.sourceType ?? source.type,
-              url: redactText(source.url),
-              title: redactText(source.title),
-              externalId: redactText(source.externalId ?? source.snapshotId),
+              url: storageFields.url,
+              title: storageFields.title,
+              externalId: storageFields.externalId,
               hash: normalizeSourceHash(source.hash),
               capturedAt: coerceDate(source.capturedAt) ?? new Date(),
               metadata: redactJson(compactData({
                 ...(source.metadata ?? {}),
+                ...storageFields.originals,
                 artifactPath: source.artifactPath,
                 snapshotId: source.snapshotId,
               }) as JsonValue),
@@ -397,6 +400,17 @@ function firstEvidenceSourceId(evidenceIds: string[] | undefined, evidenceSource
     if (sourceId) return sourceId;
   }
   return undefined;
+}
+
+/** Preserve full redacted documentary fields in JSON when varchar storage is too small. */
+export function boundedSourceFields(source: { url?: string | null; title?: string | null; externalId?: string | null; snapshotId?: string | null }) {
+  const url = redactText(source.url), title = redactText(source.title), externalId = redactText(source.externalId ?? source.snapshotId);
+  const originals = { ...(url && url.length > 1000 ? { fullUrl: url } : {}),
+    ...(title && title.length > 500 ? { fullTitle: title } : {}),
+    ...(externalId && externalId.length > 240 ? { fullExternalId: externalId } : {}) };
+  return { url: url && url.length > 1000 ? undefined : url, title: title?.slice(0, 500),
+    externalId: externalId && externalId.length > 240 ? `sha256:${createHash('sha256').update(externalId).digest('hex')}` : externalId,
+    originals };
 }
 
 function scopedResearchId(bundleId: string, localId: string): string {

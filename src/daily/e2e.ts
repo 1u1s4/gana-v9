@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { buildDailyModelEvidence } from './model-evidence.js';
 import type { AgentConfig } from '../config.js';
 import { discoverFixtures, type FixtureDiscoveryResult } from '../filters/engine.js';
 import { lowOddsScanProviderConfig } from '../filters/low-odds.js';
@@ -71,6 +72,7 @@ export interface RunDailyE2EInput {
   providers?: DailyE2EProvider[];
   providerConcurrency?: number;
   models?: Partial<Record<DailyE2EProvider, string>>;
+  providerRunIds?: Partial<Record<DailyE2EProvider, string>>;
   web?: ResearchWebMode;
   validate?: PipelineValidationMode;
   markets?: MarketKey[];
@@ -314,6 +316,7 @@ export async function runDailyE2E(
     const providerRuntime = childRuntime(runtime, providerConfig);
     const result = await runner(providerConfig, {
       date: input.date,
+      runId: input.providerRunIds?.[provider],
       web: input.web,
       validate: input.validate,
       markets: marketScope,
@@ -765,7 +768,11 @@ export async function runDailyE2E(
   const providerConsensusPath = writeJsonArtifact(dailyBatchId, 'daily-provider-consensus.json', providerConsensus);
   const councilPath = writeJsonArtifact(dailyBatchId, 'recommendation-council.json', council);
   const summaryPath = writeJsonArtifact(dailyBatchId, 'daily-e2e-summary.json', summary);
+  const modelEvidencePath = writeJsonArtifact(dailyBatchId, 'daily-model-evidence.json', jsonValue(
+    buildDailyModelEvidence(effectiveConfig.artifactRoot, input.date, parlayAnalysisRunIds),
+  ));
   const recommendationsPath = writeJsonArtifact(dailyBatchId, 'daily-parlay-recommendations.json', jsonValue({
+    modelEvidencePath,
     dailyBatchId,
     presentation: 'concise-v1',
     leagueDiscovery: input.leagueDiscovery ?? null,

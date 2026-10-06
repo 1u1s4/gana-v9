@@ -8,6 +8,7 @@ import {
   buildDiscordPayload,
   buildGatewayMessage,
   buildValidationMirrorPayload,
+  buildValidationMirrorPayloads,
   buildValidationMirrorMessage,
   findLatestMetricsArtifact,
   findLatestRecommendationArtifact,
@@ -18,6 +19,30 @@ import {
 } from '../scripts/notify-discord-daily-stats.mjs';
 
 describe('discord daily stats notifier', () => {
+  it('paginates the entire modern delivered cohort instead of silently truncating validation at eight', () => {
+    const recommendations = Array.from({ length: 25 }, (_, i) => ({ kind: 'atomic-prediction',
+      predictionId: `prediction-${i}`, legs: [{ fixture: `Selection ${i}`, market: 'h2h', selection: 'home', odds: 2 }],
+    }));
+    const payloads = buildValidationMirrorPayloads({ presentation: 'concise-v1', recommendations });
+    assert.equal(payloads.reduce((n, payload) => n + payload.embeds.length, 0), 26);
+    assert.ok(payloads.length >= 3);
+    assert.match(JSON.stringify(payloads), /Selection 24/);
+  });
+  it('mirrors only delivered review candidates and preserves their review label', () => {
+    const payload = buildValidationMirrorPayload({
+      kind: 'daily-review-candidates', status: 'published', date: '2026-10-01',
+      displayedPredictionIds: ['shown'], discord: { messageIds: ['sent'] },
+      candidates: [
+        { predictionId: 'shown', status: 'review-required', fixture: 'Local vs Visita', market: 'h2h', selection: 'home', odds: 2, confidence: 0.6 },
+        { predictionId: 'omitted', status: 'review-required', fixture: 'Invisible vs Omitido', market: 'h2h', selection: 'away', odds: 2 },
+      ],
+    }, { validationArtifact: { validations: [{ predictionId: 'shown', status: 'won' }] } });
+    const text = JSON.stringify(payload);
+    assert.match(text, /candidatas en revisión/);
+    assert.match(text, /Local vs Visita/);
+    assert.doesNotMatch(text, /Invisible/);
+    assert.match(text, /No son picks aprobados/);
+  });
   it('builds a native Discord embed payload from daily metrics without mentions or execution copy', () => {
     const payload = buildDiscordPayload(sampleMetricsArtifact(), {
       date: '2026-05-14',

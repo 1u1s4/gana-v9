@@ -622,7 +622,7 @@ describe('runFixtureScoring', () => {
     assert.match(persisted[0].warnings.join('\n'), /insufficient evidence/);
   });
 
-  it('retries scoring once with a stricter prompt when the agent returns prose instead of JSON', async () => {
+  it('recovers when scoring returns prose instead of JSON twice', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     let attempts = 0;
@@ -635,7 +635,7 @@ describe('runFixtureScoring', () => {
       agentRunner: async (_config, input) => {
         attempts += 1;
         retryPrompt = String(input);
-        if (attempts === 1) {
+        if (attempts < 3) {
           return { text: 'Estoy verificando el partido antes de responder.', usage: {}, output: '' };
         }
         return {
@@ -662,7 +662,7 @@ describe('runFixtureScoring', () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(attempts, 2);
+    assert.equal(attempts, 3);
     assert.match(retryPrompt, /minimal-scoring-retry/);
   });
 
@@ -1004,7 +1004,9 @@ describe('runFixtureScoring', () => {
       now: () => now,
       repositories: repositories(),
       writeArtifact: () => '/tmp/predictions.json',
-      agentRunner: async () => {
+      agentRunner: async (attemptConfig) => {
+        assert.equal(attemptConfig.codexThreadId, undefined);
+        attemptConfig.codexThreadId = 'failed-attempt-thread';
         attempts += 1;
         return {
           text: JSON.stringify({
@@ -1033,6 +1035,7 @@ describe('runFixtureScoring', () => {
     });
 
     assert.equal(attempts, 2);
+    assert.equal(cfg.codexThreadId, undefined);
     assert.equal(result.ok, true);
     assert.equal(result.predictions.length, 1);
     assert.equal(persisted[0].oddsQuoteId, 'odds-quote-1');
@@ -1238,7 +1241,7 @@ describe('runFixtureScoring', () => {
     assert.match(persisted[0].warnings.join('\n'), /market-specific evidence missing for h2h:home/);
   });
 
-  it('keeps unsupported markets and declared fixture fallbacks in review while a supported market remains promotable', async () => {
+  it('keeps unsupported markets and declared fixture fallbacks in review while an explicitly approved market survives global review', async () => {
     const scenarios = [
       { supportLevel: 'unsupported', conflictStatus: 'none', marketKey: 'btts', rationale: 'Both sides can score.' },
       { supportLevel: 'weak', conflictStatus: 'none', marketKey: 'btts', rationale: 'Both sides can score.' },
@@ -1258,6 +1261,13 @@ describe('runFixtureScoring', () => {
       const result = await runFixtureScoring(cfg, { fixtureId: '1001', markets: ['h2h', 'btts'], web: 'off' }, createRuntimeContext(cfg, 'market-support.jsonl'), {
         now: () => now,
         repositories: repositories({
+          researchBundles: { list: async () => [{ ...researchBundle, status: 'review-required', gateResult: {
+            verdict: 'review-required', reasons: ['BTTS requires review'], warnings: [], sharedBlockers: [],
+            markets: [
+              { market: 'h2h', verdict: 'promotable', reasons: ['Supported home result'] },
+              { market: 'btts', verdict: 'review-required', reasons: ['Unsupported or conflicting evidence'] },
+            ],
+          } }] },
           oddsQuotes: { listLatest: async () => [oddsQuote, bttsQuote] },
           claims: { list: async () => [...claims, { ...claims[0], ...scenario, id: 'claim-btts', selectionKey: 'yes' }] },
           evidenceItems: { list: async () => evidenceItems.map((item) => ({ ...item, metadata: { market: 'btts' } })) },

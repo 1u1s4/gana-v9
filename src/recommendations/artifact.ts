@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { normalizeUuid } from '../domain/ids.js';
+import { deliveredReviewRecommendations } from '../../scripts/lib/review-delivery.mjs';
 
 export interface RecommendationArtifactTargets {
   predictionIds: string[];
@@ -35,7 +36,14 @@ export function readRecommendationArtifactTargets(path: string): RecommendationA
 
 export function recommendationArtifactTargets(artifact: unknown, sourcePath?: string): RecommendationArtifactTargets {
   const payload = objectRecord(artifact);
-  const recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
+  const reviewRecommendations = deliveredReviewRecommendations(payload);
+  const recommendations = reviewRecommendations ?? (Array.isArray(payload.recommendations) ? payload.recommendations : []);
+  if (reviewRecommendations) {
+    const predictionIds = reviewRecommendations.map((item) => normalizeUuid(item.predictionId));
+    if (predictionIds.some((id) => !id)) throw new Error('Delivered review candidates require persisted prediction UUIDs');
+    return { predictionIds: predictionIds as string[], parlayIds: [], artifactSelections: [],
+      recommendationCount: reviewRecommendations.length, ...(sourcePath ? { sourcePath } : {}) };
+  }
   const requiredLeague = objectRecord(payload.requiredLeagueRecommendations);
   const concise = payload.presentation === 'concise-v1';
   const generalPredictions = concise ? [] : [

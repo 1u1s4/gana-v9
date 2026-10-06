@@ -239,7 +239,8 @@ export function isRealWebSourceRecord(source: SourceRecordRecord): boolean {
   if (source.sourceType !== 'web-search') return false;
   const metadata = objectMetadata(source.metadata);
   if (metadata.synthesized === true || metadata.repaired === true) return false;
-  return isTraceableWebLocator(source.url) || isTraceableWebLocator(source.externalId);
+  return isTraceableWebLocator(source.url) || isTraceableWebLocator(source.externalId)
+    || isTraceableWebLocator(metadata.fullUrl) || isTraceableWebLocator(metadata.fullExternalId);
 }
 
 export function isTraceableWebLocator(value: unknown): boolean {

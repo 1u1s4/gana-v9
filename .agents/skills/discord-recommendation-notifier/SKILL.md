@@ -21,6 +21,8 @@ This skill lives under `.agents/skills` for Hermes. Do not create or modify harn
 - Optional max selections: `--max N` defaults to 25. Native Discord delivery automatically splits more than 8 selections into multiple embed messages unless `--single-message` is passed, which packs compact selections into one native Discord message.
 - Validation stats artifact: `daily-metrics.json`, optionally paired with `validations.json`
 - Validation recommendation mirror: matching `daily-parlay-recommendations.json`
+- For a terminal `review-delivered` Daily, validation uses its exact published `daily-review-candidates.json` and only `displayedPredictionIds`. Label that cohort as candidatas en revisión in the mirror; never mix it with approved picks or include omitted candidates.
+- Modern `concise-v1` and delivered-review validation summaries/mirrors cover the entire delivered cohort and paginate it. The legacy eight-selection display limit must not truncate the cohort or change its denominator.
 - Strategy review artifact: `strategy-review.json`, produced by `pnpm gana strategy-review`, for technical Harness change notifications.
 - Optional channel routing by flow: `GANA_DISCORD_RECOMMENDATIONS_TARGET`, `GANA_DISCORD_VALIDATION_TARGET`, `GANA_DISCORD_STRATEGY_TARGET`, and `GANA_DISCORD_ALERTS_TARGET`. Each falls back to `--gateway-target`, then `GANA_DISCORD_TARGET`, then the default Gana channel.
 
@@ -139,3 +141,11 @@ node .agents/skills/discord-recommendation-notifier/tests/notify-discord-recomme
 node .agents/skills/discord-recommendation-notifier/tests/notify-discord-daily-stats.test.mjs
 node .agents/skills/discord-recommendation-notifier/tests/discord-targets.test.mjs
 ```
+
+## Explicit revisions
+
+A concise artifact with `revisionOfDailyBatchId` is labelled as an update by the
+canonical formatter. Publish it through `scripts/gana-publish-revision.mjs`, which
+requires the exact confirmed parent Daily and preserves its cohort. Revision
+validation uses its registered receipt, source-manifest proof and separate scope;
+never replace the parent lock or silently resend an uncertain revision.

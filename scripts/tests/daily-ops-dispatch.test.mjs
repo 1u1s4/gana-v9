@@ -91,6 +91,24 @@ test('validation catch-up scans 14 prior dates by default and keeps blocked Dail
   });
 });
 
+test('validation catch-up schedules an exact delivered review cohort without rerunning the Daily', () => {
+  withArtifacts((artifactRoot) => {
+    const date = '2026-07-14';
+    const dailyBatchId = `daily-${date}-full`;
+    const artifact = join(artifactRoot, 'runs', dailyBatchId, 'daily-review-candidates.json');
+    writeJson(join(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`), {
+      date, dailyBatchId, status: 'review-delivered', messageIds: ['message-1'],
+    });
+    writeJson(artifact, { kind: 'daily-review-candidates', status: 'published', date, dailyBatchId,
+      displayedPredictionIds: ['prediction-1'], candidates: [{ predictionId: 'prediction-1', status: 'review-required' }],
+      discord: { messageIds: ['message-1'] } });
+    const plan = planDailyOps({ now: AT.morning, artifactRoot, validationCatchupFrom: date });
+    assert.equal(plan.morning[1].run, true);
+    assert.equal(plan.morning[1].recommendationArtifact, artifact);
+    assert.equal(plan.validationBacklog[0].sourceReason, 'review-delivered-source-exact');
+  });
+});
+
 test('validation catch-up prioritizes yesterday, then the oldest runnable historical date', () => {
   withArtifacts((artifactRoot) => {
     const yesterdayArtifact = publishDailyForDate(artifactRoot, '2026-07-14');
@@ -466,11 +484,12 @@ test('Daily retry runs only from 18:15 and only after retryAfter', () => {
 
 test('known terminal Daily states never retry or call providers', () => {
   assert.equal(DAILY_TERMINAL_STATUSES.has('published'), true);
+  assert.equal(DAILY_TERMINAL_STATUSES.has('review-delivered'), true);
   assert.equal(DAILY_TERMINAL_STATUSES.has('publication-uncertain'), true);
   withArtifacts((artifactRoot) => {
     const paths = pathsFor(artifactRoot);
     writeJson(paths.strategyLock, { status: 'published' });
-    for (const status of ['published', 'review-required', 'blocked', 'publication-uncertain']) {
+    for (const status of ['published', 'review-delivered', 'review-required', 'blocked', 'publication-uncertain']) {
       writeJson(paths.dailyLock, { status, retryAfter: '2020-01-01T00:00:00.000Z' });
       const plan = planDailyOps({ now: AT.recovery2, artifactRoot });
       assert.equal(plan.heavy, null, status);

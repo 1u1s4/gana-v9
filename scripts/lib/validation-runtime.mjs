@@ -1,3 +1,4 @@
+import { readRecommendationSourceSnapshot } from './daily-recommendation-source-snapshot.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
@@ -12,6 +13,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { basename, dirname, relative, resolve } from 'node:path';
+import { deliveredReviewRecommendations } from './review-delivery.mjs';
 
 const MUTEX_INITIALIZATION_GRACE_MS = 30 * 1000;
 const MUTEX_STALE_MS = 20 * 60 * 60 * 1000;
@@ -44,9 +46,14 @@ export function sha256Json(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
-export function resolveCanonicalPublishedRecommendation({ artifactRoot, date }) {
+export function resolveCanonicalPublishedRecommendation({ artifactRoot, date, revisionBatchId }) {
   requireIsoDate(date, 'date');
-  const lockPath = resolve(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`);
+  if (revisionBatchId && (!/^[A-Za-z0-9_-]+$/.test(revisionBatchId) || !revisionBatchId.startsWith(`daily-${date}-`))) {
+    return { ok: false, reason: 'invalid-revision-batch-id' };
+  }
+  const lockPath = revisionBatchId
+    ? resolve(artifactRoot, 'cron', 'revisions', `${revisionBatchId}.lock`)
+    : resolve(artifactRoot, 'cron', 'locks', `daily-e2e-${date}.lock`);
   const dailyState = inspectJsonFile(lockPath);
   if (!dailyState.exists) {
     return { ok: false, reason: 'daily-lock-missing', lockPath };
@@ -59,7 +66,7 @@ export function resolveCanonicalPublishedRecommendation({ artifactRoot, date }) 
   if (dailyLock.date !== date) {
     return { ok: false, reason: 'daily-lock-date-mismatch', lockPath, dailyState, dailyLock };
   }
-  if (dailyLock.status !== 'published') {
+  if (!['published', 'review-delivered'].includes(dailyLock.status)) {
     return {
       ok: false,
       reason: `daily-not-published:${dailyLock.status ?? 'unknown'}`,
@@ -79,7 +86,9 @@ export function resolveCanonicalPublishedRecommendation({ artifactRoot, date }) 
   }
 
   const runsRoot = resolve(artifactRoot, 'runs');
-  const recommendationArtifact = resolve(runsRoot, dailyBatchId, 'daily-parlay-recommendations.json');
+  const reviewDelivery = dailyLock.status === 'review-delivered';
+  const recommendationArtifact = resolve(runsRoot, dailyBatchId, reviewDelivery
+    ? 'daily-review-candidates.json' : 'daily-parlay-recommendations.json');
   const relativePath = relative(runsRoot, recommendationArtifact);
   if (relativePath.startsWith('..') || relativePath === '') {
     return { ok: false, reason: 'daily-batch-path-escapes-runs-root', lockPath, dailyLock };
@@ -106,6 +115,17 @@ export function resolveCanonicalPublishedRecommendation({ artifactRoot, date }) 
       recommendationArtifact,
     };
   }
+  if (revisionBatchId && (dailyBatchId !== revisionBatchId || artifact.dailyBatchId !== revisionBatchId
+    || dailyLock.artifactSha256 !== sha256Json(artifact) || !dailyLock.messageIds?.length
+    || dailyLock.parentBatchId !== artifact.revisionOfDailyBatchId)) {
+    return { ok: false, reason: 'published-revision-proof-mismatch', lockPath, dailyLock };
+  }
+  if (revisionBatchId) {
+    try {
+      const snapshot = readRecommendationSourceSnapshot(recommendationArtifact, { strict: true });
+      if (snapshot.sourceManifestSha256 !== dailyLock.sourceManifestSha256) throw new Error('Revision source manifest changed');
+    } catch (error) { return { ok: false, reason: 'published-revision-source-mismatch', lockPath, dailyLock }; }
+  }
   if (artifact.dailyBatchId && artifact.dailyBatchId !== dailyBatchId) {
     return {
       ok: false,
@@ -115,6 +135,24 @@ export function resolveCanonicalPublishedRecommendation({ artifactRoot, date }) 
       dailyBatchId,
       recommendationArtifact,
     };
+  }
+
+  if (reviewDelivery) {
+    try {
+      if (dailyLock.reviewArtifactSha256 && dailyLock.reviewArtifactSha256 !== sha256Json(artifact)) {
+        throw new Error('Review delivery artifact changed after publication');
+      }
+      if (artifact.dailyBatchId !== dailyBatchId || !deliveredReviewRecommendations(artifact)) {
+        throw new Error('Review delivery identity mismatch');
+      }
+      const ids = dailyLock.messageIds;
+      if (!Array.isArray(ids) || !ids.length || JSON.stringify(ids) !== JSON.stringify(artifact.discord.messageIds)) {
+        throw new Error('Review delivery message IDs do not match the Daily lock');
+      }
+    } catch (error) {
+      return { ok: false, reason: 'canonical-review-delivery-invalid', lockPath, dailyLock,
+        dailyBatchId, recommendationArtifact, error: error.message };
+    }
   }
 
   return {

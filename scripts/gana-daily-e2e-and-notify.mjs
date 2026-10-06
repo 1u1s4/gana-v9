@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import 'dotenv/config';
+import { sha256Json } from './lib/validation-runtime.mjs';
 import { existsSync, mkdirSync, openSync, closeSync, readdirSync, statSync, writeSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -16,6 +17,7 @@ import {
 } from './lib/daily-e2e-wrapper-state.mjs';
 import { resolveDailyRuntime } from './lib/daily-e2e-runtime.mjs';
 import { discordMessageIds as publicationDiscordMessageIds, publishDailyRecommendations } from './lib/daily-e2e-publication.mjs';
+import { publishDailyReviewCandidates } from './lib/daily-review-candidates.mjs';
 
 const REPO_ROOT = resolve(new URL('..', import.meta.url).pathname);
 const TIMEZONE = 'America/Guatemala';
@@ -134,7 +136,17 @@ if (!Number.isInteger(providerConcurrency) || providerConcurrency < 1) {
 }
 let acquiredRunLock = false;
 const existingRunLock = !args.force && existsSync(lockPath) ? readJsonFile(lockPath) : undefined;
-if (!args.force) {
+if (args.force) {
+  writeLock(lockPath, {
+    date,
+    dailyBatchId,
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    ownerPid: process.pid,
+    forced: true,
+  });
+  acquiredRunLock = true;
+} else {
   acquiredRunLock = acquireOnce(lockPath, 20 * 60 * 60 * 1000, { date, dailyBatchId, status: 'running', startedAt: new Date().toISOString() });
 }
 if (!args.force && !acquiredRunLock) {
@@ -190,6 +202,7 @@ const command = [
   '--daily-batch-id', dailyBatchId,
 ];
 if (codexModel) command.push('--codex-model', codexModel);
+if (args.providerRunId) command.push('--provider-run-id', args.providerRunId);
 
 const env = {
   ...process.env,
@@ -365,7 +378,7 @@ try {
     handled = true;
   }
   if (artifactState.ok && selectionCount === 0) {
-    writeLogLine(logFd, `recommendations artifact contains zero publishable selections; sending operational alert instead of empty Discord recommendations: ${recommendationsPath}`);
+    writeLogLine(logFd, `recommendations artifact contains zero publishable selections; evaluating review candidates for a clearly labeled Discord delivery: ${recommendationsPath}`);
   }
   if (artifactState.ok && selectionCount > 0 && !ledgerAlignment.ok) {
     writeLogLine(logFd, `recommendations artifact failed publication ledger alignment: ${ledgerAlignment.reason}`);
@@ -378,8 +391,107 @@ try {
   }
 
   if (!handled) {
+    const reviewPublication = artifactState.ok && selectionCount === 0
+      ? await publishDailyReviewCandidates({
+        recommendationArtifact: artifactState.artifact,
+        recommendationsPath,
+        date,
+        dailyBatchId,
+        discordTarget: discordTargets.recommendations,
+        maxSelections: args.max ?? DEFAULT_DISCORD_MAX_SELECTIONS,
+      })
+      : { status: 'blocked', reason: 'review-candidate-publication-not-applicable' };
+    if (reviewPublication.status === 'published' || reviewPublication.status === 'already-published') {
+      sentRecommendations = true;
+      const messageIds = reviewPublication.status === 'published'
+        ? reviewPublication.messageIds ?? []
+        : reviewPublication.artifact?.discord?.messageIds ?? [];
+      const reviewCounts = reviewPublication.artifact?.counts ?? {};
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: 'review-delivered',
+        reviewArtifactSha256: sha256Json(reviewPublication.artifact),
+        selectionCount: 0,
+        reviewCandidateCount: reviewCounts.candidates ?? 0,
+        displayedReviewCandidateCount: reviewCounts.displayed ?? 0,
+        messageId: messageIds[0] ?? null,
+        messageIds,
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      writeOutcome(buildCronOutcome({
+        flow: 'daily-e2e',
+        status: 'review-required',
+        date,
+        timezone: TIMEZONE,
+        batchId: dailyBatchId,
+        startedAt,
+        completedAt,
+        command,
+        exitStatus: result.status,
+        signal: result.signal,
+        reason: reviewPublication.reason,
+        counts: { ...publishableCounts, reviewCandidates: reviewCounts.candidates ?? 0, displayedReviewCandidates: reviewCounts.displayed ?? 0 },
+        notifications: { reviewCandidates: messageIds, reviewCandidateTarget: discordTargets.recommendations },
+        artifacts: [
+          { label: 'review-candidates', path: reviewPublication.artifactPath },
+          { label: 'recommendations', path: recommendationsPath },
+          { label: 'log', path: logPath },
+          { label: 'outcome', path: outcomePath },
+        ],
+      }));
+      emitCronRichSummary({
+        title: 'Gana v9 · Posibles predicciones entregadas',
+        status: 'warning',
+        date,
+        timezone: TIMEZONE,
+        bullets: [
+          `Batch: ${dailyBatchId}`,
+          `Candidatas en revisión: ${reviewCounts.candidates ?? 0}`,
+          `Mostradas en Discord: ${reviewCounts.displayed ?? 0}`,
+          messageIds.length ? `Discord recomendaciones: ${messageIds.join(', ')}` : 'Discord: entrega ya registrada',
+          `Artifact: ${compactPath(reviewPublication.artifactPath)}`,
+        ],
+        footer: '🟡 No son picks aprobados · revisión manual requerida · sin ejecución monetaria',
+      });
+      process.exitCode = 0;
+      handled = true;
+    } else if (reviewPublication.status === 'publication-uncertain') {
+      sentRecommendations = true;
+      writeLogLine(logFd, `review-candidate publication uncertain: ${reviewPublication.reason}`);
+      const messageIds = reviewPublication.messageIds ?? [];
+      writeLock(lockPath, {
+        date,
+        dailyBatchId,
+        status: 'publication-uncertain',
+        reason: reviewPublication.reason,
+        messageIds,
+        updatedAt: new Date().toISOString(),
+      });
+      writeOutcome(buildCronOutcome({
+        flow: 'daily-e2e',
+        status: 'review-required',
+        date,
+        timezone: TIMEZONE,
+        batchId: dailyBatchId,
+        startedAt,
+        completedAt,
+        command,
+        exitStatus: result.status,
+        signal: result.signal,
+        reason: reviewPublication.reason,
+        notifications: { reviewCandidates: messageIds, reviewCandidateTarget: discordTargets.recommendations },
+        artifacts: [reviewPublication.artifactPath, recommendationsPath, logPath, outcomePath],
+      }));
+      process.exitCode = 1;
+      handled = true;
+    }
+  }
+
+  if (!handled) {
     const latest = artifactState.ok ? recommendationsPath : findLatestRecommendations(date);
-    await sendStatus(discordTargets.alerts, {
+    const alertDelivery = await sendStatus(discordTargets.alerts, {
       title: '⚠️ Gana v9 · Daily E2E requiere revisión',
       description: [
         `📅 ${date} · ${TIMEZONE}`,
@@ -391,6 +503,7 @@ try {
       ].filter(Boolean).join('\n'),
       color: 0xf2994a,
     });
+    const alertMessageIds = discordResultMessageIds(alertDelivery);
     emitCronRichSummary({
       title: 'Gana v9 · Daily E2E requiere revisión',
       status: 'warning',
@@ -402,7 +515,9 @@ try {
         `Artifact gate: ${artifactState.reason}`,
         artifactState.ok && selectionCount > 0 ? `Ledger gate: ${ledgerAlignment.ok ? dbLedger.reason : ledgerAlignment.reason}` : undefined,
         `Publicables: ${selectionCount}`,
-        `Discord alertas: ${discordTargets.alerts}`,
+        alertMessageIds.length
+          ? `Discord alertas: ${alertMessageIds.join(', ')}`
+          : `Discord alertas: ${discordTargets.alerts}`,
         latest ? `Latest: ${compactPath(latest)}` : undefined,
         `Log: ${compactPath(logPath)}`,
         `Outcome: ${compactPath(outcomePath)}`,
@@ -425,7 +540,7 @@ try {
         : artifactState.reason,
       counts: publishableCounts,
       ledger: artifactState.ok && selectionCount > 0 ? (ledgerAlignment.ok ? dbLedger : ledgerAlignment) : undefined,
-      notifications: { alerts: discordTargets.alerts },
+      notifications: { alerts: alertMessageIds, alertTarget: discordTargets.alerts },
       artifacts: [
         ...(latest ? [{ label: 'latest', path: latest }] : []),
         { label: 'log', path: logPath },
@@ -660,6 +775,7 @@ function parseArgs(argv) {
     else if (arg === '--gateway-target') parsed.gatewayTarget = requireValue(argv, ++index, arg);
     else if (arg === '--providers') parsed.providers = requireValue(argv, ++index, arg);
     else if (arg === '--codex-model') parsed.codexModel = requireValue(argv, ++index, arg);
+    else if (arg === '--provider-run-id') parsed.providerRunId = requireValue(argv, ++index, arg);
     else if (arg === '--threshold') parsed.threshold = Number(requireValue(argv, ++index, arg));
     else if (arg === '--provider-concurrency') parsed.providerConcurrency = Number(requireValue(argv, ++index, arg));
     else if (arg === '--max-fixtures') parsed.maxFixtures = Number(requireValue(argv, ++index, arg));
@@ -738,6 +854,13 @@ function describeExistingRunLock(lock, retryAfter) {
       reason: 'already published',
       message: 'ya corrió y publicó recomendaciones',
       footer: '⏭️ Sin duplicar publicaciones; batch ya publicado.',
+    };
+  }
+  if (status === 'review-delivered') {
+    return {
+      reason: 'review candidates already delivered',
+      message: 'ya corrió y entregó posibles predicciones en revisión',
+      footer: '⏭️ Sin duplicar publicaciones; candidatas en revisión ya entregadas.',
     };
   }
   if (status === 'running') {
@@ -907,4 +1030,13 @@ async function sendStatus(target, embed) {
     content: '',
     embeds: [embed],
   });
+}
+
+function discordResultMessageIds(result) {
+  const values = [
+    result?.message_id,
+    result?.messageId,
+    result?.id,
+  ];
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim()))];
 }

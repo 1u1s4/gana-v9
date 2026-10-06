@@ -38,6 +38,7 @@ describe('runDailyE2E', () => {
       date: '2026-05-14',
       providers: ['codex'],
       providerConcurrency: 1,
+      providerRunIds: { codex: 'resume-codex-run' },
       maxFixtures: 12,
       threshold: 1.2,
       web: 'live',
@@ -138,6 +139,7 @@ describe('runDailyE2E', () => {
     assert.deepEqual(result.recommendations, { total: 1, parlays: 0, atomic: 1 });
     assert.deepEqual(pipelineCalls.map((call) => call.provider), ['codex']);
     assert.equal(pipelineCalls[0].model, 'gpt-5.5');
+    assert.equal(pipelineCalls[0].input.runId, 'resume-codex-run');
     assert.equal(pipelineCalls[0].input.metadata.dailyBatchId, 'daily-2026-05-14');
     assert.equal(pipelineCalls[0].input.metadata.dailyRole, 'codex');
     assert.equal(pipelineCalls[0].input.markets.length > 0, true);

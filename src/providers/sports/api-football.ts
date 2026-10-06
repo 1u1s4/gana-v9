@@ -44,6 +44,7 @@ import {
   type FixtureByIdQuery,
   type FixtureQuery,
   type FixtureStatistics,
+  type FixtureLineups,
   type FixtureStatisticsQuery,
   type FinalResult,
   type NormalizedFixture,
@@ -294,6 +295,18 @@ export class ApiFootballProvider implements SportsDataProvider {
       scoreHome: fixture.scoreHome as number,
       scoreAway: fixture.scoreAway as number,
       ...(response.providerSnapshotId && { providerSnapshotId: response.providerSnapshotId }),
+    };
+  }
+
+  async getFixtureLineups(input: FixtureStatisticsQuery): Promise<FixtureLineups> {
+    const response = await this.request('fixture_lineups', '/fixtures/lineups', { fixture: input.providerFixtureId });
+    const rows = extractApiFootballResponseArray(response.payload, 'fixture_lineups') as Array<{
+      team?: { id?: number }; formation?: string; startXI?: Array<{ player?: { id?: number; name?: string } }>;
+    }>;
+    return { providerFixtureId: input.providerFixtureId, capturedAt: response.capturedAt.toISOString(),
+      providerSnapshotId: response.providerSnapshotId,
+      teams: rows.map(row => ({ teamId: String(row.team?.id ?? ''), formation: row.formation,
+        starting: (row.startXI ?? []).map(item => ({ id: String(item.player?.id ?? ''), name: item.player?.name ?? '' })) })),
     };
   }
 

@@ -8,6 +8,18 @@ const PREDICTION_3 = '33333333-3333-4333-8333-333333333333';
 const PARLAY_1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 describe('recommendation artifact targets', () => {
+  it('validates only displayed review candidates and rejects incomplete delivery', () => {
+    const artifact = { kind: 'daily-review-candidates', status: 'published',
+      displayedPredictionIds: [PREDICTION_2], discord: { messageIds: ['message-1'] },
+      candidates: [PREDICTION_1, PREDICTION_2].map((predictionId) => ({ predictionId, status: 'review-required' })),
+    };
+    const targets = recommendationArtifactTargets(artifact);
+    assert.deepEqual(targets.predictionIds, [PREDICTION_2]);
+    assert.equal(targets.recommendationCount, 1);
+    assert.deepEqual(targets.parlayIds, []);
+    assert.throws(() => recommendationArtifactTargets({ ...artifact, status: 'publication-uncertain' }), /complete published cohort/);
+    assert.throws(() => recommendationArtifactTargets({ ...artifact, displayedPredictionIds: [PREDICTION_3] }), /missing, duplicate/);
+  });
   it('concise publication tracks only rendered selections, excluding blocked addenda and general context', () => {
     const targets = recommendationArtifactTargets({
       presentation: 'concise-v1', recommendations: [{ kind: 'atomic-prediction', predictionId: PREDICTION_1 }],

@@ -205,17 +205,19 @@ export function buildGatewayMessage(metricsArtifact, options = {}) {
 
 export function buildValidationMirrorPayload(recommendationArtifact, options = {}) {
   const max = parseMaxRecommendations(String(options.maxRecommendations ?? DEFAULT_MAX_RECOMMENDATIONS));
-  const recommendations = selectRecommendations(recommendationArtifact).slice(0, Math.min(max, DEFAULT_MAX_RECOMMENDATIONS));
+  const recommendations = validationRecommendations(recommendationArtifact, max);
   const validationIndex = buildValidationIndex(options.validationArtifact);
   const validatedRecommendations = recommendations.map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
   const counts = recommendationCounts(validatedRecommendations);
   const statusCounts = countRecommendationStatuses(validatedRecommendations);
   const date = options.date || recommendationArtifact?.date || 'fecha desconocida';
   const embeds = [{
-    title: '📊 Gana v9 · Validación de recomendaciones',
+    title: recommendationArtifact?.kind === 'daily-review-candidates'
+      ? '📊 Gana v9 · Validación de candidatas en revisión' : '📊 Gana v9 · Validación de recomendaciones',
     description: [
       options.testLabel ? `🧪 ${options.testLabel}` : undefined,
       `📅 ${date}`,
+      recommendationArtifact?.kind === 'daily-review-candidates' ? 'Cohorte entregada en revisión · No son picks aprobados' : undefined,
       `📦 ${counts.parlay} parlays · 📌 ${counts.atomic} simples`,
       `Resultado: ${formatRecommendationStatusSummary(statusCounts)}`,
       'Tracking analítico · Sin ejecución monetaria',
@@ -247,7 +249,7 @@ export function buildValidationMirrorPayloads(recommendationArtifact, options = 
 
 export function buildValidationMirrorMessage(recommendationArtifact, options = {}) {
   const max = parseMaxRecommendations(String(options.maxRecommendations ?? DEFAULT_MAX_RECOMMENDATIONS));
-  const recommendations = selectRecommendations(recommendationArtifact).slice(0, max);
+  const recommendations = validationRecommendations(recommendationArtifact, max);
   const validationIndex = buildValidationIndex(options.validationArtifact);
   const validatedRecommendations = recommendations.map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
   const counts = recommendationCounts(validatedRecommendations);
@@ -1021,8 +1023,7 @@ function recommendationMetricSnapshot(metricSnapshot, options = {}) {
   if (!artifact || typeof artifact !== 'object') return metricSnapshot;
   const validationIndex = buildValidationIndex(options.validationArtifact);
   const max = parseMaxRecommendations(String(options.maxRecommendations ?? DEFAULT_MAX_RECOMMENDATIONS));
-  const recommendations = selectRecommendations(artifact)
-    .slice(0, Math.min(max, DEFAULT_MAX_RECOMMENDATIONS))
+  const recommendations = validationRecommendations(artifact, max)
     .map((recommendation) => applyValidationOverlay(recommendation, validationIndex));
   const atomic = recommendations.filter((recommendation) => recommendationKind(recommendation) === 'atomic-prediction');
   const parlays = recommendations.filter((recommendation) => recommendationKind(recommendation) !== 'atomic-prediction');
@@ -1031,6 +1032,14 @@ function recommendationMetricSnapshot(metricSnapshot, options = {}) {
     predictionMetrics: summarizeRecommendationMetrics(atomic, true),
     parlayMetrics: summarizeRecommendationMetrics(parlays, false),
   };
+}
+
+function validationRecommendations(artifact, legacyLimit) {
+  const recommendations = selectRecommendations(artifact);
+  // Modern artifacts define the delivered cohort. The old eight-item display
+  // limit must not silently change either its denominator or its mirror.
+  return artifact?.kind === 'daily-review-candidates' || artifact?.presentation === 'concise-v1'
+    ? recommendations : recommendations.slice(0, Math.min(legacyLimit, DEFAULT_MAX_RECOMMENDATIONS));
 }
 
 function summarizeRecommendationMetrics(recommendations, includeEdge) {

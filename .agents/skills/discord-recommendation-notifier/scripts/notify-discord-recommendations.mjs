@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { readRecommendationSourceSnapshot } from '../../../../scripts/lib/daily-recommendation-source-snapshot.mjs';
+import { deliveredReviewRecommendations } from '../../../../scripts/lib/review-delivery.mjs';
 import { resolveDiscordTarget } from './discord-targets.mjs';
 
 const DEFAULT_ARTIFACT_ROOT = '.artifacts/gana-v9/runs';
@@ -232,7 +233,7 @@ function buildConciseDiscordPayloads(artifact, options) {
   const counts = recommendationCounts(recommendations);
   const embeds = [{
     title: '🏆 Gana v9 · Recomendaciones',
-    description: `${formatArtifactDate(artifact?.date)} · Horarios de Guatemala\n${recommendationCountLine(counts)}`,
+    description: `${formatArtifactDate(artifact?.date)} · Horarios de Guatemala\n${recommendationCountLine(counts)}${artifact?.revisionOfDailyBatchId ? '\nActualización con evidencia nueva · el envío anterior se conserva' : ''}`,
     color: 0x2f80ed,
     footer: { text: 'Análisis sin garantías · revisión manual · sin ejecución monetaria' },
   }];
@@ -999,6 +1000,8 @@ function collectRecommendationArtifacts(dir, matches) {
 }
 
 export function selectRecommendations(artifact) {
+  const reviews = deliveredReviewRecommendations(artifact);
+  if (reviews) return reviews;
   if (Array.isArray(artifact?.recommendations)) return artifact.recommendations;
   return [
     ...(Array.isArray(artifact?.parlayRecommendations) ? artifact.parlayRecommendations : []),

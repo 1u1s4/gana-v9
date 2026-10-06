@@ -75,7 +75,7 @@ export async function publishDailyRecommendations(input, dependencies = {}) {
       if (!health.ok) return { ...blocked(health.reason), health };
       const advisoryLock = await acquirePublicationAdvisoryLock(tx, date);
       if (!advisoryLock.ok) return blocked(advisoryLock.reason);
-      const existing = await inspectExistingPublicationLedger(tx, { artifact, date, dailyBatchId });
+      const existing = await inspectExistingPublicationLedger(tx, { artifact, date, dailyBatchId, mode });
       if (existing.status !== 'empty') return existing;
       const dbLedger = await verifyDbPersistenceLedger(artifact, { prisma: tx, now });
       if (!dbLedger.ok) return { ...blocked(dbLedger.reason), dbLedger };
@@ -114,7 +114,7 @@ export async function publishDailyRecommendations(input, dependencies = {}) {
       if (!health.ok) return { ...blocked(health.reason), health };
       const advisoryLock = await acquirePublicationAdvisoryLock(tx, date);
       if (!advisoryLock.ok) return blocked(advisoryLock.reason);
-      const existing = await inspectExistingPublicationLedger(tx, { artifact, date, dailyBatchId });
+      const existing = await inspectExistingPublicationLedger(tx, { artifact, date, dailyBatchId, mode });
       if (existing.status !== 'empty') return existing;
       const dbLedger = await verifyDbPersistenceLedger(artifact, { prisma: tx, now });
       if (!dbLedger.ok) return { ...blocked(dbLedger.reason), dbLedger };
@@ -412,9 +412,24 @@ async function acquirePublicationAdvisoryLock(prisma, date) {
     : { ok: false, reason: 'publication-advisory-lock-busy' };
 }
 
-async function inspectExistingPublicationLedger(prisma, { artifact, date, dailyBatchId }) {
+export function scopeRevisionLedgerRows(rows, { date, dailyBatchId, mode, parentBatchId }) {
+  if (mode !== 'daily-revision') return { ok: true, rows };
+  if (typeof parentBatchId !== 'string' || parentBatchId === dailyBatchId
+    || !parentBatchId.startsWith(`daily-${date}-`) || !/^[A-Za-z0-9_-]+$/.test(parentBatchId)) {
+    return { ok: false, reason: 'revision-parent-invalid' };
+  }
+  const parent = rows.filter(row => row.dailyBatchId === parentBatchId);
+  if (!parent.length || parent.some(row => row.status !== 'published'
+    || !(row.discordMessageId || row.discordMessageIds?.length))) return { ok: false, reason: 'revision-parent-not-confirmed-published' };
+  if (rows.some(row => row.dailyBatchId !== dailyBatchId && row.status !== 'published')) {
+    return { ok: false, reason: 'another-publication-requires-reconciliation' };
+  }
+  return { ok: true, rows: rows.filter(row => row.dailyBatchId === dailyBatchId) };
+}
+
+async function inspectExistingPublicationLedger(prisma, { artifact, date, dailyBatchId, mode }) {
   const targetRows = publicationTargetRows(artifact);
-  const rows = await prisma.publicRecommendationPublication.findMany({
+  const allRows = await prisma.publicRecommendationPublication.findMany({
     where: {
       slateDate: new Date(`${date}T00:00:00.000Z`),
       channel: 'discord',
@@ -430,6 +445,9 @@ async function inspectExistingPublicationLedger(prisma, { artifact, date, dailyB
       discordMessageIds: true,
     },
   });
+  const revisionScope = scopeRevisionLedgerRows(allRows, { date, dailyBatchId, mode, parentBatchId: artifact.revisionOfDailyBatchId });
+  if (!revisionScope.ok) return { status: 'ledger-conflict', reason: revisionScope.reason };
+  const rows = revisionScope.rows;
   if (!rows.length) return { status: 'empty', reason: 'publication-ledger-empty' };
 
   const expectedKeys = new Set(targetRows.map(targetKey));

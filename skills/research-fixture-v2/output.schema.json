@@ -95,16 +95,82 @@
     "gateResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["verdict", "reasons", "warnings"],
+      "required": [
+        "verdict",
+        "reasons",
+        "warnings",
+        "sharedBlockers",
+        "markets"
+      ],
       "properties": {
-        "verdict": { "type": "string", "enum": ["promotable", "review-required", "blocked"] },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "promotable",
+            "review-required",
+            "blocked"
+          ]
+        },
         "reasons": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "warnings": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sharedBlockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "markets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "market",
+              "verdict",
+              "reasons"
+            ],
+            "properties": {
+              "market": {
+                "type": "string",
+                "enum": [
+                  "h2h",
+                  "double_chance",
+                  "goals_over_under",
+                  "corners_over_under",
+                  "btts"
+                ]
+              },
+              "verdict": {
+                "type": "string",
+                "enum": [
+                  "promotable",
+                  "review-required",
+                  "blocked"
+                ]
+              },
+              "reasons": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
         }
       }
     },

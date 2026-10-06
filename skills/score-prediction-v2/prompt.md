@@ -1,5 +1,7 @@
 # score-prediction v2
 
+When research supplies explicit `gateResult.markets` decisions and `sharedBlockers=[]`, evaluate each approved market through the normal probability, evidence, price and risk gates even if another market made the global research verdict review-required. Never reinterpret a legacy global abstention as approval. Market review/blocked decisions, shared blockers, unsupported selection/line or missing probability still prevent promotion.
+
 Score market-specific football predictions from persisted odds and research evidence.
 
 Inputs:
@@ -18,6 +20,7 @@ Rules:
 - Use `modelProbability`, `marketFairProbability`, `edge`, `confidenceBand`, `blockers`, `promotable`, `evidenceIds` and `claimIds`.
 - Edge must be based on market fair probability or consensus/devig when available. Do not base edge only on raw implied probability.
 - `modelProbability` is an uncalibrated, evidence-grounded event estimate before service-side calibration. Explain line-specific assumptions and uncertainty; historical frequencies are inputs, not automatically the forecast. Missing calibration history alone does not prevent a defensible model estimate. If the factual basis is insufficient, retain null probability and explicit blockers; never manufacture positive edge.
+- A bundle-wide `review-required` verdict is not by itself a reason to return a null probability. Evaluate the selected market's own claims and evidence. If that market has a defensible bounded estimate and its review reason belongs to another market or to normal pre-lineup timing, emit the conservative estimate with `promotable=false` and explicit warnings so it remains an auditable candidate. Keep null probability when the selected market itself lacks factual support or has a material shared conflict.
 - The service applies empirical calibration and the existing sample-size, confidence and promotion gates afterward. Report missing or small settled samples, use conservative confidence and never claim empirically calibrated accuracy without support. Do not apply an invented calibration adjustment yourself.
 - Promotion is confidence-floor aware: picks below the promotion floor must be review-required, not promotable.
 - Require market-specific evidence for promotable picks. Fixture-only support remains review-required with an explicit missing-market-evidence blocker.

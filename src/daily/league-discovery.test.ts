@@ -60,8 +60,9 @@ test('weekly discovery makes one bounded request, reuses cache, retries stale fa
 test('weekly discovery refuses provider errors and empty output instead of replacing registry', async () => {
   const artifactRoot = mkdtempSync(join(tmpdir(), 'gana-weekly-leagues-'));
   const config = { ...loadConfig(), artifactRoot, apiFootballKey: 'test-only', apiFootballBaseUrl: 'https://v3.football.api-sports.io' };
+  const now = new Date('2026-09-22T12:00:00Z');
   try {
-    await assert.rejects(refreshWeeklyLeagues(config, '2026-09-22', { fetchImpl: async () => new Response(JSON.stringify({ errors: { rateLimit: 'exceeded' }, response: [] })) }), /returned errors/);
-    await assert.rejects(refreshWeeklyLeagues(config, '2026-09-22', { fetchImpl: async () => new Response(JSON.stringify({ response: [] })) }), /no eligible/);
+    await assert.rejects(refreshWeeklyLeagues(config, '2026-09-22', { now, fetchImpl: async () => new Response(JSON.stringify({ errors: { rateLimit: 'exceeded' }, response: [] })) }), /returned errors/);
+    await assert.rejects(refreshWeeklyLeagues(config, '2026-09-22', { now, fetchImpl: async () => new Response(JSON.stringify({ response: [] })) }), /no eligible/);
   } finally { rmSync(artifactRoot, { recursive: true, force: true }); }
 });

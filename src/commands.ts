@@ -1,3 +1,4 @@
+import { runSelectiveRefresh } from './daily/refresh.js';
 import type { Interface } from 'readline';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
@@ -868,6 +869,19 @@ commands.push({
 });
 
 commands.push({
+  name: '/refresh',
+  description: 'Selectively recover failed stages or refresh pre-kickoff evidence into a separate revision',
+  execute: async (args, ctx) => {
+    const flags = parseFlags(args.split(' ').filter(Boolean));
+    const result = await runSelectiveRefresh(ctx.config, {
+      sourceRunId: requireStringFlag(flags, 'source-run-id'), date: requireStringFlag(flags, 'date'),
+      dryRun: flags['dry-run'] === true,
+    }, ctx.runtime);
+    console.log(JSON.stringify(result, null, 2));
+  },
+});
+
+commands.push({
   name: '/daily-e2e',
   description: 'Run daily Codex pipeline',
   execute: async (args, ctx) => {
@@ -1195,6 +1209,14 @@ export async function dispatchHeadless(argv: string[], ctx: HeadlessCommandConte
       return { ok: result.ok, exitCode: result.ok ? 0 : 1, message: result.error };
     }
 
+    if (area === 'refresh') {
+      const flags = parseFlags(argv.slice(1));
+      const result = await runSelectiveRefresh(ctx.config, { sourceRunId: requireStringFlag(flags, 'source-run-id'),
+        date: requireDateFlag(flags), dryRun: flags['dry-run'] === true }, ctx.runtime);
+      console.log(JSON.stringify(result, null, 2));
+      return { ok: result.status !== 'partial', exitCode: result.status === 'partial' ? 1 : 0 };
+    }
+
     if (area === 'daily-e2e') {
       const flags = parseFlags(argv.slice(1));
       const result = await runDailyE2ECommand(ctx, flags);
@@ -1349,7 +1371,8 @@ export function printHeadlessUsage(): void {
   console.log(`  ${CYAN}pnpm gana strategy-review --date YYYY-MM-DD --agent true|false${RESET}`);
   console.log(`  ${CYAN}pnpm gana strategy-review --all --through YYYY-MM-DD${RESET}`);
   console.log(`  ${CYAN}pnpm gana run --date YYYY-MM-DD --web live --markets h2h,btts --validate auto|force|off${RESET}`);
-  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-6-astra --max-fixtures 100 --threshold 1.10 --web live --parlay-profile portfolio-v2 --required-leagues auto${RESET}`);
+  console.log(`  ${CYAN}pnpm gana refresh --source-run-id RUN_ID --date YYYY-MM-DD --dry-run${RESET}`);
+  console.log(`  ${CYAN}pnpm gana daily-e2e --date YYYY-MM-DD --providers codex --provider-concurrency 1 --codex-model gpt-5.6-sol --max-fixtures 100 --threshold 1.10 --web live --parlay-profile portfolio-v2 --required-leagues auto${RESET}`);
   console.log(`  ${CYAN}pnpm gana certify --profile ci-certification${RESET}`);
   console.log(`  ${CYAN}pnpm gana leaderboard --since YYYY-MM-DD --by prompt|model|market|league${RESET}`);
   console.log(`  ${CYAN}pnpm gana stats${RESET}`);

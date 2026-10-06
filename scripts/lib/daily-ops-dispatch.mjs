@@ -1,3 +1,4 @@
+import { planRevisionValidations } from './revision-validation.mjs';
 import { randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -10,6 +11,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, isAbsolute, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { resolveCanonicalPublishedRecommendation } from './validation-runtime.mjs';
 
 export const DAILY_OPS_TIMEZONE = 'America/Guatemala';
 export const DAILY_OPS_CHECKPOINTS = Object.freeze([
@@ -51,6 +53,7 @@ const STRATEGY_TERMINAL_STATUSES = new Set([
 // conservative fallback also blocks unknown/corrupt locks.
 export const DAILY_TERMINAL_STATUSES = new Set([
   'published',
+  'review-delivered',
   'review-required',
   'blocked',
   'publication-uncertain',
@@ -141,6 +144,7 @@ export function planDailyOps({
   const morning = [
     planRetention({ eligible: morningEligible, state: retention, path: paths.retentionMarker }),
     planValidation({ eligible: morningEligible, catchup: validationCatchup }),
+    ...planRevisionValidations({ artifactRoot, previousDate: dates.previous, now: instant, eligible: morningEligible }),
   ];
 
   const heavy = chooseHeavyAction({
@@ -482,9 +486,11 @@ function inspectValidationDate({
     ? dailyState.value.dailyBatchId.trim()
     : '';
   const recommendationArtifact = validBatchId(dailyBatchId)
-    ? resolve(artifactRoot, 'runs', dailyBatchId, 'daily-parlay-recommendations.json')
+    ? resolve(artifactRoot, 'runs', dailyBatchId, dailyStatus === 'review-delivered'
+      ? 'daily-review-candidates.json' : 'daily-parlay-recommendations.json')
     : undefined;
   const source = inspectValidationSource({
+    artifactRoot,
     date,
     dailyBatchId,
     dailyState,
@@ -588,9 +594,13 @@ function inspectValidationDate({
   };
 }
 
-function inspectValidationSource({ date, dailyBatchId, dailyState, recommendationArtifact }) {
+function inspectValidationSource({ artifactRoot, date, dailyBatchId, dailyState, recommendationArtifact }) {
   if (!dailyState.exists) return { ok: false, reason: 'daily-lock-missing' };
   if (dailyState.error) return { ok: false, reason: 'daily-lock-invalid' };
+  if (dailyState.value?.status === 'review-delivered') {
+    const source = resolveCanonicalPublishedRecommendation({ artifactRoot, date });
+    return { ok: source.ok, reason: source.ok ? 'review-delivered-source-exact' : source.reason };
+  }
   if (dailyState.value?.status !== 'published') {
     return { ok: false, reason: `daily-not-published-${dailyState.value?.status ?? 'unknown'}` };
   }
@@ -622,7 +632,7 @@ function validationPublishedExact({ date, dailyBatchId, recommendationArtifact, 
 function validationNotApplicableExact({ date, dailyLock, dailyState, value }) {
   if (value?.date !== date || dailyState.error) return false;
   const actualDailyStatus = dailyState.exists ? dailyState.value?.status ?? 'unknown' : 'missing';
-  if (actualDailyStatus === 'published' || value?.source?.dailyStatus !== actualDailyStatus) return false;
+  if (['published', 'review-delivered'].includes(actualDailyStatus) || value?.source?.dailyStatus !== actualDailyStatus) return false;
   if (typeof value?.source?.dailyLock !== 'string' || resolve(value.source.dailyLock) !== resolve(dailyLock)) return false;
   return validationNotificationIds(value).length > 0;
 }
@@ -824,6 +834,11 @@ function actionDefinition(flow, plan, repoRoot, artifactRoot, plannedAction) {
       env: commonEnv,
       cwd: repoRoot,
     };
+  }
+  if (flow === 'revision-validation') {
+    return { flow, kind: 'morning', targetDate: plannedAction.targetDate, dailyBatchId: plannedAction.dailyBatchId,
+      command: ['node', resolve(repoRoot, 'scripts/gana-validate-metrics-and-notify.mjs'), '--date', plannedAction.targetDate, '--revision-batch-id', plannedAction.revisionBatchId],
+      displayCommand: 'scripts/gana-validate-metrics-and-notify.mjs --revision-batch-id', env: commonEnv, cwd: repoRoot };
   }
   if (flow === 'validation') {
     if (!plannedAction?.targetDate || !plannedAction?.recommendationArtifact) {

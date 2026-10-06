@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AgentProviderCompat } from '../providers/agentic/types.js';
+import { MARKET_KEYS } from '../domain/markets.js';
 
 export const SOURCE_TYPES = [
   'api-football',
@@ -99,6 +100,12 @@ export const researchGateResultSchema = z.object({
   verdict: z.enum(RESEARCH_GATE_VERDICTS),
   reasons: z.array(z.string().min(1)).default([]),
   warnings: z.array(z.string().min(1)).default([]),
+  sharedBlockers: z.array(z.string().min(1)).optional(),
+  markets: z.array(z.object({
+    market: z.enum(MARKET_KEYS),
+    verdict: z.enum(RESEARCH_GATE_VERDICTS),
+    reasons: z.array(z.string().min(1)).min(1),
+  })).optional(),
 });
 
 export const researchBundleSchema = z.object({

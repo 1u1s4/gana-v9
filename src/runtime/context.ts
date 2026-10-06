@@ -14,6 +14,7 @@ export interface RuntimeContext {
   providerSports: 'api-football';
   model: string;
   databaseUrl?: string;
+  historicalStatisticsBudget?: { remaining: number; perFixture: number };
   providerRequestCount?: number;
   providerRequestLimit?: number;
   agenticResearchCallCount?: number;

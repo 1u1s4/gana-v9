@@ -9,6 +9,7 @@ export interface PredictionGateResult {
 }
 
 export interface EvidenceGateInput {
+  market?: string;
   researchBundle?: ResearchBundleRecord | {
     id?: string;
     status?: string | null;
@@ -51,11 +52,16 @@ export function evaluateEvidenceGate(input: EvidenceGateInput): EvidenceGateResu
   const warnings: string[] = [];
   const bundle = input.researchBundle;
   const evidenceItems = input.evidenceItems ?? (bundle && 'evidenceItems' in bundle ? bundle.evidenceItems ?? [] : []);
-  const claims = input.claims ?? (bundle && 'claims' in bundle ? bundle.claims ?? [] : []);
-  const bundleStatus = researchBundleStatus(bundle);
+  const allClaims = input.claims ?? (bundle && 'claims' in bundle ? bundle.claims ?? [] : []);
+  const marketVerdict = explicitResearchMarketVerdict(bundle, input.market);
+  const claims = marketVerdict ? allClaims.filter((claim) => claim.marketKey === input.market) : allClaims;
+  const bundleStatus = marketVerdict ?? researchBundleStatus(bundle);
 
   if (!bundle) reasons.push('missing research bundle');
   if (bundleStatus === 'blocked') reasons.push('research bundle is blocked');
+  if (marketVerdict && claims.some((claim) => claim.conflictStatus === 'conflict')) {
+    reasons.push('material conflict in selected market research');
+  }
 
   const strongEvidenceIds = new Set(
     evidenceItems
@@ -98,6 +104,19 @@ export function evaluateEvidenceGate(input: EvidenceGateInput): EvidenceGateResu
     reasons,
     warnings,
   };
+}
+
+function explicitResearchMarketVerdict(bundle: EvidenceGateInput['researchBundle'], market?: string): string | undefined {
+  if (!market || !bundle || researchBundleStatus(bundle) === 'blocked') return undefined;
+  const gate = bundle.gateResult as { sharedBlockers?: unknown; markets?: unknown } | undefined;
+  // Legacy global abstentions stay abstentions. Only the model can explicitly
+  // scope a factual decision, with no shared blocker, in the new contract.
+  if (Array.isArray(gate?.sharedBlockers) && gate.sharedBlockers.length) return 'review-required';
+  if (!Array.isArray(gate?.sharedBlockers) || !Array.isArray(gate.markets)) return undefined;
+  const decisions = gate.markets.filter((item) => item?.market === market);
+  if (decisions.length !== 1 || !['promotable', 'review-required', 'blocked'].includes(decisions[0].verdict)
+    || !Array.isArray(decisions[0].reasons) || !decisions[0].reasons.length) return 'review-required';
+  return decisions[0].verdict;
 }
 
 export function evaluatePredictionGates(input: EvaluatePredictionGatesInput): PredictionGateResult {

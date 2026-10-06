@@ -40,7 +40,8 @@ export async function runValidationWorkflow(options, dependencies = {}) {
   const targets = dependencies.resolveTargets
     ? dependencies.resolveTargets(options.gatewayTarget)
     : resolveDiscordTargets({ gatewayTarget: options.gatewayTarget });
-  const runSlug = `validation-${date}`;
+  if (options.revisionBatchId && (!/^[A-Za-z0-9_-]+$/.test(options.revisionBatchId) || !options.revisionBatchId.startsWith(`daily-${date}-`))) throw new Error('Invalid revision batch ID');
+  const runSlug = options.revisionBatchId ? `validation-${date}-${options.revisionBatchId}` : `validation-${date}`;
   const lockPath = resolve(artifactRoot, 'cron', 'locks', `${runSlug}.lock`);
   const logPath = resolve(artifactRoot, 'cron', `${runSlug}.log`);
   const preparedRoot = resolve(artifactRoot, 'cron', 'prepared');
@@ -66,7 +67,7 @@ export async function runValidationWorkflow(options, dependencies = {}) {
     });
   }
 
-  const canonical = resolveCanonicalPublishedRecommendation({ artifactRoot, date });
+  const canonical = resolveCanonicalPublishedRecommendation({ artifactRoot, date, revisionBatchId: options.revisionBatchId });
   if (options.noPublication) {
     if (canonical.reason === 'daily-lock-invalid') {
       return failure('daily-lock-invalid', date, lockPath, logPath, {
@@ -209,6 +210,7 @@ export async function runValidationWorkflow(options, dependencies = {}) {
       dailyStatus: canonical.dailyLock?.status ?? 'missing',
     } : {
       dailyLock: canonical.lockPath,
+      dailyStatus: canonical.dailyLock.status,
       dailyBatchId: canonical.dailyBatchId,
       recommendationArtifact,
     },
@@ -284,7 +286,8 @@ export async function runValidationWorkflow(options, dependencies = {}) {
       }
       if (validation.status !== 0 || !validationArtifact) {
         const validationPayload = validationArtifact ? readJsonFile(validationArtifact) : undefined;
-        const retryable = !Array.isArray(validationPayload?.validations) || validationPayload.validations.length === 0;
+        const retryable = !Array.isArray(validationPayload?.validations) || validationPayload.validations.length === 0
+          || validationPayload.validations.some((item) => ['pending', 'unvalidated'].includes(item.status ?? item.outcome?.status));
         return prePublicationFailure({
           state,
           lockPath,
@@ -296,6 +299,12 @@ export async function runValidationWorkflow(options, dependencies = {}) {
           artifacts: { recommendation: recommendationArtifact, validation: validationArtifact },
         });
       }
+      const settlement = readJsonFile(validationArtifact);
+      if (settlement?.validations?.some((item) => ['pending', 'unvalidated'].includes(item.status ?? item.outcome?.status))) {
+        return prePublicationFailure({ state, lockPath, logPath, phase: 'validation',
+          reason: 'published-cohort-awaiting-settlement', retryable: true,
+          exits: { validation: 0 }, artifacts: { recommendation: recommendationArtifact, validation: validationArtifact } });
+      }
       state = writeState(lockPath, state, {
         status: 'validation-complete',
         phase: 'metrics',
@@ -305,7 +314,12 @@ export async function runValidationWorkflow(options, dependencies = {}) {
       phase = 'metrics';
     } else if (validationArtifact) {
       validationArtifact = resolveArtifactPath(repoRoot, validationArtifact);
-      validateArtifactForDate(validationArtifact, date, 'validation');
+      const settlement = validateArtifactForDate(validationArtifact, date, 'validation');
+      if (settlement.validations?.some((item) => ['pending', 'unvalidated'].includes(item.status ?? item.outcome?.status))) {
+        return prePublicationFailure({ state, lockPath, logPath, phase: 'validation',
+          reason: 'published-cohort-awaiting-settlement', retryable: true,
+          artifacts: { recommendation: recommendationArtifact, validation: validationArtifact } });
+      }
     }
 
     if (phase === 'metrics') {
@@ -316,7 +330,7 @@ export async function runValidationWorkflow(options, dependencies = {}) {
       });
       const metricsArgs = [
         'gana', 'metrics', 'daily', '--date', date,
-        '--scope', options.scope ?? `daily-${date}`,
+        '--scope', options.scope ?? options.revisionBatchId ?? `daily-${date}`,
         '--recommendation-artifact', recommendationArtifact,
       ];
       if (options.persist !== undefined) metricsArgs.push('--persist', String(options.persist));
@@ -455,7 +469,7 @@ async function prepareAndPublish({ state, lockPath, preparedRoot, date, payloads
     status: 'reserved',
     payloadSha256: sha256Json(payload),
   }));
-  const preparedPath = resolve(preparedRoot, `validation-${date}-attempt-${state.attempt}.json`);
+  const preparedPath = resolve(preparedRoot, `${state.runSlug ?? `validation-${date}`}-attempt-${state.attempt}.json`);
   writeJsonAtomic(preparedPath, {
     schemaVersion: 1,
     date,
@@ -599,7 +613,7 @@ function dryRunResult({
   testLabel,
 }) {
   const source = canonical.ok ? {
-    status: 'published',
+    status: canonical.dailyLock.status,
     dailyLock: canonical.lockPath,
     dailyBatchId: canonical.dailyBatchId,
     recommendationArtifact: recommendationArtifact ?? canonical.recommendationArtifact,

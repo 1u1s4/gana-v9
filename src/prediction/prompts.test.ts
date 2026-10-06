@@ -23,11 +23,16 @@ describe('research prompts', () => {
     assert.match(research, /factual evidence is ready for scoring/);
     assert.match(research, /material factual gap or conflict prevents reliable use/);
     assert.match(research, /do not use their absence alone as a research review reason/);
+    assert.match(research, /Confirmed starting lineups are usually unavailable until close to kickoff/);
+    assert.match(research, /result histories may support both h2h and double_chance descriptive claims/);
+    assert.match(research, /another requested market is unsupported/);
     const score = buildScorePredictionPrompt();
     assert.match(score, /uncalibrated, evidence-grounded event estimate before service-side calibration/);
     assert.match(score, /does not by itself prevent an evidence-grounded, explicitly uncertain model estimate/);
     assert.match(score, /The service applies empirical calibration and its existing sample-size and promotion gates afterward/);
     assert.match(score, /If the evidence cannot support a defensible estimate, retain probability\/modelProbability=null/);
+    assert.match(score, /bundle-wide review-required verdict is not by itself a reason to return a null probability/);
+    assert.match(score, /remains an auditable candidate/);
     assert.doesNotMatch(score, /as your calibrated model estimate/);
   });
 

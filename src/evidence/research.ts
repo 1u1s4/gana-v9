@@ -84,7 +84,10 @@ const BLOCKED_GATE: ResearchGateResult = {
   warnings: [],
 };
 const RESEARCH_AGENT_TIMEOUT_MS = positiveIntegerFromEnv('GANA_RESEARCH_AGENT_TIMEOUT_MS', positiveIntegerFromEnv('GANA_AGENT_TIMEOUT_MS', 300_000));
-const RESEARCH_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_RESEARCH_AGENT_JSON_ATTEMPTS', 2);
+// A third structured attempt covers the observed failure mode where Codex
+// returns two consecutive truncated JSON payloads despite completing the web
+// research. Operators can still tune this explicitly through the env var.
+const RESEARCH_AGENT_JSON_ATTEMPTS = positiveIntegerFromEnv('GANA_RESEARCH_AGENT_JSON_ATTEMPTS', 3);
 const RESEARCH_OUTPUT_SCHEMA_PATH = join(process.cwd(), 'skills/research-fixture-v2/output.schema.json');
 
 export async function runFixtureResearch(
@@ -110,7 +113,7 @@ export async function runFixtureResearch(
     });
   }
 
-  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot, marketScope, new Date(createdAt));
+  const providerContext = await buildResearchProviderContext(provider, fixture, input.oddsSnapshot, marketScope, new Date(createdAt), join(config.artifactRoot, 'cache', 'historical-corners'), runtime.historicalStatisticsBudget);
   const contextCapturedAt = now().toISOString();
   const researchTiming = buildResearchTiming(fixture, createdAt, contextCapturedAt);
   const prompt = buildResearchFixturePrompt({
@@ -123,6 +126,8 @@ export async function runFixtureResearch(
     teamStatistics: providerContext.teamStatistics,
     recentPerformance: providerContext.recentPerformance,
     recentTeamPerformance: providerContext.recentTeamPerformance,
+    cornerHistory: providerContext.cornerHistory,
+    lineups: providerContext.lineups,
     providerContextWarnings: providerContext.warnings,
     runId,
     createdAt,
@@ -134,11 +139,17 @@ export async function runFixtureResearch(
   const nativeWebSearchTrace = createNativeWebSearchTrace();
   for (let attempt = 1; attempt <= RESEARCH_AGENT_JSON_ATTEMPTS; attempt += 1) {
     try {
+      // Each structured research attempt must start a fresh Codex turn. Reusing
+      // the thread created by a failed first attempt switches Codex to
+      // `exec resume`, where --output-schema is unsupported, and can repeat the
+      // same truncated JSON failure. Isolating the attempt also prevents Codex
+      // from mutating the shared pipeline config with its temporary thread id.
+      const attemptConfig: AgentConfig = { ...config, codexThreadId: undefined };
       const nativeWebSearchRequirement = deriveNativeWebSearchRequirement(config, {
         required: input.web === 'live',
         reason: 'research fixture',
       });
-      const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, config, researchPromptForAttempt(prompt, attempt), {
+      const result = await runResearchAgent(deps.agentRunner ?? runAgentWithRetry, attemptConfig, researchPromptForAttempt(prompt, attempt), {
         nativeWebSearchRequirement,
         onEvent: (event) => recordNativeWebSearchEvent(nativeWebSearchTrace, event),
         signal: input.signal,
@@ -336,7 +347,7 @@ function researchPromptForAttempt(prompt: string, attempt: number): string {
     '',
     'Retry instruction: the previous research response failed or timed out. Use minimal-research-retry mode:',
     '- maximum 2 current web sources',
-    '- maximum 4 claims',
+    '- at most one concise claim per requested market; keep every supported market represented',
     '- concise evidence summaries only',
     '- strict JSON only; no markdown, prose, comments, trailing text, or partial objects',
   ].join('\n');
@@ -891,7 +902,7 @@ async function writeAndPersistResearchBundle(
   };
 }
 
-function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMode): ResearchBundle {
+export function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMode): ResearchBundle {
   if (bundle.gateResult.verdict === 'blocked') return bundle;
 
   const warnings = uniqueStrings([...bundle.warnings, ...bundle.gateResult.warnings]);
@@ -913,6 +924,13 @@ function normalizeResearchGateResult(bundle: ResearchBundle, web: ResearchWebMod
     gateResult: {
       ...bundle.gateResult,
       verdict,
+      // Global source failures and shared conflicts cannot be bypassed by a
+      // market approval. Keep legacy bundles unchanged when no scope exists.
+      ...(bundle.gateResult.markets && (bundle.metadata?.fallback === true || !hasLiveWebEvidence
+        || [...warnings, ...reasons].some((message) => /fallback research|agentic research failed|research agent timed out|no (?:real |native )?web[-_ ]search|missing web[-_ ]search|web[-_ ]search evidence was required but not included|interrupted|stale/i.test(message))
+        || bundle.claims.some((claim) => claim.conflictStatus === 'conflict' && claim.subject.type !== 'market'))
+        ? { sharedBlockers: uniqueStrings([...(bundle.gateResult.sharedBlockers ?? []), 'shared research integrity gate failed']) }
+        : {}),
       reasons: normalizedReasons,
       warnings,
     },

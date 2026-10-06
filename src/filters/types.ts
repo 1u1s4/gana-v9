@@ -73,6 +73,7 @@ export interface LowOddsHitView {
 }
 
 export interface LowOddsScanView {
+  coverageDiscovery?: ReturnType<typeof import('../runtime/coverage-discovery.js').discoverByMarketCoverage>;
   scanId?: string;
   date: string;
   threshold: number;

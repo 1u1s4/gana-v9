@@ -34,6 +34,26 @@ const researchBundle = {
 };
 
 describe('prediction gates', () => {
+  it('uses an explicit supported market decision without promoting unrelated markets or legacy abstentions', () => {
+    const scoped = { ...researchBundle,
+      claims: [{ ...researchBundle.claims[0], marketKey: 'h2h', supportLevel: 'supported' }],
+      gateResult: { verdict: 'review-required', reasons: ['Corners unsupported'], warnings: [],
+        sharedBlockers: [] as string[], markets: [
+          { market: 'h2h', verdict: 'promotable', reasons: ['Traceable result evidence'] },
+          { market: 'corners_over_under', verdict: 'review-required', reasons: ['No corner sample'] },
+        ] },
+    };
+    const gate = (bundle = scoped, market = 'h2h') => evaluatePredictionGates({ fixture, oddsQuotes, researchBundle: bundle, market });
+    assert.equal(gate().verdict, 'promotable');
+    assert.equal(gate(scoped, 'corners_over_under').verdict, 'review-required');
+    assert.equal(gate(scoped, 'btts').verdict, 'review-required');
+    assert.equal(gate({ ...scoped, claims: [] }).verdict, 'review-required');
+    assert.equal(gate({ ...scoped, claims: [{ ...scoped.claims[0], conflictStatus: 'conflict' }] }).verdict, 'review-required');
+    assert.equal(gate({ ...scoped, gateResult: { ...scoped.gateResult, sharedBlockers: ['Squad identity unresolved'] } }).verdict, 'review-required');
+    assert.equal(gate({ ...scoped, gateResult: { ...scoped.gateResult, verdict: 'blocked' } }).verdict, 'review-required');
+    const legacy = { ...scoped, gateResult: { verdict: 'review-required', reasons: [], warnings: [] } };
+    assert.equal(evaluatePredictionGates({ fixture, oddsQuotes, researchBundle: legacy, market: 'h2h' }).verdict, 'review-required');
+  });
   it('allows prediction when fixture, persisted odds, evidence, and promotable research exist', () => {
     const result = evaluatePredictionGates({ fixture, oddsQuotes, researchBundle });
 

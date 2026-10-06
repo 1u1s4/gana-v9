@@ -204,6 +204,7 @@ export async function runDailyE2ECommand(ctx: CommandRunnerContext, flags: Comma
   const dailyRuntime = resolveDailyRuntimeDefaults();
   const explicitModels = optionalDailyProviderModelsFlag(flags);
   const providers = optionalDailyProvidersFlag(flags);
+  const providerRunId = optionalStringFlag(flags, 'provider-run-id');
   const requiredLeagueValue = optionalStringFlag(flags, 'required-leagues') ?? process.env.GANA_DAILY_REQUIRED_LEAGUES ?? 'auto';
   const explicitRequiredLeagues = optionalDailyRequiredLeaguesFlag({ ...flags, 'required-leagues': requiredLeagueValue });
   const leagueDiscovery = explicitRequiredLeagues === undefined
@@ -214,6 +215,7 @@ export async function runDailyE2ECommand(ctx: CommandRunnerContext, flags: Comma
     providers,
     providerConcurrency: optionalPositiveIntegerFlag(flags, 'provider-concurrency'),
     models: explicitModels ?? { codex: dailyRuntime.codexModel },
+    providerRunIds: providerRunId ? { codex: providerRunId } : undefined,
     maxFixtures: optionalPositiveIntegerFlag(flags, 'max-fixtures'),
     threshold: optionalFloatFlag(flags, 'threshold'),
     web: optionalResearchWebModeFlag(flags),

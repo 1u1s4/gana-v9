@@ -13,6 +13,7 @@ export type ApiFootballEndpointName =
   | 'odds'
   | 'fixture_result'
   | 'fixture_statistics'
+  | 'fixture_lineups'
   | 'fixture_history'
   | 'team_statistics'
   | 'leagues'
@@ -179,6 +180,13 @@ export interface FinalResult {
   providerSnapshotId?: string;
 }
 
+export interface FixtureLineups {
+  providerFixtureId: string;
+  capturedAt: string;
+  providerSnapshotId?: string;
+  teams: Array<{ teamId: string; formation?: string; starting: Array<{ id: string; name: string }> }>;
+}
+
 export interface FixtureStatistics {
   providerFixtureId: string;
   cornersHome?: number;
@@ -217,6 +225,7 @@ export interface SportsDataProvider {
   getOdds(input: OddsQuery): Promise<OddsQuote[]>;
   scanOdds(input: OddsScanQuery): Promise<OddsScanResult[]>;
   getFinalResult(input: ResultQuery): Promise<FinalResult>;
+  getFixtureLineups?(input: FixtureStatisticsQuery): Promise<FixtureLineups>;
   getFixtureStatistics(input: FixtureStatisticsQuery): Promise<FixtureStatistics>;
   getTeamStatistics?(input: TeamStatisticsQuery): Promise<TeamStatistics>;
   getCompletedLeagueFixtures?(input: CompletedLeagueFixturesQuery): Promise<CompletedLeagueFixtures>;

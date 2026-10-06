@@ -9,6 +9,14 @@ import { oddsQuoteDedupeKey } from '../providers/sports/api-football-mappers.js'
 import type { OddsSnapshotView, PipelinePriorityLeague } from './pipeline.js';
 
 interface LowOddsPredictionCoverage {
+  fixtureDiagnostics: Array<{
+    fixtureId: string;
+    scoringStatus: string;
+    predictionCount: number;
+    estimatedPredictions: number;
+    promotablePredictions: number;
+    reasons: string[];
+  }>;
   threshold: number;
   hits: number;
   scopedHits: number;
@@ -223,6 +231,22 @@ export function buildLowOddsPredictionCoverage(
   });
   const unlinkedHits = 0;
   return {
+    fixtureDiagnostics: indicatorFixtureIds.map((fixtureId) => {
+      const results = scoring.filter((result) => result.fixtureId === fixtureId
+        || result.predictions.some((prediction) => prediction.fixtureId === fixtureId));
+      const predictions = results.flatMap((result) => result.predictions).filter((prediction) => prediction.fixtureId === fixtureId);
+      return {
+        fixtureId,
+        scoringStatus: !results.length ? 'not-scored' : !predictions.length ? 'failed' : 'scored',
+        predictionCount: predictions.length,
+        estimatedPredictions: predictions.filter((prediction) => Number.isFinite(prediction.modelProbability ?? prediction.probability)).length,
+        promotablePredictions: predictions.filter((prediction) => prediction.status === 'promotable').length,
+        reasons: [...new Set(results.flatMap((result) => [
+          ...(result.error ? [result.error] : []), ...result.gateResult.reasons,
+          ...predictions.flatMap((prediction) => [...(prediction.blockers ?? []), ...(prediction.warnings ?? [])]),
+        ]))],
+      };
+    }),
     threshold: scan.threshold,
     hits: scan.hitCount,
     scopedHits: scopedHits.length,

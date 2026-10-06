@@ -1,3 +1,5 @@
+import { verifiedLineups } from './lineups.js';
+import { fetchCornerHistory } from './corner-history.js';
 import type { AgentConfig } from '../config.js';
 import type { Fixture } from '../domain/fixtures.js';
 import type { MarketKey } from '../domain/markets.js';
@@ -19,11 +21,13 @@ import type { SourceRecord } from './types.js';
 import { fetchRecentTeamPerformance, buildTeamPerformanceContext } from './team-performance.js';
 
 export type ResearchSportsProvider = Pick<SportsDataProvider, 'getFixture'> &
-  Partial<Pick<SportsDataProvider, 'getFixtureStatistics' | 'getTeamStatistics' | 'getCompletedLeagueFixtures' | 'getCompletedTeamFixtures'>> & {
+  Partial<Pick<SportsDataProvider, 'getFixtureStatistics' | 'getFixtureLineups' | 'getTeamStatistics' | 'getCompletedLeagueFixtures' | 'getCompletedTeamFixtures'>> & {
     getCanonicalOddsSnapshot?(input: OddsQuery): Promise<CanonicalOddsSnapshot>;
   };
 
 export interface ResearchProviderContext {
+  lineups?: ReturnType<typeof verifiedLineups>;
+  cornerHistory?: Awaited<ReturnType<typeof fetchCornerHistory>>;
   fixtureStatistics?: FixtureStatistics;
   oddsSnapshot?: CanonicalOddsSnapshot;
   teamStatistics?: Array<TeamStatistics & { sourceId: string }>;
@@ -46,18 +50,33 @@ export async function buildResearchProviderContext(
   inputOddsSnapshot?: CanonicalOddsSnapshot,
   markets?: MarketKey[],
   now = new Date(),
+  cornerCacheDir?: string,
+  cornerBudget?: { remaining: number; perFixture: number },
 ): Promise<ResearchProviderContext> {
   const warnings: string[] = [];
   const fixtureStatistics = fixture.status === 'scheduled'
     ? undefined
     : await fetchFixtureStatistics(provider, fixture.providerFixtureId, warnings);
+  let lineups: ReturnType<typeof verifiedLineups>;
+  const minutesToKickoff = (Date.parse(fixture.scheduledAt) - now.getTime()) / 60_000;
+  if (provider.getFixtureLineups && fixture.status === 'scheduled' && minutesToKickoff > 0 && minutesToKickoff <= 120) {
+    try { lineups = verifiedLineups(await provider.getFixtureLineups({ providerFixtureId: fixture.providerFixtureId }), fixture); }
+    catch { warnings.push('Current provider lineups unavailable; no availability inference.'); }
+    if (lineups) warnings.push(...lineups.warnings);
+    if (!lineups) warnings.push('Complete lineups for both teams are not confirmed by the provider.');
+  }
   const teamStatistics = await fetchPrematchTeamStatistics(provider, fixture, now, warnings);
   const recentPerformance = await fetchRecentPerformance(provider, fixture, now, warnings);
   const recentTeamPerformance = await fetchRecentTeamPerformance(provider, fixture, now, warnings);
+  const cornerHistory = markets?.includes('corners_over_under') && recentTeamPerformance.length
+    ? await fetchCornerHistory(provider, fixture, recentTeamPerformance, now, cornerCacheDir, cornerBudget) : undefined;
+  if (cornerHistory?.missing.length) warnings.push(`Historical corners: ${cornerHistory.records.length} matches available, ${cornerHistory.missing.length} unavailable; no imputation.`);
   const oddsSnapshot = inputOddsSnapshot
     ?? await fetchCanonicalOddsSnapshot(provider, fixture.providerFixtureId, warnings, markets);
 
   return {
+    ...(lineups && { lineups }),
+    ...(cornerHistory && { cornerHistory }),
     ...(fixtureStatistics && { fixtureStatistics }),
     ...(oddsSnapshot && { oddsSnapshot }),
     ...(teamStatistics.length && { teamStatistics }),
@@ -303,6 +322,20 @@ export function apiFootballSources(
     providerContext.oddsSnapshot
       ? apiFootballOddsSnapshotSource(providerContext.oddsSnapshot, capturedAt)
       : undefined,
+    ...(providerContext.lineups ? [{
+      id: providerContext.lineups.sourceId, type: 'api-football' as const,
+      externalId: `fixtures/lineups?fixture=${fixture.providerFixtureId}`, snapshotId: providerContext.lineups.providerSnapshotId,
+      capturedAt: providerContext.lineups.capturedAt, hash: hashPayload(providerContext.lineups),
+      title: `API-Football reported starting lineups for ${fixture.providerFixtureId}`,
+      metadata: { status: providerContext.lineups.status, teams: providerContext.lineups.teams, unresolvedPlayerIds: providerContext.lineups.unresolvedPlayerIds },
+    }] : []),
+    ...(providerContext.cornerHistory?.records ?? []).map((record): SourceRecord => ({
+      id: record.sourceId, type: 'api-football', externalId: `fixtures/statistics?fixture=${record.providerFixtureId}`,
+      snapshotId: record.providerSnapshotId, capturedAt: record.capturedAt, hash: hashPayload(record),
+      title: `API-Football historical corners for ${record.providerFixtureId} (${record.scheduledAt})`,
+      metadata: { providerFixtureId: record.providerFixtureId, scheduledAt: record.scheduledAt, cornersHome: record.cornersHome,
+        cornersAway: record.cornersAway, totalCorners: record.totalCorners, status: 'FT' },
+    })),
     ...(providerContext.teamStatistics ?? []).map((statistics): SourceRecord => ({
       id: statistics.sourceId,
       type: 'api-football',

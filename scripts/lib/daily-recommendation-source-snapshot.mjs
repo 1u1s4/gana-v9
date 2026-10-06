@@ -39,6 +39,12 @@ export function readRecommendationSourceSnapshot(artifactPath, { strict = false 
     if (providerComparison?.manifestEntry) sources.push(providerComparison.manifestEntry);
   }
 
+  if (declaredPath(artifact.modelEvidencePath)) {
+    const modelEvidence = readDeclaredJsonSource('model-evidence', 'modelEvidencePath', artifact.modelEvidencePath,
+      resolvedArtifactPath, { strict, artifact });
+    if (modelEvidence?.manifestEntry) sources.push(modelEvidence.manifestEntry);
+  }
+
   const sourceManifest = { schemaVersion: SOURCE_MANIFEST_SCHEMA_VERSION, sources };
   const sourceManifestSha256 = sha256(JSON.stringify(sourceManifest));
 
@@ -100,7 +106,8 @@ function readDeclaredJsonSource(role, field, value, artifactPath, { strict, arti
     if (strict) throw new Error(`${field} must contain a JSON object.`);
     parsed = undefined;
   }
-  if (strict && (parsed.date !== artifact.date || parsed.dailyBatchId !== artifact.dailyBatchId)) {
+  if (strict && (parsed.date !== artifact.date || (parsed.dailyBatchId !== artifact.dailyBatchId
+    && !(role === 'model-evidence' && parsed.kind === 'daily-model-evidence' && parsed.dailyBatchId === undefined)))) {
     throw new Error(`${field} date/dailyBatchId does not match the recommendations artifact.`);
   }
 

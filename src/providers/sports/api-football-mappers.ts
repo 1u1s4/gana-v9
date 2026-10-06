@@ -257,7 +257,7 @@ export function mapApiFootballFixtureStatistics(
   };
 }
 
-export function extractApiFootballResponseArray(raw: unknown, endpointName: 'status' | 'fixtures' | 'odds' | 'fixture_statistics'): unknown[] {
+export function extractApiFootballResponseArray(raw: unknown, endpointName: 'status' | 'fixtures' | 'odds' | 'fixture_statistics' | 'fixture_lineups'): unknown[] {
   if (!raw || typeof raw !== 'object') {
     throw new ApiFootballFixtureMapperError(
       'invalid-provider-response',

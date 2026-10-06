@@ -726,6 +726,19 @@ test('validation nonzero never prepares or sends and records retryable versus re
   });
 });
 
+test('unsettled delivered picks retry validation instead of becoming a terminal published validation', async (t) => {
+  const fixture = workflowFixture(t, { validationEntries: [{ status: 'pending', predictionId: 'prediction-1' }] });
+  let sends = 0;
+  const result = await runValidationWorkflow(fixture.options(), fixture.dependencies({
+    sendPayload() { sends++; throw new Error('must wait for settlement'); },
+  }));
+  assert.equal(result.reason, 'retryable');
+  assert.equal(result.lock.status, 'retryable');
+  assert.equal(result.lock.reason, 'published-cohort-awaiting-settlement');
+  assert.equal(sends, 0);
+  assert.equal(readJson(fixture.validationLock).phase, 'validation');
+});
+
 function workflowFixture(t, {
   date = DATE,
   dailyStatus = 'published',

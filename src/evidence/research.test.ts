@@ -117,6 +117,26 @@ function emitNativeWebSearch(options: any, query = 'fixture 1001 team news injur
 }
 
 describe('runFixtureResearch', () => {
+  it('persists explicit market decisions but prevents their use when live web evidence is missing', async () => {
+    for (const search of [true, false]) {
+      const cfg = config();
+      const gateResult = { verdict: 'review-required', reasons: ['Corners unsupported'], warnings: ['A conflicting corner source was excluded from supported markets'],
+        sharedBlockers: [], markets: [{ market: 'goals_over_under', verdict: 'promotable', reasons: ['Dated goal sample'] }] };
+      const output = agentOutput({ gateResult,
+        sources: search ? [{ id: 'source-web-1', type: 'web-search', url: 'https://example.com/news', title: 'News', capturedAt: createdAt.toISOString() }]
+          : [{ id: 'source-web-1', type: 'api-football', externalId: 'fixture-1001', title: 'Provider', capturedAt: createdAt.toISOString() }],
+      });
+      const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live', oddsSnapshot }, createRuntimeContext(cfg, 'session.jsonl'), {
+        now: () => createdAt, provider: { getFixture: async () => fixture }, persistBundle: async () => {},
+        agentRunner: async (_config, _prompt, options) => {
+          if (search) emitNativeWebSearch(options);
+          return { text: output, usage: {}, output };
+        },
+      });
+      assert.deepEqual(result.bundle?.gateResult.markets, gateResult.markets);
+      assert.equal(Boolean(result.bundle?.gateResult.sharedBlockers?.length), !search);
+    }
+  });
   it('timestamps provider context after collection without backdating capture or freezing live research at startup', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
@@ -1296,21 +1316,24 @@ describe('runFixtureResearch', () => {
     assert.equal(artifact.gateResult.verdict, 'review-required');
   });
 
-  it('retries once when live web research returns incomplete JSON before falling back', async () => {
+  it('recovers when live web research returns incomplete JSON twice', async () => {
     const cfg = config();
     const runtime = createRuntimeContext(cfg, 'session.jsonl');
     let attempts = 0;
     let retryPrompt = '';
+    const attemptThreadIds: Array<string | undefined> = [];
 
     const result = await runFixtureResearch(cfg, { fixtureId: '1001', web: 'live' }, runtime, {
       now: () => createdAt,
       provider: { getFixture: async () => fixture },
-      agentRunner: async (_config, input, options) => {
+      agentRunner: async (attemptConfig, input, options) => {
         attempts += 1;
+        attemptThreadIds.push(attemptConfig.codexThreadId);
+        attemptConfig.codexThreadId = `failed-thread-${attempts}`;
         retryPrompt = String(input);
-        if (attempts > 1) emitNativeWebSearch(options);
+        if (attempts > 2) emitNativeWebSearch(options);
         return {
-          text: attempts === 1 ? '{"sources":[' : agentOutput({
+          text: attempts < 3 ? '{"sources":[' : agentOutput({
             gateResult: { verdict: 'promotable', reasons: ['retry returned valid JSON'], warnings: [] },
           }),
           usage: {},
@@ -1322,7 +1345,9 @@ describe('runFixtureResearch', () => {
 
     assert.equal(result.ok, true);
     assert.equal(result.bundle?.gateResult.verdict, 'promotable');
-    assert.equal(attempts, 2);
+    assert.equal(attempts, 3);
+    assert.deepEqual(attemptThreadIds, [undefined, undefined, undefined]);
+    assert.equal(cfg.codexThreadId, undefined);
     assert.match(retryPrompt, /minimal-research-retry mode/);
   });
 
