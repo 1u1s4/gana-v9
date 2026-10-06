@@ -457,3 +457,31 @@ modelo y versión de prompt, con web documental y mercados completos, de hasta
 12 h de antigüedad y fuera de la ventana de alineaciones. `research-reuse.json`
 registra origen y hash de cada bundle. Las cuotas y el scoring se vuelven a
 obtener; esta opción no copia predicciones ni modifica el run original.
+
+### Configuración habitual verificada desde el 06/10/2026
+
+El job activo `gana-v9-daily-operations` ejecuta el dispatcher de este checkout.
+El Daily de las 10:15 Guatemala analiza el día siguiente con Codex
+`gpt-5.6-sol`, razonamiento `high`, sin fast ni fallback, un proveedor a la vez,
+web `live`, portafolio `portfolio-v2`, ligas `auto` y hasta 12 fixtures adicionales
+por cobertura. Incluye el historial de córners, gates por mercado, índice de
+evidencia documental, entrega con los estados reales y validación de la cohorte
+publicada. Los checkpoints y las protecciones de publicación se conservan.
+
+La configuración efectiva puede inspeccionarse sin iniciar E2E, consultar APIs,
+escribir locks ni enviar mensajes:
+
+```bash
+bash scripts/gana-daily-e2e-notify.sh --print-config
+```
+
+El wrapper automático elimina `GANA_RESEARCH_REUSE_RUN_ID` aunque venga del
+entorno o de `.env`: cada día investiga evidencia nueva. La recuperación especial
+usada el 06/10 se solicita invocando directamente `pnpm gana daily-e2e`
+con un run de origen explícito. El cache de estadísticas históricas FT mantiene
+su política de 24 h; cuotas y scoring siempre se obtienen nuevamente.
+
+La reevaluación mediante `pnpm gana refresh` permanece manual. Las revisiones
+publicadas se validan automáticamente en su propia cohorte. Las pruebas
+`scripts/tests/daily-scheduled-contract.test.mjs` ejecutan el wrapper en aislamiento
+y verifican los argumentos y el entorno que recibe el proceso E2E real.

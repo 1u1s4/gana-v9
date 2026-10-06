@@ -5,6 +5,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
+if (( $# > 1 )) || [[ $# == 1 && "$1" != "--print-config" ]]; then
+  echo "Usage: $0 [--print-config]" >&2
+  exit 64
+fi
+
 if [[ -f .env ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -41,7 +46,6 @@ require_command() {
 }
 
 require_command node
-require_command pnpm
 
 DATE="${GANA_DAILY_DATE:-$(gt_date 1)}"
 DAILY_BATCH_ID="${GANA_DAILY_BATCH_ID:-daily-${DATE}-full}"
@@ -55,6 +59,13 @@ export GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN="${GANA_CRON_MAX_AGENTIC_RESEARCH
 export GANA_MAX_PROVIDER_REQUESTS_PER_RUN="${GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN:-10000}"
 export GANA_LOW_ODDS_THRESHOLD="${GANA_LOW_ODDS_THRESHOLD:-1.10}"
 export GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES="${GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES:-${GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES:-10000}}"
+# Scheduled runs always collect today's evidence. Recovery reuse is an explicit
+# direct-CLI operation and must not leak from the shell or .env into tomorrow.
+unset GANA_RESEARCH_REUSE_RUN_ID
+export GANA_DAILY_PROVIDERS="${GANA_DAILY_PROVIDERS:-codex}"
+export GANA_WEB_MODE="${GANA_WEB_MODE:-live}"
+export GANA_PARLAY_PROFILE="${GANA_PARLAY_PROFILE:-portfolio-v2}"
+export GANA_COVERAGE_DISCOVERY_MAX_FIXTURES="${GANA_COVERAGE_DISCOVERY_MAX_FIXTURES:-12}"
 export GANA_DAILY_PROVIDER_CONCURRENCY="${GANA_DAILY_PROVIDER_CONCURRENCY:-1}"
 export GANA_DAILY_CODEX_MODEL="${GANA_DAILY_CODEX_MODEL:-gpt-5.6-sol}"
 export GANA_DAILY_REASONING_EFFORT="${GANA_DAILY_REASONING_EFFORT:-high}"
@@ -65,6 +76,31 @@ export AGENT_CODEX_SANDBOX="${AGENT_CODEX_SANDBOX:-danger-full-access}"
 export AGENT_REASONING_EFFORT="$GANA_DAILY_REASONING_EFFORT"
 export AGENT_FAST_MODE="$GANA_DAILY_FAST_MODE"
 export AGENT_CODEX_FALLBACK_MODELS="$GANA_DAILY_CODEX_FALLBACK_MODELS"
+
+# Read-only audit of the same effective values consumed by the scheduled run.
+if [[ "${1:-}" == "--print-config" ]]; then
+  node --input-type=module - "$DATE" "$DAILY_BATCH_ID" <<'NODE'
+const env = process.env;
+console.log(JSON.stringify({
+  date: process.argv[2], dailyBatchId: process.argv[3],
+  providers: env.GANA_DAILY_PROVIDERS,
+  model: env.GANA_DAILY_CODEX_MODEL,
+  reasoningEffort: env.GANA_DAILY_REASONING_EFFORT,
+  fastMode: env.GANA_DAILY_FAST_MODE,
+  fallbackModels: env.GANA_DAILY_CODEX_FALLBACK_MODELS,
+  providerConcurrency: Number(env.GANA_DAILY_PROVIDER_CONCURRENCY),
+  web: env.GANA_WEB_MODE,
+  parlayProfile: env.GANA_PARLAY_PROFILE,
+  requiredLeagues: env.GANA_DAILY_REQUIRED_LEAGUES,
+  coverageDiscoveryMaxFixtures: Number(env.GANA_COVERAGE_DISCOVERY_MAX_FIXTURES),
+  lowOddsThreshold: Number(env.GANA_LOW_ODDS_THRESHOLD),
+  maxProviderRequests: Number(env.GANA_MAX_PROVIDER_REQUESTS_PER_RUN),
+  researchReuseRunId: env.GANA_RESEARCH_REUSE_RUN_ID ?? null,
+}, null, 2));
+NODE
+  exit 0
+fi
+require_command pnpm
 
 mark_retryable_lock() {
   local signal="$1"
