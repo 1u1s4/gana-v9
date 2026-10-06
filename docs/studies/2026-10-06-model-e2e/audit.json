@@ -1,0 +1,2317 @@
+{
+  "priceSource": "https://developers.openai.com/api/docs/pricing",
+  "prices": {
+    "gpt-6.1-sol": {
+      "input": 2,
+      "cached": 0.1,
+      "write": 2.5,
+      "output": 10
+    },
+    "gpt-5.6-sol": {
+      "input": 4,
+      "cached": 0.4,
+      "write": 5,
+      "output": 20
+    },
+    "gpt-6-astra": {
+      "input": 10,
+      "cached": 1,
+      "write": 12.5,
+      "output": 50
+    },
+    "gpt-6-luna": {
+      "input": 0.1,
+      "cached": 0.01,
+      "write": 0.125,
+      "output": 0.5
+    }
+  },
+  "verification": {
+    "inconsistentSelectionOdds": [],
+    "sportsRequests": 2425,
+    "uniqueSportsResponses": 561,
+    "inconsistentResponseUrls": [],
+    "sameFixtureCohort": true
+  },
+  "setupOverhead": {
+    "roots": [
+      "../model-study-2026-10-06"
+    ],
+    "totalTokens": 9465592,
+    "tokenUsd": 9.700590799999999,
+    "unknownUsage": 2,
+    "partialUsage": 14,
+    "calls": 26
+  },
+  "totalMeasuredHarness": {
+    "totalTokens": 57830364,
+    "tokenUsd": 84.30999818
+  },
+  "experiment": {
+    "date": "2026-10-07",
+    "startedAt": "2026-10-06T20:01:23.898Z",
+    "completedAt": "2026-10-06T21:47:54.952Z",
+    "gitHead": "02b2f4b30c4763ff4f5abae9fd895974f7052934",
+    "design": "One E2E per model/effort; identical seeded local databases and first-capture sports responses; independent live model web research; no Discord delivery.",
+    "normalizedSeedSha256": "f5d22e81e5107f04073c3e88f4dcb440646de5bb7a9d1bc67c7cab31744c9b5e",
+    "historicalInputs": [
+      {
+        "path": "cron/locks/daily-e2e-2026-09-22.lock",
+        "sha256": "b6c0d4164805615ca99ed04f23fd5c91c0548611b60b1cc2753a1a89be36bb0e"
+      },
+      {
+        "path": "runs/daily-2026-09-22-r7/daily-parlay-recommendations.json",
+        "sha256": "903d0b0b6b8c1bef168a949d1e54c4516c163e4ac0285566994abddfee59c33e"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-23.lock",
+        "sha256": "c2294ef717e7c4ab0f4a1105b7049ed86a0185ba5420c123ae8e86e7072a004d"
+      },
+      {
+        "path": "runs/daily-2026-09-23-full/daily-parlay-recommendations.json",
+        "sha256": "a5b6c565eda17b433d0ee4f0f3dc4ab796e1de7ad01b2b22b0cadd3238aa906d"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-24.lock",
+        "sha256": "86d52701d226fe5e49f070d369da8d45c2bcba7c3edd3d40a47d2408a8d34c0a"
+      },
+      {
+        "path": "runs/daily-2026-09-24-full/daily-parlay-recommendations.json",
+        "sha256": "f2a9ad4681fc24879a7c2e77443cae9396bbc6003caa4d54b3051ba23692c1ae"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-25.lock",
+        "sha256": "1c40aea028ebd906bd421f108bf6d728f5f4d8e558768f2c68ba92b5bbd7a5a2"
+      },
+      {
+        "path": "runs/daily-2026-09-25-full/daily-parlay-recommendations.json",
+        "sha256": "237632e6d9bbfce7585c569d8df0bdc629841e90a333cf518a3b328e005765d4"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-26.lock",
+        "sha256": "1d16336a29bc536ee41c696f5321ccabc47a8febfc67eeaa3abc3aa23d523d29"
+      },
+      {
+        "path": "runs/daily-2026-09-26-full/daily-parlay-recommendations.json",
+        "sha256": "aa562a916a55605b7dfee24a015aea02c6eee978b0e46ce6e3bf8f8d44bc82be"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-27.lock",
+        "sha256": "8c0a8b796a16a95370027c288482bd90ae1e86187e687cefd4c42d519f3b8ac0"
+      },
+      {
+        "path": "runs/daily-2026-09-27-full/daily-parlay-recommendations.json",
+        "sha256": "b3ba7631d90ac78bdac478127a6d96287b6dd7fe8cfc709bed1f235f46999b57"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-28.lock",
+        "sha256": "cba3224f0fad12b17a34c2c4079fdd7133934e104aae89cb91218a6dedaf1b88"
+      },
+      {
+        "path": "runs/daily-2026-09-28-full/daily-parlay-recommendations.json",
+        "sha256": "c0e3a9c30c355b0de46dd80a84a2a810927f75353844d11dc699bc50adab1577"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-29.lock",
+        "sha256": "5bf7499a15396e6b81d255f23faddf28cf6eee1fbf893199099e0e156c59de4b"
+      },
+      {
+        "path": "runs/daily-2026-09-29-full/daily-parlay-recommendations.json",
+        "sha256": "c2ff54d82b8206dc96dc6a7ce0be3e078a1be297fb935f7103d7913bfff639e6"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-09-30.lock",
+        "sha256": "529fbb26886f38e5431273641bebc61700cd72361e1cd2563957042e35eeb69f"
+      },
+      {
+        "path": "runs/daily-2026-09-30-full/daily-parlay-recommendations.json",
+        "sha256": "38839d61bd5bd0330fd3a0714849c57c93662af62845cebc9edb1932123433fd"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-10-01.lock",
+        "sha256": "fcc446567e84c178660b201d1d35bdb3d5a22f33cb5c1753647a83ddc6f1efb8"
+      },
+      {
+        "path": "runs/daily-2026-10-01-full/daily-parlay-recommendations.json",
+        "sha256": "35c6286c4e1a3c251c8c1e5345885edf159736cfc655c07598659e10a6a70f69"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-10-02.lock",
+        "sha256": "66934e44e14f2e006d78c5b3bf49aad815931e737ab2eecde5664ee23a283b5e"
+      },
+      {
+        "path": "runs/daily-2026-10-02-full/daily-parlay-recommendations.json",
+        "sha256": "105ab6f8eaec311cc63d9738432871f77b7400d637df08d2a0e7bb95b82076c5"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-10-03.lock",
+        "sha256": "b23f45c8a00bae78f7c47d875ec41f5690a3db34735935dc0884b7a044cd1ba7"
+      },
+      {
+        "path": "runs/daily-2026-10-03-full/daily-parlay-recommendations.json",
+        "sha256": "44da46762e250e45c6b17f14856b681d63f9ad7670bda9f588718c80aa2039da"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-10-04.lock",
+        "sha256": "bb163659dc12e77d8bb7bed7a9ebbe55934ce4042440f8ab626eb1fad98c96a0"
+      },
+      {
+        "path": "runs/daily-2026-10-04-full/daily-parlay-recommendations.json",
+        "sha256": "3f613238be5ba2eef07f3cb7edbcb3fd384ac1f48a953e53ad13751bb13ea542"
+      },
+      {
+        "path": "cron/locks/daily-e2e-2026-10-05.lock",
+        "sha256": "0afda9d861b8fed6712449ede23c575ccc5ed054b32f88d95d7f35f669b5d897"
+      },
+      {
+        "path": "runs/daily-2026-10-05-full/daily-parlay-recommendations.json",
+        "sha256": "ae2506733ccf1e19f2dd4cdc5d80e085b500b2f7cb4a6291e2c3ac4e2121c436"
+      },
+      {
+        "path": "cron/locks/validation-2026-10-04.lock",
+        "sha256": "b2a3fdb1157198ab9c7a11289315e6244155d21af37bbee1ab1658e3887685a6"
+      },
+      {
+        "path": "runs/67e27aef-bc69-4395-ba77-ab6eeaf25bfd/daily-metrics.json",
+        "sha256": "260c9b1ab57bf025d1c36d19f16814f7313453c6a75f6fa3ddaf3490b62b106e"
+      },
+      {
+        "path": "cron/locks/validation-2026-10-05.lock",
+        "sha256": "7624ac7d31f6aa85a50113105c7343a12ee958e794d4fe992593da780cd6c85e"
+      },
+      {
+        "path": "runs/daily-2026-10-05-full/daily-review-candidates.json",
+        "sha256": "00df7d1f1792812f2946489b9f17ccb422a401909d137c4a00e8d5df3304ea5f"
+      },
+      {
+        "path": "runs/0b2fc6d8-10e9-455f-8381-28d80c901ce6/daily-metrics.json",
+        "sha256": "52f5dbea36b806e3659b59dc9227975cc440f4d303e24bc4ec368e07aa3247ad"
+      }
+    ]
+  },
+  "rows": [
+    {
+      "cell": "sol61",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "state": "review-required",
+      "exitCode": 1,
+      "verdict": "review-required",
+      "minutes": 54.48936666666667,
+      "fixtures": [
+        "1492391",
+        "1492392",
+        "1492393",
+        "1492395",
+        "1492397",
+        "1492399",
+        "1517309",
+        "1517361",
+        "1520910",
+        "1520911",
+        "1520913",
+        "1520916",
+        "1520919",
+        "1549587",
+        "1562767",
+        "1597397",
+        "1635588",
+        "1638101",
+        "1638395",
+        "1638581",
+        "1638733",
+        "1643186"
+      ],
+      "researchPersisted": 22,
+      "researchValid": 22,
+      "researchFallback": 0,
+      "researchFallbacks": [],
+      "researchFailed": 0,
+      "evidenceIssues": [],
+      "evidenceAudited": 0,
+      "researchGates": {
+        "review-required": 20,
+        "promotable": 2
+      },
+      "researchMarketGates": {
+        "h2h:review-required": 13,
+        "double_chance:review-required": 13,
+        "goals_over_under:review-required": 14,
+        "corners_over_under:promotable": 7,
+        "btts:review-required": 15,
+        "h2h:promotable": 9,
+        "double_chance:promotable": 9,
+        "goals_over_under:promotable": 8,
+        "corners_over_under:review-required": 15,
+        "btts:promotable": 7
+      },
+      "scored": 20,
+      "scoringOk": 12,
+      "scoringFailures": [
+        {
+          "providerFixtureId": "1492393",
+          "error": "Monetary automation is blocked: Gana v9 only produces analytical artifacts and cannot execute wagers, move funds, collect financial credentials, or guarantee results."
+        },
+        {
+          "providerFixtureId": "1638581",
+          "error": "Odds snapshot \"94fca595-04a6-472a-a799-c122af8f07b7\" has no persisted quotes for requested markets: h2h, double_chance, goals_over_under, corners_over_under, btts."
+        }
+      ],
+      "scoringGateBlocks": [
+        {
+          "providerFixtureId": "1492399",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Las frecuencias históricas no equivalen a la probabilidad de este encuentro",
+              "Feedback h2h: una selección publicada y liquidada, ganadora; muestra insuficiente para afirmar calibración",
+              "La confianza 0 corresponde a la estimación no emitida, no a la inexistencia de evidencia descriptiva",
+              "Disponibilidad actual sin verificar: el gate identifica un conflicto compartido material para la comparación de fuerzas",
+              "El mercado no tiene aprobación explícita para promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "La cuota corta y el benchmark de 0.802941 no prueban una probabilidad alta del modelo ni valor",
+              "No hay selecciones de double_chance en el feedback suministrado",
+              "Candidato de cobertura bloqueado; no se considera una alternativa conservadora promovible",
+              "Disponibilidad actual sin verificar: conflicto compartido material para la evaluación de evitar la derrota",
+              "No puede establecerse un edge positivo para la alternativa protegida",
+              "Los conteos 7/10 y 6/10 son descriptivos y no se convierten automáticamente en un pronóstico",
+              "Feedback goals_over_under: una selección publicada y liquidada, perdedora; no permite calibrar esta línea",
+              "La línea más amplia reduce la exigencia del evento, pero no demuestra edge ni justifica promoción",
+              "Disponibilidad ofensiva y defensiva sin verificar: conflicto compartido material para el total de goles",
+              "No puede establecerse un edge positivo para esta línea conservadora",
+              "La cobertura histórica general tiene 18 registros disponibles y dos no disponibles; no se imputaron ceros",
+              "La muestra seleccionada incluye únicamente siete partidos únicos de Serie A en las sedes pertinentes",
+              "No hay selecciones de corners_over_under en el feedback suministrado",
+              "Las líneas enteras 9, 10 y 11 están marcadas como de baja liquidez; no se usan como alternativas conservadoras",
+              "Disponibilidad de laterales y atacantes sin verificar: conflicto compartido material para corners",
+              "Muestras de sede pequeñas e incompletas: cuatro partidos locales y tres visitantes",
+              "BTTS y el total de goles tienen dependencia; no representan diversificación automáticamente",
+              "No hay selecciones de btts en el feedback suministrado",
+              "Los registros de porterías a cero y BTTS no se tratan como observaciones independientes",
+              "Disponibilidad ofensiva y defensiva sin verificar: conflicto compartido material para BTTS"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Las frecuencias históricas no equivalen a la probabilidad de este encuentro",
+              "Feedback h2h: una selección publicada y liquidada, ganadora; muestra insuficiente para afirmar calibración",
+              "La confianza 0 corresponde a la estimación no emitida, no a la inexistencia de evidencia descriptiva",
+              "Disponibilidad actual sin verificar: el gate identifica un conflicto compartido material para la comparación de fuerzas",
+              "El mercado no tiene aprobación explícita para promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "La cuota corta y el benchmark de 0.802941 no prueban una probabilidad alta del modelo ni valor",
+              "No hay selecciones de double_chance en el feedback suministrado",
+              "Candidato de cobertura bloqueado; no se considera una alternativa conservadora promovible",
+              "Disponibilidad actual sin verificar: conflicto compartido material para la evaluación de evitar la derrota",
+              "No puede establecerse un edge positivo para la alternativa protegida",
+              "Los conteos 7/10 y 6/10 son descriptivos y no se convierten automáticamente en un pronóstico",
+              "Feedback goals_over_under: una selección publicada y liquidada, perdedora; no permite calibrar esta línea",
+              "La línea más amplia reduce la exigencia del evento, pero no demuestra edge ni justifica promoción",
+              "Disponibilidad ofensiva y defensiva sin verificar: conflicto compartido material para el total de goles",
+              "No puede establecerse un edge positivo para esta línea conservadora",
+              "La cobertura histórica general tiene 18 registros disponibles y dos no disponibles; no se imputaron ceros",
+              "La muestra seleccionada incluye únicamente siete partidos únicos de Serie A en las sedes pertinentes",
+              "No hay selecciones de corners_over_under en el feedback suministrado",
+              "Las líneas enteras 9, 10 y 11 están marcadas como de baja liquidez; no se usan como alternativas conservadoras",
+              "Disponibilidad de laterales y atacantes sin verificar: conflicto compartido material para corners",
+              "Muestras de sede pequeñas e incompletas: cuatro partidos locales y tres visitantes",
+              "BTTS y el total de goles tienen dependencia; no representan diversificación automáticamente",
+              "No hay selecciones de btts en el feedback suministrado",
+              "Los registros de porterías a cero y BTTS no se tratan como observaciones independientes",
+              "Disponibilidad ofensiva y defensiva sin verificar: conflicto compartido material para BTTS"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1638733",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Los dos partidos no constituyen una muestra bilateral representativa",
+              "La falta de resultados de Armenia describe cobertura ausente, no debilidad deportiva",
+              "Feedback histórico de h2h: una selección liquidada, ganada; insuficiente para acreditar calibración",
+              "El favoritismo y la cuota corta no justifican probabilidad ni confianza",
+              "Conflicto temporal material: el proveedor indica 7 de octubre y la noticia indica 6; no se puede asegurar el contexto prepartido",
+              "Jordania tiene solo dos resultados disponibles y Armenia ninguno comparable; disponibilidad actual de ambas selecciones sin verificar",
+              "El gate de h2h requiere revisión y no autoriza promoción",
+              "No hay sustento suficiente para estimar la probabilidad de victoria ante este rival",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "La protección del empate no resuelve la ausencia de evidencia rival",
+              "No hay selecciones de double_chance en el feedback histórico suministrado",
+              "El benchmark justo de 0.81485 corresponde al mercado, no a una estimación del modelo",
+              "Conflicto temporal material entre el 6 y el 7 de octubre",
+              "Muestra local de Jordania n=2, muestra comparable de Armenia n=0 y disponibilidad actual sin verificar",
+              "El gate de double_chance requiere revisión y no autoriza promoción",
+              "No se puede estimar una probabilidad defendible ni acreditar ventaja positiva para 1X",
+              "La frecuencia 1/2 es descriptiva y no equivale a una probabilidad de 0.50",
+              "Las estadísticas y el historial de Jordania describen los mismos dos encuentros; no se suman como muestras independientes",
+              "Feedback histórico de goles: una selección liquidada, perdida; insuficiente para acreditar calibración o ajustar criterios",
+              "Under 3.5 queda como candidato bloqueado, sin sustento para calificarlo como alternativa conservadora de alta probabilidad",
+              "Solo hay dos totales locales de Jordania, 1 y 7, sin muestra comparable de Armenia",
+              "Disponibilidad actual y rotación de ambas selecciones sin verificar",
+              "El gate de goals_over_under requiere revisión y no autoriza promoción",
+              "No hay distribución de goles defendible para estimar under 3.5 ni acreditar ventaja positiva"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Los dos partidos no constituyen una muestra bilateral representativa",
+              "La falta de resultados de Armenia describe cobertura ausente, no debilidad deportiva",
+              "Feedback histórico de h2h: una selección liquidada, ganada; insuficiente para acreditar calibración",
+              "El favoritismo y la cuota corta no justifican probabilidad ni confianza",
+              "Conflicto temporal material: el proveedor indica 7 de octubre y la noticia indica 6; no se puede asegurar el contexto prepartido",
+              "Jordania tiene solo dos resultados disponibles y Armenia ninguno comparable; disponibilidad actual de ambas selecciones sin verificar",
+              "El gate de h2h requiere revisión y no autoriza promoción",
+              "No hay sustento suficiente para estimar la probabilidad de victoria ante este rival",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "La protección del empate no resuelve la ausencia de evidencia rival",
+              "No hay selecciones de double_chance en el feedback histórico suministrado",
+              "El benchmark justo de 0.81485 corresponde al mercado, no a una estimación del modelo",
+              "Conflicto temporal material entre el 6 y el 7 de octubre",
+              "Muestra local de Jordania n=2, muestra comparable de Armenia n=0 y disponibilidad actual sin verificar",
+              "El gate de double_chance requiere revisión y no autoriza promoción",
+              "No se puede estimar una probabilidad defendible ni acreditar ventaja positiva para 1X",
+              "La frecuencia 1/2 es descriptiva y no equivale a una probabilidad de 0.50",
+              "Las estadísticas y el historial de Jordania describen los mismos dos encuentros; no se suman como muestras independientes",
+              "Feedback histórico de goles: una selección liquidada, perdida; insuficiente para acreditar calibración o ajustar criterios",
+              "Under 3.5 queda como candidato bloqueado, sin sustento para calificarlo como alternativa conservadora de alta probabilidad",
+              "Solo hay dos totales locales de Jordania, 1 y 7, sin muestra comparable de Armenia",
+              "Disponibilidad actual y rotación de ambas selecciones sin verificar",
+              "El gate de goals_over_under requiere revisión y no autoriza promoción",
+              "No hay distribución de goles defendible para estimar under 3.5 ni acreditar ventaja positiva"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1562767",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Target-venue samples contain only four home matches and three away matches",
+              "Mladá's stronger away results must not be treated as its home performance",
+              "Historical h2h feedback contains one settled win, with zero pending, unvalidated or voided selections; this is insufficient for calibration",
+              "Material shared conflict: current resolution of Varnsdorf's documented squad-absence problem is unverified",
+              "The market gate remains review-required without explicit promotion approval",
+              "A defensible target-fixture probability cannot be established while the material availability conflict remains unresolved",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Home and away descriptive frequencies are small samples, not fixture probabilities",
+              "The short price does not establish high confidence or positive edge",
+              "No double_chance selections are reported in the supplied historical validation feedback",
+              "A defensible target-fixture probability and positive edge cannot be established",
+              "Seven target-venue observations are insufficient to treat the historical 7/7 frequency as the forecast",
+              "Overlapping league histories are counted once; cup and friendly results are excluded from these frequencies",
+              "Historical goals feedback contains one settled loss, with zero pending, unvalidated or voided selections; this is insufficient for calibration",
+              "Material shared conflict: current resolution of Varnsdorf's documented squad-absence problem is unverified and affects application of scoring histories"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Target-venue samples contain only four home matches and three away matches",
+              "Mladá's stronger away results must not be treated as its home performance",
+              "Historical h2h feedback contains one settled win, with zero pending, unvalidated or voided selections; this is insufficient for calibration",
+              "Material shared conflict: current resolution of Varnsdorf's documented squad-absence problem is unverified",
+              "The market gate remains review-required without explicit promotion approval",
+              "A defensible target-fixture probability cannot be established while the material availability conflict remains unresolved",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Home and away descriptive frequencies are small samples, not fixture probabilities",
+              "The short price does not establish high confidence or positive edge",
+              "No double_chance selections are reported in the supplied historical validation feedback",
+              "A defensible target-fixture probability and positive edge cannot be established",
+              "Seven target-venue observations are insufficient to treat the historical 7/7 frequency as the forecast",
+              "Overlapping league histories are counted once; cup and friendly results are excluded from these frequencies",
+              "Historical goals feedback contains one settled loss, with zero pending, unvalidated or voided selections; this is insufficient for calibration",
+              "Material shared conflict: current resolution of Varnsdorf's documented squad-absence problem is unverified and affects application of scoring histories"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1638101",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Las bajas informadas de Gnistan son Marcelo, Bashkirov y Bjurström; su impacto no está cuantificado",
+              "El historial publicado de h2h tiene sólo una selección liquidada, ganadora; no acredita calibración",
+              "Conflicto material compartido: disponibilidad actual de Inter sin verificar",
+              "El gate de h2h requiere revisión y no autoriza promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "La cuota corta no establece alta confianza ni una probabilidad del fixture",
+              "No hay selecciones publicadas y liquidadas de double_chance en el feedback suministrado",
+              "El gate de double_chance requiere revisión y no autoriza promoción",
+              "No se puede establecer edge positivo para la alternativa protegida",
+              "Las muestras recientes se solapan con la temporada y no constituyen observaciones adicionales independientes",
+              "El feedback de goles contiene una sola selección liquidada, perdedora; no permite calibrar probabilidades",
+              "Conflicto material compartido: disponibilidad ofensiva y defensiva actual de Inter sin verificar",
+              "El gate de goals_over_under requiere revisión y no autoriza promoción",
+              "Alternativa registrada para análisis, sin atribuirle alta probabilidad ni recomendar su promoción",
+              "Comparte evidencia y exposición con under 2.5",
+              "Una sola selección previa de goles liquidada es insuficiente para calibración",
+              "No se puede establecer edge positivo para la alternativa conservadora",
+              "Los once registros ausentes permanecen desconocidos; no se imputaron ceros",
+              "Los corners europeos de Inter se mantienen separados de la liga",
+              "No hay selecciones publicadas y liquidadas de corners en el feedback suministrado",
+              "Sólo tres observaciones ligueras por equipo y dos por sede objetivo",
+              "Once registros de corners faltantes y ninguna corroboración independiente",
+              "Las señales por sede son contrapuestas y no sostienen una estimación fiable",
+              "El gate de corners_over_under requiere revisión y no autoriza promoción",
+              "BTTS no y under 2.5 pueden coincidir, pero tienen liquidaciones distintas: 1–1 falla BTTS no y gana under 2.5; 3–0 hace lo contrario",
+              "No hay selecciones publicadas y liquidadas de btts en el feedback suministrado",
+              "El gate de btts requiere revisión y no autoriza promoción"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Las bajas informadas de Gnistan son Marcelo, Bashkirov y Bjurström; su impacto no está cuantificado",
+              "El historial publicado de h2h tiene sólo una selección liquidada, ganadora; no acredita calibración",
+              "Conflicto material compartido: disponibilidad actual de Inter sin verificar",
+              "El gate de h2h requiere revisión y no autoriza promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "La cuota corta no establece alta confianza ni una probabilidad del fixture",
+              "No hay selecciones publicadas y liquidadas de double_chance en el feedback suministrado",
+              "El gate de double_chance requiere revisión y no autoriza promoción",
+              "No se puede establecer edge positivo para la alternativa protegida",
+              "Las muestras recientes se solapan con la temporada y no constituyen observaciones adicionales independientes",
+              "El feedback de goles contiene una sola selección liquidada, perdedora; no permite calibrar probabilidades",
+              "Conflicto material compartido: disponibilidad ofensiva y defensiva actual de Inter sin verificar",
+              "El gate de goals_over_under requiere revisión y no autoriza promoción",
+              "Alternativa registrada para análisis, sin atribuirle alta probabilidad ni recomendar su promoción",
+              "Comparte evidencia y exposición con under 2.5",
+              "Una sola selección previa de goles liquidada es insuficiente para calibración",
+              "No se puede establecer edge positivo para la alternativa conservadora",
+              "Los once registros ausentes permanecen desconocidos; no se imputaron ceros",
+              "Los corners europeos de Inter se mantienen separados de la liga",
+              "No hay selecciones publicadas y liquidadas de corners en el feedback suministrado",
+              "Sólo tres observaciones ligueras por equipo y dos por sede objetivo",
+              "Once registros de corners faltantes y ninguna corroboración independiente",
+              "Las señales por sede son contrapuestas y no sostienen una estimación fiable",
+              "El gate de corners_over_under requiere revisión y no autoriza promoción",
+              "BTTS no y under 2.5 pueden coincidir, pero tienen liquidaciones distintas: 1–1 falla BTTS no y gana under 2.5; 3–0 hace lo contrario",
+              "No hay selecciones publicadas y liquidadas de btts en el feedback suministrado",
+              "El gate de btts requiere revisión y no autoriza promoción"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1517361",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "La evidencia histórica existe; la probabilidad queda nula por el conflicto material del mercado",
+              "Validación previa de h2h: una selección liquidada, ganada; muestra insuficiente para calibración",
+              "Los resultados recientes no están ajustados por fuerza del rival",
+              "Conflicto material compartido: la previa declara suspendido a Luke Singh y lo incluye en el XI proyectado",
+              "El gate de h2h requiere revisión y no contiene aprobación explícita para promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias de no derrota son descriptivas y no equivalen a una probabilidad del fixture",
+              "No hay selecciones previas publicadas de double_chance en el feedback suministrado",
+              "La alternativa protegida queda registrada sin aprobación ni ventaja estimada",
+              "Conflicto material compartido sobre la disponibilidad defensiva de Luke Singh",
+              "El gate de double_chance requiere revisión y no contiene aprobación explícita para promoción",
+              "No puede establecerse una ventaja positiva para la alternativa protegida mientras la probabilidad permanezca nula",
+              "Validación previa de goles: una selección liquidada, perdida; muestra insuficiente para calibración",
+              "Las historias de equipos y liga se solapan y no suman observaciones independientes",
+              "Se mantienen separados los partidos de copa de Supra",
+              "Conflicto material compartido sobre la composición defensiva actual",
+              "El gate de goals_over_under requiere revisión y no contiene aprobación explícita para promoción",
+              "Comparte evidencia y exposición con over 2.5",
+              "La cuota 1.12 no acredita confianza alta ni calibración",
+              "El único antecedente publicado de goles del feedback no permite validar esta línea",
+              "No puede establecerse una ventaja positiva para esta alternativa conservadora",
+              "No se imputaron ceros ni se mezclaron partidos de copa",
+              "Cobertura general suministrada: 15 encuentros disponibles y cuatro sin datos",
+              "No hay selecciones previas publicadas de córners en el feedback suministrado",
+              "La evidencia de goles no se utiliza para pronosticar córners",
+              "Conflicto material compartido sobre la composición táctica actual",
+              "El gate de corners_over_under requiere revisión y no contiene aprobación explícita para promoción",
+              "La única línea de córners tiene soporte de cuotas marcado como baja liquidez",
+              "Muestra histórica pequeña e incompleta",
+              "low-liquidity",
+              "El BTTS visitante de temporada de Supra sólo puede acotarse entre 9/12 y 10/12",
+              "No hay selecciones previas publicadas de BTTS en el feedback suministrado",
+              "BTTS y los overs de goles comparten exposición ofensiva, aunque sus condiciones de liquidación difieren",
+              "Conflicto material compartido sobre la disponibilidad defensiva actual",
+              "El gate de btts requiere revisión y no contiene aprobación explícita para promoción"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "La evidencia histórica existe; la probabilidad queda nula por el conflicto material del mercado",
+              "Validación previa de h2h: una selección liquidada, ganada; muestra insuficiente para calibración",
+              "Los resultados recientes no están ajustados por fuerza del rival",
+              "Conflicto material compartido: la previa declara suspendido a Luke Singh y lo incluye en el XI proyectado",
+              "El gate de h2h requiere revisión y no contiene aprobación explícita para promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias de no derrota son descriptivas y no equivalen a una probabilidad del fixture",
+              "No hay selecciones previas publicadas de double_chance en el feedback suministrado",
+              "La alternativa protegida queda registrada sin aprobación ni ventaja estimada",
+              "Conflicto material compartido sobre la disponibilidad defensiva de Luke Singh",
+              "El gate de double_chance requiere revisión y no contiene aprobación explícita para promoción",
+              "No puede establecerse una ventaja positiva para la alternativa protegida mientras la probabilidad permanezca nula",
+              "Validación previa de goles: una selección liquidada, perdida; muestra insuficiente para calibración",
+              "Las historias de equipos y liga se solapan y no suman observaciones independientes",
+              "Se mantienen separados los partidos de copa de Supra",
+              "Conflicto material compartido sobre la composición defensiva actual",
+              "El gate de goals_over_under requiere revisión y no contiene aprobación explícita para promoción",
+              "Comparte evidencia y exposición con over 2.5",
+              "La cuota 1.12 no acredita confianza alta ni calibración",
+              "El único antecedente publicado de goles del feedback no permite validar esta línea",
+              "No puede establecerse una ventaja positiva para esta alternativa conservadora",
+              "No se imputaron ceros ni se mezclaron partidos de copa",
+              "Cobertura general suministrada: 15 encuentros disponibles y cuatro sin datos",
+              "No hay selecciones previas publicadas de córners en el feedback suministrado",
+              "La evidencia de goles no se utiliza para pronosticar córners",
+              "Conflicto material compartido sobre la composición táctica actual",
+              "El gate de corners_over_under requiere revisión y no contiene aprobación explícita para promoción",
+              "La única línea de córners tiene soporte de cuotas marcado como baja liquidez",
+              "Muestra histórica pequeña e incompleta",
+              "low-liquidity",
+              "El BTTS visitante de temporada de Supra sólo puede acotarse entre 9/12 y 10/12",
+              "No hay selecciones previas publicadas de BTTS en el feedback suministrado",
+              "BTTS y los overs de goles comparten exposición ofensiva, aunque sus condiciones de liquidación difieren",
+              "Conflicto material compartido sobre la disponibilidad defensiva actual",
+              "El gate de btts requiere revisión y no contiene aprobación explícita para promoción"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1597397",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Muestras limitadas: nueve partidos de liga por equipo y cinco en cada condición relevante",
+              "No se atribuye un efecto favorable o desfavorable al cambio de entrenadores",
+              "h2h tiene solamente una selección previa publicada y liquidada, ganadora; no demuestra calibración",
+              "Comparte la tesis direccional con draw_or_away; no constituye diversificación independiente",
+              "Conflicto material compartido: disponibilidad y rotación sin verificar durante la transición inmediata de los entrenadores de Poole; no puede asumirse continuidad táctica o de personal",
+              "El gate de h2h requiere revisión y no contiene aprobación explícita del mercado",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias de cinco partidos son descriptivas, no probabilidades del encuentro",
+              "No hay selecciones previas publicadas y liquidadas de double_chance en el feedback suministrado",
+              "La cuota corta no establece alta confianza ni ventaja",
+              "El gate de double_chance requiere revisión y no contiene aprobación explícita del mercado",
+              "No existe una estimación defendible que permita establecer una ventaja positiva para esta alternativa protegida",
+              "Los cinco registros por condición no están ajustados por fuerza de los rivales",
+              "El 5/10 histórico de under 2.5 no se convierte automáticamente en pronóstico",
+              "goals_over_under tiene solamente una selección previa publicada y liquidada, perdedora; no demuestra calibración ni justifica modificar umbrales",
+              "Under 3.5 ofrece mayor cobertura de resultados, pero no se incorpora como alternativa de alta probabilidad porque su probabilidad y ventaja permanecen sin establecer",
+              "Conflicto material compartido: disponibilidad ofensiva y defensiva y rotación sin verificar durante la transición de Poole; no puede asumirse continuidad de los patrones de goles",
+              "El gate de goals_over_under requiere revisión y no contiene aprobación explícita del mercado",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "Los conteos faltantes son desconocidos, no cero",
+              "La evidencia citada documenta la ausencia de soporte, no una tendencia favorable",
+              "Los goles y las cuotas no sustituyen estadísticas de córners",
+              "No hay selecciones previas publicadas y liquidadas de córners en el feedback suministrado",
+              "missing-market-evidence: no hay conteos históricos válidos de córners para fundamentar under 8.5",
+              "La única cuota permitida para esta selección está marcada como lowLiquidity",
+              "El gate de corners_over_under requiere revisión y no contiene aprobación explícita del mercado",
+              "market-specific evidence missing for corners_over_under:under:8.5",
+              "low-liquidity"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Muestras limitadas: nueve partidos de liga por equipo y cinco en cada condición relevante",
+              "No se atribuye un efecto favorable o desfavorable al cambio de entrenadores",
+              "h2h tiene solamente una selección previa publicada y liquidada, ganadora; no demuestra calibración",
+              "Comparte la tesis direccional con draw_or_away; no constituye diversificación independiente",
+              "Conflicto material compartido: disponibilidad y rotación sin verificar durante la transición inmediata de los entrenadores de Poole; no puede asumirse continuidad táctica o de personal",
+              "El gate de h2h requiere revisión y no contiene aprobación explícita del mercado",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias de cinco partidos son descriptivas, no probabilidades del encuentro",
+              "No hay selecciones previas publicadas y liquidadas de double_chance en el feedback suministrado",
+              "La cuota corta no establece alta confianza ni ventaja",
+              "El gate de double_chance requiere revisión y no contiene aprobación explícita del mercado",
+              "No existe una estimación defendible que permita establecer una ventaja positiva para esta alternativa protegida",
+              "Los cinco registros por condición no están ajustados por fuerza de los rivales",
+              "El 5/10 histórico de under 2.5 no se convierte automáticamente en pronóstico",
+              "goals_over_under tiene solamente una selección previa publicada y liquidada, perdedora; no demuestra calibración ni justifica modificar umbrales",
+              "Under 3.5 ofrece mayor cobertura de resultados, pero no se incorpora como alternativa de alta probabilidad porque su probabilidad y ventaja permanecen sin establecer",
+              "Conflicto material compartido: disponibilidad ofensiva y defensiva y rotación sin verificar durante la transición de Poole; no puede asumirse continuidad de los patrones de goles",
+              "El gate de goals_over_under requiere revisión y no contiene aprobación explícita del mercado",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "Los conteos faltantes son desconocidos, no cero",
+              "La evidencia citada documenta la ausencia de soporte, no una tendencia favorable",
+              "Los goles y las cuotas no sustituyen estadísticas de córners",
+              "No hay selecciones previas publicadas y liquidadas de córners en el feedback suministrado",
+              "missing-market-evidence: no hay conteos históricos válidos de córners para fundamentar under 8.5",
+              "La única cuota permitida para esta selección está marcada como lowLiquidity",
+              "El gate de corners_over_under requiere revisión y no contiene aprobación explícita del mercado",
+              "market-specific evidence missing for corners_over_under:under:8.5",
+              "low-liquidity"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1635588",
+          "gate": {
+            "reasons": [
+              "Estimación de juicio sin calibración; no establece favoritismo robusto",
+              "Emperor Cup aporta solamente un antecedente por equipo",
+              "La suspensión está documentada, pero faltan reemplazo, otras bajas y rotación",
+              "Ventaja negativa frente a la probabilidad justa",
+              "Fuerza relativa actual insuficientemente establecida con muestras pequeñas y competiciones distintas",
+              "confidence 0.32 below promotion floor 0.65",
+              "edge below configured minimum 0",
+              "confidence below configured minimum 0.5",
+              "no-edge",
+              "low-confidence",
+              "Comparte la tesis direccional de la victoria de Okayama; no representa diversificación independiente",
+              "La mayor probabilidad de acierto no justifica promoción con ventaja negativa",
+              "No hay publicaciones liquidadas de double_chance en el feedback suministrado",
+              "Alternativa conservadora con ventaja negativa frente a la probabilidad justa",
+              "Muestra insuficiente para sostener una estimación precisa de no derrota",
+              "material conflict in selected market research",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "research is not promotable",
+              "No combinar goles agregados, prórroga o penales con marcadores reglamentarios",
+              "No se agrega over 1.5 ni under 3.5 como alternativa conservadora: faltan una estimación defendible y una ventaja verificable",
+              "La evidencia parcial citada registra el contexto y el conflicto; no habilita promoción",
+              "Mercado review-required sin aprobación explícita para promoción",
+              "Conflicto de goles de Chiba pendiente de conciliación",
+              "Cobertura declara faltante de evidencia específica validada del mercado",
+              "No hay una estimación defendible de la distribución actual de goles",
+              "calibration skipped: missing modelProbability",
+              "market-specific evidence missing for goals_over_under:over:2.5",
+              "confidence 0 below promotion floor 0.65",
+              "missing-model-probability",
+              "No usar el precio corto como evidencia de probabilidad o confianza",
+              "La evidencia parcial conserva trazabilidad del bloqueo; no habilita promoción",
+              "No hay publicaciones liquidadas de btts en el feedback suministrado",
+              "El conflicto 0-0 reglamentario versus 1-1 agregado cambia directamente BTTS",
+              "No hay una estimación defendible de BTTS",
+              "market-specific evidence missing for btts:no"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "Estimación de juicio sin calibración; no establece favoritismo robusto",
+              "Emperor Cup aporta solamente un antecedente por equipo",
+              "La suspensión está documentada, pero faltan reemplazo, otras bajas y rotación",
+              "Ventaja negativa frente a la probabilidad justa",
+              "Fuerza relativa actual insuficientemente establecida con muestras pequeñas y competiciones distintas",
+              "confidence 0.32 below promotion floor 0.65",
+              "edge below configured minimum 0",
+              "confidence below configured minimum 0.5",
+              "no-edge",
+              "low-confidence",
+              "Comparte la tesis direccional de la victoria de Okayama; no representa diversificación independiente",
+              "La mayor probabilidad de acierto no justifica promoción con ventaja negativa",
+              "No hay publicaciones liquidadas de double_chance en el feedback suministrado",
+              "Alternativa conservadora con ventaja negativa frente a la probabilidad justa",
+              "Muestra insuficiente para sostener una estimación precisa de no derrota",
+              "material conflict in selected market research",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "research is not promotable",
+              "No combinar goles agregados, prórroga o penales con marcadores reglamentarios",
+              "No se agrega over 1.5 ni under 3.5 como alternativa conservadora: faltan una estimación defendible y una ventaja verificable",
+              "La evidencia parcial citada registra el contexto y el conflicto; no habilita promoción",
+              "Mercado review-required sin aprobación explícita para promoción",
+              "Conflicto de goles de Chiba pendiente de conciliación",
+              "Cobertura declara faltante de evidencia específica validada del mercado",
+              "No hay una estimación defendible de la distribución actual de goles",
+              "calibration skipped: missing modelProbability",
+              "market-specific evidence missing for goals_over_under:over:2.5",
+              "confidence 0 below promotion floor 0.65",
+              "missing-model-probability",
+              "No usar el precio corto como evidencia de probabilidad o confianza",
+              "La evidencia parcial conserva trazabilidad del bloqueo; no habilita promoción",
+              "No hay publicaciones liquidadas de btts en el feedback suministrado",
+              "El conflicto 0-0 reglamentario versus 1-1 agregado cambia directamente BTTS",
+              "No hay una estimación defendible de BTTS",
+              "market-specific evidence missing for btts:no"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1638395",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Cup coverage is only 7/10 matches per team, with three matches in each relevant venue split",
+              "Recent Primera División and Primera B results are separate contextual samples, not interchangeable observations",
+              "Historical feedback contains one settled h2h selection, won; this does not establish calibration",
+              "Material shared conflict: Cobreloa's possible extensive rotation and current availability remain unresolved",
+              "The h2h market gate requires review and does not explicitly permit promotion",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Small descriptive frequencies are not forecast probabilities",
+              "The short price does not establish confidence or value",
+              "No settled double_chance selections appear in the supplied historical feedback",
+              "The double_chance market gate requires review and does not explicitly permit promotion",
+              "A positive edge and high event probability cannot be established for this protected alternative",
+              "Competition and venue samples remain separate; the shared first leg is counted once",
+              "Historical feedback contains one settled goals selection, lost; this does not justify retuning or establish calibration",
+              "Material shared conflict: unresolved rotation and availability affect both teams' scoring and concession comparability",
+              "The goals_over_under market gate requires review and does not explicitly permit promotion",
+              "This is nested within the same goals thesis, not independent diversification",
+              "A lower-variance settlement threshold does not establish forecast confidence",
+              "The supplied goals validation sample is only one settled selection",
+              "Material shared conflict: unresolved rotation and availability affect scoring and concession comparability",
+              "The conservative alternative cannot be qualified as high-probability or positive-edge without a defensible estimate",
+              "Seven historical matches have usable corners; eleven unique fixtures are unavailable",
+              "Missing corners are unknown, never zero",
+              "No settled corners selections appear in the supplied historical feedback",
+              "The supplied line-specific corners claim is unsupported for this matchup",
+              "Cobreloa has 0/10 usable corners records and neither team has supplied Copa Chile corners observations",
+              "Only three Coquimbo home observations exist, all from another competition",
+              "Material shared composition conflict remains unresolved",
+              "The corners market gate requires review and does not explicitly permit promotion",
+              "The selected quote is flagged low-liquidity",
+              "low-liquidity",
+              "Venue and competition splits give opposing signals and are not pooled",
+              "The first leg is one shared observation",
+              "No settled btts selections appear in the supplied historical feedback",
+              "Material shared conflict: unresolved rotation and availability affect both teams' ability to score and concede",
+              "The btts market gate requires review and does not explicitly permit promotion"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Cup coverage is only 7/10 matches per team, with three matches in each relevant venue split",
+              "Recent Primera División and Primera B results are separate contextual samples, not interchangeable observations",
+              "Historical feedback contains one settled h2h selection, won; this does not establish calibration",
+              "Material shared conflict: Cobreloa's possible extensive rotation and current availability remain unresolved",
+              "The h2h market gate requires review and does not explicitly permit promotion",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Small descriptive frequencies are not forecast probabilities",
+              "The short price does not establish confidence or value",
+              "No settled double_chance selections appear in the supplied historical feedback",
+              "The double_chance market gate requires review and does not explicitly permit promotion",
+              "A positive edge and high event probability cannot be established for this protected alternative",
+              "Competition and venue samples remain separate; the shared first leg is counted once",
+              "Historical feedback contains one settled goals selection, lost; this does not justify retuning or establish calibration",
+              "Material shared conflict: unresolved rotation and availability affect both teams' scoring and concession comparability",
+              "The goals_over_under market gate requires review and does not explicitly permit promotion",
+              "This is nested within the same goals thesis, not independent diversification",
+              "A lower-variance settlement threshold does not establish forecast confidence",
+              "The supplied goals validation sample is only one settled selection",
+              "Material shared conflict: unresolved rotation and availability affect scoring and concession comparability",
+              "The conservative alternative cannot be qualified as high-probability or positive-edge without a defensible estimate",
+              "Seven historical matches have usable corners; eleven unique fixtures are unavailable",
+              "Missing corners are unknown, never zero",
+              "No settled corners selections appear in the supplied historical feedback",
+              "The supplied line-specific corners claim is unsupported for this matchup",
+              "Cobreloa has 0/10 usable corners records and neither team has supplied Copa Chile corners observations",
+              "Only three Coquimbo home observations exist, all from another competition",
+              "Material shared composition conflict remains unresolved",
+              "The corners market gate requires review and does not explicitly permit promotion",
+              "The selected quote is flagged low-liquidity",
+              "low-liquidity",
+              "Venue and competition splits give opposing signals and are not pooled",
+              "The first leg is one shared observation",
+              "No settled btts selections appear in the supplied historical feedback",
+              "Material shared conflict: unresolved rotation and availability affect both teams' ability to score and concede",
+              "The btts market gate requires review and does not explicitly permit promotion"
+            ]
+          }
+        }
+      ],
+      "predictions": 108,
+      "probabilityEstimates": 70,
+      "uniquePredictionKeys": 108,
+      "promotable": 0,
+      "promotableFixtures": 0,
+      "predictionStatus": {
+        "blocked": 49,
+        "review-required": 59
+      },
+      "promotableByDiscovery": {},
+      "recommendations": 0,
+      "generalRecommendations": 0,
+      "requiredRecommendations": 0,
+      "atomic": 0,
+      "parlays": 0,
+      "finalUniquePredictions": 0,
+      "council": {
+        "approved": 0,
+        "inspiredBy": {
+          "mode": "execution-lean triad-compatible local gate",
+          "name": "Council of High Intelligence",
+          "url": "https://github.com/0xNyk/council-of-high-intelligence"
+        },
+        "panel": [
+          "feynman",
+          "kahneman",
+          "taleb",
+          "meadows",
+          "torvalds"
+        ],
+        "rejected": 0,
+        "reviewRequired": 0,
+        "status": "blocked",
+        "version": "gana-local-council-v1"
+      },
+      "evidenceItems": 416,
+      "sources": 582,
+      "calls": 59,
+      "failedCalls": 17,
+      "unknownUsage": 1,
+      "partialUsage": 16,
+      "allModelsVerified": true,
+      "allCountersMatch": true,
+      "inputTokens": 18093129,
+      "cachedTokens": 14183168,
+      "cacheWriteTokens": 0,
+      "outputTokens": 382192,
+      "reasoningTokens": 98919,
+      "totalTokens": 18475321,
+      "tokenUsd": 13.060158800000004,
+      "noCacheTokenUsd": 40.008177999999994,
+      "stages": {
+        "research": {
+          "calls": 38,
+          "completed": 22,
+          "inputTokens": 17240504,
+          "cachedTokens": 14151680,
+          "outputTokens": 284171,
+          "totalTokens": 17524675,
+          "tokenUsd": 10.434526000000004
+        },
+        "scoring": {
+          "calls": 21,
+          "completed": 20,
+          "inputTokens": 852625,
+          "cachedTokens": 31488,
+          "outputTokens": 98021,
+          "totalTokens": 950646,
+          "tokenUsd": 2.6256328000000004
+        },
+        "portfolio": {
+          "calls": 0,
+          "completed": 0,
+          "inputTokens": 0,
+          "cachedTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "tokenUsd": 0
+        }
+      },
+      "runId": "8c25ab6b-0a2a-405e-a153-0cb14d76309b",
+      "dailyBatchId": "daily-2026-10-07-ms-sol61"
+    },
+    {
+      "cell": "sol56",
+      "model": "gpt-5.6-sol",
+      "effort": "xhigh",
+      "state": "completed",
+      "exitCode": 0,
+      "verdict": "promotable",
+      "minutes": 41.43416666666667,
+      "fixtures": [
+        "1492391",
+        "1492392",
+        "1492393",
+        "1492395",
+        "1492397",
+        "1492399",
+        "1517309",
+        "1517361",
+        "1520910",
+        "1520911",
+        "1520913",
+        "1520916",
+        "1520919",
+        "1549587",
+        "1562767",
+        "1597397",
+        "1635588",
+        "1638101",
+        "1638395",
+        "1638581",
+        "1638733",
+        "1643186"
+      ],
+      "researchPersisted": 22,
+      "researchValid": 22,
+      "researchFallback": 0,
+      "researchFallbacks": [],
+      "researchFailed": 0,
+      "evidenceIssues": [],
+      "evidenceAudited": 11,
+      "researchGates": {
+        "promotable": 12,
+        "review-required": 10
+      },
+      "researchMarketGates": {
+        "h2h:promotable": 20,
+        "double_chance:promotable": 20,
+        "goals_over_under:promotable": 20,
+        "corners_over_under:promotable": 13,
+        "btts:promotable": 18,
+        "h2h:blocked": 1,
+        "double_chance:blocked": 1,
+        "goals_over_under:blocked": 1,
+        "corners_over_under:blocked": 3,
+        "btts:blocked": 1,
+        "btts:review-required": 3,
+        "corners_over_under:review-required": 6,
+        "h2h:review-required": 1,
+        "double_chance:review-required": 1,
+        "goals_over_under:review-required": 1
+      },
+      "scored": 19,
+      "scoringOk": 19,
+      "scoringFailures": [
+        {
+          "providerFixtureId": "1638581",
+          "error": "Odds snapshot \"7b437be7-086c-4168-8e6e-642b791a45cd\" has no persisted quotes for requested markets: h2h, double_chance, goals_over_under, corners_over_under, btts."
+        },
+        {
+          "providerFixtureId": "1638101",
+          "error": "Monetary automation is blocked: Gana v9 only produces analytical artifacts and cannot execute wagers, move funds, collect financial credentials, or guarantee results."
+        },
+        {
+          "providerFixtureId": "1520919",
+          "error": "Monetary automation is blocked: Gana v9 only produces analytical artifacts and cannot execute wagers, move funds, collect financial credentials, or guarantee results."
+        }
+      ],
+      "scoringGateBlocks": [],
+      "predictions": 100,
+      "probabilityEstimates": 96,
+      "uniquePredictionKeys": 100,
+      "promotable": 11,
+      "promotableFixtures": 6,
+      "predictionStatus": {
+        "review-required": 80,
+        "promotable": 11,
+        "blocked": 9
+      },
+      "promotableByDiscovery": {
+        "initial": 5,
+        "expansion": 6
+      },
+      "recommendations": 4,
+      "generalRecommendations": 0,
+      "requiredRecommendations": 4,
+      "atomic": 3,
+      "parlays": 1,
+      "finalUniquePredictions": 3,
+      "council": {
+        "approved": 0,
+        "inspiredBy": {
+          "mode": "execution-lean triad-compatible local gate",
+          "name": "Council of High Intelligence",
+          "url": "https://github.com/0xNyk/council-of-high-intelligence"
+        },
+        "panel": [
+          "feynman",
+          "kahneman",
+          "taleb",
+          "meadows",
+          "torvalds"
+        ],
+        "rejected": 3,
+        "reviewRequired": 0,
+        "status": "blocked",
+        "version": "gana-local-council-v1"
+      },
+      "evidenceItems": 406,
+      "sources": 592,
+      "calls": 48,
+      "failedCalls": 6,
+      "unknownUsage": 0,
+      "partialUsage": 6,
+      "allModelsVerified": true,
+      "allCountersMatch": true,
+      "inputTokens": 9513798,
+      "cachedTokens": 7245568,
+      "cacheWriteTokens": 0,
+      "outputTokens": 481413,
+      "reasoningTokens": 287887,
+      "totalTokens": 9995211,
+      "tokenUsd": 21.599407199999998,
+      "noCacheTokenUsd": 47.683451999999996,
+      "stages": {
+        "research": {
+          "calls": 28,
+          "completed": 22,
+          "inputTokens": 8723896,
+          "cachedTokens": 7119232,
+          "outputTokens": 343702,
+          "totalTokens": 9067598,
+          "tokenUsd": 16.1403888
+        },
+        "scoring": {
+          "calls": 19,
+          "completed": 19,
+          "inputTokens": 771473,
+          "cachedTokens": 126336,
+          "outputTokens": 137140,
+          "totalTokens": 908613,
+          "tokenUsd": 5.3738824
+        },
+        "portfolio": {
+          "calls": 1,
+          "completed": 1,
+          "inputTokens": 18429,
+          "cachedTokens": 0,
+          "outputTokens": 571,
+          "totalTokens": 19000,
+          "tokenUsd": 0.085136
+        }
+      },
+      "runId": "951cb1f2-eea0-4864-a172-c7b1a4f7e001",
+      "dailyBatchId": "daily-2026-10-07-ms-sol56"
+    },
+    {
+      "cell": "astra6",
+      "model": "gpt-6-astra",
+      "effort": "medium",
+      "state": "review-required",
+      "exitCode": 1,
+      "verdict": "review-required",
+      "minutes": 25.248733333333334,
+      "fixtures": [
+        "1492391",
+        "1492392",
+        "1492393",
+        "1492395",
+        "1492397",
+        "1492399",
+        "1517309",
+        "1517361",
+        "1520910",
+        "1520911",
+        "1520913",
+        "1520916",
+        "1520919",
+        "1549587",
+        "1562767",
+        "1597397",
+        "1635588",
+        "1638101",
+        "1638395",
+        "1638581",
+        "1638733",
+        "1643186"
+      ],
+      "researchPersisted": 22,
+      "researchValid": 22,
+      "researchFallback": 0,
+      "researchFallbacks": [],
+      "researchFailed": 0,
+      "evidenceIssues": [],
+      "evidenceAudited": 0,
+      "researchGates": {
+        "review-required": 20,
+        "promotable": 2
+      },
+      "researchMarketGates": {
+        "h2h:promotable": 12,
+        "double_chance:promotable": 12,
+        "goals_over_under:review-required": 12,
+        "corners_over_under:review-required": 16,
+        "btts:review-required": 14,
+        "goals_over_under:promotable": 10,
+        "corners_over_under:promotable": 6,
+        "btts:promotable": 8,
+        "h2h:review-required": 10,
+        "double_chance:review-required": 10
+      },
+      "scored": 19,
+      "scoringOk": 11,
+      "scoringFailures": [
+        {
+          "providerFixtureId": "1638581",
+          "error": "Odds snapshot \"5fded841-859a-4c63-a91f-7d3b0c3867bd\" has no persisted quotes for requested markets: h2h, double_chance, goals_over_under, corners_over_under, btts."
+        },
+        {
+          "providerFixtureId": "1520919",
+          "error": "Monetary automation is blocked: Gana v9 only produces analytical artifacts and cannot execute wagers, move funds, collect financial credentials, or guarantee results."
+        },
+        {
+          "providerFixtureId": "1597397",
+          "error": "Monetary automation is blocked: Gana v9 only produces analytical artifacts and cannot execute wagers, move funds, collect financial credentials, or guarantee results."
+        }
+      ],
+      "scoringGateBlocks": [
+        {
+          "providerFixtureId": "1492397",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "The single previously settled h2h selection was a win; n=1 cannot establish calibration",
+              "Home win and home-or-draw share the same directional thesis",
+              "Material shared availability conflict affects relative team strength",
+              "Market verdict is review-required; no explicit promotion approval",
+              "shared research integrity gate failed",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "No settled double-chance selections are supplied in historical feedback",
+              "Protected expression of the home-win thesis, not independent diversification",
+              "Included for required market coverage, not endorsed as a positive-edge conservative alternative",
+              "Material shared availability conflict affects non-loss assumptions",
+              "Positive edge for the protected alternative cannot be established",
+              "The single previously settled goals selection lost; n=1 cannot establish calibration",
+              "The 8/10 frequencies are not an 80% forecast",
+              "This conservative threshold remains blocked; neither its short price nor historical counts establish positive edge",
+              "Material unresolved attacking and midfield availability affects the goal distribution",
+              "Positive edge for the conservative goal line cannot be established",
+              "No settled corners selections are supplied in historical feedback",
+              "Identical observed counts across offered thresholds do not imply identical future probabilities",
+              "The historical 4/8 count is not a 50% forecast",
+              "Only four relevant venue observations per team; no supported predictive distribution",
+              "Material shared wide-player availability conflict affects corner assumptions",
+              "No settled BTTS selections are supplied in historical feedback",
+              "BTTS no and under 3.5 can share a low-scoring scenario but are distinct events, not independent exposures",
+              "Material unresolved attacking and midfield availability affects both teams' scoring assumptions"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "The single previously settled h2h selection was a win; n=1 cannot establish calibration",
+              "Home win and home-or-draw share the same directional thesis",
+              "Material shared availability conflict affects relative team strength",
+              "Market verdict is review-required; no explicit promotion approval",
+              "shared research integrity gate failed",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "No settled double-chance selections are supplied in historical feedback",
+              "Protected expression of the home-win thesis, not independent diversification",
+              "Included for required market coverage, not endorsed as a positive-edge conservative alternative",
+              "Material shared availability conflict affects non-loss assumptions",
+              "Positive edge for the protected alternative cannot be established",
+              "The single previously settled goals selection lost; n=1 cannot establish calibration",
+              "The 8/10 frequencies are not an 80% forecast",
+              "This conservative threshold remains blocked; neither its short price nor historical counts establish positive edge",
+              "Material unresolved attacking and midfield availability affects the goal distribution",
+              "Positive edge for the conservative goal line cannot be established",
+              "No settled corners selections are supplied in historical feedback",
+              "Identical observed counts across offered thresholds do not imply identical future probabilities",
+              "The historical 4/8 count is not a 50% forecast",
+              "Only four relevant venue observations per team; no supported predictive distribution",
+              "Material shared wide-player availability conflict affects corner assumptions",
+              "No settled BTTS selections are supplied in historical feedback",
+              "BTTS no and under 3.5 can share a low-scoring scenario but are distinct events, not independent exposures",
+              "Material unresolved attacking and midfield availability affects both teams' scoring assumptions"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1562767",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Muestras limitadas: ocho y siete partidos de liga; splits objetivo de cuatro y tres",
+              "Validación previa h2h: una selección liquidada y ganada; insuficiente para afirmar calibración",
+              "Disponibilidad actual sin verificar tras el aplazamiento: conflicto compartido material para trasladar el historial al plantel actual",
+              "El mercado permanece review-required, sin aprobación explícita para promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias históricas no equivalen a probabilidades del encuentro",
+              "No hay selecciones de double_chance en la muestra de validación suministrada",
+              "Disponibilidad actual sin verificar: conflicto compartido material",
+              "No puede establecerse ventaja positiva para la alternativa protegida",
+              "Splits pequeños y anteriores a la incertidumbre de disponibilidad",
+              "Validación previa de goles: una selección liquidada y perdida; insuficiente para afirmar calibración",
+              "No se añade una alternativa conservadora de goles: la incertidumbre compartida impide demostrar ventaja positiva, incluso en over 2.25",
+              "Disponibilidad ofensiva y defensiva actual sin resolver: conflicto compartido material"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Muestras limitadas: ocho y siete partidos de liga; splits objetivo de cuatro y tres",
+              "Validación previa h2h: una selección liquidada y ganada; insuficiente para afirmar calibración",
+              "Disponibilidad actual sin verificar tras el aplazamiento: conflicto compartido material para trasladar el historial al plantel actual",
+              "El mercado permanece review-required, sin aprobación explícita para promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias históricas no equivalen a probabilidades del encuentro",
+              "No hay selecciones de double_chance en la muestra de validación suministrada",
+              "Disponibilidad actual sin verificar: conflicto compartido material",
+              "No puede establecerse ventaja positiva para la alternativa protegida",
+              "Splits pequeños y anteriores a la incertidumbre de disponibilidad",
+              "Validación previa de goles: una selección liquidada y perdida; insuficiente para afirmar calibración",
+              "No se añade una alternativa conservadora de goles: la incertidumbre compartida impide demostrar ventaja positiva, incluso en over 2.25",
+              "Disponibilidad ofensiva y defensiva actual sin resolver: conflicto compartido material"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1517361",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Only one settled prior h2h publication, a win; insufficient for calibration",
+              "Home win and home-or-draw share the same directional thesis",
+              "Material shared conflict: Singh is reported suspended but included in the official projected XI",
+              "Market-specific research verdict is review-required; no explicit promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "No settled double-chance publications are supplied",
+              "Historical non-loss frequencies are descriptive, not forecast probabilities",
+              "Material shared defensive-availability conflict remains unresolved",
+              "Positive edge for the protected alternative cannot be established",
+              "Only one settled prior goals publication, a loss; insufficient for calibration",
+              "Over 1.5 is an available lower-variance alternative, but its positive edge cannot be established while the material conflict remains; no high-probability designation is assigned",
+              "Team and league histories overlap and are not independent samples",
+              "Material shared defensive-availability conflict affects current scoring and conceding assumptions",
+              "No settled corners publications are supplied",
+              "Four historical fixtures lack corner observations; none are imputed",
+              "No independent dated web corner series was verified",
+              "Material shared personnel conflict has unquantified tactical effects on corners",
+              "Only low-liquidity quotes are available for this market",
+              "Small mixed venue samples and incomplete historical corner coverage",
+              "low-liquidity",
+              "No settled BTTS publications are supplied",
+              "Supra's season away BTTS is bounded at 9–10/12, not known exactly",
+              "York's historical sequence does not establish calibrated accuracy",
+              "Material shared defensive-availability conflict affects the probability of both teams scoring"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Only one settled prior h2h publication, a win; insufficient for calibration",
+              "Home win and home-or-draw share the same directional thesis",
+              "Material shared conflict: Singh is reported suspended but included in the official projected XI",
+              "Market-specific research verdict is review-required; no explicit promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "No settled double-chance publications are supplied",
+              "Historical non-loss frequencies are descriptive, not forecast probabilities",
+              "Material shared defensive-availability conflict remains unresolved",
+              "Positive edge for the protected alternative cannot be established",
+              "Only one settled prior goals publication, a loss; insufficient for calibration",
+              "Over 1.5 is an available lower-variance alternative, but its positive edge cannot be established while the material conflict remains; no high-probability designation is assigned",
+              "Team and league histories overlap and are not independent samples",
+              "Material shared defensive-availability conflict affects current scoring and conceding assumptions",
+              "No settled corners publications are supplied",
+              "Four historical fixtures lack corner observations; none are imputed",
+              "No independent dated web corner series was verified",
+              "Material shared personnel conflict has unquantified tactical effects on corners",
+              "Only low-liquidity quotes are available for this market",
+              "Small mixed venue samples and incomplete historical corner coverage",
+              "low-liquidity",
+              "No settled BTTS publications are supplied",
+              "Supra's season away BTTS is bounded at 9–10/12, not known exactly",
+              "York's historical sequence does not establish calibrated accuracy",
+              "Material shared defensive-availability conflict affects the probability of both teams scoring"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1520913",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Historical form is descriptive, not an opponent-adjusted forecast",
+              "Prior published h2h feedback contains only one settled selection, won; it cannot establish calibration",
+              "Home-or-draw below shares this directional thesis",
+              "Material unresolved eligibility conflict concerning Hereda, Bressan and Netinho",
+              "Shared research integrity gate failed",
+              "No explicit market-specific promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "The supplied fair benchmark is broadly consistent with home-plus-draw h2h probabilities, but does not prove value",
+              "No settled double-chance selections appear in the supplied feedback",
+              "The short price does not establish high confidence or justify promotion",
+              "Material unresolved eligibility conflict affects defensive resilience",
+              "Positive edge for the protected alternative is unestablished",
+              "Prior goals feedback contains one settled selection, lost; it cannot establish calibration",
+              "Web corroboration adds no independent matches",
+              "This conservative line remains blocked; no additional safer total is asserted to offer positive edge",
+              "Material unresolved defensive and midfield eligibility conflict",
+              "Positive edge for the conservative total is unestablished",
+              "Only five relevant-venue observations per team; corroborating web records may share upstream data",
+              "No settled corners selections appear in the supplied feedback",
+              "The integer-10 alternative has low-liquidity support; neither it nor over 9.5 has an established positive edge",
+              "Material unresolved full-back and midfield eligibility conflict affects wide-play assumptions",
+              "Season scoring and conceding margins do not identify joint BTTS frequency",
+              "No settled BTTS selections appear in the supplied feedback",
+              "Material unresolved eligibility conflict affects scoring and clean-sheet assumptions"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Historical form is descriptive, not an opponent-adjusted forecast",
+              "Prior published h2h feedback contains only one settled selection, won; it cannot establish calibration",
+              "Home-or-draw below shares this directional thesis",
+              "Material unresolved eligibility conflict concerning Hereda, Bressan and Netinho",
+              "Shared research integrity gate failed",
+              "No explicit market-specific promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "The supplied fair benchmark is broadly consistent with home-plus-draw h2h probabilities, but does not prove value",
+              "No settled double-chance selections appear in the supplied feedback",
+              "The short price does not establish high confidence or justify promotion",
+              "Material unresolved eligibility conflict affects defensive resilience",
+              "Positive edge for the protected alternative is unestablished",
+              "Prior goals feedback contains one settled selection, lost; it cannot establish calibration",
+              "Web corroboration adds no independent matches",
+              "This conservative line remains blocked; no additional safer total is asserted to offer positive edge",
+              "Material unresolved defensive and midfield eligibility conflict",
+              "Positive edge for the conservative total is unestablished",
+              "Only five relevant-venue observations per team; corroborating web records may share upstream data",
+              "No settled corners selections appear in the supplied feedback",
+              "The integer-10 alternative has low-liquidity support; neither it nor over 9.5 has an established positive edge",
+              "Material unresolved full-back and midfield eligibility conflict affects wide-play assumptions",
+              "Season scoring and conceding margins do not identify joint BTTS frequency",
+              "No settled BTTS selections appear in the supplied feedback",
+              "Material unresolved eligibility conflict affects scoring and clean-sheet assumptions"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1549587",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Disponibilidad, suspensiones y rotación sin verificar",
+              "Historial publicado de h2h: solamente 1 selección liquidada, ganada; insuficiente para acreditar calibración",
+              "La selección registra una hipótesis para revisión, no una ventaja demostrada",
+              "Conflicto material compartido: estado vigente y sede sin resolver",
+              "El gate de h2h exige revisión y no autoriza promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias históricas no son probabilidades proyectadas",
+              "No hay selecciones de double_chance en el historial de validación suministrado",
+              "Protección frente al empate no demuestra alta probabilidad ni valor",
+              "El gate de double_chance exige revisión y no autoriza promoción",
+              "No puede establecerse ventaja positiva para validar esta alternativa protegida",
+              "No se verificó disponibilidad ofensiva ni defensiva",
+              "Historial publicado de goles: solamente 1 selección liquidada, perdida; insuficiente para acreditar calibración",
+              "Over 1.5 y under 3 están disponibles, pero no se validan como alternativas de alta probabilidad: el conflicto compartido impide estimar su ventaja; under 3 además devuelve con exactamente tres goles",
+              "El gate de goals_over_under exige revisión y no autoriza promoción"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Disponibilidad, suspensiones y rotación sin verificar",
+              "Historial publicado de h2h: solamente 1 selección liquidada, ganada; insuficiente para acreditar calibración",
+              "La selección registra una hipótesis para revisión, no una ventaja demostrada",
+              "Conflicto material compartido: estado vigente y sede sin resolver",
+              "El gate de h2h exige revisión y no autoriza promoción",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Las frecuencias históricas no son probabilidades proyectadas",
+              "No hay selecciones de double_chance en el historial de validación suministrado",
+              "Protección frente al empate no demuestra alta probabilidad ni valor",
+              "El gate de double_chance exige revisión y no autoriza promoción",
+              "No puede establecerse ventaja positiva para validar esta alternativa protegida",
+              "No se verificó disponibilidad ofensiva ni defensiva",
+              "Historial publicado de goles: solamente 1 selección liquidada, perdida; insuficiente para acreditar calibración",
+              "Over 1.5 y under 3 están disponibles, pero no se validan como alternativas de alta probabilidad: el conflicto compartido impide estimar su ventaja; under 3 además devuelve con exactamente tres goles",
+              "El gate de goals_over_under exige revisión y no autoriza promoción"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1635588",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "La cuota favorita no demuestra superioridad ni ventaja de precio",
+              "Historial publicado h2h: una selección liquidada y ganada; muestra insuficiente para acreditar calibración",
+              "Conflicto material sin resolver entre sede física y asignación home/away de las cuotas",
+              "Cobertura reciente de J1 2026/27 incompleta y reemplazo del arquero suspendido sin verificar",
+              "El mercado no tiene aprobación explícita y sharedBlockers no está vacío",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Registrado para cobertura del mercado; no constituye una alternativa conservadora validada ni diversificación independiente",
+              "No puede establecerse edge positivo; la cuota 1.14 no acredita alta confianza",
+              "No hay selecciones liquidadas de double_chance en el feedback suministrado",
+              "Conflicto material de sede y correspondencia de la selección 1X sin reconciliar",
+              "Frecuencias por localía no trasladables automáticamente al fixture",
+              "Cobertura competitiva actual incompleta",
+              "Se utiliza el 0-0 de Chiba–Numazu a 90 minutos, no el agregado 1-1",
+              "Over 1.5 y under 3.5 tienen cuotas permitidas, pero no se añaden como alternativas de alta probabilidad porque no puede establecerse una estimación ni edge positivo defendibles",
+              "Historial publicado de goles: una selección liquidada y perdida; muestra insuficiente para calibración o ajuste de umbrales",
+              "Conflicto compartido de sede pendiente que afecta la contextualización del mercado",
+              "Distribución reciente incompleta y efecto de la suspensión del arquero sin sustento suficiente para cuantificarlo",
+              "No se mezclan amistosos, prórroga ni penales con los resultados reglamentarios",
+              "BTTS y over 2.5 pueden compartir factores ofensivos, pero son eventos distintos",
+              "No hay selecciones liquidadas de BTTS en el feedback suministrado",
+              "Conflicto compartido de sede sin resolver y splits BTTS sensibles a la localía",
+              "Señales contrapuestas entre competiciones y cobertura reciente incompleta",
+              "Reemplazo del arquero suspendido sin verificar"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "La cuota favorita no demuestra superioridad ni ventaja de precio",
+              "Historial publicado h2h: una selección liquidada y ganada; muestra insuficiente para acreditar calibración",
+              "Conflicto material sin resolver entre sede física y asignación home/away de las cuotas",
+              "Cobertura reciente de J1 2026/27 incompleta y reemplazo del arquero suspendido sin verificar",
+              "El mercado no tiene aprobación explícita y sharedBlockers no está vacío",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Registrado para cobertura del mercado; no constituye una alternativa conservadora validada ni diversificación independiente",
+              "No puede establecerse edge positivo; la cuota 1.14 no acredita alta confianza",
+              "No hay selecciones liquidadas de double_chance en el feedback suministrado",
+              "Conflicto material de sede y correspondencia de la selección 1X sin reconciliar",
+              "Frecuencias por localía no trasladables automáticamente al fixture",
+              "Cobertura competitiva actual incompleta",
+              "Se utiliza el 0-0 de Chiba–Numazu a 90 minutos, no el agregado 1-1",
+              "Over 1.5 y under 3.5 tienen cuotas permitidas, pero no se añaden como alternativas de alta probabilidad porque no puede establecerse una estimación ni edge positivo defendibles",
+              "Historial publicado de goles: una selección liquidada y perdida; muestra insuficiente para calibración o ajuste de umbrales",
+              "Conflicto compartido de sede pendiente que afecta la contextualización del mercado",
+              "Distribución reciente incompleta y efecto de la suspensión del arquero sin sustento suficiente para cuantificarlo",
+              "No se mezclan amistosos, prórroga ni penales con los resultados reglamentarios",
+              "BTTS y over 2.5 pueden compartir factores ofensivos, pero son eventos distintos",
+              "No hay selecciones liquidadas de BTTS en el feedback suministrado",
+              "Conflicto compartido de sede sin resolver y splits BTTS sensibles a la localía",
+              "Señales contrapuestas entre competiciones y cobertura reciente incompleta",
+              "Reemplazo del arquero suspendido sin verificar"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1638395",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Seven cup matches per team; historical frequencies are not forecasts",
+              "Prior h2h validation contains only one settled selection, won; it cannot establish calibration",
+              "Material shared availability conflict: current applicability of reported Salinas, Conelli, Fritz and Zúñiga absences remains unverified",
+              "No explicit market-specific promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Recorded for market coverage, not endorsed as a high-probability alternative",
+              "Qualification is distinct from the regulation result",
+              "No settled double_chance validation sample was supplied",
+              "Material shared availability conflict prevents transferring historical non-defeat rates to this fixture",
+              "Positive edge for the protected alternative cannot be established",
+              "Descriptive cup counts deduplicate the shared first leg",
+              "Under 3.5 is available as a lower-variance line, but no positive edge can be established while the shared conflict remains; no additional alternative is forced",
+              "Prior goals validation contains one settled selection, lost; it cannot establish calibration",
+              "Material shared availability conflict affects both scoring and conceding assumptions",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "Seven historical corner observations available and eleven unavailable; missing values are not zero",
+              "Neither side of 9.5 has sufficient bilateral support",
+              "No settled corners validation sample was supplied",
+              "Missing sufficient market-specific evidence: no available Cobreloa FT corner history or first-leg corner counts",
+              "Only three Coquimbo target-venue observations, all outside Copa Chile",
+              "Material shared availability conflict affects corner-production assumptions",
+              "Selected quote has low liquidity",
+              "market-specific evidence missing for corners_over_under:over:9.5",
+              "low-liquidity",
+              "BTTS no and under 2.5 have related scoring exposure but different settlement events",
+              "No settled btts validation sample was supplied",
+              "Material shared availability conflict affects clean-sheet and scoring assumptions"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Seven cup matches per team; historical frequencies are not forecasts",
+              "Prior h2h validation contains only one settled selection, won; it cannot establish calibration",
+              "Material shared availability conflict: current applicability of reported Salinas, Conelli, Fritz and Zúñiga absences remains unverified",
+              "No explicit market-specific promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "Recorded for market coverage, not endorsed as a high-probability alternative",
+              "Qualification is distinct from the regulation result",
+              "No settled double_chance validation sample was supplied",
+              "Material shared availability conflict prevents transferring historical non-defeat rates to this fixture",
+              "Positive edge for the protected alternative cannot be established",
+              "Descriptive cup counts deduplicate the shared first leg",
+              "Under 3.5 is available as a lower-variance line, but no positive edge can be established while the shared conflict remains; no additional alternative is forced",
+              "Prior goals validation contains one settled selection, lost; it cannot establish calibration",
+              "Material shared availability conflict affects both scoring and conceding assumptions",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "Seven historical corner observations available and eleven unavailable; missing values are not zero",
+              "Neither side of 9.5 has sufficient bilateral support",
+              "No settled corners validation sample was supplied",
+              "Missing sufficient market-specific evidence: no available Cobreloa FT corner history or first-leg corner counts",
+              "Only three Coquimbo target-venue observations, all outside Copa Chile",
+              "Material shared availability conflict affects corner-production assumptions",
+              "Selected quote has low liquidity",
+              "market-specific evidence missing for corners_over_under:over:9.5",
+              "low-liquidity",
+              "BTTS no and under 2.5 have related scoring exposure but different settlement events",
+              "No settled btts validation sample was supplied",
+              "Material shared availability conflict affects clean-sheet and scoring assumptions"
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1643186",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "Four-match venue samples are small; domestic divisions are not interchangeable",
+              "Universidad's nominal away sample includes the Everton match completed at Estadio Nacional",
+              "Historical validation contains only one settled h2h selection, won; it does not establish calibration",
+              "Material shared availability conflict prevents transferring historical comparative strength to this fixture",
+              "No explicit market promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "This is a blocked coverage candidate, not an established high-probability alternative",
+              "The nominal away venue exception and different domestic opposition limit comparability",
+              "No settled double_chance validation sample was supplied",
+              "Material shared availability conflict prevents estimating current non-loss probability",
+              "Positive edge for a protected alternative cannot be established",
+              "Cup and domestic frequencies were not pooled or treated as forecasts",
+              "Under 3.0/3.25/3.5 and over 1.5 alternatives cannot establish positive edge while the material availability conflict remains; none is presented as a qualified conservative pick",
+              "Historical validation contains one settled goals selection, lost; it is insufficient for calibration or threshold adjustment",
+              "Material shared availability conflict affects both scoring and conceding expectations",
+              "Conflicting cup and domestic scoring patterns lack a defensible fixture-specific reconciliation",
+              "Thirteen unavailable historical counts remain unknown, not zero",
+              "No settled corners validation sample was supplied",
+              "Missing Antofagasta corner history: zero available counts from ten matches",
+              "Universidad sample contains only seven matches from another competition, including three away",
+              "Material shared availability conflict affects expected territorial pressure",
+              "Selected quote has low-liquidity support",
+              "low-liquidity",
+              "Small venue samples and differing cup/domestic patterns limit transferability",
+              "BTTS and goals totals are related but have different settlement conditions",
+              "No settled btts validation sample was supplied",
+              "Material shared availability conflict affects each team's ability to score and keep a clean sheet"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "Four-match venue samples are small; domestic divisions are not interchangeable",
+              "Universidad's nominal away sample includes the Everton match completed at Estadio Nacional",
+              "Historical validation contains only one settled h2h selection, won; it does not establish calibration",
+              "Material shared availability conflict prevents transferring historical comparative strength to this fixture",
+              "No explicit market promotion approval",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "This is a blocked coverage candidate, not an established high-probability alternative",
+              "The nominal away venue exception and different domestic opposition limit comparability",
+              "No settled double_chance validation sample was supplied",
+              "Material shared availability conflict prevents estimating current non-loss probability",
+              "Positive edge for a protected alternative cannot be established",
+              "Cup and domestic frequencies were not pooled or treated as forecasts",
+              "Under 3.0/3.25/3.5 and over 1.5 alternatives cannot establish positive edge while the material availability conflict remains; none is presented as a qualified conservative pick",
+              "Historical validation contains one settled goals selection, lost; it is insufficient for calibration or threshold adjustment",
+              "Material shared availability conflict affects both scoring and conceding expectations",
+              "Conflicting cup and domestic scoring patterns lack a defensible fixture-specific reconciliation",
+              "Thirteen unavailable historical counts remain unknown, not zero",
+              "No settled corners validation sample was supplied",
+              "Missing Antofagasta corner history: zero available counts from ten matches",
+              "Universidad sample contains only seven matches from another competition, including three away",
+              "Material shared availability conflict affects expected territorial pressure",
+              "Selected quote has low-liquidity support",
+              "low-liquidity",
+              "Small venue samples and differing cup/domestic patterns limit transferability",
+              "BTTS and goals totals are related but have different settlement conditions",
+              "No settled btts validation sample was supplied",
+              "Material shared availability conflict affects each team's ability to score and keep a clean sheet"
+            ]
+          }
+        }
+      ],
+      "predictions": 96,
+      "probabilityEstimates": 49,
+      "uniquePredictionKeys": 96,
+      "promotable": 0,
+      "promotableFixtures": 0,
+      "predictionStatus": {
+        "review-required": 41,
+        "blocked": 55
+      },
+      "promotableByDiscovery": {},
+      "recommendations": 0,
+      "generalRecommendations": 0,
+      "requiredRecommendations": 0,
+      "atomic": 0,
+      "parlays": 0,
+      "finalUniquePredictions": 0,
+      "council": {
+        "approved": 0,
+        "inspiredBy": {
+          "mode": "execution-lean triad-compatible local gate",
+          "name": "Council of High Intelligence",
+          "url": "https://github.com/0xNyk/council-of-high-intelligence"
+        },
+        "panel": [
+          "feynman",
+          "kahneman",
+          "taleb",
+          "meadows",
+          "torvalds"
+        ],
+        "rejected": 0,
+        "reviewRequired": 0,
+        "status": "blocked",
+        "version": "gana-local-council-v1"
+      },
+      "evidenceItems": 440,
+      "sources": 611,
+      "calls": 41,
+      "failedCalls": 0,
+      "unknownUsage": 0,
+      "partialUsage": 0,
+      "allModelsVerified": true,
+      "allCountersMatch": true,
+      "inputTokens": 7121424,
+      "cachedTokens": 4869120,
+      "cacheWriteTokens": 0,
+      "outputTokens": 236463,
+      "reasoningTokens": 9243,
+      "totalTokens": 7357887,
+      "tokenUsd": 39.21531000000001,
+      "noCacheTokenUsd": 83.03739,
+      "stages": {
+        "research": {
+          "calls": 22,
+          "completed": 22,
+          "inputTokens": 6303940,
+          "cachedTokens": 4837888,
+          "outputTokens": 173504,
+          "totalTokens": 6477444,
+          "tokenUsd": 28.173608
+        },
+        "scoring": {
+          "calls": 19,
+          "completed": 19,
+          "inputTokens": 817484,
+          "cachedTokens": 31232,
+          "outputTokens": 62959,
+          "totalTokens": 880443,
+          "tokenUsd": 11.041702000000003
+        },
+        "portfolio": {
+          "calls": 0,
+          "completed": 0,
+          "inputTokens": 0,
+          "cachedTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "tokenUsd": 0
+        }
+      },
+      "runId": "76ec5847-974a-48c6-8b10-f9eef8ddbdbd",
+      "dailyBatchId": "daily-2026-10-07-ms-astra6"
+    },
+    {
+      "cell": "luna6",
+      "model": "gpt-6-luna",
+      "effort": "xhigh",
+      "state": "review-required",
+      "exitCode": 1,
+      "verdict": "review-required",
+      "minutes": 52.01441666666667,
+      "fixtures": [
+        "1492391",
+        "1492392",
+        "1492393",
+        "1492395",
+        "1492397",
+        "1492399",
+        "1517309",
+        "1517361",
+        "1520910",
+        "1520911",
+        "1520913",
+        "1520916",
+        "1520919",
+        "1549587",
+        "1562767",
+        "1597397",
+        "1635588",
+        "1638101",
+        "1638395",
+        "1638581",
+        "1638733",
+        "1643186"
+      ],
+      "researchPersisted": 22,
+      "researchValid": 18,
+      "researchFallback": 4,
+      "researchFallbacks": [
+        {
+          "providerFixtureId": "1517361",
+          "reason": "research agent timed out after 300s"
+        },
+        {
+          "providerFixtureId": "1520913",
+          "reason": "research agent timed out after 300s"
+        },
+        {
+          "providerFixtureId": "1520919",
+          "reason": "research agent timed out after 300s"
+        },
+        {
+          "providerFixtureId": "1549587",
+          "reason": "Native Codex web_search was required but was not used for provider codex mode=live. Reason: research fixture. Action: retry with /web live for research/current-info work, or use /web off for local-only work."
+        }
+      ],
+      "researchFailed": 0,
+      "evidenceIssues": [],
+      "evidenceAudited": 0,
+      "researchGates": {
+        "review-required": 20,
+        "promotable": 2
+      },
+      "researchMarketGates": {
+        "h2h:review-required": 8,
+        "double_chance:review-required": 8,
+        "goals_over_under:review-required": 8,
+        "corners_over_under:review-required": 13,
+        "btts:review-required": 9,
+        "h2h:promotable": 10,
+        "double_chance:promotable": 10,
+        "goals_over_under:promotable": 10,
+        "btts:promotable": 9,
+        "corners_over_under:promotable": 4,
+        "corners_over_under:blocked": 1
+      },
+      "scored": 16,
+      "scoringOk": 14,
+      "scoringFailures": [
+        {
+          "providerFixtureId": "1638581",
+          "error": "Odds snapshot \"029be7f1-ac84-4100-ad3c-1021ce9f5ef5\" has no persisted quotes for requested markets: h2h, double_chance, goals_over_under, corners_over_under, btts."
+        },
+        {
+          "providerFixtureId": "1517309",
+          "error": "Monetary automation is blocked: Gana v9 only produces analytical artifacts and cannot execute wagers, move funds, collect financial credentials, or guarantee results."
+        },
+        {
+          "providerFixtureId": "1517361",
+          "error": "score --web live requires a fresh research bundle with real web-search evidence for fixture \"1517361\". Current coverage: no real web-search source is linked. Action: run pnpm gana research --fixture-id 1517361 --web live --markets h2h,double_chance,goals_over_under,corners_over_under,btts and retry scoring, or use --web off for local-only scoring."
+        },
+        {
+          "providerFixtureId": "1520913",
+          "error": "score --web live requires a fresh research bundle with real web-search evidence for fixture \"1520913\". Current coverage: no real web-search source is linked. Action: run pnpm gana research --fixture-id 1520913 --web live --markets h2h,double_chance,goals_over_under,corners_over_under,btts and retry scoring, or use --web off for local-only scoring."
+        },
+        {
+          "providerFixtureId": "1520919",
+          "error": "score --web live requires a fresh research bundle with real web-search evidence for fixture \"1520919\". Current coverage: no real web-search source is linked. Action: run pnpm gana research --fixture-id 1520919 --web live --markets h2h,double_chance,goals_over_under,corners_over_under,btts and retry scoring, or use --web off for local-only scoring."
+        },
+        {
+          "providerFixtureId": "1549587",
+          "error": "score --web live requires a fresh research bundle with real web-search evidence for fixture \"1549587\". Current coverage: no real web-search source is linked. Action: run pnpm gana research --fixture-id 1549587 --web live --markets h2h,double_chance,goals_over_under,corners_over_under,btts and retry scoring, or use --web off for local-only scoring."
+        }
+      ],
+      "scoringGateBlocks": [
+        {
+          "providerFixtureId": "1638733",
+          "gate": {
+            "reasons": [
+              "research is not promotable",
+              "No hay muestra de calibración: el registro histórico suministrado contiene solo una selección h2h liquidada.",
+              "Conflicto material sobre la fecha e identidad del fixture: API-Football y Jordan News indican 7 de octubre; Armenpress, citando a la federación armenia, indica 6 de octubre.",
+              "Solo hay dos resultados de Jordan W y ninguno de Armenia W; el historial no establece una probabilidad para este partido.",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "No hay muestra histórica liquidada suministrada para doble oportunidad.",
+              "El feedback histórico suministrado para goles es una selección liquidada, insuficiente para afirmar calibración.",
+              "Conflicto material sobre la fecha e identidad del fixture; no se puede asegurar que la evidencia corresponda al partido evaluado.",
+              "Solo hay dos resultados de Jordan W y ninguno de Armenia W; el over 2.5 apareció en uno de esos dos partidos, muestra insuficiente para estimar este encuentro."
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "research is not promotable",
+              "No hay muestra de calibración: el registro histórico suministrado contiene solo una selección h2h liquidada.",
+              "Conflicto material sobre la fecha e identidad del fixture: API-Football y Jordan News indican 7 de octubre; Armenpress, citando a la federación armenia, indica 6 de octubre.",
+              "Solo hay dos resultados de Jordan W y ninguno de Armenia W; el historial no establece una probabilidad para este partido.",
+              "calibration skipped: missing modelProbability",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "No hay muestra histórica liquidada suministrada para doble oportunidad.",
+              "El feedback histórico suministrado para goles es una selección liquidada, insuficiente para afirmar calibración.",
+              "Conflicto material sobre la fecha e identidad del fixture; no se puede asegurar que la evidencia corresponda al partido evaluado.",
+              "Solo hay dos resultados de Jordan W y ninguno de Armenia W; el over 2.5 apareció en uno de esos dos partidos, muestra insuficiente para estimar este encuentro."
+            ]
+          }
+        },
+        {
+          "providerFixtureId": "1635588",
+          "gate": {
+            "reasons": [
+              "material conflict in selected market research",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "research is not promotable",
+              "A prior direct win is one observation, not a calibrated forecast.",
+              "The h2h gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "An official 2026-09-02 Chiba 1-2 Okayama result is missing from both supplied recent-ten lists, materially affecting the result sample",
+              "Expected rotation is reported, but the Cup XI and full availability are unconfirmed",
+              "Available evidence is descriptive and does not support a defensible home-win probability or selection-specific estimate",
+              "calibration skipped: missing modelProbability",
+              "market-specific evidence missing for h2h:home",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "This selection overlaps directionally with the h2h home candidate.",
+              "The double_chance gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "The omitted official 2026-09-02 result undermines the supplied recent-ten records",
+              "Expected rotation and unconfirmed lineups leave result uncertainty unresolved",
+              "No selection-specific evidence supports a defensible probability or positive edge at this quote",
+              "market-specific evidence missing for double_chance:home_or_draw",
+              "No conservative goals alternative is advanced: the supplied summaries do not establish a defensible probability at the available higher under lines, so an edge cannot be assessed.",
+              "The goals gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "The supplied over-1.5 frequencies are incomplete because the official 2026-09-02 1-2 result is absent from both recent-ten lists",
+              "The prior Cup scoring sample is only one match per team and the expected Cup rotation has unconfirmed lineups",
+              "Descriptive totals and the market quote alone do not establish a defensible probability for over 1.5",
+              "market-specific evidence missing for goals_over_under:over:1.5",
+              "The btts gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "The supplied BTTS frequencies omit an official 2026-09-02 1-2 result, which was BTTS yes",
+              "The prior Cup sample is one match per team and both were BTTS no; expected rotation and lineups remain uncertain",
+              "Available evidence is mixed and does not support a defensible BTTS yes probability",
+              "market-specific evidence missing for btts:yes"
+            ],
+            "verdict": "blocked",
+            "warnings": [
+              "material conflict in selected market research",
+              "insufficient evidence: at least one valid claim is required",
+              "insufficient evidence: at least two linked evidence items with confidence >= 0.5 are required",
+              "research is not promotable",
+              "A prior direct win is one observation, not a calibrated forecast.",
+              "The h2h gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "An official 2026-09-02 Chiba 1-2 Okayama result is missing from both supplied recent-ten lists, materially affecting the result sample",
+              "Expected rotation is reported, but the Cup XI and full availability are unconfirmed",
+              "Available evidence is descriptive and does not support a defensible home-win probability or selection-specific estimate",
+              "calibration skipped: missing modelProbability",
+              "market-specific evidence missing for h2h:home",
+              "confidence 0 below promotion floor 0.65",
+              "confidence below configured minimum 0.5",
+              "missing-model-probability",
+              "low-confidence",
+              "This selection overlaps directionally with the h2h home candidate.",
+              "The double_chance gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "The omitted official 2026-09-02 result undermines the supplied recent-ten records",
+              "Expected rotation and unconfirmed lineups leave result uncertainty unresolved",
+              "No selection-specific evidence supports a defensible probability or positive edge at this quote",
+              "market-specific evidence missing for double_chance:home_or_draw",
+              "No conservative goals alternative is advanced: the supplied summaries do not establish a defensible probability at the available higher under lines, so an edge cannot be assessed.",
+              "The goals gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "The supplied over-1.5 frequencies are incomplete because the official 2026-09-02 1-2 result is absent from both recent-ten lists",
+              "The prior Cup scoring sample is only one match per team and the expected Cup rotation has unconfirmed lineups",
+              "Descriptive totals and the market quote alone do not establish a defensible probability for over 1.5",
+              "market-specific evidence missing for goals_over_under:over:1.5",
+              "The btts gate is review-required and has no explicit promotable decision with sharedBlockers=[]",
+              "The supplied BTTS frequencies omit an official 2026-09-02 1-2 result, which was BTTS yes",
+              "The prior Cup sample is one match per team and both were BTTS no; expected rotation and lineups remain uncertain",
+              "Available evidence is mixed and does not support a defensible BTTS yes probability",
+              "market-specific evidence missing for btts:yes"
+            ]
+          }
+        }
+      ],
+      "predictions": 84,
+      "probabilityEstimates": 70,
+      "uniquePredictionKeys": 84,
+      "promotable": 0,
+      "promotableFixtures": 0,
+      "predictionStatus": {
+        "blocked": 30,
+        "review-required": 54
+      },
+      "promotableByDiscovery": {},
+      "recommendations": 0,
+      "generalRecommendations": 0,
+      "requiredRecommendations": 0,
+      "atomic": 0,
+      "parlays": 0,
+      "finalUniquePredictions": 0,
+      "council": {
+        "approved": 0,
+        "inspiredBy": {
+          "mode": "execution-lean triad-compatible local gate",
+          "name": "Council of High Intelligence",
+          "url": "https://github.com/0xNyk/council-of-high-intelligence"
+        },
+        "panel": [
+          "feynman",
+          "kahneman",
+          "taleb",
+          "meadows",
+          "torvalds"
+        ],
+        "rejected": 0,
+        "reviewRequired": 0,
+        "status": "blocked",
+        "version": "gana-local-council-v1"
+      },
+      "evidenceItems": 379,
+      "sources": 530,
+      "calls": 52,
+      "failedCalls": 17,
+      "unknownUsage": 0,
+      "partialUsage": 17,
+      "allModelsVerified": true,
+      "allCountersMatch": true,
+      "inputTokens": 11828308,
+      "cachedTokens": 8914688,
+      "cacheWriteTokens": 0,
+      "outputTokens": 708045,
+      "reasoningTokens": 532952,
+      "totalTokens": 12536353,
+      "tokenUsd": 0.73453138,
+      "noCacheTokenUsd": 1.5368533,
+      "stages": {
+        "research": {
+          "calls": 36,
+          "completed": 19,
+          "inputTokens": 11151947,
+          "cachedTokens": 8817664,
+          "outputTokens": 560386,
+          "totalTokens": 11712333,
+          "tokenUsd": 0.60179794
+        },
+        "scoring": {
+          "calls": 16,
+          "completed": 16,
+          "inputTokens": 676361,
+          "cachedTokens": 97024,
+          "outputTokens": 147659,
+          "totalTokens": 824020,
+          "tokenUsd": 0.13273344
+        },
+        "portfolio": {
+          "calls": 0,
+          "completed": 0,
+          "inputTokens": 0,
+          "cachedTokens": 0,
+          "outputTokens": 0,
+          "totalTokens": 0,
+          "tokenUsd": 0
+        }
+      },
+      "runId": "eb6ed67a-62e1-4cad-b9fc-4f88a46937a1",
+      "dailyBatchId": "daily-2026-10-07-ms-luna6"
+    }
+  ],
+  "finalVerification": {
+    "completedAt": "2026-10-06T21:47:54.952Z",
+    "verifiedSessions": 200,
+    "unmeteredSessions": 0,
+    "duplicateSessions": 0,
+    "callsStillRunning": 0,
+    "csvShape": "passed",
+    "fixtureLabels": "passed",
+    "modelsAndEfforts": "passed",
+    "completedCounters": "passed",
+    "sportsAndOdds": {
+      "inconsistentSelectionOdds": [],
+      "sportsRequests": 2425,
+      "uniqueSportsResponses": 561,
+      "inconsistentResponseUrls": [],
+      "sameFixtureCohort": true
+    },
+    "evidenceChains": {
+      "sol61": {
+        "audited": 0,
+        "issues": []
+      },
+      "sol56": {
+        "audited": 11,
+        "issues": []
+      },
+      "astra6": {
+        "audited": 0,
+        "issues": []
+      },
+      "luna6": {
+        "audited": 0,
+        "issues": []
+      }
+    }
+  },
+  "deliveryVerification": {
+    "checkedAt": "2026-10-06T21:48:03.468Z",
+    "sentMessages": 0,
+    "results": [
+      {
+        "cell": "sol61",
+        "counts": {
+          "total": 0,
+          "recommendations": 0,
+          "requiredAtomic": 0,
+          "requiredSelectedParlays": 0
+        },
+        "alignment": {
+          "ok": true,
+          "reason": "no-rendered-selections",
+          "rendered": [],
+          "targets": {
+            "parlayIds": [],
+            "predictionIds": []
+          }
+        },
+        "targetIds": {
+          "ok": true,
+          "reason": "publication-target-ids-valid",
+          "persistedParlayIds": [],
+          "artifactOnlyParlayIds": [],
+          "invalidParlayIds": [],
+          "predictionIds": [],
+          "invalidPredictionIds": []
+        },
+        "dbLedger": {
+          "ok": true,
+          "reason": "no selections to verify"
+        },
+        "renderedSelectionCount": 0,
+        "payloadCount": 1,
+        "ok": true
+      },
+      {
+        "cell": "sol56",
+        "counts": {
+          "total": 4,
+          "recommendations": 0,
+          "requiredAtomic": 3,
+          "requiredSelectedParlays": 1
+        },
+        "alignment": {
+          "ok": true,
+          "reason": "ledger-aligned",
+          "rendered": [
+            {
+              "source": "requiredLeague.atomicProjections",
+              "kind": "prediction",
+              "id": "437bff0e-3a17-4ce3-90eb-e48fd4d50ca1"
+            },
+            {
+              "source": "requiredLeague.atomicProjections",
+              "kind": "prediction",
+              "id": "92a9437c-2237-4588-886d-547407040376"
+            },
+            {
+              "source": "requiredLeague.atomicProjections",
+              "kind": "prediction",
+              "id": "f66660c2-0227-448e-9fa1-0425b9e256a5"
+            },
+            {
+              "source": "requiredLeague.parlayProjections:principal",
+              "kind": "parlay",
+              "id": "82883ba3-ccce-5ed6-9e79-92cf70585c23"
+            }
+          ],
+          "targets": {
+            "parlayIds": [
+              "82883ba3-ccce-5ed6-9e79-92cf70585c23"
+            ],
+            "predictionIds": [
+              "437bff0e-3a17-4ce3-90eb-e48fd4d50ca1",
+              "92a9437c-2237-4588-886d-547407040376",
+              "f66660c2-0227-448e-9fa1-0425b9e256a5"
+            ]
+          }
+        },
+        "targetIds": {
+          "ok": true,
+          "reason": "publication-target-ids-valid",
+          "persistedParlayIds": [
+            "82883ba3-ccce-5ed6-9e79-92cf70585c23"
+          ],
+          "artifactOnlyParlayIds": [],
+          "invalidParlayIds": [],
+          "predictionIds": [
+            "437bff0e-3a17-4ce3-90eb-e48fd4d50ca1",
+            "92a9437c-2237-4588-886d-547407040376",
+            "f66660c2-0227-448e-9fa1-0425b9e256a5"
+          ],
+          "invalidPredictionIds": []
+        },
+        "dbLedger": {
+          "ok": true,
+          "reason": "verified-db-ledger:p=1,artifact-p=0,pred=3",
+          "parlayIds": [
+            "82883ba3-ccce-5ed6-9e79-92cf70585c23"
+          ],
+          "dbParlayIds": [
+            "82883ba3-ccce-5ed6-9e79-92cf70585c23"
+          ],
+          "artifactOnlyParlayIds": [],
+          "invalidParlayIds": [],
+          "predictionIds": [
+            "437bff0e-3a17-4ce3-90eb-e48fd4d50ca1",
+            "92a9437c-2237-4588-886d-547407040376",
+            "f66660c2-0227-448e-9fa1-0425b9e256a5"
+          ],
+          "fixtureEligibility": {
+            "ok": true,
+            "reason": "publication-fixtures-upcoming",
+            "checkedAt": "2026-10-06T21:48:03.279Z",
+            "fixtureCount": 5
+          }
+        },
+        "renderedSelectionCount": 4,
+        "payloadCount": 1,
+        "ok": true
+      },
+      {
+        "cell": "astra6",
+        "counts": {
+          "total": 0,
+          "recommendations": 0,
+          "requiredAtomic": 0,
+          "requiredSelectedParlays": 0
+        },
+        "alignment": {
+          "ok": true,
+          "reason": "no-rendered-selections",
+          "rendered": [],
+          "targets": {
+            "parlayIds": [],
+            "predictionIds": []
+          }
+        },
+        "targetIds": {
+          "ok": true,
+          "reason": "publication-target-ids-valid",
+          "persistedParlayIds": [],
+          "artifactOnlyParlayIds": [],
+          "invalidParlayIds": [],
+          "predictionIds": [],
+          "invalidPredictionIds": []
+        },
+        "dbLedger": {
+          "ok": true,
+          "reason": "no selections to verify"
+        },
+        "renderedSelectionCount": 0,
+        "payloadCount": 1,
+        "ok": true
+      },
+      {
+        "cell": "luna6",
+        "counts": {
+          "total": 0,
+          "recommendations": 0,
+          "requiredAtomic": 0,
+          "requiredSelectedParlays": 0
+        },
+        "alignment": {
+          "ok": true,
+          "reason": "no-rendered-selections",
+          "rendered": [],
+          "targets": {
+            "parlayIds": [],
+            "predictionIds": []
+          }
+        },
+        "targetIds": {
+          "ok": true,
+          "reason": "publication-target-ids-valid",
+          "persistedParlayIds": [],
+          "artifactOnlyParlayIds": [],
+          "invalidParlayIds": [],
+          "predictionIds": [],
+          "invalidPredictionIds": []
+        },
+        "dbLedger": {
+          "ok": true,
+          "reason": "no selections to verify"
+        },
+        "renderedSelectionCount": 0,
+        "payloadCount": 1,
+        "ok": true
+      }
+    ]
+  },
+  "methodTests": {
+    "command": "node --test scripts/tests/model-study.test.mjs",
+    "passed": 4,
+    "failed": 0
+  }
+}

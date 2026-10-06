@@ -1,0 +1,330 @@
+[
+  {
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "sources": [
+      {
+        "summary": "Previa específica del 07/10 observada antes del kickoff: Sosa suspendido; Fabrício, Davi Gomes, Rodriguinho y Patrick Silva lesionados; Mirassol tiene a Negueba y Aldo Filho lesionados y Walter en duda. Información secundaria sin confirmación oficial actual; búsqueda indica publicación ayer, pero fecha y hora exactas no verificadas; apertura directa falló",
+        "url": "https://www.ogol.com.br/noticias/red-bull-bragantino-x-mirassol-horario-escalacoes-e-estatisticas-brasileirao-07-10/1219929",
+        "title": "oGol: Red Bull Bragantino x Mirassol, previa del 07/10/2026"
+      },
+      {
+        "summary": "Publicación oficial del 2026-10-01 22:00 UTC confirma ambos equipos, Brasileirão, jornada 29, 07/10 a las 19:30 de Brasilia y estadio Cícero de Souza Marques; coincide con el proveedor",
+        "url": "https://www.redbullbragantino.com/br-pt/noticias/check-in-e-ingressos-29-rodada-do-brasileirao-2026",
+        "title": "Red Bull Bragantino: Check-in e ingressos – 29ª rodada do Brasileirão 2026"
+      }
+    ],
+    "gates": [
+      {
+        "markets": [
+          {
+            "market": "h2h",
+            "reasons": [
+              "Resultados, sedes y contexto de oposición sustentados; falta resolver la duda material sobre el arquero de Mirassol"
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "double_chance",
+            "reasons": [
+              "Frecuencias de derrota/no derrota trazables con contraevidencia reciente; disponibilidad de Walter pendiente"
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "goals_over_under",
+            "reasons": [
+              "Distribuciones de 90 minutos cubren todas las líneas ofrecidas, incluidas liquidaciones asiáticas; duda material sobre Walter sin confirmar"
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "corners_over_under",
+            "reasons": [
+              "Quince partidos únicos de liga con corners FT, fechas, sedes y fuentes exactas; evaluación descriptiva de las cinco líneas disponibles, con muestras pequeñas explícitas y sin conflicto material identificado"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "btts",
+            "reasons": [
+              "BTTS reciente y márgenes estacionales sustentados, con contraevidencia por sede; disponibilidad del arquero pendiente"
+            ],
+            "verdict": "review-required"
+          }
+        ],
+        "reasons": [
+          "Identidad confirmada oficialmente y evidencia histórica trazable para los cinco mercados",
+          "La duda específica sobre Walter carece de confirmación oficial actual y afecta h2h, double_chance, goals_over_under y btts",
+          "corners_over_under conserva evidencia utilizable por línea; la incertidumbre del arquero no constituye un bloqueo material demostrado para esos conteos"
+        ],
+        "verdict": "review-required",
+        "warnings": [
+          "Observación web realizada el 2026-10-06 antes del kickoff exclusivo 2026-10-07T22:30:00Z; corte histórico del proveedor 2026-10-05, distinto de capturedAt",
+          "La publicación oficial tiene fecha verificable; la hora exacta de publicación de la previa secundaria es desconocida. Se usa como señal de disponibilidad pendiente, no como confirmación oficial",
+          "Alineaciones confirmadas ausentes por timing normal; su ausencia sola no determina los veredictos ni demuestra disponibilidad completa",
+          "corners_over_under: el amistoso 1642874 tiene corners desconocidos, nunca cero; copas y amistoso no se mezclan con la muestra principal de Serie A",
+          "Los historiales de equipo y liga se solapan y no aportan observaciones independientes duplicadas; amistoso, Sudamericana y Libertadores permanecen separados",
+          "supported califica hechos descriptivos; promotable sólo indica preparación factual para scoring, sin probabilidad calibrada, edge ni aprobación de selección",
+          "Historical corners: 18 matches available, 1 unavailable; no imputation.",
+          "h2h y double_chance: resolver la disponibilidad de Walter y contrastar las bajas reportadas antes de promover sus implicaciones",
+          "goals_over_under y btts: la duda sobre Walter puede cambiar la interpretación de concesión de goles",
+          "corners_over_under: sólo tres observaciones por sede objetivo; los promedios generales incluyen otros mandos"
+        ],
+        "sharedBlockers": []
+      }
+    ]
+  },
+  {
+    "model": "gpt-5.6-sol",
+    "effort": "xhigh",
+    "sources": [
+      {
+        "summary": "El sitio oficial de Bragantino anuncia el partido de la jornada 29 contra Mirassol para el 7 de octubre a las 19:30 locales, consistente con 22:30Z",
+        "url": "https://www.redbullbragantino.com/br-pt",
+        "title": "Red Bull Bragantino official site"
+      },
+      {
+        "summary": "La previa observada antes del inicio lista a Ignacio Sosa suspendido y cuatro bajas por lesión en Bragantino; para Mirassol lista a Walter en duda y a Negueba y Aldo Filho lesionados. Es una fuente secundaria y su hora exacta de publicación no aparece",
+        "url": "https://www.ogol.com.br/noticias/red-bull-bragantino-x-mirassol-horario-escalacoes-e-estatisticas-brasileirao-07-10/1219929",
+        "title": "Red Bull Bragantino x Mirassol: horário, escalações e estatísticas"
+      }
+    ],
+    "gates": [
+      {
+        "markets": [
+          {
+            "market": "h2h",
+            "reasons": [
+              "Splits local/visitante de 13 partidos y forma de liga de 10 partidos por equipo están trazados; la contraevidencia reciente quedó explícita"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "double_chance",
+            "reasons": [
+              "Los componentes ganar, empatar y evitar derrota están sustentados por splits de sede y submuestras recientes"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "goals_over_under",
+            "reasons": [
+              "La distribución de goles de 20 partidos únicos y las tasas estacionales permiten evaluar las líneas ofrecidas en scoring"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "corners_over_under",
+            "reasons": [
+              "Seis registros FT exactos y acordes con la sede cubren explícitamente cada línea ofrecida; la muestra pequeña queda advertida"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "btts",
+            "reasons": [
+              "Frecuencias recientes, porterías a cero y partidos sin marcar ofrecen soporte trazable y contraevidencia por sede"
+            ],
+            "verdict": "promotable"
+          }
+        ],
+        "reasons": [
+          "Los cinco mercados tienen evidencia factual trazable anterior al inicio, con splits de sede, muestras recientes y cotizaciones disponibles",
+          "La búsqueda web en vivo verificó la identidad y horario del fixture y aportó contexto actual de disponibilidad",
+          "No se detectó un conflicto material que invalide las conclusiones descriptivas; promotable significa listo para scoring, no pick aprobado",
+          "objective research gate passed with current web evidence"
+        ],
+        "verdict": "promotable",
+        "warnings": [
+          "No se infirió disponibilidad total a partir de la ausencia de alineaciones",
+          "Los historiales entre competiciones se mantuvieron separados; el amistoso de Mirassol no se combinó con partidos competitivos y los encuentros de liga repetidos no se duplicaron",
+          "No se imputó el registro de córners faltante del amistoso de Mirassol",
+          "No se estimaron probabilidades, edge ni picks en esta etapa",
+          "Historical corners: 18 matches available, 1 unavailable; no imputation.",
+          "h2h, double_chance, goals_over_under y btts: la disponibilidad procede de una previa secundaria y debe revisarse cerca del inicio",
+          "h2h, double_chance, goals_over_under, corners_over_under y btts: no había alineaciones confirmadas al capturar la investigación, situación normal antes del partido",
+          "corners_over_under: la muestra específica de sede es de seis partidos y requiere incertidumbre amplia",
+          "Todos los mercados: las cuotas sólo describen precios; no prueban probabilidad calibrada, ventaja ni elegibilidad"
+        ],
+        "sharedBlockers": []
+      }
+    ]
+  },
+  {
+    "model": "gpt-6-astra",
+    "effort": "medium",
+    "sources": [
+      {
+        "summary": "Official October 1 announcement independently confirms October 7, 19:30 local, round 29 at Estádio Municipal Cícero de Souza Marques. Observed before kickoff.",
+        "url": "https://www.redbullbragantino.com/br-pt/noticias/check-in-e-ingressos-29-rodada-do-brasileirao-2026",
+        "title": "Official Bragantino fixture announcement; published 2026-10-01 22:00 UTC"
+      },
+      {
+        "summary": "Official dynamic club page independently lists Bragantino's August 9–October 3 league results: Corinthians 0–2, Athletico 1–1, Gremio 1–0, Sao Paulo 1–2, Bahia 2–3, Botafogo 1–1, Flamengo 1–2, Atletico-MG 0–1, in Bragantino perspective. These corroborate eight supplied records, not eight additional observations. Publication time unknown; observed in pre-match research.",
+        "url": "https://www.redbullbragantino.com/br-pt",
+        "title": "Official Bragantino results and schedule; dynamic page, publication time unknown"
+      },
+      {
+        "summary": "Dated October 5 preview, updated October 6, reports Alix unavailable under concussion protocol, Sosa suspended, and Bragantino absences including Fabrício, Davi Gomes, Rodriguinho and Patrick. Mirassol: Negueba and Aldo Filho unavailable; Walter doubtful, Alex Muralha projected. These are attributed reports, not official confirmed lineups.",
+        "url": "https://www.ogol.com.br/noticias/red-bull-bragantino-x-mirassol-horario-escalacoes-e-estatisticas-brasileirao-07-10/1219929",
+        "title": "oGol fixture preview; published October 5, updated October 6 at 08:15, timezone unspecified"
+      },
+      {
+        "summary": "October 6 GE search excerpt instead projects Walter in Mirassol's starting XI and reports an incoming reinforcement without identifying it in the accessible excerpt. Full page could not be opened. A predicted XI does not establish Walter's medical clearance; goalkeeper uncertainty remains unresolved.",
+        "url": "https://ge.globo.com/sp/tem-esporte/futebol/times/mirassol/noticia/2026/10/06/escalacao-do-mirassol-guanaes-ganha-reforco-mas-nao-deve-mexer-contra-o-bragantino.ghtml",
+        "title": "GE Mirassol team news; October 6 at 15:37; search excerpt only"
+      }
+    ],
+    "gates": [
+      {
+        "markets": [
+          {
+            "market": "h2h",
+            "reasons": [
+              "Season venue splits, dated last-ten results, prior-opponent samples and independent result corroboration support descriptive scoring inputs",
+              "Recent Bragantino deterioration and known absences are retained as counter-evidence; no particular starting goalkeeper is assumed"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "double_chance",
+            "reasons": [
+              "Traceable season and recent venue non-loss/draw counts support all three double-chance outcomes descriptively",
+              "No missing quote or material conflict affects the historical counts; availability uncertainty remains an explicit scoring caveat"
+            ],
+            "verdict": "promotable"
+          },
+          {
+            "market": "goals_over_under",
+            "reasons": [
+              "All offered lines have traceable regulation-score context, including exact-two and exact-three counts",
+              "Walter's unresolved medical status versus a projected start materially affects current defensive interpretation"
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "corners_over_under",
+            "reasons": [
+              "Exact FT sources support each offered line in separate home/away Serie A subsets",
+              "Only three target-venue matches per team and substantial dispersion leave the fixture implication thin; broader cross-venue and cup observations cannot substitute for that split"
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "btts",
+            "reasons": [
+              "Historical BTTS counts and counter-evidence are supported independently of prices",
+              "Conflicting goalkeeper projections with unresolved fitness warrant review of the current conceding context"
+            ],
+            "verdict": "review-required"
+          }
+        ],
+        "reasons": [
+          "Fixture and historical descriptive claims are traceable, with live web corroboration",
+          "Unresolved goalkeeper availability requires review for goals_over_under and btts; corners_over_under has only three supplied target-venue league observations per team",
+          "h2h and double_chance descriptive evidence remains usable for scoring with the reported absences and uncertainty explicitly retained"
+        ],
+        "verdict": "review-required",
+        "warnings": [
+          "Live searches used both teams, Serie A and the exact fixture date; observations occurred before 2026-10-07T22:30:00Z",
+          "Provider historical cutoff is 2026-10-05; retrieval after execution start is valid in this live-prematch run",
+          "Web capturedAt values record the research observation checkpoint, not page publication times; dynamic official results have unknown publication times",
+          "GE full-page retrieval failed; only its returned search excerpt supports the limited claim attributed to it",
+          "Confirmed lineups are normally unavailable this far before kickoff; their absence alone is not a blocker",
+          "corners_over_under: the missing Uberlandia friendly corner count remains unknown, never zero; cup and friendly samples were not pooled into the cited league venue counts",
+          "No target-fixture result, later match result, prediction-tip recommendation or bookmaker price was used as independent performance evidence",
+          "Historical corners: 18 matches available, 1 unavailable; no imputation.",
+          "h2h, double_chance: readiness concerns factual inputs only; any starter-specific defensive adjustment must retain Walter uncertainty",
+          "goals_over_under, btts: resolve Walter/Muralha availability or explicitly account for both scenarios before treating the goal-market evidence as ready",
+          "corners_over_under: six cited target-venue observations are a subset of the supplied 18 records, not the complete historical sample; no independent web corner corroboration was obtained"
+        ],
+        "sharedBlockers": []
+      }
+    ]
+  },
+  {
+    "model": "gpt-6-luna",
+    "effort": "xhigh",
+    "sources": [
+      {
+        "summary": "CBF schedule lists Red Bull Bragantino x Mirassol on 07/10/2026 at 19:30 local time.",
+        "url": "https://credencial.cbf.com.br/competicoes/listar/42/1/",
+        "title": "CBF competition schedule listing RB Bragantino x Mirassol"
+      },
+      {
+        "summary": "Official Bragantino listing shows the home match against Mirassol on 7 October at 19:30.",
+        "url": "https://www.redbullbragantino.com/br-pt",
+        "title": "Red Bull Bragantino official site: 29th-round match listing"
+      },
+      {
+        "summary": "Official Mirassol schedule lists the away match at Bragantino on 07/10/2026 at 19:30.",
+        "url": "https://mirassolfc.com.br/",
+        "title": "Mirassol FC official site: upcoming match listing"
+      },
+      {
+        "summary": "Secondary preview published 05/10 and updated 06/10 08:15 BRT lists Bragantino's Ignacio Sosa suspended, Fabrício, Davi Gomes, Rodriguinho and Patrick Silva unavailable; Mirassol's Walter doubtful, Negueba and Aldo Filho injured. It does not establish the final squad or confirmed lineup.",
+        "url": "https://www.ogol.com.br/noticias/red-bull-bragantino-x-mirassol-horario-escalacoes-e-estatisticas-brasileirao-07-10/1219929",
+        "title": "Red Bull Bragantino x Mirassol: horário, escalações e estatísticas (Brasileirão 07/10)"
+      }
+    ],
+    "gates": [
+      {
+        "markets": [
+          {
+            "market": "h2h",
+            "reasons": [
+              "Hay soporte descriptivo de forma y splits de sede, pero la duda sin resolver sobre Walter puede afectar la evaluación del resultado."
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "double_chance",
+            "reasons": [
+              "Los splits de sede son trazables; confirmar la disponibilidad del arquero Walter antes de puntuar el resultado cubierto."
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "goals_over_under",
+            "reasons": [
+              "Las frecuencias de goles por línea son descriptivas y trazables; la duda sobre Walter puede cambiar la evaluación de goles."
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "corners_over_under",
+            "reasons": [
+              "Hay datos FT de 15 partidos Serie A y cuotas para las líneas ofrecidas, pero solo 3 muestras por equipo en la sede objetivo."
+            ],
+            "verdict": "review-required"
+          },
+          {
+            "market": "btts",
+            "reasons": [
+              "Las frecuencias recientes de BTTS son trazables y mixtas por sede; la duda sobre Walter es material para esta lectura."
+            ],
+            "verdict": "review-required"
+          }
+        ],
+        "reasons": [
+          "Hay evidencia trazable para los cinco mercados, pero la previa disponible deja sin resolver una duda material sobre el arquero Walter, que afecta especialmente h2h, doble oportunidad, goles y BTTS.",
+          "Para corners hay 15 resultados de liga con corners FT, aunque solo 3 observaciones por equipo en la sede objetivo; la muestra permite contexto descriptivo pero deja incertidumbre local."
+        ],
+        "verdict": "review-required",
+        "warnings": [
+          "H2h, double_chance, goals_over_under y btts: disponibilidad de Walter reportada como dudosa por una fuente secundaria, sin confirmación oficial localizada.",
+          "Corners_over_under: 15 partidos de liga disponibles; solo 3 partidos recientes de Bragantino en casa y 3 de Mirassol fuera; un amistoso no tiene corners disponibles.",
+          "No se aportaron alineaciones confirmadas ni estadísticas del fixture objetivo; las alineaciones suelen confirmarse cerca del kickoff.",
+          "Historical corners: 18 matches available, 1 unavailable; no imputation.",
+          "La previa de disponibilidad es secundaria; no se encontró confirmación oficial del estado de Walter en las fuentes consultadas.",
+          "No hay alineaciones confirmadas; su ausencia a esta hora es normal antes del inicio, pero la duda reportada sobre Walter sí puede afectar h2h, double_chance, goals_over_under y btts.",
+          "corners_over_under: las muestras de sede objetivo son de solo 3 partidos por equipo; no hay corners para el amistoso de Mirassol y no se imputaron.",
+          "fixtureStatistics no fue suministrado; los corners citados son históricos, no estadísticas del fixture objetivo.",
+          "Las estadísticas de temporada tienen corte histórico 2026-10-05; se capturaron el 2026-10-06 antes del kickoff exclusivo. Odds son contexto de mercado, no evidencia independiente de rendimiento ni de edge."
+        ],
+        "sharedBlockers": []
+      }
+    ]
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "cell": "sol61",
+    "providerFixtureId": "1492393",
+    "matches": [
+      {
+        "path": ".gateResult.warnings.2",
+        "text": "Promotable significa evidencia factual lista para scoring; no aprobación de selección, probabilidad calibrada, ventaja de precio ni garantía de resultado"
+      },
+      {
+        "path": ".warnings.2",
+        "text": "Promotable significa evidencia factual lista para scoring; no aprobación de selección, probabilidad calibrada, ventaja de precio ni garantía de resultado"
+      }
+    ]
+  },
+  {
+    "cell": "sol56",
+    "providerFixtureId": "1638101",
+    "matches": [
+      {
+        "path": ".gateResult.warnings.3",
+        "text": "Ninguna afirmación constituye una probabilidad calibrada, una ventaja de precio ni aprobación de apuesta"
+      },
+      {
+        "path": ".warnings.3",
+        "text": "Ninguna afirmación constituye una probabilidad calibrada, una ventaja de precio ni aprobación de apuesta"
+      }
+    ]
+  },
+  {
+    "cell": "sol56",
+    "providerFixtureId": "1520919",
+    "matches": [
+      {
+        "path": ".gateResult.warnings.0",
+        "text": "Las cifras históricas son descriptivas y no constituyen pronóstico, precio justo ni garantía de resultado"
+      },
+      {
+        "path": ".warnings.0",
+        "text": "Las cifras históricas son descriptivas y no constituyen pronóstico, precio justo ni garantía de resultado"
+      }
+    ]
+  },
+  {
+    "cell": "astra6",
+    "providerFixtureId": "1520919",
+    "matches": [
+      {
+        "path": ".gateResult.warnings.4",
+        "text": "Promotion means factual readiness for scoring, not pick approval, calibrated probability, positive edge or a guaranteed result"
+      },
+      {
+        "path": ".warnings.4",
+        "text": "Promotion means factual readiness for scoring, not pick approval, calibrated probability, positive edge or a guaranteed result"
+      }
+    ]
+  },
+  {
+    "cell": "astra6",
+    "providerFixtureId": "1597397",
+    "matches": [
+      {
+        "path": ".gateResult.warnings.5",
+        "text": "Promotable significa preparación factual para scoring, nunca aprobación de una apuesta o garantía de resultado"
+      },
+      {
+        "path": ".warnings.5",
+        "text": "Promotable significa preparación factual para scoring, nunca aprobación de una apuesta o garantía de resultado"
+      }
+    ]
+  },
+  {
+    "cell": "luna6",
+    "providerFixtureId": "1517309",
+    "matches": [
+      {
+        "path": ".claims.3.statement",
+        "text": "For h2h, the 2026 venue splits through Oct. 5 are Forge home 12 matches at 8-3-1 (20-9 goals) and Pacific away 12 at 1-5-6 (16-30). Their last 10 same-league results are Forge 3-4-3 and Pacific 2-5-3; the official CPL preview reports Forge won the prior six meetings and Pacific scored no goals in those six. These are descriptive records, not a fixture forecast; Forge's recent draws are counter-evidence to treating its overall season split as a guaranteed result."
+      }
+    ]
+  }
+]
