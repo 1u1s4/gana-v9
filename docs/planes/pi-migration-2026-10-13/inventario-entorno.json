@@ -1,0 +1,2718 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-10-13",
+  "timezone": "America/Guatemala",
+  "containsSecretValues": false,
+  "method": "Static env references in selected runtime/script files plus names/presence in local .env and .env.example; dynamic references and external stores require review",
+  "variables": [
+    {
+      "name": "AGENT_BROWSER_FALLBACK",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 351
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_CODEX_FALLBACK_MODELS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 375
+        },
+        {
+          "path": "src/config.ts",
+          "line": 376
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_CODEX_SANDBOX",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 374
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 213
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 75
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 125
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_FAST_MODE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 340
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_MAX_COST",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 371
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_MAX_STEPS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 370
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_MODEL",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 338
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 121
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 208
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_NATIVE_WEB_SEARCH",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 343
+        },
+        {
+          "path": "src/config.ts",
+          "line": 344
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_NATIVE_WEB_SEARCH_MODE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 345
+        },
+        {
+          "path": "src/config.ts",
+          "line": 346
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 216
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_PROVIDER",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 337
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 211
+        },
+        {
+          "path": "scripts/lib/validation-workflow.mjs",
+          "line": 37
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_REASONING_EFFORT",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 367
+        },
+        {
+          "path": "src/config.ts",
+          "line": 368
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 122
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 209
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_STRATEGY_REVIEW_MODEL",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 223
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "AGENT_STRATEGY_REVIEW_REASONING_EFFORT",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 224
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "API_FOOTBALL_BASE_URL",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 330
+        },
+        {
+          "path": "scripts/studies/run-model-study.mjs",
+          "line": 72
+        },
+        {
+          "path": "scripts/studies/run-model-study.mjs",
+          "line": 81
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "API_FOOTBALL_KEY",
+      "classification": "secret",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 329
+        },
+        {
+          "path": "scripts/studies/run-model-study.mjs",
+          "line": 72
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "API_FOOTBALL_PROVIDER",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/providers/sports/api-football.ts",
+          "line": 1513
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "API_FOOTBALL_REQUEST_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/providers/sports/api-football.ts",
+          "line": 617
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "BROWSER_USE_API_KEY",
+      "classification": "secret",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 348
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "BROWSER_USE_BASE_URL",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 349
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "BROWSER_USE_MAX_CONCURRENT_SESSIONS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 360
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "BROWSER_USE_MAX_TASKS_PER_MONTH",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 356
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "BROWSER_USE_MODEL",
+      "classification": "configuration",
+      "repo_env": "present_empty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 354
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "BROWSER_USE_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 364
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "CODEX_HOME",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 372
+        },
+        {
+          "path": "scripts/update-codex-models.ts",
+          "line": 16
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "CODEX_MODEL_LIST_PATH",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 373
+        },
+        {
+          "path": "scripts/update-codex-models.ts",
+          "line": 15
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "CODEX_USER_BIN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 20
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 23
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 15
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 18
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "COLORTERM",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/terminal-bg.ts",
+          "line": 16
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "CURSOR_MODEL_LIST_PATH",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "DATABASE_URL",
+      "classification": "secret",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 331
+        },
+        {
+          "path": "src/storage/db.ts",
+          "line": 31
+        },
+        {
+          "path": "src/storage/db.ts",
+          "line": 264
+        },
+        {
+          "path": "scripts/gana-raw-retention.mjs",
+          "line": 14
+        },
+        {
+          "path": "scripts/gana-published-lineage-fingerprint.mjs",
+          "line": 17
+        },
+        {
+          "path": "scripts/gana-publish-revision.mjs",
+          "line": 28
+        },
+        {
+          "path": "scripts/migrate_mysql_to_supabase.py",
+          "line": 3351
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 266
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 620
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 1026
+        },
+        {
+          "path": "scripts/gana-db-write-canary.mjs",
+          "line": 7
+        },
+        {
+          "path": "scripts/studies/seed-local-study.mjs",
+          "line": 8
+        },
+        {
+          "path": "scripts/studies/seed-local-study.mjs",
+          "line": 9
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "DIRECT_URL",
+      "classification": "secret",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "DISCORD_ALLOWED_USERS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "DISCORD_BOT_TOKEN",
+      "classification": "secret",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "DISCORD_WEBHOOK_URL",
+      "classification": "secret",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs",
+          "line": 49
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-validation-stats.mjs",
+          "line": 19
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs",
+          "line": 39
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_AGENT_FIXTURE_ABORT_GRACE_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 222
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_AGENT_FIXTURE_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 221
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_AGENT_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/evidence/research.ts",
+          "line": 86
+        },
+        {
+          "path": "src/prediction/service.ts",
+          "line": 55
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 224
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 229
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_ANALYTIC_RETENTION_DAYS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 671
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_APPROVAL_MODE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 333
+        },
+        {
+          "path": "src/config.ts",
+          "line": 334
+        },
+        {
+          "path": "src/config.ts",
+          "line": 431
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 210
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 118
+        },
+        {
+          "path": "scripts/lib/validation-workflow.mjs",
+          "line": 36
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_ARTIFACT_ROOT",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 332
+        },
+        {
+          "path": "scripts/gana-prematch-refresh-and-notify.mjs",
+          "line": 17
+        },
+        {
+          "path": "scripts/gana-raw-retention-apply.sh",
+          "line": 6
+        },
+        {
+          "path": "scripts/gana-publish-revision.mjs",
+          "line": 12
+        },
+        {
+          "path": "scripts/gana-daily-ops-dispatch.mjs",
+          "line": 16
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 24
+        },
+        {
+          "path": "scripts/gana-validate-metrics-and-notify.mjs",
+          "line": 65
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 23
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_BOOKMAKERS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 388
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_BOOKMAKER_ALLOWLIST",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 388
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_BOOKMAKER_PRESETS_PATH",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 387
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CALIBRATION_MIN_SAMPLE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/prediction/service.ts",
+          "line": 61
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CODEX_BIN_DIR",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 19
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 14
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_COVERAGE_DISCOVERY_MAX_FIXTURES",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 517
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 68
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 95
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_APPROVAL_MODE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 46
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 56
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 50
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_DIRECT_TELEGRAM",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 60
+        },
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 269
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_LOW_ODDS_GLOBAL_MAX_FIXTURES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 221
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 61
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 58
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_MAX_FIXTURES_PER_RUN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 57
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 147
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_MAX_PROVIDER_REQUESTS_PER_RUN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 59
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_PROFILE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 45
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 55
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 49
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_CRON_TELEGRAM_TARGET",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 61
+        },
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 20
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_BATCH_ID",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 51
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_CODEX_FALLBACK_MODELS",
+      "classification": "configuration",
+      "repo_env": "present_empty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/daily/runtime-defaults.ts",
+          "line": 25
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 73
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 78
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 90
+        },
+        {
+          "path": "scripts/lib/daily-e2e-runtime.mjs",
+          "line": 18
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_CODEX_MODEL",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/daily/runtime-defaults.ts",
+          "line": 22
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 70
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 87
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 144
+        },
+        {
+          "path": "scripts/lib/daily-e2e-runtime.mjs",
+          "line": 15
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_DATE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 50
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_E2E_NOT_BEFORE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 41
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_EMPTY_RETRY_MINUTES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 42
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_FAST_MODE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/daily/runtime-defaults.ts",
+          "line": 24
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 72
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 77
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 89
+        },
+        {
+          "path": "scripts/lib/daily-e2e-runtime.mjs",
+          "line": 17
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_GEMINI_MODEL",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "GANA_DAILY_MAX_FIXTURES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 147
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_PROVIDERS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 128
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 65
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 86
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 143
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_PROVIDER_CONCURRENCY",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/daily/e2e.ts",
+          "line": 1224
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 130
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 218
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 69
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 91
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 146
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_PUBLISH_EXISTING",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "GANA_DAILY_PUBLISH_EXISTING_MAX_AGE_HOURS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 590
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_REASONING_EFFORT",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/daily/runtime-defaults.ts",
+          "line": 16
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 71
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 76
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 88
+        },
+        {
+          "path": "scripts/lib/daily-e2e-runtime.mjs",
+          "line": 9
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DAILY_REQUIRED_LEAGUES",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/daily/required-leagues.ts",
+          "line": 176
+        },
+        {
+          "path": "src/commands/runners.ts",
+          "line": 208
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 132
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 219
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 74
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 94
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 150
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DEFAULT_MARKETS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 389
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DEFAULT_SEASON",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 214
+        },
+        {
+          "path": "src/config.ts",
+          "line": 379
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_ALERTS_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 25
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 59
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_COUNCIL_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 55
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_FEEDBACK_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 57
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_MAX_SELECTIONS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 151
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_RECOMMENDATIONS_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 54
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_STRATEGY_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 58
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 53
+        },
+        {
+          "path": "scripts/install-gana-launchd.mjs",
+          "line": 11
+        },
+        {
+          "path": "scripts/install-gana-cron.mjs",
+          "line": 11
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/discord-targets.mjs",
+          "line": 22
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_DISCORD_VALIDATION_TARGET",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 56
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_FIXTURE_TIMEZONE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 385
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_HERMES_CRON_DELIVER",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 25
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_HISTORY_RETENTION_DAYS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 689
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_INCLUDE_COMPLETED_FIXTURES",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 391
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_INCLUDE_LIVE_FIXTURES",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 390
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_KICKOFF_WINDOW_HOURS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 384
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_LEAGUE_PRESETS_PATH",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 386
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_LOW_ODDS_GLOBAL_MAX_FIXTURES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 220
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 221
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 61
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_LOW_ODDS_SCAN_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 227
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_LOW_ODDS_THRESHOLD",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 380
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 198
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 220
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 60
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 96
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 145
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_MAINTENANCE_PAUSED",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-prematch-refresh-and-notify.mjs",
+          "line": 36
+        },
+        {
+          "path": "scripts/gana-raw-retention-apply.sh",
+          "line": 218
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 27
+        },
+        {
+          "path": "scripts/gana-validate-metrics-and-notify.mjs",
+          "line": 38
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 26
+        },
+        {
+          "path": "scripts/lib/daily-ops-dispatch.mjs",
+          "line": 195
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_MAX_AGENTIC_RESEARCH_CALLS_PER_RUN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 383
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 223
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_MAX_FIXTURES_PER_RUN",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 381
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 222
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_MAX_PROVIDER_REQUESTS_PER_RUN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 382
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 224
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 97
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_METRICS_PERSIST",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 51
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_METRICS_SCOPE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 50
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_MIN_DISTINCT_SOURCES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/prediction/service.ts",
+          "line": 67
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_MIN_EVIDENCE_ITEMS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/prediction/service.ts",
+          "line": 66
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_PARLAY_PORTFOLIO_AGENT_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/parlay/service.ts",
+          "line": 76
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_PARLAY_PROFILE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 131
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 67
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 93
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 149
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_PROFILE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 328
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 209
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 117
+        },
+        {
+          "path": "scripts/lib/validation-workflow.mjs",
+          "line": 35
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_PUBLIC_PICKS_API_BASE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/check-public-recommendation-ledger.mjs",
+          "line": 6
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RAW_RETENTION_APPLY_PASSES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-raw-retention-apply.sh",
+          "line": 28
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RAW_RETENTION_BATCH_SIZE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 701
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RAW_RETENTION_DAYS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 665
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RAW_RETENTION_LOCK_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 713
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RAW_RETENTION_MAX_BATCHES",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 719
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RAW_RETENTION_STATEMENT_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 707
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RESEARCH_AGENT_JSON_ATTEMPTS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/evidence/research.ts",
+          "line": 90
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 226
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RESEARCH_AGENT_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/evidence/research.ts",
+          "line": 86
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 223
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RESEARCH_RETENTION_DAYS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 677
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RESEARCH_REUSE_RUN_ID",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 686
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 687
+        },
+        {
+          "path": "scripts/gana-prematch-refresh-and-notify.mjs",
+          "line": 19
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 98
+        },
+        {
+          "path": "scripts/studies/run-model-study.mjs",
+          "line": 85
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_RUNTIME",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 327
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_SCORING_AGENT_JSON_ATTEMPTS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/prediction/service.ts",
+          "line": 58
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 230
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_SCORING_AGENT_TIMEOUT_MS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/prediction/service.ts",
+          "line": 55
+        },
+        {
+          "path": "src/runtime/pipeline.ts",
+          "line": 228
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_AGENT",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 62
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_CODEX_FALLBACK_MODELS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 54
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 57
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 124
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_CODEX_SANDBOX",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 652
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 55
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 125
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_DATE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 46
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_DOC_PATH",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 301
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_FAST_MODE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 53
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 56
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 123
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_MAX_STEPS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 654
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_MODEL",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 223
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 51
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 121
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_NOTIFY",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 63
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_REASONING_EFFORT",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/strategy-review/daily.ts",
+          "line": 224
+        },
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 52
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 122
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STRATEGY_REVIEW_SCOPE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-strategy-review.sh",
+          "line": 61
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_CACHE_TOKEN",
+      "classification": "secret",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 10
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_CACHE_URL",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 3
+        },
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 4
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_CELL",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 10
+        },
+        {
+          "path": "scripts/studies/codex-meter.mjs",
+          "line": 10
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_REAL_CODEX",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/codex-meter.mjs",
+          "line": 7
+        },
+        {
+          "path": "scripts/studies/codex-meter.mjs",
+          "line": 15
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_SPORTS_ACCESS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 14
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_SPORTS_ORIGIN",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 3
+        },
+        {
+          "path": "scripts/studies/frozen-sports-preload.mjs",
+          "line": 8
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_USAGE_DIR",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/codex-meter.mjs",
+          "line": 6
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_STUDY_WORKSPACE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/codex-meter.mjs",
+          "line": 7
+        },
+        {
+          "path": "scripts/studies/codex-meter.mjs",
+          "line": 14
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_TELEGRAM_SUMMARY_FORMAT",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 6
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_TIMEZONE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/config.ts",
+          "line": 385
+        },
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 217
+        },
+        {
+          "path": "scripts/gana-strategy-review.mjs",
+          "line": 119
+        },
+        {
+          "path": "scripts/lib/validation-workflow.mjs",
+          "line": 38
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_TRANSIENT_RETENTION_DAYS",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/lib/raw-data-retention.mjs",
+          "line": 683
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_VALIDATION_CATCHUP_FROM",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/lib/daily-ops-dispatch.mjs",
+          "line": 201
+        },
+        {
+          "path": "scripts/lib/daily-ops-dispatch.mjs",
+          "line": 240
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_VALIDATION_DATE",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 42
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_VALIDATION_RECOMMENDATION_ARTIFACT",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 54
+        },
+        {
+          "path": "scripts/gana-previous-day-validation-notify.sh",
+          "line": 55
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_WEB_MODE",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/gana-daily-e2e-and-notify.mjs",
+          "line": 133
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 66
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 92
+        },
+        {
+          "path": "scripts/gana-daily-e2e-notify.sh",
+          "line": 148
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GANA_WEB_RESEARCH_MAX_AGE_HOURS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/prediction/service.ts",
+          "line": 60
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "GEMINI_HOME",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "GEMINI_MODEL_LIST_PATH",
+      "classification": "configuration",
+      "repo_env": "present_nonempty",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "HERMES_AGENT_ROOT",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 275
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "HERMES_CRON_DELIVER",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 111
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 121
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "HERMES_GATEWAY_PYTHON",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 274
+        },
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 303
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-daily-stats.mjs",
+          "line": 52
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-validation-stats.mjs",
+          "line": 22
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs",
+          "line": 42
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs",
+          "line": 853
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs",
+          "line": 902
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-strategy-review.mjs",
+          "line": 19
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "HERMES_HOME",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 273
+        },
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 302
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "HERMES_SCRIPTS_DIR",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 6
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 44
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 128
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 134
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 140
+        },
+        {
+          "path": "scripts/install-gana-hermes-cron.sh",
+          "line": 141
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "HOME",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/cli.ts",
+          "line": 395
+        },
+        {
+          "path": "src/cli.ts",
+          "line": 410
+        },
+        {
+          "path": "src/cli.ts",
+          "line": 473
+        },
+        {
+          "path": "src/config.ts",
+          "line": 285
+        },
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 273
+        },
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 302
+        },
+        {
+          "path": "scripts/update-codex-models.ts",
+          "line": 16
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "OPENROUTER_API_KEY",
+      "classification": "secret",
+      "repo_env": "present_empty",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "src/commands.ts",
+          "line": 331
+        },
+        {
+          "path": "src/commands.ts",
+          "line": 444
+        },
+        {
+          "path": "src/config.ts",
+          "line": 326
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "PATH",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/run-model-study.mjs",
+          "line": 83
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "PYTHONPATH",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 288
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs",
+          "line": 875
+        },
+        {
+          "path": ".agents/skills/discord-recommendation-notifier/scripts/notify-discord-recommendations.mjs",
+          "line": 963
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "SHELL",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "src/tools/shell.ts",
+          "line": 31
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "SOURCE_DATABASE_URL",
+      "classification": "secret",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/migrate_mysql_to_supabase.py",
+          "line": 3351
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "TARGET_DATABASE_URL",
+      "classification": "secret",
+      "repo_env": "absent",
+      "in_env_example": true,
+      "references": [
+        {
+          "path": "scripts/migrate_mysql_to_supabase.py",
+          "line": 3352
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "TELEGRAM_ALLOWED_USERS",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [],
+      "review": "external_or_template_only"
+    },
+    {
+      "name": "TELEGRAM_BOT_TOKEN",
+      "classification": "secret",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 320
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "TELEGRAM_HOME_CHANNEL",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/gana-telegram-rich-output.mjs",
+          "line": 322
+        }
+      ],
+      "review": "referenced"
+    },
+    {
+      "name": "USER",
+      "classification": "configuration",
+      "repo_env": "absent",
+      "in_env_example": false,
+      "references": [
+        {
+          "path": "scripts/studies/run-model-study.mjs",
+          "line": 74
+        },
+        {
+          "path": "scripts/studies/verify-study-delivery.mjs",
+          "line": 21
+        }
+      ],
+      "review": "referenced"
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-13",
+  "contracts": [
+    {
+      "contract": "build-parlay-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "calibration-monitor-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "correlation-model-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "devig-and-fairprice-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "ensemble-disagreement-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "line-movement-tracker-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "lineup-confirmation-gate-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "llm-parlay-all-in-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "llm-parlay-refinado-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "parlay-candidate-generator-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "parlay-portfolio-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "parlay-ranker-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "research-fixture-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "research-fixture-v2",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "score-prediction-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "score-prediction-v2",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "validate-settlement-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    },
+    {
+      "contract": "validation-clv-v1",
+      "hash_matches": true,
+      "schema_exists": true,
+      "manifest_exists": true
+    }
+  ]
+}

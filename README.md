@@ -1,5 +1,7 @@
 # Gana Agent TUI
 
+> **Deprecated as of October 14, 2026.** Active development and scheduled operations moved to [Gana v10 on Pi](https://github.com/1u1s4/gana-v10). This repository preserves the v9 source and migration study for reference; do not install or schedule v9 for production.
+
 ![Gana v9 analytical terminal banner](docs/assets/gana-v9-readme-banner.png)
 
 [Español](README.es.md)

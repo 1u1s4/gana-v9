@@ -1,0 +1,118 @@
+{
+  "title": "Cómo funciona el harness de Gana v9",
+  "date": "2026-10-08",
+  "revision": "65ab484",
+  "scope": "Arquitectura verificada contra el código del checkout local. Los horarios y modelos son defaults del repositorio, no una inspección del servicio desplegado ni de sus variables de entorno.",
+  "sections": [
+    {
+      "id": "mapa",
+      "title": "01 · Del dato deportivo a una publicación trazable",
+      "intro": "Gana es un harness analítico CLI/TUI. Coordina datos deportivos, investigación con modelos, reglas deterministas, persistencia y entregas. No ejecuta apuestas ni movimientos de dinero.",
+      "nodes": [
+        ["Entrada", "CLI / TUI / headless", "src/cli.ts · commands", "normal"],
+        ["Operación diaria", "Hermes → dispatcher", "scripts/lib/daily-ops-dispatch.mjs", "normal"],
+        ["Daily E2E", "Uno o varios providers", "src/daily/e2e.ts", "focal"],
+        ["Pipeline por run", "Datos → evidencia → predicciones", "src/runtime/pipeline.ts", "focal"],
+        ["Fuentes externas", "API-Football + web de investigación", "src/providers · src/evidence", "external"],
+        ["Política de recomendaciones", "Parlays + simples + council local", "src/daily · src/council", "normal"],
+        ["Estado y evidencia", "Prisma/PostgreSQL + artifacts", "src/storage · runtime/artifacts.ts", "store"],
+        ["Entrega y lectura", "Discord · dashboard local", "scripts/lib/daily-e2e-publication.mjs", "normal"]
+      ],
+      "notes": [
+        "La CLI también permite ejecutar run, research, score, parlay, validate y metrics sin pasar por Daily E2E. El diagrama destaca el recorrido diario y la entrada directa al pipeline.",
+        "Codex es el provider diario por defecto; OpenRouter es una alternativa configurable. Comparar providers es una capacidad, no implica que ambos corran en el cron normal.",
+        "El council es un gate local implementado en TypeScript. No es una llamada a cinco agentes independientes. Conserva las decisiones approve/review y filtra reject; el wrapper controla qué puede publicarse."
+      ],
+      "sources": ["src/cli.ts", "src/headless.ts", "src/agent.ts", "src/runtime/run-service.ts", "src/daily/e2e.ts", "src/council/recommendation-council.ts", "prisma/schema.prisma"]
+    },
+    {
+      "id": "pipeline",
+      "title": "02 · El pipeline: nueve tareas durables",
+      "intro": "Cada run tiene runId, contexto, límites y artifacts propios. Las etapas dejan checkpoints; un resultado técnico succeeded no equivale a un veredicto analítico promotable.",
+      "nodes": [
+        ["1. Descubrir partidos", "Filtros + ligas prioritarias", "fixtures.fetch → fixtures.json", "normal"],
+        ["2. Capturar cuotas", "Snapshots persistidos y normalizados", "odds.fetch → odds-snapshots.json", "normal"],
+        ["3. Barrer low-odds", "Amplía cobertura de favoritos 1X2", "low_odds.scan → low-odds-scan.json", "normal"],
+        ["4. Investigar", "Contexto deportivo + web + claims", "research.fixture → research-results.json", "focal"],
+        ["5. Puntuar y filtrar", "Probabilidad, precio, edge y evidencia", "score.fixture → scoring-results.json", "focal"],
+        ["6. Construir parlays", "Elegibilidad, perfiles y correlación", "parlay.build → parlay-result.json", "normal"],
+        ["7. Validar si corresponde", "Según modo y disponibilidad", "validation.run → validation-result.json", "optional"],
+        ["8. Analizar parlays", "Ranking y diagnóstico de riesgo", "parlay.analyze", "normal"],
+        ["9. Exportar evidencia", "Evidence pack, handoff y manifest", "evidence_pack.export", "store"]
+      ],
+      "notes": [
+        "Research separa la captura de contexto del corte deportivo. Conserva fuentes, provenance, claims y decisiones por mercado; retrieval aporta corpus local/BM25/freshness. Los contratos legacy mantienen su abstención global.",
+        "Scoring refresca cuotas cuando corresponde y valida la salida estructurada. La probabilidad del modelo no es la confianza de evidencia. El edge compara probabilidad del modelo con probabilidad justa de mercado; cuotas vencidas, desacuerdo y ausencia de edge impiden promoción.",
+        "Los gates producen promotable, review-required o blocked. Fixture/mercado inválido, cuotas persistidas ausentes o DB no escribible bloquean. Evidencia insuficiente, fuentes obsoletas o web requerida ausente fuerzan revisión.",
+        "tasks.json y HarnessTask guardan intentos, leases y resultados. Se reutiliza un checkpoint succeeded legible; uno ilegible vuelve a queued. El runner registra errores y reencola hasta maxAttempts (default 3); existen utilidades de recovery y worker. No implica reanudar automáticamente cualquier publicación fallida."
+      ],
+      "sources": ["src/runtime/pipeline.ts", "src/runtime/scheduler.ts", "src/runtime/worker.ts", "src/runtime/recovery.ts", "src/runtime/run-lifecycle.ts", "src/evidence/research.ts", "src/retrieval/bm25.ts", "src/prediction/gates.ts", "src/prediction/service.ts", "src/scoring/edge-gate.ts"]
+    },
+    {
+      "id": "daily",
+      "title": "03 · Daily E2E convierte runs en recomendaciones",
+      "intro": "El batch diario enlaza los runs fuente y conserva comparaciones, justificaciones y gates. La cobertura de una liga obliga a considerarla, no a inventar picks.",
+      "nodes": [
+        ["Preflight operativo", "Ligas activas + defaults del Daily", "required-leagues=auto", "normal"],
+        ["Runs por provider", "Codex por defecto; concurrencia 1", "gpt-5.6-sol · high · fast=false", "normal"],
+        ["Comparación y métricas", "Consenso + feedback histórico válido", "dailyBatchId ↔ runId", "normal"],
+        ["Candidatos", "portfolio-v2 + predicciones simples", "parlay analysis / selection", "normal"],
+        ["Council local", "Riesgo, edge, confianza y score", "approve / review / reject", "focal"],
+        ["Artifact final", "Selecciones, evidencia y auditoría", "daily-parlay-recommendations.json", "store"],
+        ["Publicación oficial", "Selecciones elegibles + pre-match", "publication ledger", "focal"],
+        ["Sin picks oficiales", "Candidatas rotuladas en revisión", "daily-review-candidates.json", "optional"]
+      ],
+      "notes": [
+        "portfolio-v2 genera varias familias; la publicación prioriza low-odds-top, parlay-diamante, parlay-refinado y low-variance. Low-odds exige ganadores 1X2 <1.10; el perfil busca 2–4 fixtures distintos y cuota combinada ≥1.20, manteniendo los gates.",
+        "La composición desde simples conserva elegibilidad y riesgo. El valor esperado usa probabilidades del modelo con ajustes conservadores; no sustituye probabilidades por confianza de evidencia. Los fallbacks de revisión no se convierten automáticamente en picks oficiales.",
+        "daily-model-evidence.json reúne justificaciones, referencias, fuentes y gates por predicción. La apuesta analítica del día guarda su regla y snapshot; si no existe una selección elegible registra no-eligible-pick.",
+        "Sin picks oficiales, el wrapper puede entregar candidatas review-required con probabilidad, edge positivo y cuota fresca. El artifact conserva el universo; Discord muestra hasta el límite configurado (default 25). La entrega queda review-delivered y se valida como cohorte separada."
+      ],
+      "sources": ["src/daily/e2e.ts", "src/daily/runtime-defaults.ts", "src/daily/league-discovery.ts", "src/daily/recommendation-policy.ts", "src/daily/model-evidence.ts", "src/council/recommendation-council.ts", "scripts/lib/daily-review-candidates.mjs", "scripts/gana-daily-e2e-and-notify.mjs"]
+    },
+    {
+      "id": "entrega",
+      "title": "04 · Publicar es una operación con estado propio",
+      "intro": "El artifact analítico no prueba que Discord recibió un mensaje. El wrapper y el ledger conservan reservas, hashes, targets e IDs para evitar duplicados y hacer visibles las entregas inciertas.",
+      "nodes": [
+        ["Artifact preparado", "Batch, fecha y selecciones alineados", "dailyBatchId + source snapshot", "normal"],
+        ["Preflight en DB", "Ledger íntegro; partidos futuros", "health / alignment / pre-match", "normal"],
+        ["Reservar entrega", "Payload/targets congelados", "ledger: publishing", "focal"],
+        ["Enviar y finalizar", "Revalidar kickoff; guardar message IDs", "Discord → ledger", "normal"],
+        ["Entrega confirmada", "Oficial o candidatas en revisión", "published / review-delivered", "store"],
+        ["Reintento permitido", "Sólo fallos seguros, con backoff", "retryable + retryAfter", "optional"],
+        ["Entrega incierta", "Parcial, conflicto o cierre fallido", "publication-uncertain / publication-ledger-error", "focal"],
+        ["Envío bloqueado", "Kickoff vencido tras reservar", "ledger: send-blocked", "optional"]
+      ],
+      "notes": [
+        "La figura resume fases y resultados, no mezcla sus namespaces: published/review-delivered/retryable pertenecen al lock Daily; publishing/send-blocked/send-uncertain también aparecen como estados del ledger. La entrega oficial y la de candidatas tienen rutas de publicación propias.",
+        "Se comprueba el estado y horario de los fixtures antes del preflight, la reserva y el envío. Metadata ausente, partidos iniciados o estados no programados bloquean la entrega.",
+        "No se reenvía automáticamente una entrega incierta ni se fuerza un estado terminal. publication-ledger-error requiere reconciliar el ledger. publish-existing es una ruta explícita y validada para artifacts ya terminados, sin repetir providers."
+      ],
+      "sources": ["scripts/gana-daily-e2e-and-notify.mjs", "scripts/lib/daily-e2e-publication.mjs", "scripts/lib/daily-e2e-wrapper-state.mjs", "scripts/lib/daily-recommendation-source-snapshot.mjs", "src/daily/pre-match-policy.ts"]
+    },
+    {
+      "id": "feedback",
+      "title": "05 · Validación y aprendizaje con trazabilidad",
+      "intro": "Los resultados se comparan con lo que se mostró realmente. El feedback descriptivo disponible alimenta el próximo Daily; las propuestas de strategy review no cambian el código por sí solas.",
+      "nodes": [
+        ["Publicación exacta", "Lock + batch + artifact + IDs/hash", "published / review-delivered", "store"],
+        ["Resultados deportivos", "API-Football → settlement", "src/validation/service.ts", "external"],
+        ["Validación de cohorte", "Oficiales y candidatas separadas", "displayedPredictionIds", "focal"],
+        ["Métricas y entrega", "Aciertos, pendientes y desgloses", "daily-metrics.json · Discord", "normal"],
+        ["Feedback publicado", "Última cohorte oficial; exige cierre", "src/daily/published-feedback.ts", "store"],
+        ["Siguiente Daily", "Contexto descriptivo para scoring", "freshness: hasta 14 días", "normal"],
+        ["Strategy review", "Diagnóstico y propuestas con evidencia", "strategy-review.json / .md", "normal"],
+        ["Implementación separada", "Revisión → cambio acotado → pruebas", "docs/harness-strategy-review-log.md", "optional"]
+      ],
+      "notes": [
+        "La validación parte del batch realmente publicado, no del artifact más reciente. Para review-delivered usa únicamente las candidatas mostradas y verifica message IDs y el hash cuando está disponible.",
+        "Resultados pendientes vuelven a validación con backoff; no se anuncian como cierre definitivo. Stats y páginas del mirror se reservan antes de enviar. Si una entrega pudo ser parcial, queda publication-uncertain.",
+        "El feedback consulta hasta 14 días y toma la publicación oficial más reciente: si su validación exacta no está completa, devuelve unavailable, sin saltar a una cohorte más antigua favorable.",
+        "El dispatcher prioriza ayer y permite un catch-up seguro por checkpoint dentro del backlog de 14 días. Las fechas sin fuente válida quedan visibles como bloqueadas.",
+        "Strategy review usa historial local y solicita JSON con patrones y propuestas; no navega ni modifica archivos mediante el modelo. El servicio persiste el reporte y la bitácora. Retunar umbrales o implementar propuestas es trabajo separado."
+      ],
+      "sources": ["scripts/gana-validate-metrics-and-notify.mjs", "scripts/lib/daily-ops-dispatch.mjs", "src/validation/service.ts", "src/metrics/daily.ts", "src/daily/published-feedback.ts", "src/strategy-review/daily.ts"]
+    }
+  ]
+}

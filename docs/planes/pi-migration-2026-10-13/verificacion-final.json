@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-13",
+  "timezone": "America/Guatemala",
+  "documentation": {
+    "filesChecked": 8,
+    "localLinksChecked": 29,
+    "environmentReferencesChecked": 324,
+    "jsonValid": true,
+    "failures": [],
+    "secretMatches": 0,
+    "nodeSyntaxCheck": true,
+    "gitDiffCheck": true
+  },
+  "baseline": {
+    "typecheckExitCode": 0,
+    "focusedTests": {
+      "pass": 164,
+      "fail": 0,
+      "skipped": 0
+    },
+    "notifierTests": {
+      "pass": 57,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "promptContracts": {
+    "count": 18,
+    "allVerified": true
+  },
+  "piSdk": {
+    "version": "1.2.0",
+    "offlineSmokePassed": true,
+    "modelRequests": 0,
+    "credentialsCopied": false
+  },
+  "liveValidation": {
+    "oauth": false,
+    "modelInference": false,
+    "webSearch": false,
+    "database": false,
+    "publication": false
+  },
+  "ok": true
+}

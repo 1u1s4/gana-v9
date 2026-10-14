@@ -6,6 +6,7 @@ Este directorio reemplaza a Notion como punto de entrada para documentacion tecn
 
 ## Leer primero
 
+0. [Diagrama completo del harness](diagrams/harness-actual.html): cinco vistas de arquitectura, pipeline, Daily E2E, publicación y feedback, más operación y controles. Basado en el checkout del 2026-10-08; no representa una inspección live. Se regenera con `python3 docs/architecture/diagrams/render-harness.py` desde `harness-content.json` y el renderizador local.
 1. [Arquitectura del sistema](system-architecture.md): mapa tecnico vigente de runtime, datos, seguridad, operaciones y limites.
 2. [Indice operativo de ingenieria](../operations/engineering-operating-index.md): runbook de reanudacion, owners y guardrails tecnicos.
 3. [SRS MVP productivo online](../planes/gana-v9-srs-mvp-productivo-online.md): requisitos de producto/sistema que originaron el diseno.

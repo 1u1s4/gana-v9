@@ -1,5 +1,7 @@
 # Gana Agent TUI
 
+> **Deprecado desde el 14 de octubre de 2026.** El desarrollo y la operación programada continúan en [Gana v10 sobre Pi](https://github.com/1u1s4/gana-v10). Este repositorio conserva el código v9 y el estudio de migración como referencia; no instalar ni programar v9 en producción.
+
 ![Banner analitico de terminal para Gana v9](docs/assets/gana-v9-readme-banner.png)
 
 [English](README.md)
